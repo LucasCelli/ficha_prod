@@ -2,7 +2,7 @@
   'use strict';
 
   const CATALOG_URL = 'data/catalogo.json';
-  const MAX_IMAGES = 2;
+  const MAX_IMAGES = 4;
 
   let catalog = {
     tamanhos: [],
@@ -1217,8 +1217,50 @@
       isEvento
     );
 
-    const eventoTxt = isEvento ? 'Sim' : 'Não';
-    setTextWithHighlight('print-evento', eventoTxt, isEvento);
+    const eventoTxt = isEvento ? '★ Sim ★' : 'Não';
+    const eventoEl = document.getElementById('print-evento');
+    if (eventoEl) {
+      if (isEvento) {
+        eventoEl.innerHTML = '<span style="color: #dc2626; font-weight: bold;">★ Sim ★</span>';
+      } else {
+        eventoEl.textContent = 'Não';
+      }
+    }
+    // Calcular e mostrar prazo restante
+    const dataEntregaVal = document.getElementById('dataEntrega')?.value;
+    if (dataEntregaVal) {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const entrega = new Date(dataEntregaVal + 'T00:00:00');
+      const diffTime = entrega - hoje;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      const prazoEl = document.getElementById('print-prazo');
+      if (prazoEl) {
+        let prazoTexto = '';
+        let prazoStyle = '';
+
+        if (diffDays < 0) {
+          prazoTexto = `ATRASADO (${Math.abs(diffDays)} dia${Math.abs(diffDays) > 1 ? 's' : ''})`;
+          prazoStyle = 'color: #dc2626; font-weight: bold;';
+        } else if (diffDays === 0) {
+          prazoTexto = 'ENTREGA HOJE!';
+          prazoStyle = 'color: #dc2626; font-weight: bold;';
+        } else if (diffDays <= 3) {
+          prazoTexto = `${diffDays} dia${diffDays > 1 ? 's' : ''} restante${diffDays > 1 ? 's' : ''}`;
+          prazoStyle = 'color: #dc2626; font-weight: bold;';
+        } else if (diffDays <= 7) {
+          prazoTexto = `${diffDays} dias restantes`;
+          prazoStyle = 'color: #f59e0b; font-weight: bold;';
+        } else {
+          prazoTexto = `${diffDays} dias restantes`;
+          prazoStyle = 'color: #059669; font-weight: bold;';
+        }
+
+        prazoEl.innerHTML = '<span style="' + prazoStyle + '">' + prazoTexto + '</span>';
+      }
+    }
+
 
     const printBody = document.getElementById('print-produtosTable');
     if (printBody) {
@@ -1227,12 +1269,12 @@
         const tamanho = row.querySelector('.tamanho')?.value;
         const quantidade = row.querySelector('.quantidade')?.value;
         const descricao = row.querySelector('.descricao')?.value;
-        if (!tamanho || !quantidade || !descricao) return;
+        if (!tamanho || !quantidade) return;
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${tamanho}</td>
           <td>${quantidade}</td>
-          <td>${descricao}</td>
+          <td>${descricao || 'Não informado'}</td>
         `;
         printBody.appendChild(tr);
       });
