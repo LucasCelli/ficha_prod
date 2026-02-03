@@ -1,0 +1,183 @@
+{
+  "tamanhos": [
+    "RN",
+    "1",
+    "2",
+    "4",
+    "6",
+    "8",
+    "10",
+    "12",
+    "14",
+    "PP",
+    "P",
+    "M",
+    "G",
+    "GG",
+    "XG (52)",
+    "XGG (54)",
+    "XXGG (56)",
+    "XXXGG (58)",
+    "ESP1 (60)",
+    "ESP2 (62)",
+    "ESP3 (64)"
+  ],
+  "produtos": [
+    "Camiseta Básica",
+    "Baby Look Básica",
+    "Camisa Polo",
+    "Baby Look Polo",
+    "Camiseta de Pesca UV50+",
+    "Conjunto Esportivo",
+    "Regata Machão",
+    "Regata Física",
+    "Regata Nadador",
+    "Camisa Social (Masculina)",
+    "Camisete Social (Feminina)",
+    "Camisa Safari (Pescaria)",
+    "Jaqueta",
+    "Bandeira",
+    "Windbanner",
+    "Sacochila",
+    "Banner",
+    "Short de Passeio",
+    "Short Esportivo",
+    "Bermuda",
+    "Calça de Helanca",
+    "Calça de Brim",
+    "Jaleco de Brim",
+    "Meião",
+    "Sacochila Pequena",
+    "Lixocar",
+    "Bandeira 40x30",
+    "Bandeira 100x70",
+    "Bandeira 140x100",
+    "Bandeira 180x140",
+    "Bandeira 230x180",
+    "Raglan Esportiva",
+    "Raglan Esportiva com Recorte",
+    "Raglan Esportiva (Costa Arredondada)",
+    "Bata",
+    "Short Saia",
+    "Calça Legging",
+    "Mochila",
+    "Abadá"
+  ],
+  "materiais": [
+    {
+      "id": "malha_fria_pv",
+      "nome": "Malha Fria (PV)",
+      "composicao": "67% Poliéster / 33% Viscose"
+    },
+    {
+      "id": "piquet",
+      "nome": "Piquet",
+      "composicao": "50% Algodão / 50% Poliéster"
+    },
+    {
+      "id": "dry_fit",
+      "nome": "Dry Fit",
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "aero_dry_elastano",
+      "nome": "Aero Dry com Elastano",
+      "composicao": "92% Poliéster / 8% Elastano"
+    },
+    {
+      "id": "aero_dry_sem_elastano",
+      "nome": "Aero Dry sem Elastano",
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "malha_pp_elastano",
+      "nome": "Malha PP com Elastano",
+      "composicao": "92% Poliéster / 8% Elastano"
+    },
+    {
+      "id": "malha_pp_sem_elastano",
+      "nome": "Malha PP sem Elastano",
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "malha_dry_uv_50",
+      "nome": "Malha Dry UV 50+",
+      "composicao": "100% Poliéster UV 50+"
+    },
+    {
+      "id": "camisaria",
+      "nome": "Tecido de Camisaria",
+      "composicao": "/"
+    },
+    {
+      "id": "dry_colmeia",
+      "nome": "Dry Colmeia",
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "helanca",
+      "nome": "Helanca",
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "helanquinha",
+      "nome": "Helanquinha",
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "diolei",
+      "nome": "Diolei",
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "brim",
+      "nome": "Brim",
+      "composicao": "100% Algodão"
+    },
+    {
+      "id": "gabardine",
+      "nome": "Gabardine",
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "oxford",
+      "nome": "Oxford",
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "oxfordine",
+      "nome": "Oxfordine",
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "tactel",
+      "nome": "Tactel",
+      "composicao": "/"
+    },
+    {
+      "id": "dry_3d",
+      "nome": "Dry 3D",
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "cetim",
+      "nome": "Cetim",
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "algodao",
+      "nome": "Algodão",
+      "composicao": "100% Algodão"
+    },
+    {
+      "id": "dry_termico",
+      "nome": "Dry Térmico",
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "crepe",
+      "nome": "Crepe",
+      "composicao": "100% Poliéster"
+    }
+  ]
+}

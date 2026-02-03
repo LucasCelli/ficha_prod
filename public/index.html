@@ -1,0 +1,467 @@
+﻿
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ficha Técnica de Produção Têxtil</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/drag-drop.css">
+</head>
+
+<body>
+    <!-- VERSÃO NORMAL -->
+    <div id="normal-version" class="container">
+        <header>
+            <h1><i class="fas fa-tshirt"></i> Ficha Técnica de Produção</h1>
+            <p>Sistema para criação de fichas técnicas para produtos têxteis</p>
+        </header>
+
+        <main>
+            <!-- INFORMAÇÕES DO CLIENTE -->
+            <section class="card">
+                <div class="card-header">
+                    <i class="fas fa-user"></i>
+                    <span>Informações do Cliente</span>
+                </div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="cliente">Nome do Cliente</label>
+                            <input type="text" id="cliente" class="form-control" placeholder="Digite o nome do cliente">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="vendedor">Vendedor</label>
+                            <input type="text" id="vendedor" list="vendedoresList" class="form-control"
+                                placeholder="Digite o vendedor">
+                            <datalist id="vendedoresList">
+                                <option value="Fernanda">
+                                <option value="Kemilly">
+                                <option value="Priscilla">
+                                <option value="Biagi">
+                            </datalist>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dataInicio">Data de Início</label>
+                            <input type="date" id="dataInicio" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="numeroVenda">Número da Venda</label>
+                            <input type="text" id="numeroVenda" class="form-control" placeholder="Número da venda">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dataEntrega">Data de Entrega</label>
+                            <input type="date" id="dataEntrega" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="evento">Pedido para Evento?</label>
+                            <select id="evento" class="form-control">
+                                <option value="nao">Não</option>
+                                <option value="sim">Sim</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="eventoAlert" class="event-warning" style="display: none;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <div>
+                            <h3>ATENÇÃO: Pedido para Evento!</h3>
+                            <p>Este pedido tem prioridade máxima e prazo crítico.</p>
+                        </div>
+                    </div>
+
+                    <div id="prazoInfo" class="prazo-info" style="display: none;">
+                        <i class="fas fa-calendar-check"></i>
+                        <span id="prazoTexto"></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PRODUTOS -->
+            <section class="card">
+                <div class="card-header">
+                    <i class="fas fa-boxes-stacked"></i>
+                    <span>Produtos</span>
+                </div>
+                <div class="card-body">
+                    <table class="product-table">
+                        <thead>
+                            <tr>
+                                <th>Tam.</th>
+                                <th>Qtd</th>
+                                <th>Descrição</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="produtosTable"></tbody>
+                    </table>
+
+                    <template id="productRowTemplate">
+                        <tr>
+                            <td>
+                                <select class="form-control tamanho"></select>
+                            </td>
+                            <td>
+                                <input type="text" class="form-control quantidade" min="1" value="1">
+                            </td>
+                            <td>
+                                <input list="produtosList" class="form-control descricao"
+                                    placeholder="Digite ou selecione">
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-secondary btn-icon duplicar-produto" title="Duplicar">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                                <button type="button" class="btn btn-danger btn-icon remover-produto" title="Remover">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+
+                    <datalist id="produtosList"></datalist>
+
+                    <div class="product-actions-row">
+                        <button id="adicionarProduto" type="button" class="btn btn-primary">
+                            <i class="fas fa-plus"></i>
+                            <span>Adicionar Produto</span>
+                        </button>
+
+                        <div class="total-section">
+                            <span class="total-label">Total de Itens:</span>
+                            <span class="total-value" id="totalItens">0</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ESPECIFICAÇÕES TÉCNICAS -->
+            <section class="card">
+                <div class="card-header">
+                    <i class="fas fa-cogs"></i>
+                    <span>Especificações Técnicas</span>
+                </div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="material">Tecido/Material</label>
+                            <input type="text" id="material" list="materiaisList" class="form-control" 
+                                placeholder="Digite ou selecione">
+                            <datalist id="materiaisList"></datalist>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="corMaterial">Cor do Material</label>
+                            <input type="text" id="corMaterial" class="form-control"
+                                placeholder="Ex: Branco, Preto, Azul Marinho">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="manga">Tipo de Manga</label>
+                            <select id="manga" class="form-control">
+                                <option value="">Selecione</option>
+                                <option value="">-</option>
+                                <option value="curta">Curta</option>
+                                <option value="longa">Longa</option>
+                                <option value="raglan_curta">Raglan Curta</option>
+                                <option value="raglan_longa">Raglan Longa</option>
+                                <option value="tres_quartos">3/4</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="acabamentoManga">Acabamento da Manga</label>
+                            <select id="acabamentoManga" class="form-control">
+                                <option value="">Selecione</option>
+                                <option value="">-</option>
+                                <option value="barra">Barra</option>
+                                <option value="vies">Viés</option>
+                                <option value="punho">Punho</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="larguraMangaContainer" style="display: none;">
+                            <label for="larguraManga">Largura (cm)</label>
+                            <input type="text" id="larguraManga" class="form-control" placeholder="Ex: 2,5">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="gola">Tipo de Gola</label>
+                            <select id="gola" class="form-control">
+                                <option value="">Selecione</option>
+                                <option value="">-</option>
+                                <option value="redonda">Gola Redonda</option>
+                                <option value="v">Gola V</option>
+                                <option value="padre_ziper">Gola Padre com Zíper</option>
+                                <option value="padre_esportiva">Gola Padre Esportiva</option>
+                                <option value="polo">Gola Polo</option>
+                                <option value="v_polo">Gola V Polo</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="acabamentoGola">Acabamento da Gola</label>
+                            <select id="acabamentoGola" class="form-control">
+                                <option value="">Selecione</option>
+                                <option value="">-</option>
+                                <option value="polo">Polo</option>
+                                <option value="ribana_2_5">Ribana 2,5</option>
+                                <option value="ribana_3_5">Ribana 3,5</option>
+                                <option value="ribana_4_5">Ribana 4,5</option>
+                                <option value="vies_2_5">Viés 2,5</option>
+                                <option value="vies_3_5">Viés 3,5</option>
+                                <option value="vies_4_5">Viés 4,5</option>
+                                <option value="vies_sublimado">Viés Sublimado</option>
+                                <option value="ribana_sublimada">Ribana Sublimada</option>
+                                <option value="ribana_molde">Ribana em Molde</option>
+                            </select>
+                        </div>
+
+                        <!-- Campos específicos para Gola Polo -->
+                        <div class="form-group" id="corPeitilhoInternoContainer" style="display: none;">
+                            <label for="corPeitilhoInterno">Cor do Peitilho Interno</label>
+                            <input type="text" id="corPeitilhoInterno" class="form-control" placeholder="Ex: Branco">
+                        </div>
+
+                        <div class="form-group" id="corPeitilhoExternoContainer" style="display: none;">
+                            <label for="corPeitilhoExterno">Cor do Peitilho Externo</label>
+                            <input type="text" id="corPeitilhoExterno" class="form-control" placeholder="Ex: Azul">
+                        </div>
+
+                        <div class="form-group" id="aberturaLateralContainer" style="display: none;">
+                            <label>
+                                <input type="checkbox" id="aberturaLateral">
+                                Abertura na Lateral
+                            </label>
+                        </div>
+
+                        <!-- Reforço na Gola (para todas as golas) -->
+                        <div class="form-group" id="reforcoGolaContainer" style="display: none;">
+                            <label>
+                                <input type="checkbox" id="reforcoGola">
+                                Com Reforço na Gola
+                            </label>
+                        </div>
+
+                        <div class="form-group" id="corReforcoContainer" style="display: none;">
+                            <label for="corReforco">Cor do Reforço</label>
+                            <input type="text" id="corReforco" class="form-control" placeholder="Ex: Preto">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="bolso">Bolso</label>
+                            <select id="bolso" class="form-control">
+                                <option value="nenhum">Nenhum</option>
+                                <option value="peito">Bolso de Peito</option>
+                                <option value="traseiros">Bolsos Traseiros</option>
+                                <option value="canguru">Bolso Canguru</option>
+                                <option value="cargueiro">Bolso Cargueiro</option>
+                                <option value="embutido">Bolso na frente embutido</option>
+                                <option value="externo">Bolso na frente externo</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="filete">Filete</label>
+                            <select id="filete" class="form-control">
+                                <option value="nao">Não</option>
+                                <option value="sim">Sim</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="faixa">Faixa Refletiva</label>
+                            <select id="faixa" class="form-control">
+                                <option value="nao">Não</option>
+                                <option value="sim">Sim</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="arte">Tipo de Arte/Personalização</label>
+                            <select id="arte" class="form-control">
+                                <option value="">Selecione</option>
+                                <option value="sublimacao">Sublimação</option>
+                                <option value="serigrafia">Serigrafia</option>
+                                <option value="bordado">Bordado</option>
+                                <option value="dtf">DTF Têxtil</option>
+                                <option value="transfer">Transfer</option>
+                                <option value="sublimacao_serigrafia">Sublimação e Serigrafia</option>
+                                <option value="serigrafia_dtf">Serigrafia e DTF</option>
+                                <option value="serigrafia_bordado">Serigrafia e Bordado</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="composicao">Composição do Material</label>
+                            <input type="text" id="composicao" class="form-control"
+                                placeholder="Preenchido automaticamente (pode editar)">
+                        </div>
+
+                        <div class="form-group" id="corContainer" style="display: none;">
+                            <label for="cor">Cor (Sublimação)</label>
+                            <div class="sublimation-color">
+                                <input type="color" id="cor" class="form-control color-input" value="#ff0000">
+                                <div id="corPreview" class="color-preview"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="observacoes">Observações</label>
+                        <textarea id="observacoes" class="form-control" rows="3"
+                            placeholder="Ex: Algumas camisetas com manga longa, outras com manga curta..."></textarea>
+                    </div>
+
+                    <h3 class="subsection-title">Visualização das Especificações</h3>
+                    <div class="icon-preview">
+                        <div class="icon-item" data-spec="material">
+                            <div class="icon-circle"><i class="fas fa-layer-group"></i></div>
+                            <span class="icon-label">Material</span>
+                        </div>
+                        <div class="icon-item" data-spec="manga">
+                            <div class="icon-circle"><i class="fas fa-arrows-left-right"></i></div>
+                            <span class="icon-label">Manga</span>
+                        </div>
+                        <div class="icon-item" data-spec="gola">
+                            <div class="icon-circle"><i class="fas fa-circle-notch"></i></div>
+                            <span class="icon-label">Gola</span>
+                        </div>
+                        <div class="icon-item" data-spec="arte">
+                            <div class="icon-circle"><i class="fas fa-palette"></i></div>
+                            <span class="icon-label">Arte</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ARTE / IMAGEM DO PRODUTO -->
+            <section class="card">
+                <div class="card-header">
+                    <i class="fas fa-image"></i>
+                    <span>Arte / Imagem do Produto</span>
+                </div>
+                <div class="card-body">
+                    <div class="image-upload" id="imageUpload" role="button" tabindex="0">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h3>Arraste e solte uma imagem aqui</h3>
+                        <p>ou clique para selecionar um arquivo</p>
+                        <input type="file" id="fileInput" accept="image/*" hidden>
+                    </div>
+
+                    <!-- Imagem escondida por padrão, só aparece quando carregada -->
+                    <img id="imagePreview" class="image-preview" alt="Pré-visualização da arte do produto" style="display: none;">
+
+                    <p class="hint-text">
+                        Você também pode colar uma imagem diretamente (Ctrl+V) se ela estiver na área de transferência.
+                    </p>
+                </div>
+            </section>
+
+            <!-- AÇÕES -->
+            <section class="card">
+                <div class="card-header">
+                    <i class="fas fa-tools"></i>
+                    <span>Ações</span>
+                </div>
+                <div class="card-body actions" id="acoesContainer">
+                    <!-- Botões serão inseridos pelo integration.js -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- VERSÃO DE IMPRESSÃO -->
+    <div id="print-version" class="print-container" style="display: none;">
+        <header class="print-header">
+            <h1>Ficha Técnica de Produção</h1>
+            <p>Data de Emissão: <span id="print-dataEmissao"></span></p>
+        </header>
+
+        <!-- INFORMAÇÕES DO CLIENTE - 1 COLUNA -->
+        <section class="print-card">
+            <h2>Dados do Pedido</h2>
+            <div class="print-grid">
+                <div><span class="label">Cliente:</span> <span id="print-cliente"></span></div>
+                <div><span class="label">Nº Venda:</span> <span id="print-numeroVenda"></span></div>
+                <div><span class="label">Vendedor:</span> <span id="print-vendedor"></span></div>
+                <div><span class="label">Início:</span> <span id="print-dataInicio"></span></div>
+                <div><span class="label">Entrega:</span> <span id="print-dataEntrega"></span></div>
+                <div><span class="label">Evento:</span> <span id="print-evento"></span></div>
+            </div>
+        </section>
+
+        <!-- PRODUTOS E ESPECIFICAÇÕES - 2 COLUNAS -->
+        <div class="print-two-cols">
+            <!-- PRODUTOS -->
+            <section class="print-card">
+                <h2>Produtos</h2>
+                <table class="print-table">
+                    <thead>
+                        <tr>
+                            <th>Tam.</th>
+                            <th>Qtd</th>
+                            <th>Descrição</th>
+                        </tr>
+                    </thead>
+                    <tbody id="print-produtosTable"></tbody>
+                </table>
+                <div class="print-total">
+                    Total de Itens: <span id="print-totalItens"></span>
+                </div>
+            </section>
+
+            <!-- ESPECIFICAÇÕES TÉCNICAS - 1 COLUNA -->
+            <section class="print-card">
+                <h2>Especificações Técnicas</h2>
+                <div class="print-grid-single">
+                    <div><span class="label">Material:</span> <span id="print-material"></span></div>
+                    <div><span class="label">Cor Material:</span> <span id="print-corMaterial"></span></div>
+                    <div><span class="label">Tipo Manga:</span> <span id="print-manga"></span></div>
+                    <div><span class="label">Acab. Manga:</span> <span id="print-acabamentoManga"></span></div>
+                    <div id="print-larguraMangaDiv" style="display: none;"><span class="label">Largura Manga:</span> <span id="print-larguraManga"></span></div>
+                    <div><span class="label">Tipo Gola:</span> <span id="print-gola"></span></div>
+                    <div><span class="label">Acab. Gola:</span> <span id="print-acabamentoGola"></span></div>
+                    <div id="print-corPeitilhoInternoDiv" style="display: none;"><span class="label">Cor Peitilho Interno:</span> <span id="print-corPeitilhoInterno"></span></div>
+                    <div id="print-corPeitilhoExternoDiv" style="display: none;"><span class="label">Cor Peitilho Externo:</span> <span id="print-corPeitilhoExterno"></span></div>
+                    <div id="print-aberturaLateralDiv" style="display: none;"><span class="label">Abertura Lateral:</span> <span id="print-aberturaLateral"></span></div>
+                    <div id="print-reforcoGolaDiv" style="display: none;"><span class="label">Reforço na Gola:</span> <span id="print-reforcoGola"></span></div>
+                    <div id="print-corReforcoDiv" style="display: none;"><span class="label">Cor do Reforço:</span> <span id="print-corReforco"></span></div>
+                    <div><span class="label">Bolso:</span> <span id="print-bolso"></span></div>
+                    <div><span class="label">Filete:</span> <span id="print-filete"></span></div>
+                    <div><span class="label">Faixa Refletiva:</span> <span id="print-faixa"></span></div>
+                    <div><span class="label">Personalização:</span> <span id="print-arte"></span></div>
+                    <div><span class="label">Composição:</span> <span id="print-composicao"></span></div>
+                </div>
+            </section>
+        </div>
+
+        <!-- OBSERVAÇÕES - 1 COLUNA -->
+        <section class="print-card">
+            <h2>Observações</h2>
+            <div id="print-observacoes" class="print-observacoes"></div>
+        </section>
+
+        <!-- IMAGEM - 1 COLUNA -->
+        <section class="print-card">
+            <h2>Layout / Mockup do Produto</h2>
+            <div class="print-image-container">
+                <img id="print-imagePreview" alt="Arte/Imagem do Produto">
+            </div>
+        </section>
+    </div>
+
+    <script src="js/main.js" defer></script>
+    <script src="js/api-client.js"></script>
+    <script src="js/integration.js"></script>
+</body>
+
+</html>

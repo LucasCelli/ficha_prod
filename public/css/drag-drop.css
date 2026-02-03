@@ -1,0 +1,159 @@
+
+/* ==================== DRAG AND DROP - PRODUTOS ==================== */
+
+/* Handle de arraste - posicionado à esquerda da linha */
+.drag-handle {
+  cursor: grab;
+  color: #adb5bd;
+  padding: 8px 10px 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+
+.drag-handle:hover {
+  color: #495057;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+  color: #007bff;
+}
+
+/* Corrigir alinhamento da primeira célula */
+#produtosTable tr td:first-child {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+  padding-left: 4px !important;
+}
+
+/* Input de tamanho ao lado do handle */
+#produtosTable tr td:first-child .tamanho {
+  flex: 1;
+  min-width: 70px;
+}
+
+/* Linha normal */
+#produtosTable tr {
+  transition: all 0.15s ease;
+  position: relative;
+  background: white;
+}
+
+/* Linha sendo arrastada */
+#produtosTable tr.dragging {
+  opacity: 0.5;
+  background: #cce5ff !important;
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+  z-index: 100;
+}
+
+/* Indicador de posição - ACIMA da linha de destino */
+#produtosTable tr.drag-over-top {
+  box-shadow: inset 0 3px 0 0 #007bff;
+}
+
+#produtosTable tr.drag-over-top::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: #007bff;
+  border-radius: 2px;
+  z-index: 10;
+}
+
+/* Indicador de posição - ABAIXO da linha de destino */
+#produtosTable tr.drag-over-bottom {
+  box-shadow: inset 0 -3px 0 0 #007bff;
+}
+
+#produtosTable tr.drag-over-bottom::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: #007bff;
+  border-radius: 2px;
+  z-index: 10;
+}
+
+/* Linha de destino destacada */
+#produtosTable tr.drag-over-top,
+#produtosTable tr.drag-over-bottom {
+  background: #f0f7ff !important;
+}
+
+/* Seta indicadora para cima */
+#produtosTable tr.drag-over-top .drag-handle::before {
+  content: '↑';
+  position: absolute;
+  left: -20px;
+  color: #007bff;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+/* Seta indicadora para baixo */
+#produtosTable tr.drag-over-bottom .drag-handle::after {
+  content: '↓';
+  position: absolute;
+  left: -20px;
+  color: #007bff;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+/* Flash de confirmação após ordenar */
+#produtosTable.sorted-flash tr {
+  animation: sortFlash 0.5s ease;
+}
+
+@keyframes sortFlash {
+  0% { background: #d4edda; }
+  100% { background: white; }
+}
+
+/* Animação ao soltar */
+#produtosTable tr.just-dropped {
+  animation: dropBounce 0.3s ease;
+}
+
+@keyframes dropBounce {
+  0% { transform: scale(1.05); background: #d4edda; }
+  50% { transform: scale(0.98); }
+  100% { transform: scale(1); background: white; }
+}
+
+/* Botão ordenar */
+#ordenarProdutos {
+  margin-left: 10px;
+}
+
+/* ==================== RESPONSIVO ==================== */
+
+@media (max-width: 768px) {
+  .drag-handle {
+    padding: 6px 8px 6px 0;
+  }
+
+  #ordenarProdutos span {
+    display: none;
+  }
+
+  #ordenarProdutos {
+    padding: 8px 12px;
+  }
+
+  #produtosTable tr td:first-child .tamanho {
+    min-width: 60px;
+  }
+}

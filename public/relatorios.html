@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatórios - Fichas Técnicas</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/relatorios.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div>
+                    <h1><i class="fas fa-chart-bar"></i> Relatórios e Estatísticas</h1>
+                    <p>Análise detalhada de produção e vendas</p>
+                </div>
+                <div class="header-actions">
+                    <a href="dashboard.html" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Voltar</span>
+                    </a>
+                    <a href="index.html" class="btn btn-primary">
+                        <i class="fas fa-plus"></i>
+                        <span>Nova Ficha</span>
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- SELETOR DE PERÍODO -->
+            <section class="card">
+                <div class="card-header">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Período do Relatório</span>
+                </div>
+                <div class="card-body">
+                    <div class="periodo-selector">
+                        <button class="btn-periodo active" data-periodo="mes">
+                            <i class="fas fa-calendar-week"></i>
+                            <span>Este Mês</span>
+                        </button>
+                        <button class="btn-periodo" data-periodo="ano">
+                            <i class="fas fa-calendar"></i>
+                            <span>Este Ano</span>
+                        </button>
+                        <button class="btn-periodo" data-periodo="customizado">
+                            <i class="fas fa-calendar-day"></i>
+                            <span>Personalizado</span>
+                        </button>
+                    </div>
+
+                    <div id="customPeriod" class="custom-period" style="display: none;">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="relDataInicio">Data Inicial</label>
+                                <input type="date" id="relDataInicio" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="relDataFim">Data Final</label>
+                                <input type="date" id="relDataFim" class="form-control">
+                            </div>
+                        </div>
+                        <button id="btnAplicarPeriodo" class="btn btn-primary">
+                            <i class="fas fa-check"></i>
+                            Aplicar Período
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ESTATÍSTICAS PRINCIPAIS -->
+            <section class="stats-grid-large">
+                <div class="stat-card-large green">
+                    <div class="stat-header">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Pedidos Entregues</span>
+                    </div>
+                    <div class="stat-value" id="statPedidosEntregues">0</div>
+                    <div class="stat-subtitle">no período selecionado</div>
+                </div>
+
+                <div class="stat-card-large orange">
+                    <div class="stat-header">
+                        <i class="fas fa-clock"></i>
+                        <span>Pedidos Pendentes</span>
+                    </div>
+                    <div class="stat-value" id="statPedidosPendentes">0</div>
+                    <div class="stat-subtitle">aguardando entrega</div>
+                </div>
+
+                <div class="stat-card-large blue">
+                    <div class="stat-header">
+                        <i class="fas fa-tshirt"></i>
+                        <span>Itens Confeccionados</span>
+                    </div>
+                    <div class="stat-value" id="statItensConfeccionados">0</div>
+                    <div class="stat-subtitle">peças produzidas</div>
+                </div>
+
+                <div class="stat-card-large purple">
+                    <div class="stat-header">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Novos Clientes</span>
+                    </div>
+                    <div class="stat-value" id="statNovosClientes">0</div>
+                    <div class="stat-subtitle">cadastrados</div>
+                </div>
+            </section>
+
+            <!-- DETALHES ADICIONAIS -->
+            <div class="two-columns">
+                <!-- TOP VENDEDOR -->
+                <section class="card">
+                    <div class="card-header">
+                        <i class="fas fa-trophy"></i>
+                        <span>Vendedor Destaque</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="top-vendedor">
+                            <div class="vendedor-icon">
+                                <i class="fas fa-user-tie"></i>
+                            </div>
+                            <div class="vendedor-info">
+                                <div class="vendedor-nome" id="topVendedorNome">-</div>
+                                <div class="vendedor-stats" id="topVendedorStats">0 vendas</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAXA DE ENTREGA -->
+                <section class="card">
+                    <div class="card-header">
+                        <i class="fas fa-percentage"></i>
+                        <span>Taxa de Entrega</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="taxa-container">
+                            <div class="taxa-circle">
+                                <svg viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="45" class="taxa-bg"></circle>
+                                    <circle cx="50" cy="50" r="45" class="taxa-progress" id="taxaProgress"></circle>
+                                </svg>
+                                <div class="taxa-value" id="taxaValue">0%</div>
+                            </div>
+                            <div class="taxa-legenda">
+                                <div><span id="taxaEntregues">0</span> entregues</div>
+                                <div><span id="taxaTotal">0</span> total</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- RESUMO MENSAL (se ano selecionado) -->
+            <section class="card" id="resumoMensalCard" style="display: none;">
+                <div class="card-header">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Resumo Mensal</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="chartMensal"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- AÇÕES -->
+            <section class="card">
+                <div class="card-header">
+                    <i class="fas fa-download"></i>
+                    <span>Exportar Relatório</span>
+                </div>
+                <div class="card-body actions">
+                    <button id="btnExportarPDF" class="btn btn-danger">
+                        <i class="fas fa-file-pdf"></i>
+                        <span>Exportar PDF</span>
+                    </button>
+                    <button id="btnExportarExcel" class="btn btn-success">
+                        <i class="fas fa-file-excel"></i>
+                        <span>Exportar Excel</span>
+                    </button>
+                    <button id="btnImprimir" class="btn btn-secondary">
+                        <i class="fas fa-print"></i>
+                        <span>Imprimir</span>
+                    </button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="js/api-client.js"></script>
+    <script src="js/relatorios.js"></script>
+</body>
+
+</html>

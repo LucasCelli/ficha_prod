@@ -1,0 +1,291 @@
+/* RelatÃ³rios Styles */
+
+.periodo-selector {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.btn-periodo {
+  flex: 1;
+  min-width: 160px;
+  background: white;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-periodo i {
+  font-size: 1.5rem;
+  color: var(--text-soft);
+}
+
+.btn-periodo span {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.btn-periodo:hover {
+  border-color: var(--secondary);
+  background: #f8faff;
+}
+
+.btn-periodo.active {
+  border-color: var(--secondary);
+  background: #e5edff;
+}
+
+.btn-periodo.active i,
+.btn-periodo.active span {
+  color: var(--secondary);
+}
+
+.custom-period {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* ESTATÃSTICAS GRANDES */
+.stats-grid-large {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stat-card-large {
+  background: white;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card-large::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+}
+
+.stat-card-large.green::before {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.stat-card-large.orange::before {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.stat-card-large.blue::before {
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+}
+
+.stat-card-large.purple::before {
+  background: linear-gradient(90deg, #8b5cf6, #7c3aed);
+}
+
+.stat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.stat-header i {
+  font-size: 1.2rem;
+}
+
+.stat-card-large .stat-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.stat-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+/* DUAS COLUNAS */
+.two-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+/* TOP VENDEDOR */
+.top-vendedor {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-radius: 14px;
+}
+
+.vendedor-icon {
+  width: 70px;
+  height: 70px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: #d97706;
+  flex-shrink: 0;
+}
+
+.vendedor-info {
+  flex: 1;
+}
+
+.vendedor-nome {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #92400e;
+  margin-bottom: 4px;
+}
+
+.vendedor-stats {
+  font-size: 0.9rem;
+  color: #b45309;
+}
+
+/* TAXA DE ENTREGA */
+.taxa-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+}
+
+.taxa-circle {
+  position: relative;
+  width: 140px;
+  height: 140px;
+}
+
+.taxa-circle svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.taxa-bg {
+  fill: none;
+  stroke: #e5e7eb;
+  stroke-width: 8;
+}
+
+.taxa-progress {
+  fill: none;
+  stroke: #10b981;
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: 283;
+  stroke-dashoffset: 283;
+  transition: stroke-dashoffset 1s ease;
+}
+
+.taxa-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.taxa-legenda {
+  display: flex;
+  gap: 24px;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
+.taxa-legenda span {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* GRÃFICO */
+.chart-container {
+  position: relative;
+  height: 300px;
+  padding: 10px;
+}
+
+/* IMPRESSÃO */
+@media print {
+  .header-actions,
+  .btn-periodo,
+  .custom-period,
+  #btnExportarPDF,
+  #btnExportarExcel,
+  #btnImprimir {
+    display: none !important;
+  }
+
+  .stat-card-large,
+  .card {
+    break-inside: avoid;
+  }
+}
+
+/* RESPONSIVO */
+@media (max-width: 768px) {
+  .stats-grid-large {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-card-large .stat-value {
+    font-size: 2rem;
+  }
+
+  .vendedor-nome {
+    font-size: 1.1rem;
+  }
+
+  .two-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .btn-periodo {
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid-large {
+    grid-template-columns: 1fr;
+  }
+
+  .periodo-selector {
+    flex-direction: column;
+  }
+
+  .btn-periodo {
+    width: 100%;
+  }
+}
