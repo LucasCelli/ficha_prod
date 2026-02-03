@@ -1,4 +1,6 @@
+import 'dotenv/config';
 import express from 'express';
+import crypto from 'crypto';
 import cors from 'cors';
 import { createClient } from '@libsql/client';
 import path from 'path';
@@ -9,6 +11,26 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+
+// ==================== CONFIGURAÇÃO CLOUDINARY ====================
+const CLOUDINARY_CONFIG = {
+  cloudName: process.env.CLOUDINARY_CLOUD_NAME || 'SEU_CLOUD_NAME',
+  apiKey: process.env.CLOUDINARY_API_KEY || 'SUA_API_KEY',
+  apiSecret: process.env.CLOUDINARY_API_SECRET || 'SEU_API_SECRET',
+  uploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || 'fichas_upload' // Opcional, para unsigned uploads
+};
+
+// Função para gerar assinatura do Cloudinary
+function generateCloudinarySignature(paramsToSign) {
+  const sortedParams = Object.keys(paramsToSign)
+    .sort()
+    .map(key => `${key}=${paramsToSign[key]}`)
+    .join('&');
+
+  const stringToSign = sortedParams + CLOUDINARY_CONFIG.apiSecret;
+  return crypto.createHash('sha1').update(stringToSign).digest('hex');
+}
 
 // Middlewares
 app.use(cors());
@@ -76,6 +98,7 @@ async function initDatabase() {
         cor_sublimacao TEXT,
         observacoes TEXT,
         imagem_data TEXT,
+        imagens_data TEXT,
         produtos TEXT,
         data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
         data_atualizacao DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -101,6 +124,15 @@ async function initDatabase() {
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_data_inicio ON fichas(data_inicio)`);
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_data_entrega ON fichas(data_entrega)`);
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_vendedor ON fichas(vendedor)`);
+
+    
+    // Migração: adicionar coluna imagens_data se não existir
+    try {
+      await db.execute('ALTER TABLE fichas ADD COLUMN imagens_data TEXT');
+      console.log('✅ Coluna imagens_data adicionada via migração');
+    } catch (e) {
+      // Coluna já existe, ignorar
+    }
 
     console.log('✅ Banco de dados Turso inicializado com sucesso');
   } catch (error) {
@@ -235,8 +267,8 @@ app.post('/api/fichas', async (req, res) => {
         material, composicao, cor_material, manga, acabamento_manga, largura_manga,
         gola, acabamento_gola, cor_peitilho_interno, cor_peitilho_externo,
         abertura_lateral, reforco_gola, cor_reforco, bolso, filete, faixa,
-        arte, cor_sublimacao, observacoes, imagem_data, produtos, data_criacao, data_atualizacao
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        arte, cor_sublimacao, observacoes, imagem_data, imagens_data, produtos, data_criacao, data_atualizacao
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -246,7 +278,7 @@ app.post('/api/fichas', async (req, res) => {
       dados.acabamentoManga, dados.larguraManga, dados.gola, dados.acabamentoGola,
       dados.corPeitilhoInterno, dados.corPeitilhoExterno, dados.aberturaLateral,
       dados.reforcoGola, dados.corReforco, dados.bolso, dados.filete, dados.faixa,
-      dados.arte, dados.corSublimacao, dados.observacoes, dados.imagemData,
+      dados.arte, dados.corSublimacao, dados.observacoes, dados.imagemData, dados.imagensData,
       produtosJson, now, now
     ];
 
@@ -287,7 +319,7 @@ app.put('/api/fichas/:id', async (req, res) => {
         acabamento_manga = ?, largura_manga = ?, gola = ?, acabamento_gola = ?,
         cor_peitilho_interno = ?, cor_peitilho_externo = ?, abertura_lateral = ?,
         reforco_gola = ?, cor_reforco = ?, bolso = ?, filete = ?, faixa = ?,
-        arte = ?, cor_sublimacao = ?, observacoes = ?, imagem_data = ?,
+        arte = ?, cor_sublimacao = ?, observacoes = ?, imagem_data = ?, imagens_data = ?,
         produtos = ?, data_atualizacao = ?
       WHERE id = ?
     `;
@@ -299,7 +331,7 @@ app.put('/api/fichas/:id', async (req, res) => {
       dados.acabamentoManga, dados.larguraManga, dados.gola, dados.acabamentoGola,
       dados.corPeitilhoInterno, dados.corPeitilhoExterno, dados.aberturaLateral,
       dados.reforcoGola, dados.corReforco, dados.bolso, dados.filete, dados.faixa,
-      dados.arte, dados.corSublimacao, dados.observacoes, dados.imagemData,
+      dados.arte, dados.corSublimacao, dados.observacoes, dados.imagemData, dados.imagensData,
       produtosJson, now, req.params.id
     ];
 
@@ -414,6 +446,72 @@ app.get('/api/clientes/lista', async (req, res) => {
     res.status(500).json({ error: 'Erro ao listar clientes' });
   }
 });
+
+// Atualizar cliente
+app.put('/api/clientes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nome, primeiro_pedido, ultimo_pedido } = req.body;
+
+    // Verificar se cliente existe
+    const clienteExiste = await dbGet('SELECT * FROM clientes WHERE id = ?', [id]);
+    if (!clienteExiste) {
+      return res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+
+    // Verificar se o novo nome já existe em outro cliente
+    if (nome && nome !== clienteExiste.nome) {
+      const nomeExiste = await dbGet('SELECT id FROM clientes WHERE nome = ? AND id != ?', [nome, id]);
+      if (nomeExiste) {
+        return res.status(400).json({ error: 'Já existe um cliente com este nome' });
+      }
+    }
+
+    // Atualizar cliente
+    await dbRun(
+      `UPDATE clientes SET nome = ?, primeiro_pedido = ?, ultimo_pedido = ? WHERE id = ?`,
+      [nome || clienteExiste.nome, primeiro_pedido, ultimo_pedido, id]
+    );
+
+    // Se o nome mudou, atualizar também nas fichas
+    if (nome && nome !== clienteExiste.nome) {
+      await dbRun(
+        `UPDATE fichas SET cliente = ? WHERE cliente = ?`,
+        [nome, clienteExiste.nome]
+      );
+      console.log(`📝 Nome do cliente atualizado nas fichas: "${clienteExiste.nome}" -> "${nome}"`);
+    }
+
+    console.log(`✅ Cliente #${id} atualizado`);
+    res.json({ message: 'Cliente atualizado com sucesso' });
+  } catch (error) {
+    console.error('Erro ao atualizar cliente:', error);
+    res.status(500).json({ error: 'Erro ao atualizar cliente' });
+  }
+});
+
+// Deletar cliente
+app.delete('/api/clientes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar se cliente existe
+    const clienteExiste = await dbGet('SELECT * FROM clientes WHERE id = ?', [id]);
+    if (!clienteExiste) {
+      return res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+
+    // Deletar cliente (as fichas NÃO são deletadas, conforme a mensagem no modal)
+    await dbRun('DELETE FROM clientes WHERE id = ?', [id]);
+
+    console.log(`✅ Cliente #${id} (${clienteExiste.nome}) deletado`);
+    res.json({ message: 'Cliente excluído com sucesso' });
+  } catch (error) {
+    console.error('Erro ao deletar cliente:', error);
+    res.status(500).json({ error: 'Erro ao deletar cliente' });
+  }
+});
+
 
 // Estatísticas gerais
 app.get('/api/estatisticas', async (req, res) => {
@@ -618,6 +716,265 @@ async function atualizarCliente(nomeCliente, dataInicio) {
     console.error('Erro ao atualizar cliente:', error);
   }
 }
+
+
+// ==================== ROTAS CLOUDINARY ====================
+
+// Obter configuração pública do Cloudinary
+app.get('/api/cloudinary/config', (req, res) => {
+  res.json({
+    cloudName: CLOUDINARY_CONFIG.cloudName,
+    apiKey: CLOUDINARY_CONFIG.apiKey,
+    uploadPreset: CLOUDINARY_CONFIG.uploadPreset
+  });
+});
+
+// Gerar assinatura para upload signed (com otimização)
+app.post('/api/cloudinary/signature', (req, res) => {
+  try {
+    const timestamp = Math.round(new Date().getTime() / 1000);
+    const folder = 'fichas';
+
+    // OTIMIZAÇÃO: Redimensionar e comprimir no upload
+    // - Limita a 1500px (suficiente para visualização/impressão)
+    // - Qualidade automática (Cloudinary escolhe o melhor)
+    // - Formato automático (WebP quando suportado)
+    const transformation = 'c_limit,w_1500,h_1500,q_auto:good';
+
+    const paramsToSign = {
+      timestamp,
+      folder,
+      transformation,
+      ...req.body
+    };
+
+    // Remover parâmetros vazios
+    Object.keys(paramsToSign).forEach(key => {
+      if (paramsToSign[key] === undefined || paramsToSign[key] === '') {
+        delete paramsToSign[key];
+      }
+    });
+
+    const signature = generateCloudinarySignature(paramsToSign);
+
+    res.json({
+      signature,
+      timestamp,
+      folder,
+      transformation,
+      apiKey: CLOUDINARY_CONFIG.apiKey,
+      cloudName: CLOUDINARY_CONFIG.cloudName
+    });
+  } catch (error) {
+    console.error('Erro ao gerar assinatura:', error);
+    res.status(500).json({ error: 'Erro ao gerar assinatura' });
+  }
+});
+
+// Rota de migração - converter base64 existentes para Cloudinary
+app.post('/api/cloudinary/migrar', async (req, res) => {
+  try {
+    // Buscar fichas com imagens em base64
+    const fichas = await dbAll(`
+      SELECT id, imagem_data, imagens_data 
+      FROM fichas 
+      WHERE (imagem_data IS NOT NULL AND imagem_data LIKE 'data:%')
+         OR (imagens_data IS NOT NULL AND imagens_data LIKE '%data:%')
+    `);
+
+    console.log(`📦 Encontradas ${fichas.length} fichas com imagens para migrar`);
+
+    const resultados = {
+      total: fichas.length,
+      migradas: 0,
+      erros: [],
+      detalhes: []
+    };
+
+    for (const ficha of fichas) {
+      try {
+        let imagensAtualizadas = [];
+        let temAlteracao = false;
+
+        // Processar imagens_data (novo formato - array JSON)
+        if (ficha.imagens_data) {
+          let imagens = [];
+          try {
+            imagens = JSON.parse(ficha.imagens_data);
+          } catch (e) {
+            console.warn(`Ficha #${ficha.id}: erro ao parsear imagens_data`);
+          }
+
+          for (const img of imagens) {
+            if (img.src && img.src.startsWith('data:')) {
+              // Precisa migrar - fazer upload para Cloudinary
+              const uploadResult = await uploadBase64ToCloudinary(img.src, `ficha_${ficha.id}`);
+              if (uploadResult.success) {
+                imagensAtualizadas.push({
+                  src: uploadResult.url,
+                  publicId: uploadResult.publicId,
+                  descricao: img.descricao || ''
+                });
+                temAlteracao = true;
+              } else {
+                // Manter original se falhar
+                imagensAtualizadas.push(img);
+                resultados.erros.push(`Ficha #${ficha.id}: ${uploadResult.error}`);
+              }
+            } else {
+              // Já é URL, manter
+              imagensAtualizadas.push(img);
+            }
+          }
+        }
+
+        // Processar imagem_data (formato antigo - single base64)
+        if (ficha.imagem_data && ficha.imagem_data.startsWith('data:') && imagensAtualizadas.length === 0) {
+          const uploadResult = await uploadBase64ToCloudinary(ficha.imagem_data, `ficha_${ficha.id}`);
+          if (uploadResult.success) {
+            imagensAtualizadas.push({
+              src: uploadResult.url,
+              publicId: uploadResult.publicId,
+              descricao: ''
+            });
+            temAlteracao = true;
+          } else {
+            resultados.erros.push(`Ficha #${ficha.id}: ${uploadResult.error}`);
+          }
+        }
+
+        // Atualizar no banco se houve alteração
+        if (temAlteracao && imagensAtualizadas.length > 0) {
+          await dbRun(
+            `UPDATE fichas SET imagens_data = ?, imagem_data = NULL WHERE id = ?`,
+            [JSON.stringify(imagensAtualizadas), ficha.id]
+          );
+          resultados.migradas++;
+          resultados.detalhes.push({
+            fichaId: ficha.id,
+            imagensMigradas: imagensAtualizadas.length
+          });
+          console.log(`✅ Ficha #${ficha.id}: ${imagensAtualizadas.length} imagem(ns) migrada(s)`);
+        }
+
+      } catch (err) {
+        console.error(`❌ Erro na ficha #${ficha.id}:`, err);
+        resultados.erros.push(`Ficha #${ficha.id}: ${err.message}`);
+      }
+    }
+
+    console.log(`🎉 Migração concluída: ${resultados.migradas}/${resultados.total} fichas`);
+    res.json(resultados);
+
+  } catch (error) {
+    console.error('Erro na migração:', error);
+    res.status(500).json({ error: 'Erro ao executar migração' });
+  }
+});
+
+// Função auxiliar para upload de base64 para Cloudinary
+async function uploadBase64ToCloudinary(base64Data, publicIdPrefix) {
+  try {
+    const timestamp = Math.round(new Date().getTime() / 1000);
+    const folder = 'fichas';
+    const publicId = `${publicIdPrefix}_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const transformation = 'c_limit,w_1500,h_1500,q_auto:good';
+
+    const paramsToSign = {
+      timestamp,
+      folder,
+      public_id: publicId,
+      transformation
+    };
+
+    const signature = generateCloudinarySignature(paramsToSign);
+
+    const formData = new URLSearchParams();
+    formData.append('file', base64Data);
+    formData.append('timestamp', timestamp);
+    formData.append('folder', folder);
+    formData.append('public_id', publicId);
+    formData.append('signature', signature);
+    formData.append('api_key', CLOUDINARY_CONFIG.apiKey);
+    formData.append('transformation', transformation);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`,
+      {
+        method: 'POST',
+        body: formData
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Upload falhou: ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    return {
+      success: true,
+      url: result.secure_url,
+      publicId: result.public_id
+    };
+
+  } catch (error) {
+    console.error('Erro no upload Cloudinary:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// Deletar imagem do Cloudinary
+app.delete('/api/cloudinary/image/:publicId', async (req, res) => {
+  try {
+    const { publicId } = req.params;
+    const timestamp = Math.round(new Date().getTime() / 1000);
+
+    // O publicId pode vir com / substituído por _SLASH_
+    const realPublicId = publicId.replace(/_SLASH_/g, '/');
+
+    const paramsToSign = {
+      public_id: realPublicId,
+      timestamp
+    };
+
+    const signature = generateCloudinarySignature(paramsToSign);
+
+    const formData = new URLSearchParams();
+    formData.append('public_id', realPublicId);
+    formData.append('timestamp', timestamp);
+    formData.append('signature', signature);
+    formData.append('api_key', CLOUDINARY_CONFIG.apiKey);
+    formData.append('transformation', transformation);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/destroy`,
+      {
+        method: 'POST',
+        body: formData
+      }
+    );
+
+    const result = await response.json();
+
+    if (result.result === 'ok') {
+      console.log(`🗑️ Imagem deletada do Cloudinary: ${realPublicId}`);
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ error: 'Falha ao deletar imagem', details: result });
+    }
+
+  } catch (error) {
+    console.error('Erro ao deletar imagem:', error);
+    res.status(500).json({ error: 'Erro ao deletar imagem' });
+  }
+});
+
 
 // Rota catch-all
 app.get('*', (req, res) => {

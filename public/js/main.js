@@ -519,6 +519,13 @@
       if (e.target.classList.contains('quantidade')) {
         atualizarTotalItens();
       }
+      // Forçar uppercase no campo tamanho
+      if (e.target.classList.contains('tamanho')) {
+        const start = e.target.selectionStart;
+        const end = e.target.selectionEnd;
+        e.target.value = e.target.value.toUpperCase();
+        e.target.setSelectionRange(start, end);
+      }
     });
 
     tabelaBody.addEventListener('keydown', e => {
@@ -1148,14 +1155,37 @@
 
     // NOVO: Carregar múltiplas imagens
     if (window.setImagens) {
-      if (ficha.imagens && Array.isArray(ficha.imagens) && ficha.imagens.length > 0) {
-        window.setImagens(ficha.imagens);
-      } else if (ficha.imagem) {
-        // Compatibilidade com formato antigo (única imagem)
-        window.setImagens([{ src: ficha.imagem, descricao: '' }]);
-      } else {
-        window.setImagens([]);
+      let imagensCarregadas = [];
+
+      // Tentar carregar do novo formato (imagensData como JSON string)
+      const imagensData = ficha.imagensData || ficha.imagens_data;
+      if (imagensData) {
+        try {
+          if (typeof imagensData === 'string') {
+            imagensCarregadas = JSON.parse(imagensData);
+          } else if (Array.isArray(imagensData)) {
+            imagensCarregadas = imagensData;
+          }
+        } catch (e) {
+          console.warn('Erro ao parsear imagens:', e);
+        }
       }
+
+      // Fallback: tentar campo imagens (array direto)
+      if (imagensCarregadas.length === 0 && ficha.imagens && Array.isArray(ficha.imagens)) {
+        imagensCarregadas = ficha.imagens;
+      }
+
+      // Fallback: formato antigo (imagemData única)
+      if (imagensCarregadas.length === 0) {
+        const imagemData = ficha.imagemData || ficha.imagem_data || ficha.imagem;
+        if (imagemData && typeof imagemData === 'string' && imagemData.startsWith('data:')) {
+          imagensCarregadas = [{ src: imagemData, descricao: '' }];
+        }
+      }
+
+      window.setImagens(imagensCarregadas);
+      console.log('✅ Imagens carregadas:', imagensCarregadas.length);
     }
 
     atualizarIconPreview();

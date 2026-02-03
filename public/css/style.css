@@ -463,13 +463,13 @@ textarea.form-control {
   .print-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .print-table th,
   .print-table td {
     border: 0.5mm solid #000000;
-    padding: 1mm 1mm;
+    padding: 0.5mm 1mm;
   }
 
   .print-table th {
@@ -495,7 +495,7 @@ textarea.form-control {
   }
 
   .print-image-container img {
-    max-height: 75mm;
+    max-height: 70mm;
     max-width: 100%;
     object-fit: contain;
   }

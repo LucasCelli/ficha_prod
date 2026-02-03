@@ -287,6 +287,9 @@
       imagensData = window.getImagens();
     }
 
+    // DEBUG: Log das imagens coletadas
+    console.log('📸 Coletando imagens para salvar:', imagensData.length, 'imagem(ns)');
+
     const dados = {
       cliente: document.getElementById('cliente')?.value || '',
       vendedor: document.getElementById('vendedor')?.value || '',
@@ -368,7 +371,13 @@
       fichaAtualId = id;
       console.log(`✅ Editando ficha #${fichaAtualId}`);
 
+      // DEBUG: Log do que veio do banco
+      console.log('📦 Dados brutos do banco:', fichaBanco);
+
       const ficha = converterBancoParaForm(fichaBanco);
+
+      // DEBUG: Log após conversão
+      console.log('🔄 Dados após conversão:', ficha);
 
       setTimeout(() => {
         preencherFormulario(ficha);
@@ -399,7 +408,13 @@
       fichaAtualId = id;
       console.log(`✅ Visualizando ficha #${fichaAtualId}`);
 
+      // DEBUG: Log do que veio do banco
+      console.log('📦 Dados brutos do banco:', fichaBanco);
+
       const ficha = converterBancoParaForm(fichaBanco);
+
+      // DEBUG: Log após conversão
+      console.log('🔄 Dados após conversão:', ficha);
 
       setTimeout(() => {
         preencherFormulario(ficha);
@@ -473,6 +488,60 @@
     if (estilo) estilo.remove();
 
     document.body.classList.remove('modo-visualizacao');
+  }
+
+  // ==================== FUNÇÃO CORRIGIDA PARA PARSEAR IMAGENS ====================
+
+  function parsearImagensData(imagensData) {
+    // Se não tem dados, retorna array vazio
+    if (!imagensData) {
+      console.log('📸 imagensData está vazio/null');
+      return [];
+    }
+
+    // Se já é um array, retorna direto
+    if (Array.isArray(imagensData)) {
+      console.log('📸 imagensData já é array com', imagensData.length, 'item(ns)');
+      return imagensData;
+    }
+
+    // Se é string
+    if (typeof imagensData === 'string') {
+      // String vazia
+      if (imagensData.trim() === '') {
+        console.log('📸 imagensData é string vazia');
+        return [];
+      }
+
+      // String "[]" 
+      if (imagensData.trim() === '[]') {
+        console.log('📸 imagensData é "[]"');
+        return [];
+      }
+
+      // Tentar parsear JSON
+      try {
+        const parsed = JSON.parse(imagensData);
+
+        // Verificar se o resultado é array
+        if (Array.isArray(parsed)) {
+          console.log('📸 imagensData parseado com sucesso:', parsed.length, 'imagem(ns)');
+          return parsed;
+        }
+
+        // Se parseou mas não é array, pode ser outro tipo de dado
+        console.warn('📸 imagensData parseado mas não é array:', typeof parsed);
+        return [];
+
+      } catch (e) {
+        console.warn('📸 Erro ao parsear imagensData:', e.message);
+        console.warn('📸 Conteúdo original:', imagensData.substring(0, 100) + '...');
+        return [];
+      }
+    }
+
+    console.warn('📸 imagensData tem tipo inesperado:', typeof imagensData);
+    return [];
   }
 
   function preencherFormulario(ficha) {
@@ -553,35 +622,43 @@
       }
     }
 
-    // NOVO: Carregar múltiplas imagens
+    // ==================== CORREÇÃO: Carregar múltiplas imagens ====================
     if (typeof window.setImagens === 'function') {
       let imagensCarregadas = [];
 
-      // Tentar carregar do novo formato (imagensData como JSON string)
-      const imagensData = ficha.imagensData || ficha.imagens_data;
-      if (imagensData) {
-        try {
-          if (typeof imagensData === 'string') {
-            imagensCarregadas = JSON.parse(imagensData);
-          } else if (Array.isArray(imagensData)) {
-            imagensCarregadas = imagensData;
-          }
-        } catch (e) {
-          console.warn('Erro ao parsear imagens:', e);
-        }
-      }
+      // DEBUG: Mostrar o que veio em cada campo
+      console.log('📸 DEBUG - Campos de imagem recebidos:');
+      console.log('  - ficha.imagensData:', typeof ficha.imagensData, ficha.imagensData ? (typeof ficha.imagensData === 'string' ? ficha.imagensData.substring(0,50) + '...' : ficha.imagensData) : '(vazio)');
+      console.log('  - ficha.imagens_data:', typeof ficha.imagens_data, ficha.imagens_data ? (typeof ficha.imagens_data === 'string' ? ficha.imagens_data.substring(0,50) + '...' : ficha.imagens_data) : '(vazio)');
+      console.log('  - ficha.imagemData:', typeof ficha.imagemData, ficha.imagemData ? ficha.imagemData.substring(0,50) + '...' : '(vazio)');
+      console.log('  - ficha.imagem_data:', typeof ficha.imagem_data, ficha.imagem_data ? ficha.imagem_data.substring(0,50) + '...' : '(vazio)');
 
-      // Fallback: tentar formato antigo (imagemData única)
+      // 1. Tentar carregar do novo formato (imagensData)
+      const imagensDataRaw = ficha.imagensData || ficha.imagens_data;
+      imagensCarregadas = parsearImagensData(imagensDataRaw);
+
+      // 2. Se não conseguiu do novo formato, tentar formato antigo
       if (imagensCarregadas.length === 0) {
+        console.log('📸 Tentando fallback para formato antigo...');
+
         const imagemData = ficha.imagemData || ficha.imagem_data;
-        if (imagemData && imagemData.startsWith('data:')) {
-          imagensCarregadas = [{ src: imagemData, descricao: '' }];
+
+        if (imagemData && typeof imagemData === 'string' && imagemData.length > 0) {
+          // Verificar se é base64 válido
+          if (imagemData.startsWith('data:image')) {
+            console.log('📸 Usando fallback: imagem única do campo antigo');
+            imagensCarregadas = [{ src: imagemData, descricao: '' }];
+          } else {
+            console.log('📸 Campo imagemData não é base64 válido');
+          }
         }
       }
 
       // Setar imagens no sistema
       window.setImagens(imagensCarregadas);
-      console.log(`✅ ${imagensCarregadas.length} imagem(ns) carregada(s)`);
+      console.log(`✅ ${imagensCarregadas.length} imagem(ns) carregada(s) no formulário`);
+    } else {
+      console.warn('⚠️ window.setImagens não está disponível');
     }
 
     console.log('✅ Formulário preenchido!');

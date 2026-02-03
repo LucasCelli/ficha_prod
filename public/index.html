@@ -1,6 +1,4 @@
-﻿
-
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
@@ -12,6 +10,8 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/drag-drop.css">
     <link rel="stylesheet" href="css/images.css">
+    <link rel="stylesheet" href="css/cloudinary-styles.css">
+
 </head>
 
 <body>
@@ -97,9 +97,9 @@
                     <table class="product-table">
                         <thead>
                             <tr>
-                                <th>Tam.</th>
-                                <th>Qtd</th>
-                                <th>Descrição</th>
+                                <th>Tamanho</th>
+                                <th>Quantidade</th>
+                                <th>Descrição do Produto</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -109,7 +109,8 @@
                     <template id="productRowTemplate">
                         <tr>
                             <td>
-                                <select class="form-control tamanho"></select>
+                                <input type="text" class="form-control tamanho" placeholder="Tam."
+                                    style="text-transform: uppercase;">
                             </td>
                             <td>
                                 <input type="text" class="form-control quantidade" min="1" value="1">
@@ -119,7 +120,8 @@
                                     placeholder="Digite ou selecione">
                             </td>
                             <td>
-                                <button type="button" class="btn btn-secondary btn-icon duplicar-produto" title="Duplicar">
+                                <button type="button" class="btn btn-secondary btn-icon duplicar-produto"
+                                    title="Duplicar">
                                     <i class="fas fa-copy"></i>
                                 </button>
                                 <button type="button" class="btn btn-danger btn-icon remover-produto" title="Remover">
@@ -155,7 +157,7 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="material">Tecido/Material</label>
-                            <input type="text" id="material" list="materiaisList" class="form-control" 
+                            <input type="text" id="material" list="materiaisList" class="form-control"
                                 placeholder="Digite ou selecione">
                             <datalist id="materiaisList"></datalist>
                         </div>
@@ -169,7 +171,6 @@
                         <div class="form-group">
                             <label for="manga">Tipo de Manga</label>
                             <select id="manga" class="form-control">
-                                <option value="">Selecione</option>
                                 <option value="">-</option>
                                 <option value="curta">Curta</option>
                                 <option value="longa">Longa</option>
@@ -182,7 +183,6 @@
                         <div class="form-group">
                             <label for="acabamentoManga">Acabamento da Manga</label>
                             <select id="acabamentoManga" class="form-control">
-                                <option value="">Selecione</option>
                                 <option value="">-</option>
                                 <option value="barra">Barra</option>
                                 <option value="vies">Viés</option>
@@ -198,7 +198,6 @@
                         <div class="form-group">
                             <label for="gola">Tipo de Gola</label>
                             <select id="gola" class="form-control">
-                                <option value="">Selecione</option>
                                 <option value="">-</option>
                                 <option value="redonda">Gola Redonda</option>
                                 <option value="v">Gola V</option>
@@ -212,7 +211,6 @@
                         <div class="form-group">
                             <label for="acabamentoGola">Acabamento da Gola</label>
                             <select id="acabamentoGola" class="form-control">
-                                <option value="">Selecione</option>
                                 <option value="">-</option>
                                 <option value="polo">Polo</option>
                                 <option value="ribana_2_5">Ribana 2,5</option>
@@ -261,7 +259,7 @@
                         <div class="form-group">
                             <label for="bolso">Bolso</label>
                             <select id="bolso" class="form-control">
-                                <option value="nenhum">Nenhum</option>
+                                <option value="nenhum">-</option>
                                 <option value="peito">Bolso de Peito</option>
                                 <option value="traseiros">Bolsos Traseiros</option>
                                 <option value="canguru">Bolso Canguru</option>
@@ -290,7 +288,7 @@
                         <div class="form-group">
                             <label for="arte">Tipo de Arte/Personalização</label>
                             <select id="arte" class="form-control">
-                                <option value="">Selecione</option>
+                                <option value="">-</option>
                                 <option value="sublimacao">Sublimação</option>
                                 <option value="serigrafia">Serigrafia</option>
                                 <option value="bordado">Bordado</option>
@@ -350,7 +348,7 @@
                 <div class="card-header">
                     <i class="fas fa-images"></i>
                     <span>Arte / Imagens do Produto</span>
-                    <span class="images-counter" id="imagesCounter">(0/2)</span>
+                    <span class="images-counter" id="imagesCounter">(0/4)</span>
                 </div>
                 <div class="card-body">
                     <!-- Container das imagens adicionadas -->
@@ -366,7 +364,8 @@
 
                     <p class="hint-text">
                         <i class="fas fa-lightbulb"></i>
-                        Você pode colar imagens diretamente (Ctrl+V), arrastar para reordenar ou passar o mouse para deletar.
+                        Você pode colar imagens diretamente (Ctrl+V), arrastar para reordenar ou passar o mouse para
+                        deletar.
                     </p>
                 </div>
             </section>
@@ -433,14 +432,20 @@
                     <div><span class="label">Cor Material:</span> <span id="print-corMaterial"></span></div>
                     <div><span class="label">Tipo Manga:</span> <span id="print-manga"></span></div>
                     <div><span class="label">Acab. Manga:</span> <span id="print-acabamentoManga"></span></div>
-                    <div id="print-larguraMangaDiv" style="display: none;"><span class="label">Largura Manga:</span> <span id="print-larguraManga"></span></div>
+                    <div id="print-larguraMangaDiv" style="display: none;"><span class="label">Largura Manga:</span>
+                        <span id="print-larguraManga"></span></div>
                     <div><span class="label">Tipo Gola:</span> <span id="print-gola"></span></div>
                     <div><span class="label">Acab. Gola:</span> <span id="print-acabamentoGola"></span></div>
-                    <div id="print-corPeitilhoInternoDiv" style="display: none;"><span class="label">Cor Peitilho Interno:</span> <span id="print-corPeitilhoInterno"></span></div>
-                    <div id="print-corPeitilhoExternoDiv" style="display: none;"><span class="label">Cor Peitilho Externo:</span> <span id="print-corPeitilhoExterno"></span></div>
-                    <div id="print-aberturaLateralDiv" style="display: none;"><span class="label">Abertura Lateral:</span> <span id="print-aberturaLateral"></span></div>
-                    <div id="print-reforcoGolaDiv" style="display: none;"><span class="label">Reforço na Gola:</span> <span id="print-reforcoGola"></span></div>
-                    <div id="print-corReforcoDiv" style="display: none;"><span class="label">Cor do Reforço:</span> <span id="print-corReforco"></span></div>
+                    <div id="print-corPeitilhoInternoDiv" style="display: none;"><span class="label">Cor Peitilho
+                            Interno:</span> <span id="print-corPeitilhoInterno"></span></div>
+                    <div id="print-corPeitilhoExternoDiv" style="display: none;"><span class="label">Cor Peitilho
+                            Externo:</span> <span id="print-corPeitilhoExterno"></span></div>
+                    <div id="print-aberturaLateralDiv" style="display: none;"><span class="label">Abertura
+                            Lateral:</span> <span id="print-aberturaLateral"></span></div>
+                    <div id="print-reforcoGolaDiv" style="display: none;"><span class="label">Reforço na Gola:</span>
+                        <span id="print-reforcoGola"></span></div>
+                    <div id="print-corReforcoDiv" style="display: none;"><span class="label">Cor do Reforço:</span>
+                        <span id="print-corReforco"></span></div>
                     <div><span class="label">Bolso:</span> <span id="print-bolso"></span></div>
                     <div><span class="label">Filete:</span> <span id="print-filete"></span></div>
                     <div><span class="label">Faixa Refletiva:</span> <span id="print-faixa"></span></div>
@@ -468,6 +473,9 @@
     <script src="js/main.js" defer></script>
     <script src="js/api-client.js"></script>
     <script src="js/integration.js"></script>
+    <script src="js/cloudinary-upload.js"></script>
+    <script src="js/image-handler-cloudinary.js"></script>
+
 </body>
 
 </html>

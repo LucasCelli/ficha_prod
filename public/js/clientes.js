@@ -348,9 +348,20 @@
         method: 'DELETE'
       });
 
+      // Verificar content-type antes de tentar parsear JSON
+      const contentType = response.headers.get('content-type');
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao excluir');
+        let errorMsg = 'Erro ao excluir cliente';
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const error = await response.json();
+            errorMsg = error.error || errorMsg;
+          } catch (e) {
+            // Ignorar erro de parse
+          }
+        }
+        throw new Error(errorMsg);
       }
 
       mostrarToast('Cliente excluído com sucesso!', 'success');
@@ -359,7 +370,10 @@
 
     } catch (error) {
       console.error('❌ Erro ao excluir:', error);
-      mostrarToast(error.message || 'Erro ao excluir cliente', 'error');
+      // Evitar mostrar erro de parse JSON no toast
+      const msg = error.message || 'Erro ao excluir cliente';
+      const msgLimpa = msg.includes('Unexpected token') ? 'Erro ao excluir cliente' : msg;
+      mostrarToast(msgLimpa, 'error');
     }
   }
 
