@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import initSqlJs from 'sql.js';
-import fs from 'fs';
+import { createClient } from '@libsql/client';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -22,7 +21,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Servir arquivos estáticos com charset UTF-8
+// Servir arquivos estáticos
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
@@ -37,40 +36,17 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 
-// Variável global do banco de dados
-let db = null;
-const DB_PATH = path.join(__dirname, 'fichas.db');
-
-// Função para salvar o banco em disco
-function saveDatabase() {
-  try {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(DB_PATH, buffer);
-  } catch (error) {
-    console.error('Erro ao salvar banco de dados:', error);
-  }
-}
-
-// Auto-save a cada 30 segundos
-setInterval(saveDatabase, 30000);
+// ==================== CONEXÃO TURSO ====================
+const db = createClient({
+  url: process.env.TURSO_DATABASE_URL || 'libsql://fichas-lucascelli.aws-us-east-1.turso.io',
+  authToken: process.env.TURSO_AUTH_TOKEN || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzAxMzA5NzQsImlkIjoiZTMwYmY5NTktN2M5Yy00NDRiLWI3OTctYWVhMzg1ZmYzNGQ3IiwicmlkIjoiMTEwOTA3ZmMtNmMxMi00MWEzLThkNjMtYTZjMzM1YTQ0MjRmIn0.xIc3ziBEzsZ-HdBnYeVJXrxS2bSEXTB2nWie2uaKwuX0TyhiHuvGIM1Mn8w4xoX7Q5LulVCOf8_l8xnFtW8pAA'
+});
 
 // Inicializar banco de dados
 async function initDatabase() {
   try {
-    const SQL = await initSqlJs();
-
-    if (fs.existsSync(DB_PATH)) {
-      const fileBuffer = fs.readFileSync(DB_PATH);
-      db = new SQL.Database(fileBuffer);
-      console.log('✅ Banco de dados carregado de fichas.db');
-    } else {
-      db = new SQL.Database();
-      console.log('✅ Novo banco de dados criado');
-    }
-
-    // Criar tabelas
-    db.run(`
+    // Criar tabela de fichas
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS fichas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         cliente TEXT NOT NULL,
@@ -100,7 +76,6 @@ async function initDatabase() {
         cor_sublimacao TEXT,
         observacoes TEXT,
         imagem_data TEXT,
-        imagens_data TEXT,
         produtos TEXT,
         data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
         data_atualizacao DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -108,15 +83,8 @@ async function initDatabase() {
       )
     `);
 
-    // Adicionar coluna imagens_data se não existir (migração)
-    try {
-      db.run('ALTER TABLE fichas ADD COLUMN imagens_data TEXT');
-      console.log('✅ Coluna imagens_data adicionada');
-    } catch (e) {
-      // Coluna já existe, ignorar
-    }
-
-    db.run(`
+    // Criar tabela de clientes
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS clientes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT UNIQUE NOT NULL,
@@ -127,72 +95,54 @@ async function initDatabase() {
       )
     `);
 
-    db.run(`CREATE INDEX IF NOT EXISTS idx_fichas_cliente ON fichas(cliente)`);
-    db.run(`CREATE INDEX IF NOT EXISTS idx_fichas_status ON fichas(status)`);
-    db.run(`CREATE INDEX IF NOT EXISTS idx_fichas_data_inicio ON fichas(data_inicio)`);
-    db.run(`CREATE INDEX IF NOT EXISTS idx_fichas_data_entrega ON fichas(data_entrega)`);
-    db.run(`CREATE INDEX IF NOT EXISTS idx_fichas_vendedor ON fichas(vendedor)`);
+    // Criar índices
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_cliente ON fichas(cliente)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_status ON fichas(status)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_data_inicio ON fichas(data_inicio)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_data_entrega ON fichas(data_entrega)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_vendedor ON fichas(vendedor)`);
 
-    saveDatabase();
-    console.log('✅ Tabelas e índices criados com sucesso');
+    console.log('✅ Banco de dados Turso inicializado com sucesso');
   } catch (error) {
     console.error('❌ Erro ao inicializar banco de dados:', error);
-    process.exit(1);
+    throw error;
   }
 }
 
-// Funções auxiliares para queries
-function dbAll(sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const results = [];
-  while (stmt.step()) {
-    results.push(stmt.getAsObject());
-  }
-  stmt.free();
-  return results;
+// ==================== FUNÇÕES AUXILIARES ====================
+
+async function dbAll(sql, params = []) {
+  const result = await db.execute({ sql, args: params });
+  return result.rows;
 }
 
-function dbGet(sql, params = []) {
-  const results = dbAll(sql, params);
-  return results.length > 0 ? results[0] : null;
+async function dbGet(sql, params = []) {
+  const result = await db.execute({ sql, args: params });
+  return result.rows.length > 0 ? result.rows[0] : null;
 }
 
-function dbRun(sql, params = []) {
-  db.run(sql, params);
-  saveDatabase();
-
-  const lastIdResult = db.exec("SELECT last_insert_rowid() as id");
-  const lastId = lastIdResult.length > 0 && lastIdResult[0].values.length > 0 
-    ? lastIdResult[0].values[0][0] 
-    : 0;
-
+async function dbRun(sql, params = []) {
+  const result = await db.execute({ sql, args: params });
   return {
-    lastInsertRowid: lastId,
-    changes: db.getRowsModified()
+    lastInsertRowid: result.lastInsertRowid,
+    rowsAffected: result.rowsAffected
   };
-}
-
-function dbInsert(sql, params = []) {
-  db.run(sql, params);
-
-  const result = db.exec("SELECT last_insert_rowid() as id");
-  const lastId = result[0]?.values[0]?.[0] || 0;
-
-  saveDatabase();
-
-  return lastId;
 }
 
 // ==================== ROTAS DA API ====================
 
 // Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', database: 'connected' });
+app.get('/api/health', async (req, res) => {
+  try {
+    await db.execute('SELECT 1');
+    res.json({ status: 'ok', database: 'turso connected' });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
 });
 
 // Listar todas as fichas
-app.get('/api/fichas', (req, res) => {
+app.get('/api/fichas', async (req, res) => {
   try {
     const { status, cliente, vendedor, dataInicio, dataFim } = req.query;
 
@@ -226,19 +176,22 @@ app.get('/api/fichas', (req, res) => {
 
     query += ' ORDER BY id DESC';
 
-    const fichas = dbAll(query, params);
+    const fichas = await dbAll(query, params);
 
-    fichas.forEach(ficha => {
-      if (ficha.produtos) {
+    // Parse produtos JSON
+    const fichasFormatadas = fichas.map(ficha => {
+      const f = { ...ficha };
+      if (f.produtos) {
         try {
-          ficha.produtos = JSON.parse(ficha.produtos);
+          f.produtos = JSON.parse(f.produtos);
         } catch (e) {
-          ficha.produtos = [];
+          f.produtos = [];
         }
       }
+      return f;
     });
 
-    res.json(fichas);
+    res.json(fichasFormatadas);
   } catch (error) {
     console.error('Erro ao listar fichas:', error);
     res.status(500).json({ error: 'Erro ao listar fichas' });
@@ -246,9 +199,9 @@ app.get('/api/fichas', (req, res) => {
 });
 
 // Buscar ficha por ID
-app.get('/api/fichas/:id', (req, res) => {
+app.get('/api/fichas/:id', async (req, res) => {
   try {
-    const ficha = dbGet('SELECT * FROM fichas WHERE id = ?', [req.params.id]);
+    const ficha = await dbGet('SELECT * FROM fichas WHERE id = ?', [req.params.id]);
 
     if (!ficha) {
       return res.status(404).json({ error: 'Ficha não encontrada' });
@@ -270,7 +223,7 @@ app.get('/api/fichas/:id', (req, res) => {
 });
 
 // Criar nova ficha
-app.post('/api/fichas', (req, res) => {
+app.post('/api/fichas', async (req, res) => {
   try {
     const dados = req.body;
     const produtosJson = JSON.stringify(dados.produtos || []);
@@ -282,9 +235,8 @@ app.post('/api/fichas', (req, res) => {
         material, composicao, cor_material, manga, acabamento_manga, largura_manga,
         gola, acabamento_gola, cor_peitilho_interno, cor_peitilho_externo,
         abertura_lateral, reforco_gola, cor_reforco, bolso, filete, faixa,
-        arte, cor_sublimacao, observacoes, imagem_data, imagens_data, produtos, 
-        data_criacao, data_atualizacao
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        arte, cor_sublimacao, observacoes, imagem_data, produtos, data_criacao, data_atualizacao
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -294,16 +246,16 @@ app.post('/api/fichas', (req, res) => {
       dados.acabamentoManga, dados.larguraManga, dados.gola, dados.acabamentoGola,
       dados.corPeitilhoInterno, dados.corPeitilhoExterno, dados.aberturaLateral,
       dados.reforcoGola, dados.corReforco, dados.bolso, dados.filete, dados.faixa,
-      dados.arte, dados.corSublimacao, dados.observacoes, 
-      dados.imagemData || '',
-      dados.imagensData || '[]',
+      dados.arte, dados.corSublimacao, dados.observacoes, dados.imagemData,
       produtosJson, now, now
     ];
 
-    const novoId = dbInsert(sql, params);
+    const result = await dbRun(sql, params);
+    const novoId = Number(result.lastInsertRowid);
 
+    // Atualizar tabela de clientes
     if (dados.cliente) {
-      atualizarCliente(dados.cliente, dados.dataInicio);
+      await atualizarCliente(dados.cliente, dados.dataInicio);
     }
 
     console.log(`✅ Ficha #${novoId} criada`);
@@ -315,9 +267,9 @@ app.post('/api/fichas', (req, res) => {
 });
 
 // Atualizar ficha
-app.put('/api/fichas/:id', (req, res) => {
+app.put('/api/fichas/:id', async (req, res) => {
   try {
-    const fichaExiste = dbGet('SELECT id FROM fichas WHERE id = ?', [req.params.id]);
+    const fichaExiste = await dbGet('SELECT id FROM fichas WHERE id = ?', [req.params.id]);
 
     if (!fichaExiste) {
       return res.status(404).json({ error: 'Ficha não encontrada' });
@@ -336,7 +288,7 @@ app.put('/api/fichas/:id', (req, res) => {
         cor_peitilho_interno = ?, cor_peitilho_externo = ?, abertura_lateral = ?,
         reforco_gola = ?, cor_reforco = ?, bolso = ?, filete = ?, faixa = ?,
         arte = ?, cor_sublimacao = ?, observacoes = ?, imagem_data = ?,
-        imagens_data = ?, produtos = ?, data_atualizacao = ?
+        produtos = ?, data_atualizacao = ?
       WHERE id = ?
     `;
 
@@ -347,13 +299,11 @@ app.put('/api/fichas/:id', (req, res) => {
       dados.acabamentoManga, dados.larguraManga, dados.gola, dados.acabamentoGola,
       dados.corPeitilhoInterno, dados.corPeitilhoExterno, dados.aberturaLateral,
       dados.reforcoGola, dados.corReforco, dados.bolso, dados.filete, dados.faixa,
-      dados.arte, dados.corSublimacao, dados.observacoes, 
-      dados.imagemData || '',
-      dados.imagensData || '[]',
+      dados.arte, dados.corSublimacao, dados.observacoes, dados.imagemData,
       produtosJson, now, req.params.id
     ];
 
-    dbRun(sql, params);
+    await dbRun(sql, params);
 
     console.log(`✅ Ficha #${req.params.id} atualizada`);
     res.json({ id: parseInt(req.params.id), message: 'Ficha atualizada com sucesso' });
@@ -364,16 +314,16 @@ app.put('/api/fichas/:id', (req, res) => {
 });
 
 // Marcar ficha como entregue
-app.patch('/api/fichas/:id/entregar', (req, res) => {
+app.patch('/api/fichas/:id/entregar', async (req, res) => {
   try {
-    const fichaExiste = dbGet('SELECT id FROM fichas WHERE id = ?', [req.params.id]);
+    const fichaExiste = await dbGet('SELECT id FROM fichas WHERE id = ?', [req.params.id]);
 
     if (!fichaExiste) {
       return res.status(404).json({ error: 'Ficha não encontrada' });
     }
 
     const now = new Date().toISOString();
-    dbRun(`UPDATE fichas SET status = 'entregue', data_entregue = ? WHERE id = ?`, [now, req.params.id]);
+    await dbRun(`UPDATE fichas SET status = 'entregue', data_entregue = ? WHERE id = ?`, [now, req.params.id]);
 
     console.log(`✅ Ficha #${req.params.id} marcada como entregue`);
     res.json({ message: 'Ficha marcada como entregue' });
@@ -384,15 +334,15 @@ app.patch('/api/fichas/:id/entregar', (req, res) => {
 });
 
 // Desmarcar ficha (voltar para pendente)
-app.patch('/api/fichas/:id/pendente', (req, res) => {
+app.patch('/api/fichas/:id/pendente', async (req, res) => {
   try {
-    const fichaExiste = dbGet('SELECT id FROM fichas WHERE id = ?', [req.params.id]);
+    const fichaExiste = await dbGet('SELECT id FROM fichas WHERE id = ?', [req.params.id]);
 
     if (!fichaExiste) {
       return res.status(404).json({ error: 'Ficha não encontrada' });
     }
 
-    dbRun(`UPDATE fichas SET status = 'pendente', data_entregue = NULL WHERE id = ?`, [req.params.id]);
+    await dbRun(`UPDATE fichas SET status = 'pendente', data_entregue = NULL WHERE id = ?`, [req.params.id]);
 
     console.log(`✅ Ficha #${req.params.id} voltou para pendente`);
     res.json({ message: 'Ficha marcada como pendente' });
@@ -403,15 +353,15 @@ app.patch('/api/fichas/:id/pendente', (req, res) => {
 });
 
 // Deletar ficha
-app.delete('/api/fichas/:id', (req, res) => {
+app.delete('/api/fichas/:id', async (req, res) => {
   try {
-    const fichaExiste = dbGet('SELECT id FROM fichas WHERE id = ?', [req.params.id]);
+    const fichaExiste = await dbGet('SELECT id FROM fichas WHERE id = ?', [req.params.id]);
 
     if (!fichaExiste) {
       return res.status(404).json({ error: 'Ficha não encontrada' });
     }
 
-    dbRun('DELETE FROM fichas WHERE id = ?', [req.params.id]);
+    await dbRun('DELETE FROM fichas WHERE id = ?', [req.params.id]);
 
     console.log(`✅ Ficha #${req.params.id} deletada`);
     res.json({ message: 'Ficha deletada com sucesso' });
@@ -422,7 +372,7 @@ app.delete('/api/fichas/:id', (req, res) => {
 });
 
 // Buscar clientes (autocomplete)
-app.get('/api/clientes', (req, res) => {
+app.get('/api/clientes', async (req, res) => {
   try {
     const { termo } = req.query;
     let query = 'SELECT nome FROM clientes';
@@ -435,7 +385,7 @@ app.get('/api/clientes', (req, res) => {
 
     query += ' ORDER BY ultimo_pedido DESC LIMIT 50';
 
-    const clientes = dbAll(query, params);
+    const clientes = await dbAll(query, params);
     res.json(clientes.map(c => c.nome));
   } catch (error) {
     console.error('Erro ao buscar clientes:', error);
@@ -443,214 +393,10 @@ app.get('/api/clientes', (req, res) => {
   }
 });
 
-// Estatísticas gerais
-app.get('/api/estatisticas', (req, res) => {
+// Listar todos os clientes com detalhes
+app.get('/api/clientes/lista', async (req, res) => {
   try {
-    const stats = {};
-
-    stats.totalFichas = dbGet('SELECT COUNT(*) as total FROM fichas')?.total || 0;
-    stats.pendentes = dbGet("SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente'")?.total || 0;
-    stats.entregues = dbGet("SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue'")?.total || 0;
-    stats.totalClientes = dbGet('SELECT COUNT(*) as total FROM clientes')?.total || 0;
-
-    const now = new Date();
-    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    stats.esteMes = dbGet(
-      "SELECT COUNT(*) as total FROM fichas WHERE substr(data_inicio, 1, 7) = ?",
-      [mesAtual]
-    )?.total || 0;
-
-    // Contar itens apenas de fichas existentes
-    const fichas = dbAll('SELECT produtos FROM fichas');
-    let totalItens = 0;
-    fichas.forEach(ficha => {
-      if (ficha.produtos) {
-        try {
-          const produtos = JSON.parse(ficha.produtos);
-          produtos.forEach(p => {
-            totalItens += parseInt(p.quantidade) || 0;
-          });
-        } catch (e) {}
-      }
-    });
-    stats.totalItens = totalItens;
-
-    res.json(stats);
-  } catch (error) {
-    console.error('Erro ao buscar estatísticas:', error);
-    res.status(500).json({ error: 'Erro ao buscar estatísticas' });
-  }
-});
-
-// Relatório por período - CORRIGIDO v2
-app.get('/api/relatorio', (req, res) => {
-  try {
-    const { periodo, dataInicio, dataFim } = req.query;
-
-    const now = new Date();
-    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const anoAtual = `${now.getFullYear()}`;
-
-    const relatorio = {};
-
-    // ============ FICHAS ENTREGUES ============
-    // Usa data_entregue (quando foi marcado como entregue)
-    let sqlEntregues = '';
-    let paramsEntregues = [];
-
-    if (periodo === 'mes') {
-      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 7) = ?`;
-      paramsEntregues = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 4) = ?`;
-      paramsEntregues = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND date(data_entregue) BETWEEN ? AND ?`;
-      paramsEntregues = [dataInicio, dataFim];
-    } else {
-      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue'`;
-    }
-
-    relatorio.fichasEntregues = dbGet(sqlEntregues, paramsEntregues)?.total || 0;
-
-    // ============ FICHAS PENDENTES ============
-    // Usa data_inicio (quando o pedido foi criado)
-    let sqlPendentes = '';
-    let paramsPendentes = [];
-
-    if (periodo === 'mes') {
-      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND substr(data_inicio, 1, 7) = ?`;
-      paramsPendentes = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND substr(data_inicio, 1, 4) = ?`;
-      paramsPendentes = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND data_inicio BETWEEN ? AND ?`;
-      paramsPendentes = [dataInicio, dataFim];
-    } else {
-      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente'`;
-    }
-
-    relatorio.fichasPendentes = dbGet(sqlPendentes, paramsPendentes)?.total || 0;
-
-    // ============ ITENS CONFECCIONADOS ============
-    // Soma itens de fichas ENTREGUES no período (por data_entregue)
-    let sqlItens = '';
-    let paramsItens = [];
-
-    if (periodo === 'mes') {
-      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 7) = ?`;
-      paramsItens = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 4) = ?`;
-      paramsItens = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND date(data_entregue) BETWEEN ? AND ?`;
-      paramsItens = [dataInicio, dataFim];
-    } else {
-      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue'`;
-    }
-
-    const fichasParaItens = dbAll(sqlItens, paramsItens);
-
-    let itensConfeccionados = 0;
-    fichasParaItens.forEach(ficha => {
-      if (ficha.produtos) {
-        try {
-          const produtos = typeof ficha.produtos === 'string' 
-            ? JSON.parse(ficha.produtos) 
-            : ficha.produtos;
-          produtos.forEach(p => {
-            itensConfeccionados += parseInt(p.quantidade) || 0;
-          });
-        } catch (e) {
-          console.warn('Erro ao parsear produtos:', e);
-        }
-      }
-    });
-    relatorio.itensConfeccionados = itensConfeccionados;
-
-    // ============ NOVOS CLIENTES ============
-    let sqlClientes = '';
-    let paramsClientes = [];
-
-    if (periodo === 'mes') {
-      sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE substr(primeiro_pedido, 1, 7) = ?`;
-      paramsClientes = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE substr(primeiro_pedido, 1, 4) = ?`;
-      paramsClientes = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE primeiro_pedido BETWEEN ? AND ?`;
-      paramsClientes = [dataInicio, dataFim];
-    } else {
-      sqlClientes = `SELECT COUNT(*) as total FROM clientes`;
-    }
-
-    relatorio.novosClientes = dbGet(sqlClientes, paramsClientes)?.total || 0;
-
-    // ============ TOP VENDEDOR ============
-    // Baseado em fichas criadas no período (data_inicio)
-    let sqlVendedor = '';
-    let paramsVendedor = [];
-
-    if (periodo === 'mes') {
-      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 7) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
-      paramsVendedor = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 4) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
-      paramsVendedor = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND data_inicio BETWEEN ? AND ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
-      paramsVendedor = [dataInicio, dataFim];
-    } else {
-      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
-    }
-
-    const topVendedor = dbGet(sqlVendedor, paramsVendedor);
-    relatorio.topVendedor = topVendedor ? topVendedor.vendedor : null;
-    relatorio.topVendedorTotal = topVendedor ? topVendedor.total : 0;
-
-    console.log('📊 Relatório gerado:', relatorio);
-    res.json(relatorio);
-
-  } catch (error) {
-    console.error('Erro ao gerar relatório:', error);
-    res.status(500).json({ error: 'Erro ao gerar relatório' });
-  }
-});
-
-
-// Função auxiliar para atualizar dados do cliente
-function atualizarCliente(nomeCliente, dataInicio) {
-  try {
-    const hoje = new Date().toISOString().split('T')[0];
-    const data = dataInicio || hoje;
-
-    const clienteExiste = dbGet('SELECT * FROM clientes WHERE nome = ?', [nomeCliente]);
-
-    if (clienteExiste) {
-      dbRun(
-        `UPDATE clientes SET ultimo_pedido = ?, total_pedidos = total_pedidos + 1 WHERE nome = ?`,
-        [data, nomeCliente]
-      );
-    } else {
-      dbRun(
-        `INSERT INTO clientes (nome, primeiro_pedido, ultimo_pedido, total_pedidos) VALUES (?, ?, ?, 1)`,
-        [nomeCliente, data, data]
-      );
-    }
-  } catch (error) {
-    console.error('Erro ao atualizar cliente:', error);
-  }
-}
-
-// ==================== ROTAS DE CLIENTES (CRUD) ====================
-
-// Listar todos os clientes com detalhes (contando pedidos reais)
-app.get('/api/clientes/lista', (req, res) => {
-  try {
-    const clientes = dbAll(`
+    const clientes = await dbAll(`
       SELECT 
         c.id, 
         c.nome, 
@@ -669,115 +415,209 @@ app.get('/api/clientes/lista', (req, res) => {
   }
 });
 
-// Buscar cliente por ID
-app.get('/api/clientes/:id', (req, res) => {
+// Estatísticas gerais
+app.get('/api/estatisticas', async (req, res) => {
   try {
-    const cliente = dbGet('SELECT * FROM clientes WHERE id = ?', [req.params.id]);
+    const stats = {};
 
-    if (!cliente) {
-      return res.status(404).json({ error: 'Cliente não encontrado' });
-    }
+    const totalFichas = await dbGet('SELECT COUNT(*) as total FROM fichas');
+    stats.totalFichas = totalFichas?.total || 0;
 
-    res.json(cliente);
+    const pendentes = await dbGet("SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente'");
+    stats.pendentes = pendentes?.total || 0;
+
+    const entregues = await dbGet("SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue'");
+    stats.entregues = entregues?.total || 0;
+
+    const totalClientes = await dbGet('SELECT COUNT(*) as total FROM clientes');
+    stats.totalClientes = totalClientes?.total || 0;
+
+    const now = new Date();
+    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const esteMes = await dbGet(
+      "SELECT COUNT(*) as total FROM fichas WHERE substr(data_inicio, 1, 7) = ?",
+      [mesAtual]
+    );
+    stats.esteMes = esteMes?.total || 0;
+
+    // Total de itens
+    const fichas = await dbAll('SELECT produtos FROM fichas');
+    let totalItens = 0;
+    fichas.forEach(ficha => {
+      if (ficha.produtos) {
+        try {
+          const produtos = typeof ficha.produtos === 'string' ? JSON.parse(ficha.produtos) : ficha.produtos;
+          produtos.forEach(p => {
+            totalItens += parseInt(p.quantidade) || 0;
+          });
+        } catch (e) {}
+      }
+    });
+    stats.totalItens = totalItens;
+
+    res.json(stats);
   } catch (error) {
-    console.error('Erro ao buscar cliente:', error);
-    res.status(500).json({ error: 'Erro ao buscar cliente' });
+    console.error('Erro ao buscar estatísticas:', error);
+    res.status(500).json({ error: 'Erro ao buscar estatísticas' });
   }
 });
 
-// Atualizar cliente
-app.put('/api/clientes/:id', (req, res) => {
+// Relatório por período
+app.get('/api/relatorio', async (req, res) => {
   try {
-    const clienteExiste = dbGet('SELECT id, nome FROM clientes WHERE id = ?', [req.params.id]);
+    const { periodo, dataInicio, dataFim } = req.query;
 
-    if (!clienteExiste) {
-      return res.status(404).json({ error: 'Cliente não encontrado' });
+    const now = new Date();
+    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const anoAtual = `${now.getFullYear()}`;
+
+    const relatorio = {};
+
+    // Fichas entregues (por data_entregue)
+    let sqlEntregues = '';
+    let paramsEntregues = [];
+
+    if (periodo === 'mes') {
+      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 7) = ?`;
+      paramsEntregues = [mesAtual];
+    } else if (periodo === 'ano') {
+      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 4) = ?`;
+      paramsEntregues = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND date(data_entregue) BETWEEN ? AND ?`;
+      paramsEntregues = [dataInicio, dataFim];
+    } else {
+      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue'`;
     }
 
-    const { nome, primeiro_pedido, ultimo_pedido } = req.body;
+    const entreguesResult = await dbGet(sqlEntregues, paramsEntregues);
+    relatorio.fichasEntregues = entreguesResult?.total || 0;
 
-    if (!nome || !nome.trim()) {
-      return res.status(400).json({ error: 'Nome é obrigatório' });
+    // Fichas pendentes (por data_inicio)
+    let sqlPendentes = '';
+    let paramsPendentes = [];
+
+    if (periodo === 'mes') {
+      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND substr(data_inicio, 1, 7) = ?`;
+      paramsPendentes = [mesAtual];
+    } else if (periodo === 'ano') {
+      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND substr(data_inicio, 1, 4) = ?`;
+      paramsPendentes = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND data_inicio BETWEEN ? AND ?`;
+      paramsPendentes = [dataInicio, dataFim];
+    } else {
+      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente'`;
     }
 
-    const nomeExiste = dbGet('SELECT id FROM clientes WHERE nome = ? AND id != ?', [nome.trim(), req.params.id]);
+    const pendentesResult = await dbGet(sqlPendentes, paramsPendentes);
+    relatorio.fichasPendentes = pendentesResult?.total || 0;
 
-    if (nomeExiste) {
-      return res.status(400).json({ error: 'Já existe um cliente com esse nome' });
+    // Itens confeccionados (fichas entregues)
+    let sqlItens = '';
+    let paramsItens = [];
+
+    if (periodo === 'mes') {
+      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 7) = ?`;
+      paramsItens = [mesAtual];
+    } else if (periodo === 'ano') {
+      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 4) = ?`;
+      paramsItens = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND date(data_entregue) BETWEEN ? AND ?`;
+      paramsItens = [dataInicio, dataFim];
+    } else {
+      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue'`;
     }
 
-    const nomeAntigo = clienteExiste.nome;
-    const nomeNovo = nome.trim();
+    const fichasParaItens = await dbAll(sqlItens, paramsItens);
 
-    dbRun(`
-      UPDATE clientes SET 
-        nome = ?,
-        primeiro_pedido = ?,
-        ultimo_pedido = ?
-      WHERE id = ?
-    `, [nomeNovo, primeiro_pedido || null, ultimo_pedido || null, req.params.id]);
+    let itensConfeccionados = 0;
+    fichasParaItens.forEach(ficha => {
+      if (ficha.produtos) {
+        try {
+          const produtos = typeof ficha.produtos === 'string' ? JSON.parse(ficha.produtos) : ficha.produtos;
+          produtos.forEach(p => {
+            itensConfeccionados += parseInt(p.quantidade) || 0;
+          });
+        } catch (e) {}
+      }
+    });
+    relatorio.itensConfeccionados = itensConfeccionados;
 
-    if (nomeAntigo !== nomeNovo) {
-      dbRun('UPDATE fichas SET cliente = ? WHERE cliente = ?', [nomeNovo, nomeAntigo]);
-      console.log(`✅ Nome atualizado de "${nomeAntigo}" para "${nomeNovo}" em todas as fichas`);
+    // Novos clientes
+    let sqlClientes = '';
+    let paramsClientes = [];
+
+    if (periodo === 'mes') {
+      sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE substr(primeiro_pedido, 1, 7) = ?`;
+      paramsClientes = [mesAtual];
+    } else if (periodo === 'ano') {
+      sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE substr(primeiro_pedido, 1, 4) = ?`;
+      paramsClientes = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE primeiro_pedido BETWEEN ? AND ?`;
+      paramsClientes = [dataInicio, dataFim];
+    } else {
+      sqlClientes = `SELECT COUNT(*) as total FROM clientes`;
     }
 
-    console.log(`✅ Cliente #${req.params.id} atualizado`);
-    res.json({ message: 'Cliente atualizado com sucesso' });
+    const clientesResult = await dbGet(sqlClientes, paramsClientes);
+    relatorio.novosClientes = clientesResult?.total || 0;
+
+    // Top vendedor
+    let sqlVendedor = '';
+    let paramsVendedor = [];
+
+    if (periodo === 'mes') {
+      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 7) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+      paramsVendedor = [mesAtual];
+    } else if (periodo === 'ano') {
+      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 4) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+      paramsVendedor = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND data_inicio BETWEEN ? AND ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+      paramsVendedor = [dataInicio, dataFim];
+    } else {
+      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+    }
+
+    const topVendedor = await dbGet(sqlVendedor, paramsVendedor);
+    relatorio.topVendedor = topVendedor ? topVendedor.vendedor : null;
+    relatorio.topVendedorTotal = topVendedor ? topVendedor.total : 0;
+
+    console.log('📊 Relatório gerado:', relatorio);
+    res.json(relatorio);
+
+  } catch (error) {
+    console.error('Erro ao gerar relatório:', error);
+    res.status(500).json({ error: 'Erro ao gerar relatório' });
+  }
+});
+
+// Função auxiliar para atualizar dados do cliente
+async function atualizarCliente(nomeCliente, dataInicio) {
+  try {
+    const hoje = new Date().toISOString().split('T')[0];
+    const data = dataInicio || hoje;
+
+    const clienteExiste = await dbGet('SELECT * FROM clientes WHERE nome = ?', [nomeCliente]);
+
+    if (clienteExiste) {
+      await dbRun(
+        `UPDATE clientes SET ultimo_pedido = ?, total_pedidos = total_pedidos + 1 WHERE nome = ?`,
+        [data, nomeCliente]
+      );
+    } else {
+      await dbRun(
+        `INSERT INTO clientes (nome, primeiro_pedido, ultimo_pedido, total_pedidos) VALUES (?, ?, ?, 1)`,
+        [nomeCliente, data, data]
+      );
+    }
   } catch (error) {
     console.error('Erro ao atualizar cliente:', error);
-    res.status(500).json({ error: 'Erro ao atualizar cliente' });
   }
-});
-
-// Deletar cliente
-app.delete('/api/clientes/:id', (req, res) => {
-  try {
-    const cliente = dbGet('SELECT id, nome FROM clientes WHERE id = ?', [req.params.id]);
-
-    if (!cliente) {
-      return res.status(404).json({ error: 'Cliente não encontrado' });
-    }
-
-    dbRun('DELETE FROM clientes WHERE id = ?', [req.params.id]);
-
-    console.log(`✅ Cliente "${cliente.nome}" excluído`);
-    res.json({ message: 'Cliente excluído com sucesso' });
-  } catch (error) {
-    console.error('Erro ao excluir cliente:', error);
-    res.status(500).json({ error: 'Erro ao excluir cliente' });
-  }
-});
-
-// Criar cliente manualmente
-app.post('/api/clientes', (req, res) => {
-  try {
-    const { nome, primeiro_pedido, ultimo_pedido } = req.body;
-
-    if (!nome || !nome.trim()) {
-      return res.status(400).json({ error: 'Nome é obrigatório' });
-    }
-
-    const existe = dbGet('SELECT id FROM clientes WHERE nome = ?', [nome.trim()]);
-
-    if (existe) {
-      return res.status(400).json({ error: 'Cliente já existe' });
-    }
-
-    const hoje = new Date().toISOString().split('T')[0];
-
-    const id = dbInsert(`
-      INSERT INTO clientes (nome, primeiro_pedido, ultimo_pedido, total_pedidos)
-      VALUES (?, ?, ?, 0)
-    `, [nome.trim(), primeiro_pedido || hoje, ultimo_pedido || hoje]);
-
-    console.log(`✅ Cliente "${nome}" criado`);
-    res.status(201).json({ id, message: 'Cliente criado com sucesso' });
-  } catch (error) {
-    console.error('Erro ao criar cliente:', error);
-    res.status(500).json({ error: 'Erro ao criar cliente' });
-  }
-});
+}
 
 // Rota catch-all
 app.get('*', (req, res) => {
@@ -790,21 +630,10 @@ app.get('*', (req, res) => {
 initDatabase().then(() => {
   app.listen(PORT, () => {
     console.log('🚀 Servidor rodando em http://localhost:' + PORT);
-    console.log('📊 Banco de dados: fichas.db (sql.js)');
+    console.log('📊 Banco de dados: Turso (LibSQL)');
     console.log('✅ Encoding UTF-8 configurado');
   });
-});
-
-// Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('\n💾 Salvando banco de dados...');
-  saveDatabase();
-  console.log('✅ Banco de dados salvo');
-  console.log('👋 Servidor encerrado');
-  process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-  saveDatabase();
-  process.exit(0);
+}).catch(error => {
+  console.error('❌ Falha ao iniciar servidor:', error);
+  process.exit(1);
 });

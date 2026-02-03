@@ -1,26 +1,17 @@
 {
-  "name": "sistema-fichas-tecnicas",
+  "name": "fichas-tecnicas",
   "version": "2.0.0",
-  "description": "Sistema de gestão de fichas técnicas com backend SQL",
+  "description": "Sistema de Fichas Técnicas com Turso",
   "main": "server.js",
   "type": "module",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js"
   },
-  "keywords": [
-    "fichas",
-    "producao",
-    "textil",
-    "gestao"
-  ],
-  "author": "",
-  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
-    "sql.js": "^1.8.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1"
+    "@libsql/client": "^0.14.0"
   },
   "engines": {
     "node": ">=18.0.0"
