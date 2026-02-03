@@ -583,10 +583,10 @@ function atualizarCliente(nomeCliente, dataInicio) {
 // Rota catch-all
 app.get('*', (req, res) => {
   if (!req.path.startsWith('/api')) {
-    res.sendHeader('Content-Type', 'text/html; charset=utf-8');
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
   }
 });
+
 
 // Iniciar servidor
 initDatabase().then(() => {
