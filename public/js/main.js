@@ -2,12 +2,16 @@
   'use strict';
 
   const CATALOG_URL = 'data/catalogo.json';
+  const MAX_IMAGES = 2;
 
   let catalog = {
     tamanhos: [],
     produtos: [],
     materiais: []
   };
+
+  // Array para armazenar as imagens
+  let imagens = [];
 
   document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -23,7 +27,7 @@
     initSpecsAutoFill();
     initArtColorControls();
     initIconPreview();
-    initImageUpload();
+    initMultipleImages();
     initSaveLoad();
     initPrint();
     initPrazoCalculator();
@@ -213,7 +217,7 @@
     calcularPrazo();
   }
 
-  // ==================== DRAG AND DROP ====================
+  // ==================== DRAG AND DROP (PRODUTOS) ====================
 
   let draggedRow = null;
   let dropPosition = null;
@@ -742,28 +746,163 @@
     });
   }
 
-  function initImageUpload() {
+  // ==================== SISTEMA DE MÚLTIPLAS IMAGENS ====================
+
+  function initMultipleImages() {
     const dropArea = document.getElementById('imageUpload');
     const fileInput = document.getElementById('fileInput');
-    const preview = document.getElementById('imagePreview');
-    if (!dropArea || !fileInput || !preview) return;
+    const container = document.getElementById('imagesContainer');
+    const counter = document.getElementById('imagesCounter');
 
-    const setPreview = src => {
-      preview.src = src;
-    };
+    if (!dropArea || !fileInput || !container) return;
 
-    const handleFiles = files => {
-      if (!files || !files.length) return;
-      const file = files[0];
-      if (!file.type.startsWith('image/')) {
-        alert('Selecione um arquivo de imagem.');
-        return;
+    // Atualizar contador
+    function atualizarContador() {
+      if (counter) {
+        counter.textContent = `(${imagens.length}/${MAX_IMAGES})`;
       }
-      const reader = new FileReader();
-      reader.onload = e => setPreview(e.target.result);
-      reader.readAsDataURL(file);
-    };
 
+      // Mostrar/esconder área de upload
+      if (imagens.length >= MAX_IMAGES) {
+        dropArea.classList.add('hidden');
+      } else {
+        dropArea.classList.remove('hidden');
+      }
+    }
+
+    // Renderizar imagens
+    function renderizarImagens() {
+      container.innerHTML = '';
+
+      imagens.forEach((img, index) => {
+        const card = document.createElement('div');
+        card.className = 'image-card';
+        card.draggable = true;
+        card.dataset.index = index;
+
+        card.innerHTML = `
+          <div class="image-wrapper">
+            <span class="image-number">${index + 1}</span>
+            <img src="${img.src}" alt="Imagem ${index + 1}" draggable="false">
+            <button type="button" class="image-delete-btn" title="Remover imagem">
+              <i class="fas fa-times"></i>
+            </button>
+            <div class="image-drag-handle">
+              <i class="fas fa-grip-horizontal"></i>
+              Arrastar
+            </div>
+          </div>
+          <div class="image-description">
+            <input type="text" placeholder="Descrição da imagem (opcional)" value="${img.descricao || ''}" data-index="${index}">
+          </div>
+        `;
+
+        container.appendChild(card);
+
+        // Event: Deletar
+        card.querySelector('.image-delete-btn').addEventListener('click', () => {
+          imagens.splice(index, 1);
+          renderizarImagens();
+          atualizarContador();
+        });
+
+        // Event: Atualizar descrição
+        card.querySelector('input').addEventListener('input', (e) => {
+          imagens[index].descricao = e.target.value;
+        });
+
+        // Events: Drag and drop para reordenar
+        card.addEventListener('dragstart', handleImageDragStart);
+        card.addEventListener('dragend', handleImageDragEnd);
+        card.addEventListener('dragover', handleImageDragOver);
+        card.addEventListener('drop', handleImageDrop);
+        card.addEventListener('dragleave', handleImageDragLeave);
+      });
+
+      atualizarContador();
+    }
+
+    // Drag handlers para imagens
+    let draggedImageIndex = null;
+
+    function handleImageDragStart(e) {
+      draggedImageIndex = parseInt(e.currentTarget.dataset.index);
+      e.currentTarget.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleImageDragEnd(e) {
+      e.currentTarget.classList.remove('dragging');
+      document.querySelectorAll('.image-card').forEach(card => {
+        card.classList.remove('drag-over');
+      });
+      draggedImageIndex = null;
+    }
+
+    function handleImageDragOver(e) {
+      e.preventDefault();
+      const card = e.currentTarget;
+      const targetIndex = parseInt(card.dataset.index);
+
+      if (targetIndex !== draggedImageIndex) {
+        card.classList.add('drag-over');
+      }
+    }
+
+    function handleImageDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+
+    function handleImageDrop(e) {
+      e.preventDefault();
+      const card = e.currentTarget;
+      card.classList.remove('drag-over');
+
+      const targetIndex = parseInt(card.dataset.index);
+
+      if (draggedImageIndex !== null && targetIndex !== draggedImageIndex) {
+        // Reordenar array
+        const [movedItem] = imagens.splice(draggedImageIndex, 1);
+        imagens.splice(targetIndex, 0, movedItem);
+        renderizarImagens();
+        console.log('✅ Imagens reordenadas');
+      }
+    }
+
+    // Adicionar imagem
+    function adicionarImagem(src, descricao = '') {
+      if (imagens.length >= MAX_IMAGES) {
+        alert(`Máximo de ${MAX_IMAGES} imagens permitido.`);
+        return false;
+      }
+
+      imagens.push({ src, descricao });
+      renderizarImagens();
+      return true;
+    }
+
+    // Processar arquivos
+    function processarArquivos(files) {
+      if (!files || !files.length) return;
+
+      Array.from(files).forEach(file => {
+        if (!file.type.startsWith('image/')) {
+          console.warn('Arquivo não é uma imagem:', file.name);
+          return;
+        }
+
+        if (imagens.length >= MAX_IMAGES) {
+          alert(`Máximo de ${MAX_IMAGES} imagens atingido.`);
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = e => adicionarImagem(e.target.result);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Events
     dropArea.addEventListener('click', () => fileInput.click());
     dropArea.addEventListener('keypress', e => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -772,7 +911,10 @@
       }
     });
 
-    fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+    fileInput.addEventListener('change', () => {
+      processarArquivos(fileInput.files);
+      fileInput.value = '';
+    });
 
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(name => {
       dropArea.addEventListener(name, e => {
@@ -794,25 +936,46 @@
     });
 
     dropArea.addEventListener('drop', e => {
-      handleFiles(e.dataTransfer.files);
+      processarArquivos(e.dataTransfer.files);
     });
 
+    // Paste (Ctrl+V)
     document.addEventListener('paste', e => {
       const items = e.clipboardData?.items;
       if (!items) return;
-      for (let i = 0; i < items.length; i += 1) {
-        const it = items[i];
-        if (it.type.startsWith('image/')) {
-          const blob = it.getAsFile();
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith('image/')) {
+          const blob = item.getAsFile();
           if (!blob) continue;
+
+          if (imagens.length >= MAX_IMAGES) {
+            alert(`Máximo de ${MAX_IMAGES} imagens atingido.`);
+            return;
+          }
+
           const reader = new FileReader();
-          reader.onload = ev => setPreview(ev.target.result);
+          reader.onload = ev => adicionarImagem(ev.target.result);
           reader.readAsDataURL(blob);
           break;
         }
       }
     });
+
+    // Exportar funções
+    window.getImagens = () => imagens;
+    window.setImagens = (novasImagens) => {
+      imagens = novasImagens || [];
+      renderizarImagens();
+    };
+    window.adicionarImagem = adicionarImagem;
+
+    // Inicializar
+    atualizarContador();
   }
+
+  // ==================== SALVAR E CARREGAR ====================
 
   function initSaveLoad() {
     const btnSalvar = document.getElementById('btnSalvar');
@@ -863,7 +1026,10 @@
       composicao: document.getElementById('composicao')?.value || '',
       corSublimacao,
       observacoes: document.getElementById('observacoes')?.value || '',
-      imagem: document.getElementById('imagePreview')?.src || ''
+      // NOVO: Array de imagens com descrições
+      imagens: window.getImagens ? window.getImagens() : [],
+      // Manter compatibilidade com formato antigo
+      imagem: (window.getImagens && window.getImagens().length > 0) ? window.getImagens()[0].src : ''
     };
   }
 
@@ -882,7 +1048,6 @@
     a.remove();
   }
 
-  // Exportar para uso global
   window.salvarFicha = salvarFicha;
 
   function carregarFichaDeArquivo() {
@@ -909,7 +1074,6 @@
     input.click();
   }
 
-  // Exportar para uso global
   window.carregarFichaDeArquivo = carregarFichaDeArquivo;
 
   function preencherFicha(ficha) {
@@ -982,13 +1146,22 @@
       }
     }
 
-    if (ficha.imagem) {
-      const img = document.getElementById('imagePreview');
-      if (img) img.src = ficha.imagem;
+    // NOVO: Carregar múltiplas imagens
+    if (window.setImagens) {
+      if (ficha.imagens && Array.isArray(ficha.imagens) && ficha.imagens.length > 0) {
+        window.setImagens(ficha.imagens);
+      } else if (ficha.imagem) {
+        // Compatibilidade com formato antigo (única imagem)
+        window.setImagens([{ src: ficha.imagem, descricao: '' }]);
+      } else {
+        window.setImagens([]);
+      }
     }
 
     atualizarIconPreview();
   }
+
+  // ==================== IMPRESSÃO ====================
 
   function initPrint() {
     const btn = document.getElementById('btnImprimir');
@@ -1146,9 +1319,38 @@
       'Nenhuma'
     );
 
-    const imgSrc = document.getElementById('imagePreview')?.src || '';
-    const printImg = document.getElementById('print-imagePreview');
-    if (printImg) printImg.src = imgSrc;
+    // NOVO: Renderizar múltiplas imagens na impressão
+    const printImagesContainer = document.getElementById('print-imagesContainer');
+    const printImagesSection = document.getElementById('print-imagesSection');
+
+    if (printImagesContainer) {
+      printImagesContainer.innerHTML = '';
+
+      const imgs = window.getImagens ? window.getImagens() : [];
+
+      if (imgs.length === 0) {
+        // Esconder seção se não há imagens
+        if (printImagesSection) {
+          printImagesSection.style.display = 'none';
+        }
+      } else {
+        if (printImagesSection) {
+          printImagesSection.style.display = 'block';
+        }
+
+        imgs.forEach((img, index) => {
+          const div = document.createElement('div');
+          div.className = imgs.length === 1 ? 'print-image-item single' : 'print-image-item';
+
+          div.innerHTML = `
+            <img src="${img.src}" alt="Imagem ${index + 1}">
+            ${img.descricao ? `<div class="print-image-description">${img.descricao}</div>` : ''}
+          `;
+
+          printImagesContainer.appendChild(div);
+        });
+      }
+    }
 
     const normal = document.getElementById('normal-version');
     const printV = document.getElementById('print-version');
@@ -1170,5 +1372,7 @@
   window.gerarVersaoImpressao = gerarVersaoImpressao;
   window.salvarFicha = salvarFicha;
   window.carregarFichaDeArquivo = carregarFichaDeArquivo;
+  window.coletarFicha = coletarFicha;
+  window.preencherFicha = preencherFicha;
 
 })();

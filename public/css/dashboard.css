@@ -320,3 +320,20 @@
     gap: 6px;
   }
 }
+
+/* PAGINAÇÃO */
+.paginacao {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.page-info {
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  font-weight: 500;
+}

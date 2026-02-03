@@ -1,0 +1,280 @@
+/* ==================== SISTEMA DE MÚLTIPLAS IMAGENS ==================== */
+
+/* Contador no header */
+.images-counter {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  font-weight: 500;
+}
+
+/* Grid de imagens */
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.images-grid:empty {
+  display: none;
+}
+
+/* Card de cada imagem */
+.image-card {
+  position: relative;
+  background: #f9fafb;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.image-card:hover {
+  border-color: var(--secondary);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.image-card.dragging {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+.image-card.drag-over {
+  border-color: var(--secondary);
+  background: #e5edff;
+}
+
+/* Wrapper da imagem */
+.image-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4/3;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+
+.image-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  cursor: grab;
+}
+
+.image-wrapper img:active {
+  cursor: grabbing;
+}
+
+/* Botão de deletar (aparece no hover) */
+.image-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.image-card:hover .image-delete-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.image-delete-btn:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+/* Handle de arrastar */
+.image-drag-handle {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.6);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.image-card:hover .image-drag-handle {
+  opacity: 1;
+}
+
+/* Input de descrição */
+.image-description {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.image-description input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  background: white;
+  transition: border-color 0.2s;
+}
+
+.image-description input:focus {
+  outline: none;
+  border-color: var(--secondary);
+}
+
+.image-description input::placeholder {
+  color: #9ca3af;
+}
+
+/* Número da imagem */
+.image-number {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--secondary);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+/* Área de upload quando tem imagens */
+.images-grid + .image-upload {
+  margin-top: 0;
+}
+
+/* Esconder área de upload quando cheio */
+.image-upload.hidden {
+  display: none;
+}
+
+/* Mensagem de limite */
+.images-limit-message {
+  text-align: center;
+  padding: 16px;
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+  border-radius: 10px;
+  color: #92400e;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Hint text melhorado */
+.hint-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.hint-text i {
+  color: #f59e0b;
+}
+
+/* ==================== ESTILOS DE IMPRESSÃO ==================== */
+
+.print-images-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+}
+
+.print-image-item {
+  flex: 1 1 45%;
+  max-width: 48%;
+  text-align: center;
+}
+
+.print-image-item.single {
+  flex: 1 1 100%;
+  max-width: 100%;
+}
+
+.print-image-item img {
+  max-width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.print-image-item.single img {
+  max-height: 400px;
+}
+
+.print-image-description {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: #374151;
+  font-style: italic;
+}
+
+/* Esconder seção de imagens se vazia */
+#print-imagesSection:has(.print-images-container:empty) {
+  display: none;
+}
+
+@media print {
+  .print-images-container {
+    page-break-inside: avoid;
+  }
+
+  .print-image-item {
+    page-break-inside: avoid;
+  }
+
+  .print-image-item img {
+    max-height: 250px;
+  }
+
+  .print-image-item.single img {
+    max-height: 350px;
+  }
+}
+
+/* ==================== RESPONSIVO ==================== */
+
+@media (max-width: 600px) {
+  .images-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .print-image-item {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+}

@@ -37,6 +37,7 @@
     'arte': 'arte',
     'cor_sublimacao': 'corSublimacao',
     'observacoes': 'observacoes',
+    'imagens_data': 'imagensData',
     'imagem_data': 'imagemData',
     'produtos': 'produtos'
   };
@@ -110,13 +111,9 @@
     const container = document.getElementById('acoesContainer');
     if (!container) return;
 
-    // Limpar container
     container.innerHTML = '';
 
     if (modoVisualizacao) {
-      // ===== MODO VISUALIZAÇÃO =====
-      // Ordem: Imprimir | Duplicar | Editar | Voltar (direita)
-
       const btnImprimir = criarBotao('btnImprimir', 'btn-primary', 'fa-print', 'Imprimir', () => {
         if (typeof gerarVersaoImpressao === 'function') {
           gerarVersaoImpressao();
@@ -134,7 +131,7 @@
       const btnDashboard = criarBotao('btnDashboard', 'btn-secondary', 'fa-chart-line', 'Dashboard', () => {
         window.location.href = 'dashboard.html';
       });
-      btnDashboard.style.marginLeft = 'auto'; // Empurra para direita
+      btnDashboard.style.marginLeft = 'auto';
 
       container.appendChild(btnImprimir);
       container.appendChild(btnDuplicar);
@@ -142,9 +139,6 @@
       container.appendChild(btnDashboard);
 
     } else if (fichaAtualId) {
-      // ===== MODO EDIÇÃO (ficha existente) =====
-      // Ordem: Atualizar Ficha | Imprimir | Baixar JSON | Carregar JSON | Dashboard (direita)
-
       const btnAtualizar = criarBotao('btnSalvarDB', 'btn-success', 'fa-save', `Atualizar Ficha #${fichaAtualId}`, salvarNoBanco);
 
       const btnImprimir = criarBotao('btnImprimir', 'btn-warning', 'fa-print', 'Imprimir', () => {
@@ -175,9 +169,6 @@
       container.appendChild(btnDashboard);
 
     } else {
-      // ===== MODO NOVA FICHA =====
-      // Ordem: Salvar Ficha | Imprimir | Baixar JSON | Carregar JSON | Dashboard (direita)
-
       const btnSalvar = criarBotao('btnSalvarDB', 'btn-success', 'fa-save', 'Salvar Ficha', salvarNoBanco);
 
       const btnImprimir = criarBotao('btnImprimir', 'btn-warning', 'fa-print', 'Imprimir', () => {
@@ -263,22 +254,18 @@
 
       const id = await db.salvarFicha(dados);
 
-      // Se era nova ficha, agora passa a ser edição
       if (!fichaAtualId) {
         fichaAtualId = id;
 
-        // Atualizar URL para modo edição
         const novaUrl = new URL(window.location.href);
         novaUrl.searchParams.set('editar', id);
         window.history.replaceState({}, '', novaUrl);
 
-        // Atualizar título
         const header = document.querySelector('header h1');
         if (header) {
           header.innerHTML = `<i class="fas fa-edit"></i> Editando Ficha #${fichaAtualId}`;
         }
 
-        // Reconfigurar botões (agora será modo edição)
         configurarBotoesAcao();
       }
 
@@ -294,6 +281,12 @@
   }
 
   function coletarDadosFormulario() {
+    // Coletar imagens do novo sistema de múltiplas imagens
+    let imagensData = [];
+    if (typeof window.getImagens === 'function') {
+      imagensData = window.getImagens();
+    }
+
     const dados = {
       cliente: document.getElementById('cliente')?.value || '',
       vendedor: document.getElementById('vendedor')?.value || '',
@@ -321,7 +314,10 @@
       arte: document.getElementById('arte')?.value || '',
       corSublimacao: document.getElementById('cor')?.value || '#ffffff',
       observacoes: document.getElementById('observacoes')?.value || '',
-      imagemData: document.getElementById('imagePreview')?.src || ''
+      // NOVO: Salvar array de imagens como JSON string
+      imagensData: JSON.stringify(imagensData),
+      // Manter compatibilidade: primeira imagem no campo antigo
+      imagemData: imagensData.length > 0 ? imagensData[0].src : ''
     };
 
     return dados;
@@ -374,7 +370,6 @@
 
       const ficha = converterBancoParaForm(fichaBanco);
 
-      // Aguardar um pouco para o main.js inicializar
       setTimeout(() => {
         preencherFormulario(ficha);
         configurarBotoesAcao();
@@ -433,7 +428,7 @@
       campo.style.cursor = 'not-allowed';
     });
 
-    const botoesOcultar = document.querySelectorAll('#adicionarProduto, .remover-produto, .duplicar-produto, #imageUpload, .btn-add-produto');
+    const botoesOcultar = document.querySelectorAll('#adicionarProduto, #ordenarProdutos, .remover-produto, .duplicar-produto, #imageUpload, .btn-add-produto, .image-delete-btn, .image-drag-handle, .drag-handle');
     botoesOcultar.forEach(btn => {
       btn.style.display = 'none';
     });
@@ -450,6 +445,13 @@
         background-color: #f8f9fa !important;
         border-color: #e9ecef !important;
       }
+      .modo-visualizacao .image-card {
+        pointer-events: none;
+      }
+      .modo-visualizacao .image-delete-btn,
+      .modo-visualizacao .image-drag-handle {
+        display: none !important;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -462,7 +464,7 @@
       campo.style.cursor = '';
     });
 
-    const botoesOcultar = document.querySelectorAll('#adicionarProduto, .remover-produto, .duplicar-produto, #imageUpload, .btn-add-produto');
+    const botoesOcultar = document.querySelectorAll('#adicionarProduto, #ordenarProdutos, .remover-produto, .duplicar-produto, #imageUpload, .btn-add-produto');
     botoesOcultar.forEach(btn => {
       btn.style.display = '';
     });
@@ -515,6 +517,7 @@
       if (corPreview) corPreview.style.backgroundColor = corSublimacao;
     }
 
+    // Preencher produtos
     const produtos = ficha.produtos;
     if (produtos) {
       const produtosArray = typeof produtos === 'string' ? JSON.parse(produtos) : produtos;
@@ -550,13 +553,35 @@
       }
     }
 
-    const imagemData = ficha.imagemData || ficha.imagem_data;
-    if (imagemData && imagemData.startsWith('data:')) {
-      const imgPreview = document.getElementById('imagePreview');
-      if (imgPreview) {
-        imgPreview.src = imagemData;
-        imgPreview.style.display = 'block';
+    // NOVO: Carregar múltiplas imagens
+    if (typeof window.setImagens === 'function') {
+      let imagensCarregadas = [];
+
+      // Tentar carregar do novo formato (imagensData como JSON string)
+      const imagensData = ficha.imagensData || ficha.imagens_data;
+      if (imagensData) {
+        try {
+          if (typeof imagensData === 'string') {
+            imagensCarregadas = JSON.parse(imagensData);
+          } else if (Array.isArray(imagensData)) {
+            imagensCarregadas = imagensData;
+          }
+        } catch (e) {
+          console.warn('Erro ao parsear imagens:', e);
+        }
       }
+
+      // Fallback: tentar formato antigo (imagemData única)
+      if (imagensCarregadas.length === 0) {
+        const imagemData = ficha.imagemData || ficha.imagem_data;
+        if (imagemData && imagemData.startsWith('data:')) {
+          imagensCarregadas = [{ src: imagemData, descricao: '' }];
+        }
+      }
+
+      // Setar imagens no sistema
+      window.setImagens(imagensCarregadas);
+      console.log(`✅ ${imagensCarregadas.length} imagem(ns) carregada(s)`);
     }
 
     console.log('✅ Formulário preenchido!');

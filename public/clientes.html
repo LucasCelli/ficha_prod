@@ -1,0 +1,217 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clientes - Fichas Técnicas</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div>
+                    <h1><i class="fas fa-users"></i> Gestão de Clientes</h1>
+                    <p>Visualize e gerencie todos os clientes cadastrados</p>
+                </div>
+                <div class="header-actions">
+                    <a href="dashboard.html" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Voltar</span>
+                    </a>
+                    <a href="index.html" class="btn btn-primary">
+                        <i class="fas fa-plus"></i>
+                        <span>Nova Ficha</span>
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- ESTATÍSTICAS -->
+            <section class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #dbeafe;">
+                        <i class="fas fa-users" style="color: #2563eb;"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statTotalClientes">0</div>
+                        <div class="stat-label">Total de Clientes</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #dcfce7;">
+                        <i class="fas fa-shopping-bag" style="color: #16a34a;"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statTotalPedidos">0</div>
+                        <div class="stat-label">Total de Pedidos</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #fef3c7;">
+                        <i class="fas fa-user-plus" style="color: #d97706;"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statNovosClientes">0</div>
+                        <div class="stat-label">Novos este Mês</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #fce7f3;">
+                        <i class="fas fa-star" style="color: #db2777;"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statMediaPedidos">0</div>
+                        <div class="stat-label">Média por Cliente</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- FILTROS E PESQUISA -->
+            <section class="card">
+                <div class="card-header">
+                    <i class="fas fa-filter"></i>
+                    <span>Filtros e Pesquisa</span>
+                </div>
+                <div class="card-body">
+                    <div class="filters-grid">
+                        <div class="form-group">
+                            <label for="searchCliente">
+                                <i class="fas fa-search"></i>
+                                Pesquisar
+                            </label>
+                            <input 
+                                type="text" 
+                                id="searchCliente" 
+                                class="form-control" 
+                                placeholder="Digite o nome do cliente...">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="ordenarPor">Ordenar por</label>
+                            <select id="ordenarPor" class="form-control">
+                                <option value="nome_asc">Nome (A-Z)</option>
+                                <option value="nome_desc">Nome (Z-A)</option>
+                                <option value="pedidos_desc">Mais pedidos</option>
+                                <option value="pedidos_asc">Menos pedidos</option>
+                                <option value="recente">Mais recente</option>
+                                <option value="antigo">Mais antigo</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="filter-actions">
+                        <button id="btnLimparFiltros" class="btn btn-secondary">
+                            <i class="fas fa-eraser"></i>
+                            Limpar Filtros
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- LISTA DE CLIENTES -->
+            <section class="card">
+                <div class="card-header">
+                    <div>
+                        <i class="fas fa-address-book"></i>
+                        <span>Clientes Cadastrados</span>
+                    </div>
+                    <span id="resultadosCount" class="badge">0 resultados</span>
+                </div>
+                <div class="card-body">
+                    <div id="clientesContainer" class="fichas-list">
+                        <!-- Clientes serão inseridos aqui via JavaScript -->
+                    </div>
+
+                    <div id="emptyState" class="empty-state" style="display: none;">
+                        <i class="fas fa-users-slash"></i>
+                        <h3>Nenhum cliente encontrado</h3>
+                        <p>Clientes são cadastrados automaticamente ao criar fichas técnicas.</p>
+                        <a href="index.html" class="btn btn-primary">
+                            <i class="fas fa-plus"></i>
+                            Criar Nova Ficha
+                        </a>
+                    </div>
+
+                    <!-- Paginação -->
+                    <div id="paginacao" class="paginacao" style="display: none;">
+                        <button id="btnPrevPage" class="btn btn-secondary" disabled>
+                            <i class="fas fa-chevron-left"></i>
+                            Anterior
+                        </button>
+                        <span id="pageInfo" class="page-info">Página 1 de 1</span>
+                        <button id="btnNextPage" class="btn btn-secondary" disabled>
+                            Próxima
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal de Edição -->
+    <div id="editModal" class="modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <h3><i class="fas fa-edit"></i> Editar Cliente</h3>
+            <form id="editForm">
+                <input type="hidden" id="editId">
+                <div class="form-group">
+                    <label for="editNome">Nome do Cliente</label>
+                    <input type="text" id="editNome" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="editPrimeiroPedido">Primeiro Pedido</label>
+                    <input type="date" id="editPrimeiroPedido" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="editUltimoPedido">Último Pedido</label>
+                    <input type="date" id="editUltimoPedido" class="form-control">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="btnCancelarEdit" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i>
+                        Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação de Exclusão -->
+    <div id="deleteModal" class="modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <h3><i class="fas fa-exclamation-triangle"></i> Confirmar Exclusão</h3>
+            <p>Tem certeza que deseja excluir o cliente <strong id="deleteClienteNome"></strong>?</p>
+            <p style="font-size: 0.85rem; color: var(--text-soft);">
+                <i class="fas fa-info-circle"></i>
+                As fichas técnicas associadas não serão excluídas.
+            </p>
+            <div class="modal-actions">
+                <button id="btnCancelarDelete" class="btn btn-secondary">Cancelar</button>
+                <button id="btnConfirmarDelete" class="btn btn-danger">
+                    <i class="fas fa-trash"></i>
+                    Excluir
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api-client.js"></script>
+    <script src="js/clientes.js"></script>
+</body>
+
+</html>

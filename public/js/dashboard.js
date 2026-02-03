@@ -10,7 +10,6 @@
 
   document.addEventListener('DOMContentLoaded', async () => {
     await initDashboard();
-    criarModalDelete();
   });
 
   async function initDashboard() {
@@ -27,255 +26,13 @@
       // Atualizar estatísticas
       await atualizarEstatisticas();
 
+      // Verificar parâmetros da URL (filtro por cliente)
+      verificarParametrosURL();
+
     } catch (error) {
       console.error('❌ Erro ao inicializar dashboard:', error);
-      mostrarToast('Erro ao carregar dados do servidor', 'error');
+      mostrarErro('Erro ao carregar dados do servidor');
     }
-  }
-
-  // Criar modal de delete moderno
-  function criarModalDelete() {
-    // Remover modal existente se houver
-    const existente = document.getElementById('modalDeleteCustom');
-    if (existente) existente.remove();
-
-    const modal = document.createElement('div');
-    modal.id = 'modalDeleteCustom';
-    modal.innerHTML = `
-      <div class="modal-overlay-custom"></div>
-      <div class="modal-container-custom">
-        <div class="modal-icon-custom">
-          <i class="fas fa-exclamation-triangle"></i>
-        </div>
-        <h3 class="modal-title-custom">Confirmar Exclusão</h3>
-        <p class="modal-message-custom">Tem certeza que deseja excluir esta ficha?<br><strong>Esta ação não pode ser desfeita.</strong></p>
-        <div class="modal-buttons-custom">
-          <button class="btn-cancelar-custom" id="btnCancelarCustom">
-            <i class="fas fa-times"></i>
-            Cancelar
-          </button>
-          <button class="btn-confirmar-custom" id="btnConfirmarCustom">
-            <i class="fas fa-trash"></i>
-            Sim, Excluir
-          </button>
-        </div>
-      </div>
-    `;
-
-    // Estilos do modal
-    const styles = document.createElement('style');
-    styles.textContent = `
-      #modalDeleteCustom {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 10000;
-        align-items: center;
-        justify-content: center;
-      }
-
-      #modalDeleteCustom.show {
-        display: flex;
-        animation: fadeIn 0.2s ease;
-      }
-
-      .modal-overlay-custom {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.6);
-        backdrop-filter: blur(4px);
-      }
-
-      .modal-container-custom {
-        position: relative;
-        background: white;
-        border-radius: 16px;
-        padding: 32px;
-        max-width: 400px;
-        width: 90%;
-        text-align: center;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        animation: slideUp 0.3s ease;
-      }
-
-      .modal-icon-custom {
-        width: 70px;
-        height: 70px;
-        background: linear-gradient(135deg, #fee2e2, #fecaca);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 20px;
-      }
-
-      .modal-icon-custom i {
-        font-size: 32px;
-        color: #dc2626;
-      }
-
-      .modal-title-custom {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #1f2937;
-        margin-bottom: 12px;
-      }
-
-      .modal-message-custom {
-        color: #6b7280;
-        font-size: 0.95rem;
-        line-height: 1.6;
-        margin-bottom: 28px;
-      }
-
-      .modal-message-custom strong {
-        color: #dc2626;
-      }
-
-      .modal-buttons-custom {
-        display: flex;
-        gap: 12px;
-        justify-content: center;
-      }
-
-      .btn-cancelar-custom,
-      .btn-confirmar-custom {
-        padding: 12px 24px;
-        border-radius: 10px;
-        font-size: 0.95rem;
-        font-weight: 600;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        transition: all 0.2s ease;
-        border: none;
-      }
-
-      .btn-cancelar-custom {
-        background: #f3f4f6;
-        color: #4b5563;
-      }
-
-      .btn-cancelar-custom:hover {
-        background: #e5e7eb;
-        transform: translateY(-1px);
-      }
-
-      .btn-confirmar-custom {
-        background: linear-gradient(135deg, #dc2626, #b91c1c);
-        color: white;
-      }
-
-      .btn-confirmar-custom:hover {
-        background: linear-gradient(135deg, #b91c1c, #991b1b);
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
-      }
-
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-
-      @keyframes slideUp {
-        from { 
-          opacity: 0;
-          transform: translateY(20px) scale(0.95);
-        }
-        to { 
-          opacity: 1;
-          transform: translateY(0) scale(1);
-        }
-      }
-
-      @keyframes slideOut {
-        from { 
-          opacity: 1;
-          transform: translateY(0) scale(1);
-        }
-        to { 
-          opacity: 0;
-          transform: translateY(20px) scale(0.95);
-        }
-      }
-
-      /* Toast styles */
-      .toast-custom {
-        position: fixed;
-        bottom: 24px;
-        right: 24px;
-        padding: 16px 24px;
-        border-radius: 12px;
-        color: white;
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        z-index: 10001;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-        animation: toastIn 0.4s ease;
-      }
-
-      .toast-custom.success {
-        background: linear-gradient(135deg, #10b981, #059669);
-      }
-
-      .toast-custom.error {
-        background: linear-gradient(135deg, #ef4444, #dc2626);
-      }
-
-      .toast-custom.warning {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-      }
-
-      .toast-custom i {
-        font-size: 1.2rem;
-      }
-
-      @keyframes toastIn {
-        from { 
-          transform: translateX(100%);
-          opacity: 0;
-        }
-        to { 
-          transform: translateX(0);
-          opacity: 1;
-        }
-      }
-
-      @keyframes toastOut {
-        from { 
-          transform: translateX(0);
-          opacity: 1;
-        }
-        to { 
-          transform: translateX(100%);
-          opacity: 0;
-        }
-      }
-    `;
-
-    document.head.appendChild(styles);
-    document.body.appendChild(modal);
-
-    // Event listeners do modal
-    document.getElementById('btnCancelarCustom').addEventListener('click', fecharModalDelete);
-    document.getElementById('btnConfirmarCustom').addEventListener('click', confirmarDelete);
-    document.querySelector('.modal-overlay-custom').addEventListener('click', fecharModalDelete);
-
-    // Fechar com ESC
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && document.getElementById('modalDeleteCustom').classList.contains('show')) {
-        fecharModalDelete();
-      }
-    });
   }
 
   function initEventListeners() {
@@ -288,10 +45,6 @@
     const filterDataFim = document.getElementById('filterDataFim');
     filterDataInicio.addEventListener('change', aplicarFiltros);
     filterDataFim.addEventListener('change', aplicarFiltros);
-
-    // Filtro de vendedor
-    const filterVendedor = document.getElementById('filterVendedor');
-    filterVendedor.addEventListener('change', aplicarFiltros);
 
     // Limpar filtros
     const btnLimparFiltros = document.getElementById('btnLimparFiltros');
@@ -309,6 +62,25 @@
 
     const importFileInput = document.getElementById('importFileInput');
     importFileInput.addEventListener('change', importarBackup);
+
+    // Modal de exclusão
+    const btnCancelarDelete = document.getElementById('btnCancelarDelete');
+    const btnConfirmarDelete = document.getElementById('btnConfirmarDelete');
+    btnCancelarDelete.addEventListener('click', fecharModalDelete);
+    btnConfirmarDelete.addEventListener('click', confirmarDelete);
+
+    // Fechar modal clicando no overlay
+    document.querySelector('#deleteModal .modal-overlay').addEventListener('click', fecharModalDelete);
+  }
+
+  function verificarParametrosURL() {
+    const params = new URLSearchParams(window.location.search);
+    const clienteFiltro = params.get('cliente');
+
+    if (clienteFiltro) {
+      document.getElementById('searchInput').value = clienteFiltro;
+      aplicarFiltros();
+    }
   }
 
   async function carregarFichas() {
@@ -317,13 +89,8 @@
       renderizarFichas(fichasCache);
     } catch (error) {
       console.error('❌ Erro ao carregar fichas:', error);
-      mostrarToast('Erro ao carregar fichas', 'error');
+      mostrarErro('Erro ao carregar fichas');
     }
-  }
-
-  async function atualizarDashboard() {
-    await carregarFichas();
-    await atualizarEstatisticas();
   }
 
   function renderizarFichas(fichas) {
@@ -331,6 +98,7 @@
     const emptyState = document.getElementById('emptyState');
     const resultadosCount = document.getElementById('resultadosCount');
 
+    // Atualizar contador
     resultadosCount.textContent = `${fichas.length} ${fichas.length === 1 ? 'resultado' : 'resultados'}`;
 
     if (!fichas || fichas.length === 0) {
@@ -343,25 +111,33 @@
 
     container.innerHTML = fichas.map(ficha => criarCardFicha(ficha)).join('');
 
-    // Event listeners
+    // Adicionar event listeners aos botões
     container.querySelectorAll('.btn-visualizar').forEach(btn => {
-      btn.addEventListener('click', () => visualizarFicha(parseInt(btn.dataset.id)));
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.dataset.id);
+        visualizarFicha(id);
+      });
     });
 
     container.querySelectorAll('.btn-editar').forEach(btn => {
-      btn.addEventListener('click', () => editarFicha(parseInt(btn.dataset.id)));
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.dataset.id);
+        editarFicha(id);
+      });
     });
 
     container.querySelectorAll('.btn-entregar').forEach(btn => {
-      btn.addEventListener('click', () => marcarComoEntregue(parseInt(btn.dataset.id)));
-    });
-
-    container.querySelectorAll('.btn-pendente').forEach(btn => {
-      btn.addEventListener('click', () => marcarComoPendente(parseInt(btn.dataset.id)));
+      btn.addEventListener('click', async () => {
+        const id = parseInt(btn.dataset.id);
+        await marcarComoEntregue(id);
+      });
     });
 
     container.querySelectorAll('.btn-deletar').forEach(btn => {
-      btn.addEventListener('click', () => abrirModalDelete(parseInt(btn.dataset.id)));
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.dataset.id);
+        abrirModalDelete(id);
+      });
     });
   }
 
@@ -373,7 +149,7 @@
     const isPendente = ficha.status === 'pendente';
 
     return `
-      <div class="ficha-item ${isPendente ? '' : 'ficha-entregue'}" data-id="${ficha.id}">
+      <div class="ficha-item ${isPendente ? '' : 'ficha-entregue'}">
         <div class="ficha-main">
           <div class="ficha-header">
             <span class="ficha-cliente">${ficha.cliente || 'Cliente não informado'}</span>
@@ -412,11 +188,7 @@
             <button class="btn btn-success btn-entregar" data-id="${ficha.id}" title="Marcar como Entregue">
               <i class="fas fa-check-circle"></i>
             </button>
-          ` : `
-            <button class="btn btn-warning btn-pendente" data-id="${ficha.id}" title="Voltar para Pendente">
-              <i class="fas fa-undo"></i>
-            </button>
-          `}
+          ` : ''}
           <button class="btn btn-primary btn-visualizar" data-id="${ficha.id}" title="Visualizar">
             <i class="fas fa-eye"></i>
           </button>
@@ -432,34 +204,50 @@
   }
 
   async function aplicarFiltros() {
-    const searchTerm = document.getElementById('searchInput').value;
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
     const dataInicio = document.getElementById('filterDataInicio').value;
     const dataFim = document.getElementById('filterDataFim').value;
-    const vendedor = document.getElementById('filterVendedor').value;
 
-    try {
-      const filtros = {};
-      if (searchTerm) filtros.cliente = searchTerm;
-      if (dataInicio) filtros.dataInicio = dataInicio;
-      if (dataFim) filtros.dataFim = dataFim;
-      if (vendedor) filtros.vendedor = vendedor;
+    // Filtrar localmente para maior responsividade
+    let fichasFiltradas = fichasCache.filter(ficha => {
+      // Filtro de busca (cliente, número da venda, vendedor)
+      if (searchTerm) {
+        const cliente = (ficha.cliente || '').toLowerCase();
+        const numeroVenda = (ficha.numero_venda || '').toLowerCase();
+        const vendedor = (ficha.vendedor || '').toLowerCase();
 
-      const fichasFiltradas = await db.listarFichas(filtros);
+        if (!cliente.includes(searchTerm) && 
+            !numeroVenda.includes(searchTerm) && 
+            !vendedor.includes(searchTerm)) {
+          return false;
+        }
+      }
 
-      fichasCache = fichasFiltradas;
-      renderizarFichas(fichasFiltradas);
-    } catch (error) {
-      console.error('Erro ao aplicar filtros:', error);
-    }
+      // Filtro de data início
+      if (dataInicio && ficha.data_inicio) {
+        if (ficha.data_inicio < dataInicio) return false;
+      }
+
+      // Filtro de data fim
+      if (dataFim && ficha.data_inicio) {
+        if (ficha.data_inicio > dataFim) return false;
+      }
+
+      return true;
+    });
+
+    renderizarFichas(fichasFiltradas);
   }
 
   function limparFiltros() {
     document.getElementById('searchInput').value = '';
     document.getElementById('filterDataInicio').value = '';
     document.getElementById('filterDataFim').value = '';
-    document.getElementById('filterVendedor').value = '';
 
-    carregarFichas();
+    // Limpar parâmetros da URL
+    window.history.replaceState({}, '', window.location.pathname);
+
+    renderizarFichas(fichasCache);
   }
 
   async function atualizarEstatisticas() {
@@ -483,74 +271,50 @@
     window.location.href = `index.html?editar=${id}`;
   }
 
-  // Marcar como entregue SEM confirmação
   async function marcarComoEntregue(id) {
+    const confirmar = confirm('Deseja marcar este pedido como entregue?');
+    if (!confirmar) return;
+
     try {
       await db.marcarComoEntregue(id);
-      await atualizarDashboard();
-      mostrarToast('Pedido marcado como entregue!', 'success');
+
+      // Recarregar fichas
+      await carregarFichas();
+      await atualizarEstatisticas();
+
+      mostrarSucesso('Pedido marcado como entregue!');
     } catch (error) {
       console.error('❌ Erro ao marcar como entregue:', error);
-      mostrarToast('Erro ao marcar pedido como entregue', 'error');
+      mostrarErro('Erro ao marcar pedido como entregue');
     }
   }
 
-  // Marcar como pendente SEM confirmação
-  async function marcarComoPendente(id) {
-    try {
-      await db.marcarComoPendente(id);
-      await atualizarDashboard();
-      mostrarToast('Pedido voltou para pendente!', 'warning');
-    } catch (error) {
-      console.error('❌ Erro ao marcar como pendente:', error);
-      mostrarToast('Erro ao marcar pedido como pendente', 'error');
-    }
-  }
-
-  // Deletar COM modal de confirmação moderno
   function abrirModalDelete(id) {
     fichaParaDeletar = id;
-    document.getElementById('modalDeleteCustom').classList.add('show');
+    document.getElementById('deleteModal').style.display = 'flex';
   }
 
   function fecharModalDelete() {
-    const modal = document.getElementById('modalDeleteCustom');
-    const container = modal.querySelector('.modal-container-custom');
-
-    container.style.animation = 'slideOut 0.2s ease';
-
-    setTimeout(() => {
-      modal.classList.remove('show');
-      container.style.animation = '';
-      fichaParaDeletar = null;
-    }, 200);
+    fichaParaDeletar = null;
+    document.getElementById('deleteModal').style.display = 'none';
   }
 
   async function confirmarDelete() {
     if (!fichaParaDeletar) return;
 
-    const id = fichaParaDeletar;
-
     try {
-      // Desabilitar botão enquanto processa
-      const btnConfirmar = document.getElementById('btnConfirmarCustom');
-      btnConfirmar.disabled = true;
-      btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Excluindo...';
+      await db.deletarFicha(fichaParaDeletar);
 
-      await db.deletarFicha(id);
+      // Recarregar fichas
+      await carregarFichas();
+      await atualizarEstatisticas();
 
       fecharModalDelete();
-      await atualizarDashboard();
 
-      mostrarToast('Ficha excluída com sucesso!', 'success');
+      mostrarSucesso('Ficha excluída com sucesso!');
     } catch (error) {
       console.error('❌ Erro ao deletar ficha:', error);
-      mostrarToast('Erro ao excluir ficha', 'error');
-    } finally {
-      // Restaurar botão
-      const btnConfirmar = document.getElementById('btnConfirmarCustom');
-      btnConfirmar.disabled = false;
-      btnConfirmar.innerHTML = '<i class="fas fa-trash"></i> Sim, Excluir';
+      mostrarErro('Erro ao excluir ficha');
     }
   }
 
@@ -569,10 +333,10 @@
 
       URL.revokeObjectURL(url);
 
-      mostrarToast('Backup exportado com sucesso!', 'success');
+      mostrarSucesso('Backup exportado com sucesso!');
     } catch (error) {
       console.error('❌ Erro ao exportar backup:', error);
-      mostrarToast('Erro ao exportar backup', 'error');
+      mostrarErro('Erro ao exportar backup');
     }
   }
 
@@ -588,14 +352,24 @@
         throw new Error('Formato de backup inválido');
       }
 
-      await db.importarBackup(dados);
-      await atualizarDashboard();
+      const confirmar = confirm(
+        `Deseja importar ${dados.fichas.length} ficha(s)? ` +
+        `Isso não apagará suas fichas existentes.`
+      );
 
-      mostrarToast(`${dados.fichas.length} ficha(s) importada(s) com sucesso!`, 'success');
+      if (!confirmar) return;
+
+      await db.importarBackup(dados);
+
+      // Recarregar fichas
+      await carregarFichas();
+      await atualizarEstatisticas();
+
+      mostrarSucesso(`${dados.fichas.length} ficha(s) importada(s) com sucesso!`);
 
     } catch (error) {
       console.error('❌ Erro ao importar backup:', error);
-      mostrarToast('Erro ao importar backup. Verifique o arquivo.', 'error');
+      mostrarErro('Erro ao importar backup. Verifique o arquivo.');
     }
 
     event.target.value = '';
@@ -607,8 +381,8 @@
     if (!dataStr) return '-';
 
     try {
-      const data = new Date(dataStr + 'T00:00:00');
-      return data.toLocaleDateString('pt-BR');
+      const [ano, mes, dia] = dataStr.split('-');
+      return `${dia}/${mes}/${ano}`;
     } catch {
       return dataStr;
     }
@@ -635,27 +409,66 @@
     };
   }
 
+  function mostrarSucesso(mensagem) {
+    mostrarToast(mensagem, 'success');
+  }
+
+  function mostrarErro(mensagem) {
+    mostrarToast(mensagem, 'error');
+  }
+
   function mostrarToast(mensagem, tipo = 'success') {
-    // Remover toast existente
     const existente = document.querySelector('.toast-custom');
     if (existente) existente.remove();
 
     const icons = {
       success: 'fa-check-circle',
-      error: 'fa-exclamation-circle',
-      warning: 'fa-exclamation-triangle'
+      error: 'fa-exclamation-circle'
+    };
+
+    const cores = {
+      success: 'linear-gradient(135deg, #10b981, #059669)',
+      error: 'linear-gradient(135deg, #ef4444, #dc2626)'
     };
 
     const toast = document.createElement('div');
-    toast.className = `toast-custom ${tipo}`;
-    toast.innerHTML = `
-      <i class="fas ${icons[tipo] || icons.success}"></i>
-      <span>${mensagem}</span>
+    toast.className = 'toast-custom';
+    toast.innerHTML = `<i class="fas ${icons[tipo]}"></i><span>${mensagem}</span>`;
+    toast.style.cssText = `
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 16px 24px;
+      border-radius: 12px;
+      color: white;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 10001;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      background: ${cores[tipo]};
+      animation: toastIn 0.4s ease;
     `;
+
+    if (!document.getElementById('toastStyles')) {
+      const style = document.createElement('style');
+      style.id = 'toastStyles';
+      style.textContent = `
+        @keyframes toastIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes toastOut {
+          from { transform: translateX(0); opacity: 1; }
+          to { transform: translateX(100%); opacity: 0; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
 
     document.body.appendChild(toast);
 
-    // Remover após 3 segundos
     setTimeout(() => {
       toast.style.animation = 'toastOut 0.4s ease forwards';
       setTimeout(() => toast.remove(), 400);

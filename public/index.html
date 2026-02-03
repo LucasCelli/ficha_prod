@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/drag-drop.css">
+    <link rel="stylesheet" href="css/images.css">
 </head>
 
 <body>
@@ -343,25 +344,28 @@
                 </div>
             </section>
 
-            <!-- ARTE / IMAGEM DO PRODUTO -->
+            <!-- ARTE / IMAGENS DO PRODUTO -->
             <section class="card">
                 <div class="card-header">
-                    <i class="fas fa-image"></i>
-                    <span>Arte / Imagem do Produto</span>
+                    <i class="fas fa-images"></i>
+                    <span>Arte / Imagens do Produto</span>
+                    <span class="images-counter" id="imagesCounter">(0/2)</span>
                 </div>
                 <div class="card-body">
+                    <!-- Container das imagens adicionadas -->
+                    <div id="imagesContainer" class="images-grid"></div>
+
+                    <!-- Área de upload (esconde quando tem 2 imagens) -->
                     <div class="image-upload" id="imageUpload" role="button" tabindex="0">
                         <i class="fas fa-cloud-upload-alt"></i>
-                        <h3>Arraste e solte uma imagem aqui</h3>
-                        <p>ou clique para selecionar um arquivo</p>
-                        <input type="file" id="fileInput" accept="image/*" hidden>
+                        <h3>Arraste e solte imagens aqui</h3>
+                        <p>ou clique para selecionar (máximo 2 imagens)</p>
+                        <input type="file" id="fileInput" accept="image/*" multiple hidden>
                     </div>
 
-                    <!-- Imagem escondida por padrão, só aparece quando carregada -->
-                    <img id="imagePreview" class="image-preview" alt="Pré-visualização da arte do produto" style="display: none;">
-
                     <p class="hint-text">
-                        Você também pode colar uma imagem diretamente (Ctrl+V) se ela estiver na área de transferência.
+                        <i class="fas fa-lightbulb"></i>
+                        Você pode colar imagens diretamente (Ctrl+V), arrastar para reordenar ou passar o mouse para deletar.
                     </p>
                 </div>
             </section>
@@ -450,11 +454,11 @@
             <div id="print-observacoes" class="print-observacoes"></div>
         </section>
 
-        <!-- IMAGEM - 1 COLUNA -->
-        <section class="print-card">
+        <!-- IMAGENS - RESPONSIVO 1 OU 2 COLUNAS -->
+        <section class="print-card" id="print-imagesSection">
             <h2>Layout / Mockup do Produto</h2>
-            <div class="print-image-container">
-                <img id="print-imagePreview" alt="Arte/Imagem do Produto">
+            <div id="print-imagesContainer" class="print-images-container">
+                <!-- Imagens serão inseridas via JS -->
             </div>
         </section>
     </div>
