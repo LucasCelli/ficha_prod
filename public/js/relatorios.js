@@ -576,61 +576,6 @@
     }
   }
 
-  function mostrarToast(mensagem, tipo = 'success') {
-    const existente = document.querySelector('.toast-relatorio');
-    if (existente) existente.remove();
-
-    const cores = {
-      success: 'linear-gradient(135deg, #10b981, #059669)',
-      error: 'linear-gradient(135deg, #ef4444, #dc2626)',
-      info: 'linear-gradient(135deg, #3b82f6, #2563eb)'
-    };
-
-    const icons = {
-      success: '✅',
-      error: '❌',
-      info: 'ℹ️'
-    };
-
-    const toast = document.createElement('div');
-    toast.className = 'toast-relatorio';
-    toast.innerHTML = `${icons[tipo]} ${mensagem}`;
-    toast.style.cssText = `
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      padding: 16px 24px;
-      border-radius: 12px;
-      color: white;
-      font-weight: 500;
-      z-index: 10001;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-      background: ${cores[tipo]};
-      animation: toastIn 0.4s ease;
-    `;
-
-    if (!document.getElementById('toastStylesRel')) {
-      const style = document.createElement('style');
-      style.id = 'toastStylesRel';
-      style.textContent = `
-        @keyframes toastIn {
-          from { transform: translateX(100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateX(100%)';
-      toast.style.transition = 'all 0.4s ease';
-      setTimeout(() => toast.remove(), 400);
-    }, 3000);
-  }
-
   function mostrarSucesso(mensagem) {
     mostrarToast(mensagem, 'success');
   }

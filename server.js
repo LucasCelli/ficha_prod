@@ -12,13 +12,12 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-
 // ==================== CONFIGURAÇÃO CLOUDINARY ====================
 const CLOUDINARY_CONFIG = {
   cloudName: process.env.CLOUDINARY_CLOUD_NAME || 'SEU_CLOUD_NAME',
   apiKey: process.env.CLOUDINARY_API_KEY || 'SUA_API_KEY',
   apiSecret: process.env.CLOUDINARY_API_SECRET || 'SEU_API_SECRET',
-  uploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || 'fichas_upload' // Opcional, para unsigned uploads
+  uploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || 'fichas_upload'
 };
 
 // Função para gerar assinatura do Cloudinary
@@ -84,16 +83,24 @@ async function initDatabase() {
         manga TEXT,
         acabamento_manga TEXT,
         largura_manga TEXT,
+        cor_acabamento_manga TEXT,
         gola TEXT,
+        cor_gola TEXT,
         acabamento_gola TEXT,
+        largura_gola TEXT,
         cor_peitilho_interno TEXT,
         cor_peitilho_externo TEXT,
         abertura_lateral TEXT,
+        cor_abertura_lateral TEXT,
         reforco_gola TEXT,
         cor_reforco TEXT,
         bolso TEXT,
         filete TEXT,
+        filete_local TEXT,
+        filete_cor TEXT,
         faixa TEXT,
+        faixa_local TEXT,
+        faixa_cor TEXT,
         arte TEXT,
         cor_sublimacao TEXT,
         observacoes TEXT,
@@ -125,13 +132,27 @@ async function initDatabase() {
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_data_entrega ON fichas(data_entrega)`);
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_vendedor ON fichas(vendedor)`);
 
-    
-    // Migração: adicionar coluna imagens_data se não existir
-    try {
-      await db.execute('ALTER TABLE fichas ADD COLUMN imagens_data TEXT');
-      console.log('✅ Coluna imagens_data adicionada via migração');
-    } catch (e) {
-      // Coluna já existe, ignorar
+    // ==================== MIGRAÇÕES ====================
+    // Adicionar colunas que podem não existir em bancos antigos
+    const migrações = [
+      'imagens_data TEXT',
+      'cor_acabamento_manga TEXT',
+      'cor_gola TEXT',
+      'largura_gola TEXT',
+      'cor_abertura_lateral TEXT',
+      'filete_local TEXT',
+      'filete_cor TEXT',
+      'faixa_local TEXT',
+      'faixa_cor TEXT'
+    ];
+
+    for (const coluna of migrações) {
+      try {
+        await db.execute(`ALTER TABLE fichas ADD COLUMN ${coluna}`);
+        console.log(`✅ Coluna ${coluna.split(' ')[0]} adicionada`);
+      } catch (e) {
+        // Coluna já existe, ignorar
+      }
     }
 
     console.log('✅ Banco de dados Turso inicializado com sucesso');
@@ -264,20 +285,24 @@ app.post('/api/fichas', async (req, res) => {
     const sql = `
       INSERT INTO fichas (
         cliente, vendedor, data_inicio, numero_venda, data_entrega, evento,
-        material, composicao, cor_material, manga, acabamento_manga, largura_manga,
-        gola, acabamento_gola, cor_peitilho_interno, cor_peitilho_externo,
-        abertura_lateral, reforco_gola, cor_reforco, bolso, filete, faixa,
+        material, composicao, cor_material, manga, acabamento_manga, largura_manga, cor_acabamento_manga,
+        gola, cor_gola, acabamento_gola, largura_gola, cor_peitilho_interno, cor_peitilho_externo,
+        abertura_lateral, cor_abertura_lateral, reforco_gola, cor_reforco, bolso,
+        filete, filete_local, filete_cor, faixa, faixa_local, faixa_cor,
         arte, cor_sublimacao, observacoes, imagem_data, imagens_data, produtos, data_criacao, data_atualizacao
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
       dados.cliente, dados.vendedor, dados.dataInicio, dados.numeroVenda,
       dados.dataEntrega, dados.evento || 'nao',
       dados.material, dados.composicao, dados.corMaterial, dados.manga,
-      dados.acabamentoManga, dados.larguraManga, dados.gola, dados.acabamentoGola,
-      dados.corPeitilhoInterno, dados.corPeitilhoExterno, dados.aberturaLateral,
-      dados.reforcoGola, dados.corReforco, dados.bolso, dados.filete, dados.faixa,
+      dados.acabamentoManga, dados.larguraManga, dados.corAcabamentoManga,
+      dados.gola, dados.corGola, dados.acabamentoGola,
+      dados.larguraGola, dados.corPeitilhoInterno, dados.corPeitilhoExterno,
+      dados.aberturaLateral, dados.corAberturaLateral, dados.reforcoGola, dados.corReforco, dados.bolso,
+      dados.filete, dados.fileteLocal, dados.fileteCor,
+      dados.faixa, dados.faixaLocal, dados.faixaCor,
       dados.arte, dados.corSublimacao, dados.observacoes, dados.imagemData, dados.imagensData,
       produtosJson, now, now
     ];
@@ -316,9 +341,12 @@ app.put('/api/fichas/:id', async (req, res) => {
         cliente = ?, vendedor = ?, data_inicio = ?, numero_venda = ?,
         data_entrega = ?, evento = ?, status = ?,
         material = ?, composicao = ?, cor_material = ?, manga = ?,
-        acabamento_manga = ?, largura_manga = ?, gola = ?, acabamento_gola = ?,
-        cor_peitilho_interno = ?, cor_peitilho_externo = ?, abertura_lateral = ?,
-        reforco_gola = ?, cor_reforco = ?, bolso = ?, filete = ?, faixa = ?,
+        acabamento_manga = ?, largura_manga = ?, cor_acabamento_manga = ?,
+        gola = ?, cor_gola = ?, acabamento_gola = ?,
+        largura_gola = ?, cor_peitilho_interno = ?, cor_peitilho_externo = ?,
+        abertura_lateral = ?, cor_abertura_lateral = ?, reforco_gola = ?, cor_reforco = ?, bolso = ?,
+        filete = ?, filete_local = ?, filete_cor = ?,
+        faixa = ?, faixa_local = ?, faixa_cor = ?,
         arte = ?, cor_sublimacao = ?, observacoes = ?, imagem_data = ?, imagens_data = ?,
         produtos = ?, data_atualizacao = ?
       WHERE id = ?
@@ -328,9 +356,12 @@ app.put('/api/fichas/:id', async (req, res) => {
       dados.cliente, dados.vendedor, dados.dataInicio, dados.numeroVenda,
       dados.dataEntrega, dados.evento || 'nao', dados.status || 'pendente',
       dados.material, dados.composicao, dados.corMaterial, dados.manga,
-      dados.acabamentoManga, dados.larguraManga, dados.gola, dados.acabamentoGola,
-      dados.corPeitilhoInterno, dados.corPeitilhoExterno, dados.aberturaLateral,
-      dados.reforcoGola, dados.corReforco, dados.bolso, dados.filete, dados.faixa,
+      dados.acabamentoManga, dados.larguraManga, dados.corAcabamentoManga,
+      dados.gola, dados.corGola, dados.acabamentoGola,
+      dados.larguraGola, dados.corPeitilhoInterno, dados.corPeitilhoExterno,
+      dados.aberturaLateral, dados.corAberturaLateral, dados.reforcoGola, dados.corReforco, dados.bolso,
+      dados.filete, dados.fileteLocal, dados.fileteCor,
+      dados.faixa, dados.faixaLocal, dados.faixaCor,
       dados.arte, dados.corSublimacao, dados.observacoes, dados.imagemData, dados.imagensData,
       produtosJson, now, req.params.id
     ];
@@ -453,13 +484,11 @@ app.put('/api/clientes/:id', async (req, res) => {
     const { id } = req.params;
     const { nome, primeiro_pedido, ultimo_pedido } = req.body;
 
-    // Verificar se cliente existe
     const clienteExiste = await dbGet('SELECT * FROM clientes WHERE id = ?', [id]);
     if (!clienteExiste) {
       return res.status(404).json({ error: 'Cliente não encontrado' });
     }
 
-    // Verificar se o novo nome já existe em outro cliente
     if (nome && nome !== clienteExiste.nome) {
       const nomeExiste = await dbGet('SELECT id FROM clientes WHERE nome = ? AND id != ?', [nome, id]);
       if (nomeExiste) {
@@ -467,13 +496,11 @@ app.put('/api/clientes/:id', async (req, res) => {
       }
     }
 
-    // Atualizar cliente
     await dbRun(
       `UPDATE clientes SET nome = ?, primeiro_pedido = ?, ultimo_pedido = ? WHERE id = ?`,
       [nome || clienteExiste.nome, primeiro_pedido, ultimo_pedido, id]
     );
 
-    // Se o nome mudou, atualizar também nas fichas
     if (nome && nome !== clienteExiste.nome) {
       await dbRun(
         `UPDATE fichas SET cliente = ? WHERE cliente = ?`,
@@ -495,13 +522,11 @@ app.delete('/api/clientes/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Verificar se cliente existe
     const clienteExiste = await dbGet('SELECT * FROM clientes WHERE id = ?', [id]);
     if (!clienteExiste) {
       return res.status(404).json({ error: 'Cliente não encontrado' });
     }
 
-    // Deletar cliente (as fichas NÃO são deletadas, conforme a mensagem no modal)
     await dbRun('DELETE FROM clientes WHERE id = ?', [id]);
 
     console.log(`✅ Cliente #${id} (${clienteExiste.nome}) deletado`);
@@ -511,7 +536,6 @@ app.delete('/api/clientes/:id', async (req, res) => {
     res.status(500).json({ error: 'Erro ao deletar cliente' });
   }
 });
-
 
 // Estatísticas gerais
 app.get('/api/estatisticas', async (req, res) => {
@@ -538,7 +562,6 @@ app.get('/api/estatisticas', async (req, res) => {
     );
     stats.esteMes = esteMes?.total || 0;
 
-    // Total de itens
     const fichas = await dbAll('SELECT produtos FROM fichas');
     let totalItens = 0;
     fichas.forEach(ficha => {
@@ -571,7 +594,7 @@ app.get('/api/relatorio', async (req, res) => {
 
     const relatorio = {};
 
-    // Fichas entregues (por data_entregue)
+    // Fichas entregues
     let sqlEntregues = '';
     let paramsEntregues = [];
 
@@ -591,7 +614,7 @@ app.get('/api/relatorio', async (req, res) => {
     const entreguesResult = await dbGet(sqlEntregues, paramsEntregues);
     relatorio.fichasEntregues = entreguesResult?.total || 0;
 
-    // Fichas pendentes (por data_inicio)
+    // Fichas pendentes
     let sqlPendentes = '';
     let paramsPendentes = [];
 
@@ -611,7 +634,7 @@ app.get('/api/relatorio', async (req, res) => {
     const pendentesResult = await dbGet(sqlPendentes, paramsPendentes);
     relatorio.fichasPendentes = pendentesResult?.total || 0;
 
-    // Itens confeccionados (fichas entregues)
+    // Itens confeccionados
     let sqlItens = '';
     let paramsItens = [];
 
@@ -717,7 +740,6 @@ async function atualizarCliente(nomeCliente, dataInicio) {
   }
 }
 
-
 // ==================== ROTAS CLOUDINARY ====================
 
 // Obter configuração pública do Cloudinary
@@ -729,16 +751,11 @@ app.get('/api/cloudinary/config', (req, res) => {
   });
 });
 
-// Gerar assinatura para upload signed (com otimização)
+// Gerar assinatura para upload signed
 app.post('/api/cloudinary/signature', (req, res) => {
   try {
     const timestamp = Math.round(new Date().getTime() / 1000);
     const folder = 'fichas';
-
-    // OTIMIZAÇÃO: Redimensionar e comprimir no upload
-    // - Limita a 1500px (suficiente para visualização/impressão)
-    // - Qualidade automática (Cloudinary escolhe o melhor)
-    // - Formato automático (WebP quando suportado)
     const transformation = 'c_limit,w_1500,h_1500,q_auto:good';
 
     const paramsToSign = {
@@ -748,7 +765,6 @@ app.post('/api/cloudinary/signature', (req, res) => {
       ...req.body
     };
 
-    // Remover parâmetros vazios
     Object.keys(paramsToSign).forEach(key => {
       if (paramsToSign[key] === undefined || paramsToSign[key] === '') {
         delete paramsToSign[key];
@@ -771,10 +787,9 @@ app.post('/api/cloudinary/signature', (req, res) => {
   }
 });
 
-// Rota de migração - converter base64 existentes para Cloudinary
+// Migração - converter base64 para Cloudinary
 app.post('/api/cloudinary/migrar', async (req, res) => {
   try {
-    // Buscar fichas com imagens em base64
     const fichas = await dbAll(`
       SELECT id, imagem_data, imagens_data 
       FROM fichas 
@@ -796,7 +811,6 @@ app.post('/api/cloudinary/migrar', async (req, res) => {
         let imagensAtualizadas = [];
         let temAlteracao = false;
 
-        // Processar imagens_data (novo formato - array JSON)
         if (ficha.imagens_data) {
           let imagens = [];
           try {
@@ -807,7 +821,6 @@ app.post('/api/cloudinary/migrar', async (req, res) => {
 
           for (const img of imagens) {
             if (img.src && img.src.startsWith('data:')) {
-              // Precisa migrar - fazer upload para Cloudinary
               const uploadResult = await uploadBase64ToCloudinary(img.src, `ficha_${ficha.id}`);
               if (uploadResult.success) {
                 imagensAtualizadas.push({
@@ -817,18 +830,15 @@ app.post('/api/cloudinary/migrar', async (req, res) => {
                 });
                 temAlteracao = true;
               } else {
-                // Manter original se falhar
                 imagensAtualizadas.push(img);
                 resultados.erros.push(`Ficha #${ficha.id}: ${uploadResult.error}`);
               }
             } else {
-              // Já é URL, manter
               imagensAtualizadas.push(img);
             }
           }
         }
 
-        // Processar imagem_data (formato antigo - single base64)
         if (ficha.imagem_data && ficha.imagem_data.startsWith('data:') && imagensAtualizadas.length === 0) {
           const uploadResult = await uploadBase64ToCloudinary(ficha.imagem_data, `ficha_${ficha.id}`);
           if (uploadResult.success) {
@@ -843,7 +853,6 @@ app.post('/api/cloudinary/migrar', async (req, res) => {
           }
         }
 
-        // Atualizar no banco se houve alteração
         if (temAlteracao && imagensAtualizadas.length > 0) {
           await dbRun(
             `UPDATE fichas SET imagens_data = ?, imagem_data = NULL WHERE id = ?`,
@@ -878,7 +887,6 @@ async function uploadBase64ToCloudinary(base64Data, publicIdPrefix) {
     const timestamp = Math.round(new Date().getTime() / 1000);
     const folder = 'fichas';
     const publicId = `${publicIdPrefix}_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
-
     const transformation = 'c_limit,w_1500,h_1500,q_auto:good';
 
     const paramsToSign = {
@@ -934,8 +942,6 @@ app.delete('/api/cloudinary/image/:publicId', async (req, res) => {
   try {
     const { publicId } = req.params;
     const timestamp = Math.round(new Date().getTime() / 1000);
-
-    // O publicId pode vir com / substituído por _SLASH_
     const realPublicId = publicId.replace(/_SLASH_/g, '/');
 
     const paramsToSign = {
@@ -950,7 +956,6 @@ app.delete('/api/cloudinary/image/:publicId', async (req, res) => {
     formData.append('timestamp', timestamp);
     formData.append('signature', signature);
     formData.append('api_key', CLOUDINARY_CONFIG.apiKey);
-    formData.append('transformation', transformation);
 
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/destroy`,
@@ -975,7 +980,6 @@ app.delete('/api/cloudinary/image/:publicId', async (req, res) => {
   }
 });
 
-
 // Rota catch-all
 app.get('*', (req, res) => {
   if (!req.path.startsWith('/api')) {
@@ -988,6 +992,7 @@ initDatabase().then(() => {
   app.listen(PORT, () => {
     console.log('🚀 Servidor rodando em http://localhost:' + PORT);
     console.log('📊 Banco de dados: Turso (LibSQL)');
+    console.log('☁️ Cloudinary: ' + CLOUDINARY_CONFIG.cloudName);
     console.log('✅ Encoding UTF-8 configurado');
   });
 }).catch(error => {

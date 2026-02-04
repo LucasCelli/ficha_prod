@@ -1,39 +1,50 @@
 /**
- * Image Handler com Cloudinary
- * Substitui o sistema de imagens base64 por uploads no Cloudinary
- * 
- * COMO USAR:
- * 1. Inclua este arquivo APÓS cloudinary-upload.js e ANTES de main.js
- * 2. Ou substitua a seção de imagens no main.js pelo conteúdo deste arquivo
+ * Image Handler com Cloudinary - VERSÃO CORRIGIDA
+ * Usa a estrutura HTML original do main.js
  */
 
 (function() {
   'use strict';
 
-  // Array para armazenar as imagens (agora com URLs do Cloudinary)
+  console.log('🔧 [IMAGE-HANDLER] Script carregado');
+
+  // Array para armazenar as imagens
   let imagens = [];
   const MAX_IMAGENS = 4;
 
   // Elementos do DOM
-  let imageUpload, imagesContainer, fileInput, imagesCounter;
+  let container, uploadArea, fileInput, counterEl;
+
+  // Drag handlers
+  let draggedImageIndex = null;
 
   // Inicializar quando DOM estiver pronto
   document.addEventListener('DOMContentLoaded', initImageHandler);
 
   function initImageHandler() {
-    imageUpload = document.getElementById('imageUpload');
-    imagesContainer = document.getElementById('imagesContainer');
-    fileInput = document.getElementById('fileInput');
-    imagesCounter = document.getElementById('imagesCounter');
+    console.log('🔧 [IMAGE-HANDLER] initImageHandler() chamado');
 
-    if (!imageUpload || !imagesContainer || !fileInput) {
-      console.warn('⚠️ Elementos de imagem não encontrados');
+    container = document.getElementById('imagesContainer');
+    uploadArea = document.getElementById('imageUpload');
+    fileInput = document.getElementById('fileInput');
+    counterEl = document.getElementById('imagesCounter');
+
+    console.log('🔧 [IMAGE-HANDLER] Elementos encontrados:', {
+      container: !!container,
+      uploadArea: !!uploadArea,
+      fileInput: !!fileInput,
+      counterEl: !!counterEl
+    });
+
+    if (!container || !uploadArea || !fileInput) {
+      console.warn('⚠️ [IMAGE-HANDLER] Elementos de imagem não encontrados');
       return;
     }
 
     // Event listeners
-    imageUpload.addEventListener('click', () => fileInput.click());
-    imageUpload.addEventListener('keydown', (e) => {
+    uploadArea.addEventListener('click', () => fileInput.click());
+
+    uploadArea.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         fileInput.click();
@@ -42,53 +53,46 @@
 
     fileInput.addEventListener('change', handleFileSelect);
 
-    // Drag and drop
-    imageUpload.addEventListener('dragover', handleDragOver);
-    imageUpload.addEventListener('dragleave', handleDragLeave);
-    imageUpload.addEventListener('drop', handleDrop);
+    // Drag and drop na área de upload
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('drag-over');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('drag-over');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('drag-over');
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+      if (files.length > 0) processFiles(files);
+    });
 
     // Paste de imagens (Ctrl+V)
     document.addEventListener('paste', handlePaste);
 
-    console.log('📸 Image Handler com Cloudinary inicializado');
-  }
+    console.log('📸 [IMAGE-HANDLER] Inicializado');
 
-  function handleDragOver(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    imageUpload.classList.add('drag-over');
-  }
-
-  function handleDragLeave(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    imageUpload.classList.remove('drag-over');
-  }
-
-  function handleDrop(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    imageUpload.classList.remove('drag-over');
-
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-    if (files.length > 0) {
-      processFiles(files);
-    }
+    // Verificar CloudinaryUpload após pequeno delay
+    setTimeout(() => {
+      if (window.CloudinaryUpload) {
+        console.log('✅ [IMAGE-HANDLER] CloudinaryUpload disponível');
+      } else {
+        console.warn('⚠️ [IMAGE-HANDLER] CloudinaryUpload NÃO disponível - usando base64');
+      }
+    }, 500);
   }
 
   function handleFileSelect(e) {
     const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
-    if (files.length > 0) {
-      processFiles(files);
-    }
-    e.target.value = ''; // Reset input
+    if (files.length > 0) processFiles(files);
+    e.target.value = '';
   }
 
   function handlePaste(e) {
-    // Ignorar se estiver em campo de texto
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-      return;
-    }
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
     const items = Array.from(e.clipboardData?.items || []);
     const imageItems = items.filter(item => item.type.startsWith('image/'));
@@ -101,8 +105,10 @@
   }
 
   async function processFiles(files) {
+    console.log('📤 [IMAGE-HANDLER] processFiles() -', files.length, 'arquivo(s)');
+
     if (imagens.length >= MAX_IMAGENS) {
-      mostrarToast('Máximo de 4 imagens atingido', 'warning');
+      toast('Máximo de ' + MAX_IMAGENS + ' imagens atingido', 'warning');
       return;
     }
 
@@ -110,39 +116,42 @@
     const filesToProcess = files.slice(0, espacoDisponivel);
 
     // Mostrar loading
-    mostrarLoadingImagens(filesToProcess.length);
+    mostrarLoading(filesToProcess.length);
 
     for (const file of filesToProcess) {
+      console.log('📤 [IMAGE-HANDLER] Processando:', file.name);
+
       try {
-        // Verificar se Cloudinary está disponível
         if (window.CloudinaryUpload) {
           // Upload para Cloudinary
+          console.log('📤 [IMAGE-HANDLER] Enviando para Cloudinary...');
           const result = await CloudinaryUpload.uploadFile(file);
 
           if (result.success) {
-            adicionarImagem({
+            imagens.push({
               src: result.url,
               publicId: result.publicId,
               descricao: ''
             });
-            console.log('☁️ Imagem enviada para Cloudinary:', result.publicId);
+            console.log('✅ [IMAGE-HANDLER] Upload Cloudinary OK:', result.publicId);
           } else {
             throw new Error(result.error || 'Erro no upload');
           }
         } else {
-          // Fallback para base64 se Cloudinary não estiver disponível
-          console.warn('⚠️ Cloudinary não disponível, usando base64');
+          // Fallback para base64
+          console.warn('⚠️ [IMAGE-HANDLER] Usando fallback base64');
           const base64 = await fileToBase64(file);
-          adicionarImagem({ src: base64, descricao: '' });
+          imagens.push({ src: base64, descricao: '' });
         }
       } catch (error) {
-        console.error('❌ Erro ao processar imagem:', error);
-        mostrarToast('Erro ao fazer upload da imagem', 'error');
+        console.error('❌ [IMAGE-HANDLER] Erro:', error);
+        toast('Erro ao enviar imagem: ' + error.message, 'error');
       }
     }
 
-    esconderLoadingImagens();
+    esconderLoading();
     renderizarImagens();
+    atualizarContador();
   }
 
   function fileToBase64(file) {
@@ -154,21 +163,132 @@
     });
   }
 
-  function adicionarImagem(imgData) {
-    if (imagens.length < MAX_IMAGENS) {
-      imagens.push(imgData);
-      atualizarContador();
+  // ==================== RENDERIZAÇÃO - ESTRUTURA ORIGINAL ====================
+
+  function renderizarImagens() {
+    if (!container) return;
+
+    console.log('🔧 [IMAGE-HANDLER] renderizarImagens() -', imagens.length, 'imagem(ns)');
+
+    container.innerHTML = '';
+
+    imagens.forEach((img, index) => {
+      const card = document.createElement('div');
+      card.className = 'image-card';
+      card.draggable = true;
+      card.dataset.index = index;
+
+      // Usar URL original - CSS controla o tamanho
+      const thumbUrl = img.src;
+
+      // Badge de nuvem se estiver no Cloudinary
+      const cloudBadge = img.publicId 
+        ? '<span class="cloud-badge" title="Armazenada na nuvem"><i class="fas fa-cloud"></i></span>' 
+        : '';
+
+      // ESTRUTURA HTML ORIGINAL DO MAIN.JS
+      card.innerHTML = `
+        <div class="image-wrapper">
+          <span class="image-number">${index + 1}</span>
+          <img src="${thumbUrl}" alt="Imagem ${index + 1}" draggable="false">
+          <button type="button" class="image-delete-btn" title="Remover imagem">
+            <i class="fas fa-times"></i>
+          </button>
+          <div class="image-drag-handle">
+            <i class="fas fa-grip-horizontal"></i>
+            Arrastar
+          </div>
+          ${cloudBadge}
+        </div>
+        <div class="image-description">
+          <input type="text" placeholder="Descrição da imagem (opcional)" value="${img.descricao || ''}" data-index="${index}">
+        </div>
+      `;
+
+      container.appendChild(card);
+
+      // Event: Deletar
+      card.querySelector('.image-delete-btn').addEventListener('click', async () => {
+        await removerImagem(index);
+      });
+
+      // Event: Atualizar descrição
+      card.querySelector('input').addEventListener('input', (e) => {
+        imagens[index].descricao = e.target.value;
+      });
+
+      // Events: Drag and drop para reordenar
+      card.addEventListener('dragstart', handleImageDragStart);
+      card.addEventListener('dragend', handleImageDragEnd);
+      card.addEventListener('dragover', handleImageDragOver);
+      card.addEventListener('drop', handleImageDrop);
+      card.addEventListener('dragleave', handleImageDragLeave);
+    });
+
+    atualizarContador();
+
+    // Mostrar/esconder área de upload
+    if (uploadArea) {
+      uploadArea.style.display = imagens.length >= MAX_IMAGENS ? 'none' : '';
     }
   }
 
+  // ==================== DRAG HANDLERS ORIGINAIS ====================
+
+  function handleImageDragStart(e) {
+    draggedImageIndex = parseInt(e.currentTarget.dataset.index);
+    e.currentTarget.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function handleImageDragEnd(e) {
+    e.currentTarget.classList.remove('dragging');
+    document.querySelectorAll('.image-card').forEach(card => {
+      card.classList.remove('drag-over');
+    });
+    draggedImageIndex = null;
+  }
+
+  function handleImageDragOver(e) {
+    e.preventDefault();
+    const card = e.currentTarget;
+    const targetIndex = parseInt(card.dataset.index);
+
+    if (targetIndex !== draggedImageIndex) {
+      card.classList.add('drag-over');
+    }
+  }
+
+  function handleImageDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+  }
+
+  function handleImageDrop(e) {
+    e.preventDefault();
+    const card = e.currentTarget;
+    card.classList.remove('drag-over');
+
+    const targetIndex = parseInt(card.dataset.index);
+
+    if (draggedImageIndex !== null && targetIndex !== draggedImageIndex) {
+      // Reordenar
+      const [movedImage] = imagens.splice(draggedImageIndex, 1);
+      imagens.splice(targetIndex, 0, movedImage);
+      renderizarImagens();
+    }
+  }
+
+  // ==================== FUNÇÕES AUXILIARES ====================
+
   async function removerImagem(index) {
     const img = imagens[index];
+    console.log('🗑️ [IMAGE-HANDLER] Removendo imagem', index);
 
     // Se tem publicId, deletar do Cloudinary
     if (img.publicId && window.CloudinaryUpload) {
       try {
         await CloudinaryUpload.deleteImage(img.publicId);
-        console.log('🗑️ Imagem removida do Cloudinary');
+        console.log('✅ Removida do Cloudinary');
       } catch (error) {
         console.warn('⚠️ Erro ao deletar do Cloudinary:', error);
       }
@@ -179,188 +299,49 @@
     atualizarContador();
   }
 
-  function renderizarImagens() {
-    if (!imagesContainer) return;
-
-    imagesContainer.innerHTML = imagens.map((img, index) => {
-      // Usar thumbnail otimizado se for URL do Cloudinary
-      const thumbUrl = window.CloudinaryUpload && CloudinaryUpload.isCloudinaryUrl(img.src)
-        ? CloudinaryUpload.getThumbnailUrl(img.src, 200)
-        : img.src;
-
-      return `
-        <div class="image-card" draggable="true" data-index="${index}">
-          <div class="image-preview">
-            <img src="${thumbUrl}" alt="Imagem ${index + 1}" loading="lazy">
-          </div>
-          <div class="image-actions">
-            <button type="button" class="btn-view-image" data-index="${index}" title="Visualizar">
-              <i class="fas fa-search-plus"></i>
-            </button>
-            <button type="button" class="btn-remove-image" data-index="${index}" title="Remover">
-              <i class="fas fa-trash"></i>
-            </button>
-          </div>
-          <input type="text" class="image-description" placeholder="Descrição (opcional)" 
-                 value="${img.descricao || ''}" data-index="${index}">
-          ${img.publicId ? '<span class="cloud-badge" title="Armazenada na nuvem"><i class="fas fa-cloud"></i></span>' : ''}
-        </div>
-      `;
-    }).join('');
-
-    // Event listeners
-    imagesContainer.querySelectorAll('.btn-remove-image').forEach(btn => {
-      btn.addEventListener('click', () => removerImagem(parseInt(btn.dataset.index)));
-    });
-
-    imagesContainer.querySelectorAll('.btn-view-image').forEach(btn => {
-      btn.addEventListener('click', () => visualizarImagem(parseInt(btn.dataset.index)));
-    });
-
-    imagesContainer.querySelectorAll('.image-description').forEach(input => {
-      input.addEventListener('change', (e) => {
-        const index = parseInt(e.target.dataset.index);
-        imagens[index].descricao = e.target.value;
-      });
-    });
-
-    // Drag and drop para reordenar
-    initDragReorder();
-
-    // Mostrar/esconder área de upload
-    if (imageUpload) {
-      imageUpload.style.display = imagens.length >= MAX_IMAGENS ? 'none' : 'flex';
-    }
-  }
-
-  function visualizarImagem(index) {
-    const img = imagens[index];
-    if (!img) return;
-
-    // Usar URL em tamanho maior para visualização
-    const fullUrl = window.CloudinaryUpload && CloudinaryUpload.isCloudinaryUrl(img.src)
-      ? CloudinaryUpload.getOptimizedUrl(img.src, { width: 1200, height: 1200 })
-      : img.src;
-
-    // Criar modal de visualização
-    const modal = document.createElement('div');
-    modal.className = 'image-modal';
-    modal.innerHTML = `
-      <div class="image-modal-backdrop"></div>
-      <div class="image-modal-content">
-        <img src="${fullUrl}" alt="Visualização">
-        <button class="image-modal-close"><i class="fas fa-times"></i></button>
-      </div>
-    `;
-
-    modal.querySelector('.image-modal-backdrop').addEventListener('click', () => modal.remove());
-    modal.querySelector('.image-modal-close').addEventListener('click', () => modal.remove());
-
-    document.body.appendChild(modal);
-
-    // Fechar com ESC
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') {
-        modal.remove();
-        document.removeEventListener('keydown', handleEsc);
-      }
-    };
-    document.addEventListener('keydown', handleEsc);
-  }
-
-  function initDragReorder() {
-    const cards = imagesContainer.querySelectorAll('.image-card');
-
-    cards.forEach(card => {
-      card.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', card.dataset.index);
-        card.classList.add('dragging');
-      });
-
-      card.addEventListener('dragend', () => {
-        card.classList.remove('dragging');
-      });
-
-      card.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        const dragging = imagesContainer.querySelector('.dragging');
-        if (dragging && dragging !== card) {
-          card.classList.add('drag-target');
-        }
-      });
-
-      card.addEventListener('dragleave', () => {
-        card.classList.remove('drag-target');
-      });
-
-      card.addEventListener('drop', (e) => {
-        e.preventDefault();
-        card.classList.remove('drag-target');
-
-        const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-        const toIndex = parseInt(card.dataset.index);
-
-        if (fromIndex !== toIndex) {
-          // Reordenar array
-          const [moved] = imagens.splice(fromIndex, 1);
-          imagens.splice(toIndex, 0, moved);
-          renderizarImagens();
-        }
-      });
-    });
-  }
-
   function atualizarContador() {
-    if (imagesCounter) {
-      imagesCounter.textContent = `(${imagens.length}/${MAX_IMAGENS})`;
+    if (counterEl) {
+      counterEl.textContent = `(${imagens.length}/${MAX_IMAGENS})`;
     }
   }
 
-  function mostrarLoadingImagens(count) {
-    if (!imagesContainer) return;
+  function mostrarLoading(count) {
+    if (!container) return;
 
     for (let i = 0; i < count; i++) {
       const placeholder = document.createElement('div');
       placeholder.className = 'image-card loading-placeholder';
       placeholder.innerHTML = `
-        <div class="loading-spinner">
-          <i class="fas fa-cloud-upload-alt fa-spin"></i>
-          <span>Enviando...</span>
+        <div class="image-wrapper" style="display: flex; align-items: center; justify-content: center; background: #f3f4f6;">
+          <div style="text-align: center; color: #6b7280;">
+            <i class="fas fa-cloud-upload-alt fa-2x fa-spin"></i>
+            <div style="margin-top: 8px; font-size: 12px;">Enviando...</div>
+          </div>
         </div>
       `;
-      imagesContainer.appendChild(placeholder);
+      container.appendChild(placeholder);
     }
   }
 
-  function esconderLoadingImagens() {
-    if (!imagesContainer) return;
-    imagesContainer.querySelectorAll('.loading-placeholder').forEach(el => el.remove());
+  function esconderLoading() {
+    if (!container) return;
+    container.querySelectorAll('.loading-placeholder').forEach(el => el.remove());
   }
 
-  function mostrarToast(mensagem, tipo = 'info') {
-    // Usar toast do sistema se disponível
-    if (window.mostrarToast) {
+  // Toast - usa o global (toast.js) se disponível
+  function toast(mensagem, tipo = 'info') {
+    if (typeof window.mostrarToast === 'function') {
       window.mostrarToast(mensagem, tipo);
-      return;
+    } else {
+      // Fallback mínimo (não deveria acontecer se toast.js carregou)
+      console.log(`[TOAST ${tipo.toUpperCase()}] ${mensagem}`);
     }
-
-    // Fallback simples
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${tipo}`;
-    toast.textContent = mensagem;
-    toast.style.cssText = `
-      position: fixed; bottom: 20px; right: 20px; padding: 12px 24px;
-      background: ${tipo === 'error' ? '#ef4444' : tipo === 'warning' ? '#f59e0b' : '#3b82f6'};
-      color: white; border-radius: 8px; z-index: 10000;
-    `;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
   }
 
   // ==================== API PÚBLICA ====================
 
-  // Obter imagens (para salvar no banco)
   window.getImagens = function() {
+    console.log('🔧 [IMAGE-HANDLER] getImagens() -', imagens.length, 'imagem(ns)');
     return imagens.map(img => ({
       src: img.src,
       publicId: img.publicId || null,
@@ -368,12 +349,13 @@
     }));
   };
 
-  // Definir imagens (ao carregar ficha)
   window.setImagens = function(novasImagens) {
+    console.log('🔧 [IMAGE-HANDLER] setImagens() -', novasImagens?.length || 0, 'imagem(ns)');
+
     imagens = [];
 
     if (Array.isArray(novasImagens)) {
-      novasImagens.forEach(img => {
+      novasImagens.forEach((img) => {
         if (typeof img === 'string') {
           imagens.push({ src: img, descricao: '' });
         } else if (img && img.src) {
@@ -388,14 +370,36 @@
 
     renderizarImagens();
     atualizarContador();
-    console.log(`📸 ${imagens.length} imagem(ns) carregada(s)`);
+    console.log('✅ [IMAGE-HANDLER]', imagens.length, 'imagem(ns) carregada(s)');
   };
 
-  // Limpar todas as imagens
   window.limparImagens = function() {
     imagens = [];
     renderizarImagens();
     atualizarContador();
   };
+
+  window.adicionarImagem = function(imgData) {
+    if (imagens.length >= MAX_IMAGENS) {
+      toast('Máximo de ' + MAX_IMAGENS + ' imagens atingido', 'warning');
+      return false;
+    }
+
+    if (typeof imgData === 'string') {
+      imagens.push({ src: imgData, descricao: '' });
+    } else {
+      imagens.push({
+        src: imgData.src,
+        publicId: imgData.publicId || null,
+        descricao: imgData.descricao || ''
+      });
+    }
+
+    renderizarImagens();
+    atualizarContador();
+    return true;
+  };
+
+  console.log('🔧 [IMAGE-HANDLER] APIs: getImagens, setImagens, limparImagens, adicionarImagem');
 
 })();

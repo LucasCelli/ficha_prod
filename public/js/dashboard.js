@@ -216,9 +216,9 @@
         const numeroVenda = (ficha.numero_venda || '').toLowerCase();
         const vendedor = (ficha.vendedor || '').toLowerCase();
 
-        if (!cliente.includes(searchTerm) && 
-            !numeroVenda.includes(searchTerm) && 
-            !vendedor.includes(searchTerm)) {
+        if (!cliente.includes(searchTerm) &&
+          !numeroVenda.includes(searchTerm) &&
+          !vendedor.includes(searchTerm)) {
           return false;
         }
       }
@@ -416,63 +416,4 @@
   function mostrarErro(mensagem) {
     mostrarToast(mensagem, 'error');
   }
-
-  function mostrarToast(mensagem, tipo = 'success') {
-    const existente = document.querySelector('.toast-custom');
-    if (existente) existente.remove();
-
-    const icons = {
-      success: 'fa-check-circle',
-      error: 'fa-exclamation-circle'
-    };
-
-    const cores = {
-      success: 'linear-gradient(135deg, #10b981, #059669)',
-      error: 'linear-gradient(135deg, #ef4444, #dc2626)'
-    };
-
-    const toast = document.createElement('div');
-    toast.className = 'toast-custom';
-    toast.innerHTML = `<i class="fas ${icons[tipo]}"></i><span>${mensagem}</span>`;
-    toast.style.cssText = `
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      padding: 16px 24px;
-      border-radius: 12px;
-      color: white;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      z-index: 10001;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-      background: ${cores[tipo]};
-      animation: toastIn 0.4s ease;
-    `;
-
-    if (!document.getElementById('toastStyles')) {
-      const style = document.createElement('style');
-      style.id = 'toastStyles';
-      style.textContent = `
-        @keyframes toastIn {
-          from { transform: translateX(100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes toastOut {
-          from { transform: translateX(0); opacity: 1; }
-          to { transform: translateX(100%); opacity: 0; }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-      toast.style.animation = 'toastOut 0.4s ease forwards';
-      setTimeout(() => toast.remove(), 400);
-    }, 3000);
-  }
-
 })();

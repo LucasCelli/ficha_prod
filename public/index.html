@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+﻿
+<!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
@@ -12,6 +13,29 @@
     <link rel="stylesheet" href="css/images.css">
     <link rel="stylesheet" href="css/cloudinary-styles.css">
 
+    <style>
+        /* Separador de seções dentro do formulário */
+        .form-divider {
+            grid-column: 1 / -1;
+            border: none;
+            border-top: 2px solid #e5e7eb;
+            margin: 16px 0 12px;
+            position: relative;
+        }
+        .form-divider::after {
+            content: attr(data-label);
+            position: absolute;
+            top: -10px;
+            left: 16px;
+            background: white;
+            padding: 0 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
 </head>
 
 <body>
@@ -155,6 +179,8 @@
                 </div>
                 <div class="card-body">
                     <div class="form-grid">
+
+                        <!-- ══════════════ MATERIAL ══════════════ -->
                         <div class="form-group">
                             <label for="material">Tecido/Material</label>
                             <input type="text" id="material" list="materiaisList" class="form-control"
@@ -167,6 +193,9 @@
                             <input type="text" id="corMaterial" class="form-control"
                                 placeholder="Ex: Branco, Preto, Azul Marinho">
                         </div>
+
+                        <!-- ══════════════ MANGA ══════════════ -->
+                        <hr class="form-divider" data-label="Manga">
 
                         <div class="form-group">
                             <label for="manga">Tipo de Manga</label>
@@ -190,10 +219,19 @@
                             </select>
                         </div>
 
+                        <!-- Campos condicionais da manga (viés ou punho) -->
                         <div class="form-group" id="larguraMangaContainer" style="display: none;">
-                            <label for="larguraManga">Largura (cm)</label>
-                            <input type="text" id="larguraManga" class="form-control" placeholder="Ex: 2,5">
+                            <label for="larguraManga">Largura Acab. Manga</label>
+                            <input type="text" id="larguraManga" class="form-control" placeholder="Ex: 3,5">
                         </div>
+
+                        <div class="form-group" id="corAcabamentoMangaContainer" style="display: none;">
+                            <label for="corAcabamentoManga">Cor Acab. Manga</label>
+                            <input type="text" id="corAcabamentoManga" class="form-control" placeholder="Ex: Preto">
+                        </div>
+
+                        <!-- ══════════════ GOLA ══════════════ -->
+                        <hr class="form-divider" data-label="Gola">
 
                         <div class="form-group">
                             <label for="gola">Tipo de Gola</label>
@@ -208,24 +246,46 @@
                             </select>
                         </div>
 
-                        <div class="form-group">
+                        <!-- Cor da Gola (sempre que tiver gola selecionada) -->
+                        <div class="form-group" id="corGolaContainer" style="display: none;">
+                            <label for="corGola">Cor da Gola</label>
+                            <input type="text" id="corGola" class="form-control" placeholder="Ex: Branco">
+                        </div>
+
+                        <!-- Acabamento da Gola (NÃO aparece para Polo) -->
+                        <div class="form-group" id="acabamentoGolaContainer">
                             <label for="acabamentoGola">Acabamento da Gola</label>
                             <select id="acabamentoGola" class="form-control">
                                 <option value="">-</option>
-                                <option value="polo">Polo</option>
-                                <option value="ribana_2_5">Ribana 2,5</option>
-                                <option value="ribana_3_5">Ribana 3,5</option>
-                                <option value="ribana_4_5">Ribana 4,5</option>
-                                <option value="vies_2_5">Viés 2,5</option>
-                                <option value="vies_3_5">Viés 3,5</option>
-                                <option value="vies_4_5">Viés 4,5</option>
+                                <option value="ribana">Ribana</option>
+                                <option value="vies">Viés</option>
                                 <option value="vies_sublimado">Viés Sublimado</option>
                                 <option value="ribana_sublimada">Ribana Sublimada</option>
                                 <option value="ribana_molde">Ribana em Molde</option>
                             </select>
                         </div>
 
-                        <!-- Campos específicos para Gola Polo -->
+                        <!-- Largura do acabamento da gola (NÃO aparece para Polo) -->
+                        <div class="form-group" id="larguraGolaContainer" style="display: none;">
+                            <label for="larguraGola">Largura Acab. Gola</label>
+                            <input type="text" id="larguraGola" class="form-control" placeholder="Ex: 2,5">
+                        </div>
+
+                        <!-- Reforço na Gola (select Sim/Não) -->
+                        <div class="form-group" id="reforcoGolaContainer" style="display: none;">
+                            <label for="reforcoGola">Reforço na Gola</label>
+                            <select id="reforcoGola" class="form-control">
+                                <option value="nao">Não</option>
+                                <option value="sim">Sim</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="corReforcoContainer" style="display: none;">
+                            <label for="corReforco">Cor do Reforço</label>
+                            <input type="text" id="corReforco" class="form-control" placeholder="Ex: Preto">
+                        </div>
+
+                        <!-- ══════════════ CAMPOS ESPECÍFICOS POLO ══════════════ -->
                         <div class="form-group" id="corPeitilhoInternoContainer" style="display: none;">
                             <label for="corPeitilhoInterno">Cor do Peitilho Interno</label>
                             <input type="text" id="corPeitilhoInterno" class="form-control" placeholder="Ex: Branco">
@@ -236,25 +296,22 @@
                             <input type="text" id="corPeitilhoExterno" class="form-control" placeholder="Ex: Azul">
                         </div>
 
+                        <!-- Abertura Lateral (select Sim/Não - só para Polo) -->
                         <div class="form-group" id="aberturaLateralContainer" style="display: none;">
-                            <label>
-                                <input type="checkbox" id="aberturaLateral">
-                                Abertura na Lateral
-                            </label>
+                            <label for="aberturaLateral">Abertura na Lateral</label>
+                            <select id="aberturaLateral" class="form-control">
+                                <option value="nao">Não</option>
+                                <option value="sim">Sim</option>
+                            </select>
                         </div>
 
-                        <!-- Reforço na Gola (para todas as golas) -->
-                        <div class="form-group" id="reforcoGolaContainer" style="display: none;">
-                            <label>
-                                <input type="checkbox" id="reforcoGola">
-                                Com Reforço na Gola
-                            </label>
+                        <div class="form-group" id="corAberturaLateralContainer" style="display: none;">
+                            <label for="corAberturaLateral">Cor da Abertura Lateral</label>
+                            <input type="text" id="corAberturaLateral" class="form-control" placeholder="Ex: Azul">
                         </div>
 
-                        <div class="form-group" id="corReforcoContainer" style="display: none;">
-                            <label for="corReforco">Cor do Reforço</label>
-                            <input type="text" id="corReforco" class="form-control" placeholder="Ex: Preto">
-                        </div>
+                        <!-- ══════════════ DETALHES ══════════════ -->
+                        <hr class="form-divider" data-label="Detalhes">
 
                         <div class="form-group">
                             <label for="bolso">Bolso</label>
@@ -277,6 +334,16 @@
                             </select>
                         </div>
 
+                        <div class="form-group" id="fileteLocalContainer" style="display: none;">
+                            <label for="fileteLocal">Local do Filete</label>
+                            <input type="text" id="fileteLocal" class="form-control" placeholder="Ex: Gola, Manga">
+                        </div>
+
+                        <div class="form-group" id="fileteCorContainer" style="display: none;">
+                            <label for="fileteCor">Cor do Filete</label>
+                            <input type="text" id="fileteCor" class="form-control" placeholder="Ex: Vermelho">
+                        </div>
+
                         <div class="form-group">
                             <label for="faixa">Faixa Refletiva</label>
                             <select id="faixa" class="form-control">
@@ -285,8 +352,21 @@
                             </select>
                         </div>
 
+                        <div class="form-group" id="faixaLocalContainer" style="display: none;">
+                            <label for="faixaLocal">Local da Faixa</label>
+                            <input type="text" id="faixaLocal" class="form-control" placeholder="Ex: Braço, Peito">
+                        </div>
+
+                        <div class="form-group" id="faixaCorContainer" style="display: none;">
+                            <label for="faixaCor">Cor da Faixa</label>
+                            <input type="text" id="faixaCor" class="form-control" placeholder="Ex: Prata">
+                        </div>
+
+                        <!-- ══════════════ ARTE ══════════════ -->
+                        <hr class="form-divider" data-label="Arte / Personalização">
+
                         <div class="form-group">
-                            <label for="arte">Tipo de Arte/Personalização</label>
+                            <label for="arte">Tipo de Arte</label>
                             <select id="arte" class="form-control">
                                 <option value="">-</option>
                                 <option value="sublimacao">Sublimação</option>
@@ -315,30 +395,10 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" style="margin-top: 16px;">
                         <label for="observacoes">Observações</label>
                         <textarea id="observacoes" class="form-control" rows="3"
                             placeholder="Ex: Algumas camisetas com manga longa, outras com manga curta..."></textarea>
-                    </div>
-
-                    <h3 class="subsection-title">Visualização das Especificações</h3>
-                    <div class="icon-preview">
-                        <div class="icon-item" data-spec="material">
-                            <div class="icon-circle"><i class="fas fa-layer-group"></i></div>
-                            <span class="icon-label">Material</span>
-                        </div>
-                        <div class="icon-item" data-spec="manga">
-                            <div class="icon-circle"><i class="fas fa-arrows-left-right"></i></div>
-                            <span class="icon-label">Manga</span>
-                        </div>
-                        <div class="icon-item" data-spec="gola">
-                            <div class="icon-circle"><i class="fas fa-circle-notch"></i></div>
-                            <span class="icon-label">Gola</span>
-                        </div>
-                        <div class="icon-item" data-spec="arte">
-                            <div class="icon-circle"><i class="fas fa-palette"></i></div>
-                            <span class="icon-label">Arte</span>
-                        </div>
                     </div>
                 </div>
             </section>
@@ -351,10 +411,8 @@
                     <span class="images-counter" id="imagesCounter">(0/4)</span>
                 </div>
                 <div class="card-body">
-                    <!-- Container das imagens adicionadas -->
                     <div id="imagesContainer" class="images-grid"></div>
 
-                    <!-- Área de upload (esconde quando tem 4 imagens) -->
                     <div class="image-upload" id="imageUpload" role="button" tabindex="0">
                         <i class="fas fa-cloud-upload-alt"></i>
                         <h3>Arraste e solte imagens aqui</h3>
@@ -377,7 +435,6 @@
                     <span>Ações</span>
                 </div>
                 <div class="card-body actions" id="acoesContainer">
-                    <!-- Botões serão inseridos pelo integration.js -->
                 </div>
             </section>
         </main>
@@ -390,7 +447,6 @@
             <p>Data de Emissão: <span id="print-dataEmissao"></span></p>
         </header>
 
-        <!-- INFORMAÇÕES DO CLIENTE - 1 COLUNA -->
         <section class="print-card">
             <h2>Dados do Pedido</h2>
             <div class="print-grid">
@@ -404,9 +460,7 @@
             </div>
         </section>
 
-        <!-- PRODUTOS E ESPECIFICAÇÕES - 2 COLUNAS -->
         <div class="print-two-cols">
-            <!-- PRODUTOS -->
             <section class="print-card">
                 <h2>Produtos</h2>
                 <table class="print-table">
@@ -424,7 +478,6 @@
                 </div>
             </section>
 
-            <!-- ESPECIFICAÇÕES TÉCNICAS - 1 COLUNA -->
             <section class="print-card">
                 <h2>Especificações Técnicas</h2>
                 <div class="print-grid-single">
@@ -432,49 +485,48 @@
                     <div><span class="label">Cor Material:</span> <span id="print-corMaterial"></span></div>
                     <div><span class="label">Tipo Manga:</span> <span id="print-manga"></span></div>
                     <div><span class="label">Acab. Manga:</span> <span id="print-acabamentoManga"></span></div>
-                    <div id="print-larguraMangaDiv" style="display: none;"><span class="label">Largura Manga:</span>
-                        <span id="print-larguraManga"></span></div>
+                    <div id="print-larguraMangaDiv" style="display: none;"><span class="label">Largura Acab. Manga:</span> <span id="print-larguraManga"></span></div>
+                    <div id="print-corAcabamentoMangaDiv" style="display: none;"><span class="label">Cor Acab. Manga:</span> <span id="print-corAcabamentoManga"></span></div>
                     <div><span class="label">Tipo Gola:</span> <span id="print-gola"></span></div>
-                    <div><span class="label">Acab. Gola:</span> <span id="print-acabamentoGola"></span></div>
-                    <div id="print-corPeitilhoInternoDiv" style="display: none;"><span class="label">Cor Peitilho
-                            Interno:</span> <span id="print-corPeitilhoInterno"></span></div>
-                    <div id="print-corPeitilhoExternoDiv" style="display: none;"><span class="label">Cor Peitilho
-                            Externo:</span> <span id="print-corPeitilhoExterno"></span></div>
-                    <div id="print-aberturaLateralDiv" style="display: none;"><span class="label">Abertura
-                            Lateral:</span> <span id="print-aberturaLateral"></span></div>
-                    <div id="print-reforcoGolaDiv" style="display: none;"><span class="label">Reforço na Gola:</span>
-                        <span id="print-reforcoGola"></span></div>
-                    <div id="print-corReforcoDiv" style="display: none;"><span class="label">Cor do Reforço:</span>
-                        <span id="print-corReforco"></span></div>
+                    <div id="print-corGolaDiv" style="display: none;"><span class="label">Cor da Gola:</span> <span id="print-corGola"></span></div>
+                    <div id="print-acabamentoGolaDiv"><span class="label">Acab. Gola:</span> <span id="print-acabamentoGola"></span></div>
+                    <div id="print-larguraGolaDiv" style="display: none;"><span class="label">Largura Acab. Gola:</span> <span id="print-larguraGola"></span></div>
+                    <div id="print-reforcoGolaDiv" style="display: none;"><span class="label">Reforço na Gola:</span> <span id="print-reforcoGola"></span></div>
+                    <div id="print-corReforcoDiv" style="display: none;"><span class="label">Cor do Reforço:</span> <span id="print-corReforco"></span></div>
+                    <div id="print-corPeitilhoInternoDiv" style="display: none;"><span class="label">Cor Peitilho Interno:</span> <span id="print-corPeitilhoInterno"></span></div>
+                    <div id="print-corPeitilhoExternoDiv" style="display: none;"><span class="label">Cor Peitilho Externo:</span> <span id="print-corPeitilhoExterno"></span></div>
+                    <div id="print-aberturaLateralDiv" style="display: none;"><span class="label">Abertura Lateral:</span> <span id="print-aberturaLateral"></span></div>
+                    <div id="print-corAberturaLateralDiv" style="display: none;"><span class="label">Cor Abertura Lateral:</span> <span id="print-corAberturaLateral"></span></div>
                     <div><span class="label">Bolso:</span> <span id="print-bolso"></span></div>
                     <div><span class="label">Filete:</span> <span id="print-filete"></span></div>
+                    <div id="print-fileteLocalDiv" style="display: none;"><span class="label">Local Filete:</span> <span id="print-fileteLocal"></span></div>
+                    <div id="print-fileteCorDiv" style="display: none;"><span class="label">Cor Filete:</span> <span id="print-fileteCor"></span></div>
                     <div><span class="label">Faixa Refletiva:</span> <span id="print-faixa"></span></div>
+                    <div id="print-faixaLocalDiv" style="display: none;"><span class="label">Local Faixa:</span> <span id="print-faixaLocal"></span></div>
+                    <div id="print-faixaCorDiv" style="display: none;"><span class="label">Cor Faixa:</span> <span id="print-faixaCor"></span></div>
                     <div><span class="label">Personalização:</span> <span id="print-arte"></span></div>
                     <div><span class="label">Composição:</span> <span id="print-composicao"></span></div>
                 </div>
             </section>
         </div>
 
-        <!-- OBSERVAÇÕES - 1 COLUNA -->
         <section class="print-card">
             <h2>Observações</h2>
             <div id="print-observacoes" class="print-observacoes"></div>
         </section>
 
-        <!-- IMAGENS - RESPONSIVO 1 OU 2 COLUNAS -->
         <section class="print-card" id="print-imagesSection">
             <h2>Layout / Mockup do Produto</h2>
-            <div id="print-imagesContainer" class="print-images-container">
-                <!-- Imagens serão inseridas via JS -->
-            </div>
+            <div id="print-imagesContainer" class="print-images-container"></div>
         </section>
     </div>
 
-    <script src="js/main.js" defer></script>
+    <script src="js/toast.js"></script>
     <script src="js/api-client.js"></script>
-    <script src="js/integration.js"></script>
-    <script src="js/cloudinary-upload.js"></script>
     <script src="js/image-handler-cloudinary.js"></script>
+    <script src="js/cloudinary-upload.js"></script>
+    <script src="js/main.js" defer></script>
+    <script src="js/integration.js"></script>
 
 </body>
 

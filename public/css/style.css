@@ -500,3 +500,260 @@ textarea.form-control {
     object-fit: contain;
   }
 }
+
+
+/* ==================== SPECS GROUP STYLES ==================== */
+
+/* Grupo de especificações com título */
+.specs-group {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.specs-group-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.specs-group-title i {
+  color: #3b82f6;
+}
+
+.specs-group .form-group {
+  margin-bottom: 12px;
+}
+
+.specs-group .form-group:last-child {
+  margin-bottom: 0;
+}
+
+/* Grid dentro do specs-group */
+.specs-group .form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+/* Campos condicionais dentro do grupo */
+.specs-group .conditional-field {
+  margin-top: 8px;
+  padding-left: 16px;
+  border-left: 3px solid #3b82f6;
+}
+
+/* ==================== PRINT VERSION - NOVOS CAMPOS ==================== */
+
+#print-version .print-grid-single > div[style*="display: none"] {
+  display: none !important;
+}
+
+/* Estilo para campos de filete e faixa na impressão */
+#print-fileteDiv,
+#print-fileteLocalDiv,
+#print-fileteCorDiv,
+#print-faixaDiv,
+#print-faixaLocalDiv,
+#print-faixaCorDiv,
+#print-larguraGolaDiv {
+  display: block;
+}
+
+/* ==================== CAMPOS CONDICIONAIS ==================== */
+
+/* Container de filete */
+#fileteContainer,
+#fileteLocalContainer,
+#fileteCorContainer,
+#faixaContainer,
+#faixaLocalContainer,
+#faixaCorContainer,
+#larguraGolaContainer {
+  transition: all 0.3s ease;
+}
+
+#fileteLocalContainer,
+#fileteCorContainer,
+#faixaLocalContainer,
+#faixaCorContainer {
+  display: none;
+}
+
+#fileteLocalContainer.visible,
+#fileteCorContainer.visible,
+#faixaLocalContainer.visible,
+#faixaCorContainer.visible {
+  display: block;
+}
+
+/* ==================== RESPONSIVO ==================== */
+
+@media (max-width: 768px) {
+  .specs-group {
+    padding: 12px;
+  }
+
+  .specs-group .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .specs-group .conditional-field {
+    padding-left: 12px;
+  }
+}
+
+/* ==================== CLOUDINARY IMAGE STYLES ==================== */
+
+/* Badge de nuvem */
+.image-card .cloud-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(59, 130, 246, 0.9);
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+/* Loading placeholder */
+.image-card.loading-placeholder {
+  background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+}
+
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+}
+
+.loading-spinner i {
+  font-size: 24px;
+  color: #3b82f6;
+}
+
+.loading-spinner span {
+  font-size: 12px;
+}
+
+/* Drag over state */
+.image-upload.drag-over {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+/* Drag reorder */
+.image-card.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.image-card.drag-target {
+  border: 2px dashed #3b82f6;
+}
+
+/* Modal de visualização */
+.image-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-modal-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.image-modal-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.image-modal-content img {
+  max-width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.image-modal-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: white;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-modal-close:hover {
+  background: #f0f0f0;
+}
+
+/* Botão de visualizar */
+.btn-view-image {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-view-image:hover {
+  background: #2563eb;
+}
+
+/* Image card improvements */
+.image-card {
+  position: relative;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.image-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.image-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  justify-content: center;
+}

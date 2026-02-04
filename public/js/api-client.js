@@ -1,229 +1,234 @@
 /**
- * Cliente da API REST
- * Compatível com o servidor sql.js
+ * API Client - Comunicação com o Backend
  */
 
 class APIClient {
   constructor() {
-    this.baseURL = window.location.origin + '/api';
+    // Detectar URL base automaticamente
+    this.baseURL = this.detectBaseURL();
+    this.initialized = false;
+  }
+
+  detectBaseURL() {
+    const hostname = window.location.hostname;
+
+    // Produção (Render, Railway, etc)
+    if (hostname.includes('render.com') || 
+        hostname.includes('railway.app') ||
+        hostname.includes('onrender.com')) {
+      return window.location.origin + '/api';
+    }
+
+    // Desenvolvimento local
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      // Tentar a porta do servidor primeiro
+      return 'http://localhost:3000/api';
+    }
+
+    // Fallback: usar a mesma origem
+    return window.location.origin + '/api';
   }
 
   async init() {
+    if (this.initialized) return true;
+
     try {
-      const response = await fetch(`${this.baseURL}/health`);
-      if (!response.ok) throw new Error('API indisponível');
-      const data = await response.json();
-      console.log('✅ API conectada com sucesso');
-      return true;
-    } catch (error) {
-      console.error('❌ Erro ao conectar com API:', error);
-      throw error;
-    }
-  }
-
-  async salvarFicha(ficha) {
-    try {
-      const url = ficha.id 
-        ? `${this.baseURL}/fichas/${ficha.id}`
-        : `${this.baseURL}/fichas`;
-
-      const method = ficha.id ? 'PUT' : 'POST';
-
-      console.log(`📤 ${method} ${url}`);
-
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ficha)
+      // Testar conexão com o servidor
+      const response = await fetch(`${this.baseURL}/health`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Erro ao salvar ficha');
+      if (response.ok) {
+        console.log('✅ Conectado ao servidor:', this.baseURL);
+        this.initialized = true;
+        return true;
       }
-
-      const result = await response.json().catch(() => ({}));
-      console.log('✅ Ficha salva com sucesso', result);
-
-      return result.id || ficha.id;
     } catch (error) {
-      console.error('❌ Erro ao salvar ficha:', error);
-      throw error;
+      console.warn('⚠️ Servidor não disponível em:', this.baseURL);
     }
+
+    // Tentar porta alternativa em desenvolvimento
+    if (window.location.hostname === 'localhost') {
+      const altURL = 'http://localhost:3000/api';
+      try {
+        const response = await fetch(`${altURL}/health`);
+        if (response.ok) {
+          this.baseURL = altURL;
+          console.log('✅ Conectado ao servidor:', this.baseURL);
+          this.initialized = true;
+          return true;
+        }
+      } catch (e) {}
+    }
+
+    console.error('❌ Não foi possível conectar ao servidor');
+    return false;
+  }
+
+  // ==================== FICHAS ====================
+
+  async listarFichas() {
+    const response = await fetch(`${this.baseURL}/fichas`);
+    if (!response.ok) throw new Error('Erro ao listar fichas');
+    return response.json();
   }
 
   async buscarFicha(id) {
-    try {
-      const response = await fetch(`${this.baseURL}/fichas/${id}`);
-
-      if (!response.ok) {
-        throw new Error('Ficha não encontrada');
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (error) {
-      console.error('❌ Erro ao buscar ficha:', error);
-      throw error;
+    const response = await fetch(`${this.baseURL}/fichas/${id}`);
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error('Erro ao buscar ficha');
     }
+    return response.json();
   }
 
-  async listarFichas(filtros = {}) {
-    try {
-      const params = new URLSearchParams();
+  async salvarFicha(dados) {
+    const url = dados.id 
+      ? `${this.baseURL}/fichas/${dados.id}`
+      : `${this.baseURL}/fichas`;
 
-      if (filtros.status) params.append('status', filtros.status);
-      if (filtros.cliente) params.append('cliente', filtros.cliente);
-      if (filtros.vendedor) params.append('vendedor', filtros.vendedor);
-      if (filtros.dataInicio) params.append('dataInicio', filtros.dataInicio);
-      if (filtros.dataFim) params.append('dataFim', filtros.dataFim);
+    const method = dados.id ? 'PUT' : 'POST';
 
-      const url = `${this.baseURL}/fichas${params.toString() ? '?' + params.toString() : ''}`;
-      const response = await fetch(url);
+    // Preparar dados para envio (garantir formato correto)
+    const dadosEnvio = {
+      cliente: dados.cliente || '',
+      vendedor: dados.vendedor || '',
+      dataInicio: dados.dataInicio || '',
+      numeroVenda: dados.numeroVenda || '',
+      dataEntrega: dados.dataEntrega || '',
+      evento: dados.evento || 'nao',
+      status: dados.status || 'pendente',
+      produtos: dados.produtos || [],
 
-      if (!response.ok) {
-        throw new Error('Erro ao listar fichas');
-      }
+      // Material
+      material: dados.material || '',
+      composicao: dados.composicao || '',
+      corMaterial: dados.corMaterial || '',
 
-      const result = await response.json();
-      return Array.isArray(result) ? result : [];
-    } catch (error) {
-      console.error('❌ Erro ao listar fichas:', error);
-      throw error;
+      // Manga
+      manga: dados.manga || '',
+      acabamentoManga: dados.acabamentoManga || '',
+      larguraManga: dados.larguraManga || '',
+      corAcabamentoManga: dados.corAcabamentoManga || '',
+
+      // Gola
+      gola: dados.gola || '',
+      corGola: dados.corGola || '',
+      acabamentoGola: dados.acabamentoGola || '',
+      larguraGola: dados.larguraGola || '',
+
+      // Polo específico
+      corPeitilhoInterno: dados.corPeitilhoInterno || '',
+      corPeitilhoExterno: dados.corPeitilhoExterno || '',
+      aberturaLateral: dados.aberturaLateral || 'nao',
+      corAberturaLateral: dados.corAberturaLateral || '',
+
+      // Reforço gola
+      reforcoGola: dados.reforcoGola || 'nao',
+      corReforco: dados.corReforco || '',
+
+      // Bolso
+      bolso: dados.bolso || '',
+
+      // Filete
+      filete: dados.filete || 'nao',
+      fileteLocal: dados.fileteLocal || '',
+      fileteCor: dados.fileteCor || '',
+
+      // Faixa
+      faixa: dados.faixa || 'nao',
+      faixaLocal: dados.faixaLocal || '',
+      faixaCor: dados.faixaCor || '',
+
+      // Arte
+      arte: dados.arte || '',
+      corSublimacao: dados.corSublimacao || '',
+
+      // Observações
+      observacoes: dados.observacoes || '',
+
+      // Imagens
+      imagemData: dados.imagemData || '',
+      imagensData: dados.imagensData || '[]'
+    };
+
+    console.log('📤 Enviando dados para o servidor:', Object.keys(dadosEnvio).length, 'campos');
+
+    const response = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dadosEnvio)
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Erro ao salvar ficha');
     }
+
+    const result = await response.json();
+    return result.id;
   }
 
   async deletarFicha(id) {
-    try {
-      const response = await fetch(`${this.baseURL}/fichas/${id}`, {
-        method: 'DELETE'
-      });
+    const response = await fetch(`${this.baseURL}/fichas/${id}`, {
+      method: 'DELETE'
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Erro ao deletar ficha');
-      }
-
-      console.log('✅ Ficha deletada com sucesso');
-      return true;
-    } catch (error) {
-      console.error('❌ Erro ao deletar ficha:', error);
-      throw error;
-    }
+    if (!response.ok) throw new Error('Erro ao deletar ficha');
+    return true;
   }
 
   async marcarComoEntregue(id) {
-    try {
-      const response = await fetch(`${this.baseURL}/fichas/${id}/entregar`, {
-        method: 'PATCH'
-      });
+    const response = await fetch(`${this.baseURL}/fichas/${id}/entregar`, {
+      method: 'PATCH'
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Erro ao marcar como entregue');
-      }
-
-      console.log('✅ Ficha marcada como entregue');
-      return true;
-    } catch (error) {
-      console.error('❌ Erro ao marcar como entregue:', error);
-      throw error;
-    }
+    if (!response.ok) throw new Error('Erro ao marcar como entregue');
+    return true;
   }
 
-  // *** NOVA FUNÇÃO *** Desmarcar como entregue (voltar para pendente)
   async marcarComoPendente(id) {
-    try {
-      const response = await fetch(`${this.baseURL}/fichas/${id}/pendente`, {
-        method: 'PATCH'
-      });
+    const response = await fetch(`${this.baseURL}/fichas/${id}/pendente`, {
+      method: 'PATCH'
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Erro ao marcar como pendente');
-      }
-
-      console.log('✅ Ficha marcada como pendente');
-      return true;
-    } catch (error) {
-      console.error('❌ Erro ao marcar como pendente:', error);
-      throw error;
-    }
+    if (!response.ok) throw new Error('Erro ao marcar como pendente');
+    return true;
   }
 
-  async pesquisarFichas(termo) {
-    try {
-      return await this.listarFichas({ cliente: termo });
-    } catch (error) {
-      console.error('❌ Erro ao pesquisar fichas:', error);
-      throw error;
-    }
-  }
-
-  async filtrarPorData(dataInicio, dataFim) {
-    try {
-      return await this.listarFichas({ dataInicio, dataFim });
-    } catch (error) {
-      console.error('❌ Erro ao filtrar por data:', error);
-      throw error;
-    }
-  }
+  // ==================== CLIENTES ====================
 
   async buscarClientes(termo = '') {
-    try {
-      const params = termo ? `?termo=${encodeURIComponent(termo)}` : '';
-      const response = await fetch(`${this.baseURL}/clientes${params}`);
+    const url = termo 
+      ? `${this.baseURL}/clientes?termo=${encodeURIComponent(termo)}`
+      : `${this.baseURL}/clientes`;
 
-      if (!response.ok) {
-        throw new Error('Erro ao buscar clientes');
-      }
-
-      const result = await response.json();
-      return Array.isArray(result) ? result : [];
-    } catch (error) {
-      console.error('❌ Erro ao buscar clientes:', error);
-      return [];
-    }
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Erro ao buscar clientes');
+    return response.json();
   }
+
+  // ==================== ESTATÍSTICAS E RELATÓRIOS ====================
 
   async buscarEstatisticas() {
-    try {
-      const response = await fetch(`${this.baseURL}/estatisticas`);
-
-      if (!response.ok) {
-        throw new Error('Erro ao buscar estatísticas');
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (error) {
-      console.error('❌ Erro ao buscar estatísticas:', error);
-      throw error;
-    }
+    const response = await fetch(`${this.baseURL}/estatisticas`);
+    if (!response.ok) throw new Error('Erro ao buscar estatísticas');
+    return response.json();
   }
 
-  async buscarRelatorio(periodo, dataInicio = null, dataFim = null) {
-    try {
-      const params = new URLSearchParams({ periodo });
+  async buscarRelatorio(periodo = 'mes', dataInicio = null, dataFim = null) {
+    let url = `${this.baseURL}/relatorios?periodo=${periodo}`;
 
-      if (periodo === 'customizado' && dataInicio && dataFim) {
-        params.append('dataInicio', dataInicio);
-        params.append('dataFim', dataFim);
-      }
+    if (dataInicio) url += `&dataInicio=${dataInicio}`;
+    if (dataFim) url += `&dataFim=${dataFim}`;
 
-      const response = await fetch(`${this.baseURL}/relatorio?${params.toString()}`);
-
-      if (!response.ok) {
-        throw new Error('Erro ao buscar relatório');
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (error) {
-      console.error('❌ Erro ao buscar relatório:', error);
-      throw error;
-    }
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Erro ao buscar relatório');
+    return response.json();
   }
+
+  // ==================== BACKUP ====================
 
   async exportarBackup() {
     try {
@@ -263,3 +268,4 @@ class APIClient {
 
 // Instância global
 const db = new APIClient();
+window.db = db;

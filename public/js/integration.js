@@ -24,16 +24,24 @@
     'manga': 'manga',
     'acabamento_manga': 'acabamentoManga',
     'largura_manga': 'larguraManga',
+    'cor_acabamento_manga': 'corAcabamentoManga',
     'gola': 'gola',
+    'cor_gola': 'corGola',
     'acabamento_gola': 'acabamentoGola',
+    'largura_gola': 'larguraGola',
     'cor_peitilho_interno': 'corPeitilhoInterno',
     'cor_peitilho_externo': 'corPeitilhoExterno',
     'abertura_lateral': 'aberturaLateral',
+    'cor_abertura_lateral': 'corAberturaLateral',
     'reforco_gola': 'reforcoGola',
     'cor_reforco': 'corReforco',
     'bolso': 'bolso',
     'filete': 'filete',
+    'filete_local': 'fileteLocal',
+    'filete_cor': 'fileteCor',
     'faixa': 'faixa',
+    'faixa_local': 'faixaLocal',
+    'faixa_cor': 'faixaCor',
     'arte': 'arte',
     'cor_sublimacao': 'corSublimacao',
     'observacoes': 'observacoes',
@@ -304,16 +312,24 @@
       manga: document.getElementById('manga')?.value || '',
       acabamentoManga: document.getElementById('acabamentoManga')?.value || '',
       larguraManga: document.getElementById('larguraManga')?.value || '',
+      corAcabamentoManga: document.getElementById('corAcabamentoManga')?.value || '',
       gola: document.getElementById('gola')?.value || '',
+      corGola: document.getElementById('corGola')?.value || '',
       acabamentoGola: document.getElementById('acabamentoGola')?.value || '',
+      larguraGola: document.getElementById('larguraGola')?.value || '',
       corPeitilhoInterno: document.getElementById('corPeitilhoInterno')?.value || '',
       corPeitilhoExterno: document.getElementById('corPeitilhoExterno')?.value || '',
-      aberturaLateral: document.getElementById('aberturaLateral')?.checked ? 'sim' : 'nao',
-      reforcoGola: document.getElementById('reforcoGola')?.checked ? 'sim' : 'nao',
+      aberturaLateral: document.getElementById('aberturaLateral')?.value || 'nao',
+      corAberturaLateral: document.getElementById('corAberturaLateral')?.value || '',
+      reforcoGola: document.getElementById('reforcoGola')?.value || 'nao',
       corReforco: document.getElementById('corReforco')?.value || '',
       bolso: document.getElementById('bolso')?.value || '',
       filete: document.getElementById('filete')?.value || '',
+      fileteLocal: document.getElementById('fileteLocal')?.value || '',
+      fileteCor: document.getElementById('fileteCor')?.value || '',
       faixa: document.getElementById('faixa')?.value || '',
+      faixaLocal: document.getElementById('faixaLocal')?.value || '',
+      faixaCor: document.getElementById('faixaCor')?.value || '',
       arte: document.getElementById('arte')?.value || '',
       corSublimacao: document.getElementById('cor')?.value || '#ffffff',
       observacoes: document.getElementById('observacoes')?.value || '',
@@ -550,9 +566,13 @@
     const camposTexto = [
       'cliente', 'vendedor', 'dataInicio', 'numeroVenda', 
       'dataEntrega', 'evento', 'material', 'composicao',
-      'corMaterial', 'manga', 'acabamentoManga', 'larguraManga',
-      'gola', 'acabamentoGola', 'corPeitilhoInterno', 'corPeitilhoExterno',
-      'corReforco', 'bolso', 'filete', 'faixa', 'arte', 'observacoes'
+      'corMaterial', 'manga', 'acabamentoManga', 'larguraManga', 'corAcabamentoManga',
+      'gola', 'corGola', 'acabamentoGola', 'larguraGola', 
+      'corPeitilhoInterno', 'corPeitilhoExterno',
+      'aberturaLateral', 'corAberturaLateral',
+      'reforcoGola', 'corReforco', 
+      'bolso', 'filete', 'fileteLocal', 'fileteCor',
+      'faixa', 'faixaLocal', 'faixaCor', 'arte', 'observacoes'
     ];
 
     camposTexto.forEach(campo => {
@@ -566,16 +586,8 @@
       }
     });
 
-    const checkboxes = ['aberturaLateral', 'reforcoGola'];
-    checkboxes.forEach(campo => {
-      const elemento = document.getElementById(campo);
-      const valor = ficha[campo];
-
-      if (elemento) {
-        elemento.checked = valor === 'sim' || valor === true || valor === 1 || valor === '1';
-        elemento.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    });
+    // aberturaLateral e reforcoGola agora são selects, não checkboxes
+    // Já são tratados em camposTexto acima
 
     const corSublimacao = ficha.corSublimacao || ficha.cor_sublimacao;
     if (corSublimacao) {
@@ -644,12 +656,12 @@
         const imagemData = ficha.imagemData || ficha.imagem_data;
 
         if (imagemData && typeof imagemData === 'string' && imagemData.length > 0) {
-          // Verificar se é base64 válido
-          if (imagemData.startsWith('data:image')) {
+          // Verificar se é base64 válido ou URL do Cloudinary
+          if (imagemData.startsWith('data:image') || imagemData.startsWith('http')) {
             console.log('📸 Usando fallback: imagem única do campo antigo');
             imagensCarregadas = [{ src: imagemData, descricao: '' }];
           } else {
-            console.log('📸 Campo imagemData não é base64 válido');
+            console.log('📸 Campo imagemData não é base64/URL válido');
           }
         }
       }
@@ -661,9 +673,90 @@
       console.warn('⚠️ window.setImagens não está disponível');
     }
 
+    // Mostrar campos condicionais após preenchimento
+    setTimeout(() => {
+      // Manga - mostrar campos extras se viés ou punho
+      const acabamentoMangaVal = ficha.acabamentoManga;
+      if (acabamentoMangaVal === 'vies' || acabamentoMangaVal === 'punho') {
+        const larguraMangaContainer = document.getElementById('larguraMangaContainer');
+        const corAcabamentoMangaContainer = document.getElementById('corAcabamentoMangaContainer');
+        if (larguraMangaContainer) larguraMangaContainer.style.display = 'block';
+        if (corAcabamentoMangaContainer) corAcabamentoMangaContainer.style.display = 'block';
+      }
+
+      // Gola
+      const golaVal = ficha.gola;
+      const isPolo = golaVal === 'polo' || golaVal === 'v_polo';
+      const temGola = golaVal && golaVal !== '';
+
+      // Cor da Gola (para todas as golas)
+      if (temGola) {
+        const corGolaContainer = document.getElementById('corGolaContainer');
+        if (corGolaContainer) corGolaContainer.style.display = 'block';
+      }
+
+      // Acabamento da Gola (NÃO para polo)
+      if (temGola && !isPolo) {
+        const acabamentoGolaContainer = document.getElementById('acabamentoGolaContainer');
+        if (acabamentoGolaContainer) acabamentoGolaContainer.style.display = 'block';
+
+        // Largura do acabamento
+        if (ficha.acabamentoGola) {
+          const larguraGolaContainer = document.getElementById('larguraGolaContainer');
+          if (larguraGolaContainer) larguraGolaContainer.style.display = 'block';
+        }
+      }
+
+      // Reforço na Gola (para todas as golas)
+      if (temGola) {
+        const reforcoGolaContainer = document.getElementById('reforcoGolaContainer');
+        if (reforcoGolaContainer) reforcoGolaContainer.style.display = 'block';
+
+        // Cor do reforço
+        if (ficha.reforcoGola === 'sim') {
+          const corReforcoContainer = document.getElementById('corReforcoContainer');
+          if (corReforcoContainer) corReforcoContainer.style.display = 'block';
+        }
+      }
+
+      // Campos específicos POLO
+      if (isPolo) {
+        const corPeitilhoInternoContainer = document.getElementById('corPeitilhoInternoContainer');
+        const corPeitilhoExternoContainer = document.getElementById('corPeitilhoExternoContainer');
+        const aberturaLateralContainer = document.getElementById('aberturaLateralContainer');
+
+        if (corPeitilhoInternoContainer) corPeitilhoInternoContainer.style.display = 'block';
+        if (corPeitilhoExternoContainer) corPeitilhoExternoContainer.style.display = 'block';
+        if (aberturaLateralContainer) aberturaLateralContainer.style.display = 'block';
+
+        // Cor da abertura lateral
+        if (ficha.aberturaLateral === 'sim') {
+          const corAberturaLateralContainer = document.getElementById('corAberturaLateralContainer');
+          if (corAberturaLateralContainer) corAberturaLateralContainer.style.display = 'block';
+        }
+      }
+
+      // Filete
+      if (ficha.filete === 'sim') {
+        const fileteLocalContainer = document.getElementById('fileteLocalContainer');
+        const fileteCorContainer = document.getElementById('fileteCorContainer');
+        if (fileteLocalContainer) fileteLocalContainer.style.display = 'block';
+        if (fileteCorContainer) fileteCorContainer.style.display = 'block';
+      }
+
+      // Faixa
+      if (ficha.faixa === 'sim') {
+        const faixaLocalContainer = document.getElementById('faixaLocalContainer');
+        const faixaCorContainer = document.getElementById('faixaCorContainer');
+        if (faixaLocalContainer) faixaLocalContainer.style.display = 'block';
+        if (faixaCorContainer) faixaCorContainer.style.display = 'block';
+      }
+    }, 150);
+
     console.log('✅ Formulário preenchido!');
   }
 
+  // ==================== TOAST GLOBAL CENTRALIZADO ====================
   function mostrarToast(mensagem, tipo = 'success') {
     const existente = document.querySelector('.toast-custom');
     if (existente) existente.remove();
@@ -686,7 +779,8 @@
     toast.style.cssText = `
       position: fixed;
       bottom: 24px;
-      right: 24px;
+      left: 50%;
+      transform: translateX(-50%);
       padding: 16px 24px;
       border-radius: 12px;
       color: white;
@@ -705,12 +799,12 @@
       style.id = 'toastStyles';
       style.textContent = `
         @keyframes toastIn {
-          from { transform: translateX(100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
+          from { transform: translateX(-50%) translateY(100%); opacity: 0; }
+          to { transform: translateX(-50%) translateY(0); opacity: 1; }
         }
         @keyframes toastOut {
-          from { transform: translateX(0); opacity: 1; }
-          to { transform: translateX(100%); opacity: 0; }
+          from { transform: translateX(-50%) translateY(0); opacity: 1; }
+          to { transform: translateX(-50%) translateY(100%); opacity: 0; }
         }
       `;
       document.head.appendChild(style);
@@ -723,6 +817,9 @@
       setTimeout(() => toast.remove(), 400);
     }, 3000);
   }
+
+  // Expor toast globalmente para outros scripts usarem
+  window.mostrarToast = mostrarToast;
 
   window.dbIntegration = {
     salvarNoBanco,
