@@ -1,5 +1,4 @@
 /* Dashboard Styles */
-
 .header-content {
   display: flex;
   justify-content: space-between;
@@ -13,7 +12,6 @@
   gap: 10px;
 }
 
-/* ESTATÃSTICAS */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -32,12 +30,10 @@
 }
 
 .stat-icon {
-  width: 50px;
-  height: 50px;
+  size: 50px;
   border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   font-size: 1.3rem;
   flex-shrink: 0;
 }
@@ -59,7 +55,6 @@
   color: var(--text-soft);
 }
 
-/* FILTROS */
 .filters-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -73,7 +68,6 @@
   flex-wrap: wrap;
 }
 
-/* LISTA DE FICHAS */
 .fichas-list {
   display: flex;
   flex-direction: column;
@@ -90,12 +84,12 @@
   align-items: flex-start;
   gap: 16px;
   transition: all 0.2s;
-}
 
-.ficha-item:hover {
-  background: #ffffff;
-  border-color: var(--secondary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  &:hover {
+    background: white;
+    border-color: var(--secondary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
 }
 
 .ficha-main {
@@ -147,10 +141,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
-}
 
-.ficha-detail i {
-  font-size: 0.8rem;
+  & i {
+    font-size: 0.8rem;
+  }
 }
 
 .ficha-actions {
@@ -163,7 +157,6 @@
   padding: 8px 12px;
 }
 
-/* BADGE */
 .badge {
   background: #e5edff;
   color: #1d4ed8;
@@ -173,50 +166,41 @@
   font-weight: 600;
 }
 
-/* EMPTY STATE */
 .empty-state {
   text-align: center;
   padding: 60px 20px;
   color: var(--text-soft);
+
+  & i {
+    font-size: 4rem;
+    margin-bottom: 16px;
+    color: #d1d5db;
+  }
+
+  & h3 {
+    font-size: 1.3rem;
+    margin: 0 0 8px;
+    color: var(--primary);
+  }
+
+  & p {
+    margin: 0 0 20px;
+    font-size: 0.95rem;
+  }
 }
 
-.empty-state i {
-  font-size: 4rem;
-  margin-bottom: 16px;
-  color: #d1d5db;
-}
-
-.empty-state h3 {
-  font-size: 1.3rem;
-  margin: 0 0 8px;
-  color: var(--primary);
-}
-
-.empty-state p {
-  margin: 0 0 20px;
-  font-size: 0.95rem;
-}
-
-/* MODAL */
 .modal {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   padding: 20px;
 }
 
 .modal-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
 }
@@ -229,25 +213,25 @@
   max-width: 420px;
   width: 100%;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-}
 
-.modal-content h3 {
-  margin: 0 0 12px;
-  font-size: 1.2rem;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--primary);
-}
+  & h3 {
+    margin: 0 0 12px;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--primary);
 
-.modal-content h3 i {
-  color: var(--accent);
-}
+    & i {
+      color: var(--accent);
+    }
+  }
 
-.modal-content p {
-  margin: 0 0 20px;
-  color: var(--text-soft);
-  line-height: 1.5;
+  & p {
+    margin: 0 0 20px;
+    color: var(--text-soft);
+    line-height: 1.5;
+  }
 }
 
 .modal-actions {
@@ -256,16 +240,15 @@
   justify-content: flex-end;
 }
 
-/* LOADING STATE */
 .loading {
   text-align: center;
   padding: 40px 20px;
   color: var(--text-soft);
-}
 
-.loading i {
-  font-size: 2rem;
-  animation: spin 1s linear infinite;
+  & i {
+    font-size: 2rem;
+    animation: spin 1s linear infinite;
+  }
 }
 
 @keyframes spin {
@@ -273,55 +256,36 @@
   to { transform: rotate(360deg); }
 }
 
-/* RESPONSIVO */
 @media (max-width: 768px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .stat-card {
-    padding: 14px;
-  }
-
-  .stat-value {
-    font-size: 1.5rem;
-  }
-
-  .ficha-item {
-    flex-direction: column;
-  }
-
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-card { padding: 14px; }
+  .stat-value { font-size: 1.5rem; }
+  .ficha-item { flex-direction: column; }
   .ficha-actions {
     width: 100%;
     justify-content: flex-end;
   }
-
   .header-content {
     flex-direction: column;
     align-items: stretch;
   }
-
   .header-actions {
     width: 100%;
-  }
-
-  .header-actions .btn {
-    flex: 1;
+    
+    & .btn {
+      flex: 1;
+    }
   }
 }
 
 @media (max-width: 480px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
+  .stats-grid { grid-template-columns: 1fr; }
   .ficha-details {
     flex-direction: column;
     gap: 6px;
   }
 }
 
-/* PAGINAÇÃO */
 .paginacao {
   display: flex;
   justify-content: center;

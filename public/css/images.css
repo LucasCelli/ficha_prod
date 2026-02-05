@@ -1,6 +1,4 @@
-/* ==================== SISTEMA DE MÚLTIPLAS IMAGENS ==================== */
-
-/* Contador no header */
+/* Tratamento de Imagens */
 .images-counter {
   margin-left: auto;
   font-size: 0.85rem;
@@ -8,7 +6,6 @@
   font-weight: 500;
 }
 
-/* Grid de imagens */
 .images-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -20,7 +17,6 @@
   display: none;
 }
 
-/* Card de cada imagem */
 .image-card {
   position: relative;
   background: #f9fafb;
@@ -45,7 +41,6 @@
   background: #e5edff;
 }
 
-/* Wrapper da imagem */
 .image-wrapper {
   position: relative;
   width: 100%;
@@ -65,7 +60,6 @@
   cursor: grabbing;
 }
 
-/* Botão de deletar (aparece no hover) */
 .image-delete-btn {
   position: absolute;
   top: 8px;
@@ -96,7 +90,6 @@
   transform: scale(1.1);
 }
 
-/* Handle de arrastar */
 .image-drag-handle {
   position: absolute;
   bottom: 8px;
@@ -119,7 +112,6 @@
   opacity: 1;
 }
 
-/* Input de descrição */
 .image-description {
   padding: 10px 12px;
   border-top: 1px solid var(--border);
@@ -144,7 +136,6 @@
   color: #9ca3af;
 }
 
-/* Número da imagem */
 .image-number {
   position: absolute;
   top: 8px;
@@ -162,17 +153,14 @@
   z-index: 5;
 }
 
-/* Área de upload quando tem imagens */
 .images-grid + .image-upload {
   margin-top: 0;
 }
 
-/* Esconder área de upload quando cheio */
 .image-upload.hidden {
   display: none;
 }
 
-/* Mensagem de limite */
 .images-limit-message {
   text-align: center;
   padding: 16px;
@@ -187,7 +175,6 @@
   gap: 8px;
 }
 
-/* Hint text melhorado */
 .hint-text {
   display: flex;
   align-items: center;
@@ -203,8 +190,6 @@
 .hint-text i {
   color: #f59e0b;
 }
-
-/* ==================== ESTILOS DE IMPRESSÃO ==================== */
 
 .print-images-container {
   display: flex;
@@ -243,7 +228,6 @@
   font-style: italic;
 }
 
-/* Esconder seção de imagens se vazia */
 #print-imagesSection:has(.print-images-container:empty) {
   display: none;
 }
@@ -265,8 +249,6 @@
     max-height: 350px;
   }
 }
-
-/* ==================== RESPONSIVO ==================== */
 
 @media (max-width: 600px) {
   .images-grid {

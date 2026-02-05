@@ -19,7 +19,7 @@ body {
   color: var(--text);
 }
 
-a{
+a {
   text-decoration: none;
 }
 
@@ -120,16 +120,20 @@ textarea.form-control {
   color: #111827;
 }
 
-.event-warning {
+.event-warning,
+.prazo-info {
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid #fbbf24;
-  background: #fffbeb;
   display: flex;
   gap: 8px;
-  align-items: flex-start;
   font-size: 0.85rem;
+}
+
+.event-warning {
+  border: 1px solid #fbbf24;
+  background: #fffbeb;
+  align-items: flex-start;
   color: #92400e;
 }
 
@@ -138,15 +142,9 @@ textarea.form-control {
 }
 
 .prazo-info {
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
   border: 1px solid #60a5fa;
   background: #eff6ff;
-  display: flex;
-  gap: 8px;
   align-items: center;
-  font-size: 0.85rem;
   color: #1e40af;
 }
 
@@ -164,7 +162,7 @@ textarea.form-control {
 
 .product-table th,
 .product-table td {
-  padding: 6px 6px;
+  padding: 6px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -502,8 +500,6 @@ textarea.form-control {
 }
 
 
-/* ==================== SPECS GROUP STYLES ==================== */
-
 /* Grupo de especificações com título */
 .specs-group {
   background: #f8fafc;
@@ -537,21 +533,17 @@ textarea.form-control {
   margin-bottom: 0;
 }
 
-/* Grid dentro do specs-group */
 .specs-group .form-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
 }
 
-/* Campos condicionais dentro do grupo */
 .specs-group .conditional-field {
   margin-top: 8px;
   padding-left: 16px;
   border-left: 3px solid #3b82f6;
 }
-
-/* ==================== PRINT VERSION - NOVOS CAMPOS ==================== */
 
 #print-version .print-grid-single > div[style*="display: none"] {
   display: none !important;
@@ -568,9 +560,6 @@ textarea.form-control {
   display: block;
 }
 
-/* ==================== CAMPOS CONDICIONAIS ==================== */
-
-/* Container de filete */
 #fileteContainer,
 #fileteLocalContainer,
 #fileteCorContainer,
@@ -595,8 +584,6 @@ textarea.form-control {
   display: block;
 }
 
-/* ==================== RESPONSIVO ==================== */
-
 @media (max-width: 768px) {
   .specs-group {
     padding: 12px;
@@ -610,8 +597,6 @@ textarea.form-control {
     padding-left: 12px;
   }
 }
-
-/* ==================== CLOUDINARY IMAGE STYLES ==================== */
 
 /* Badge de nuvem */
 .image-card .cloud-badge {
@@ -629,7 +614,6 @@ textarea.form-control {
   font-size: 10px;
 }
 
-/* Loading placeholder */
 .image-card.loading-placeholder {
   background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
   display: flex;
@@ -655,13 +639,11 @@ textarea.form-control {
   font-size: 12px;
 }
 
-/* Drag over state */
 .image-upload.drag-over {
   border-color: #3b82f6;
   background: rgba(59, 130, 246, 0.1);
 }
 
-/* Drag reorder */
 .image-card.dragging {
   opacity: 0.5;
   transform: scale(0.95);
@@ -740,7 +722,6 @@ textarea.form-control {
   background: #2563eb;
 }
 
-/* Image card improvements */
 .image-card {
   position: relative;
   transition: transform 0.2s, box-shadow 0.2s;
@@ -756,4 +737,27 @@ textarea.form-control {
   gap: 8px;
   padding: 8px;
   justify-content: center;
+}
+
+/* Separador de seções dentro do formulário */
+.form-divider {
+  grid-column: 1 / -1;
+  border: none;
+  border-top: 2px solid #e5e7eb;
+  margin: 16px 0 12px;
+  position: relative;
+}
+
+.form-divider::after {
+  content: attr(data-label);
+  position: absolute;
+  top: -10px;
+  left: 16px;
+  background: white;
+  padding: 0 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }

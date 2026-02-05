@@ -980,6 +980,604 @@ app.delete('/api/cloudinary/image/:publicId', async (req, res) => {
   }
 });
 
+
+// ==================== ROTAS DE RELATÓRIO DETALHADO ====================
+
+// Relatório principal
+app.get('/api/relatorio', async (req, res) => {
+  try {
+    const { periodo, dataInicio, dataFim } = req.query;
+
+    const now = new Date();
+    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const anoAtual = `${now.getFullYear()}`;
+
+    let whereClause = '';
+    let params = [];
+
+    if (periodo === 'mes') {
+      whereClause = "WHERE substr(data_inicio, 1, 7) = ?";
+      params = [mesAtual];
+    } else if (periodo === 'ano') {
+      whereClause = "WHERE substr(data_inicio, 1, 4) = ?";
+      params = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      whereClause = "WHERE data_inicio BETWEEN ? AND ?";
+      params = [dataInicio, dataFim];
+    }
+
+    // Buscar estatísticas básicas
+    const stats = await dbGet(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'entregue' THEN 1 ELSE 0 END) as entregues,
+        SUM(CASE WHEN status != 'entregue' OR status IS NULL THEN 1 ELSE 0 END) as pendentes
+      FROM fichas ${whereClause}
+    `, params);
+
+    // Buscar fichas para calcular itens
+    const fichas = await dbAll(`SELECT produtos FROM fichas ${whereClause}`, params);
+
+    let itensConfeccionados = 0;
+    fichas.forEach(f => {
+      if (f.produtos) {
+        try {
+          const produtos = typeof f.produtos === 'string' ? JSON.parse(f.produtos) : f.produtos;
+          produtos.forEach(p => {
+            itensConfeccionados += parseInt(p.quantidade) || 0;
+          });
+        } catch (e) {}
+      }
+    });
+
+    // Buscar novos clientes no período
+    let novosClientesQuery = '';
+    if (periodo === 'mes') {
+      novosClientesQuery = `SELECT COUNT(DISTINCT cliente) as total FROM fichas WHERE cliente IS NOT NULL AND cliente != '' AND substr(data_inicio, 1, 7) = ?`;
+    } else if (periodo === 'ano') {
+      novosClientesQuery = `SELECT COUNT(DISTINCT cliente) as total FROM fichas WHERE cliente IS NOT NULL AND cliente != '' AND substr(data_inicio, 1, 4) = ?`;
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      novosClientesQuery = `SELECT COUNT(DISTINCT cliente) as total FROM fichas WHERE cliente IS NOT NULL AND cliente != '' AND data_inicio BETWEEN ? AND ?`;
+    } else {
+      novosClientesQuery = `SELECT COUNT(DISTINCT cliente) as total FROM fichas WHERE cliente IS NOT NULL AND cliente != ''`;
+      params = [];
+    }
+
+    const novosClientes = await dbGet(novosClientesQuery, params);
+
+    // Buscar top vendedor
+    let topVendedorQuery = '';
+    if (periodo === 'mes') {
+      topVendedorQuery = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 7) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+    } else if (periodo === 'ano') {
+      topVendedorQuery = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 4) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      topVendedorQuery = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND data_inicio BETWEEN ? AND ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+    } else {
+      topVendedorQuery = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+      params = [];
+    }
+
+    const topVendedor = await dbGet(topVendedorQuery, params);
+
+    res.json({
+      totalFichas: stats?.total || 0,
+      fichasEntregues: stats?.entregues || 0,
+      fichasPendentes: stats?.pendentes || 0,
+      itensConfeccionados,
+      novosClientes: novosClientes?.total || 0,
+      topVendedor: topVendedor?.vendedor || null,
+      topVendedorTotal: topVendedor?.total || 0
+    });
+
+  } catch (error) {
+    console.error('Erro ao buscar relatório:', error);
+    res.status(500).json({ error: 'Erro ao buscar relatório' });
+  }
+});
+
+// Análise por vendedor
+app.get('/api/relatorio/vendedores', async (req, res) => {
+  try {
+    const { periodo, dataInicio, dataFim } = req.query;
+
+    const now = new Date();
+    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const anoAtual = `${now.getFullYear()}`;
+
+    let whereClause = "WHERE vendedor IS NOT NULL AND vendedor != ''";
+    let params = [];
+
+    if (periodo === 'mes') {
+      whereClause += " AND substr(data_inicio, 1, 7) = ?";
+      params = [mesAtual];
+    } else if (periodo === 'ano') {
+      whereClause += " AND substr(data_inicio, 1, 4) = ?";
+      params = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      whereClause += " AND data_inicio BETWEEN ? AND ?";
+      params = [dataInicio, dataFim];
+    }
+
+    // Buscar todas as fichas com vendedor
+    const fichas = await dbAll(`SELECT vendedor, produtos, status FROM fichas ${whereClause}`, params);
+
+    // Agrupar por vendedor
+    const vendedoresMap = {};
+    fichas.forEach(ficha => {
+      if (!vendedoresMap[ficha.vendedor]) {
+        vendedoresMap[ficha.vendedor] = { total_pedidos: 0, total_itens: 0, entregues: 0 };
+      }
+      vendedoresMap[ficha.vendedor].total_pedidos++;
+
+      if (ficha.status === 'entregue') {
+        vendedoresMap[ficha.vendedor].entregues++;
+      }
+
+      if (ficha.produtos) {
+        try {
+          const produtos = typeof ficha.produtos === 'string' ? JSON.parse(ficha.produtos) : ficha.produtos;
+          produtos.forEach(p => {
+            vendedoresMap[ficha.vendedor].total_itens += parseInt(p.quantidade) || 0;
+          });
+        } catch (e) {}
+      }
+    });
+
+    const resultado = Object.entries(vendedoresMap)
+      .map(([vendedor, dados]) => ({
+        vendedor,
+        total_pedidos: dados.total_pedidos,
+        total_itens: dados.total_itens,
+        entregues: dados.entregues
+      }))
+      .sort((a, b) => b.total_itens - a.total_itens);
+
+    res.json(resultado);
+  } catch (error) {
+    console.error('Erro ao buscar vendedores:', error);
+    res.status(500).json({ error: 'Erro ao buscar análise por vendedor' });
+  }
+});
+
+// Análise por material
+app.get('/api/relatorio/materiais', async (req, res) => {
+  try {
+    const { periodo, dataInicio, dataFim } = req.query;
+
+    const now = new Date();
+    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const anoAtual = `${now.getFullYear()}`;
+
+    let whereClause = "WHERE material IS NOT NULL AND material != ''";
+    let params = [];
+
+    if (periodo === 'mes') {
+      whereClause += " AND substr(data_inicio, 1, 7) = ?";
+      params = [mesAtual];
+    } else if (periodo === 'ano') {
+      whereClause += " AND substr(data_inicio, 1, 4) = ?";
+      params = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      whereClause += " AND data_inicio BETWEEN ? AND ?";
+      params = [dataInicio, dataFim];
+    }
+
+    const fichas = await dbAll(`SELECT material, produtos FROM fichas ${whereClause}`, params);
+
+    // Agrupar por material
+    const materiaisMap = {};
+    fichas.forEach(ficha => {
+      if (!materiaisMap[ficha.material]) {
+        materiaisMap[ficha.material] = { total_pedidos: 0, total_itens: 0 };
+      }
+      materiaisMap[ficha.material].total_pedidos++;
+
+      if (ficha.produtos) {
+        try {
+          const produtos = typeof ficha.produtos === 'string' ? JSON.parse(ficha.produtos) : ficha.produtos;
+          produtos.forEach(p => {
+            materiaisMap[ficha.material].total_itens += parseInt(p.quantidade) || 0;
+          });
+        } catch (e) {}
+      }
+    });
+
+    const resultado = Object.entries(materiaisMap)
+      .map(([material, dados]) => ({
+        material,
+        total_pedidos: dados.total_pedidos,
+        total_itens: dados.total_itens
+      }))
+      .sort((a, b) => b.total_itens - a.total_itens);
+
+    res.json(resultado);
+  } catch (error) {
+    console.error('Erro ao buscar materiais:', error);
+    res.status(500).json({ error: 'Erro ao buscar análise por material' });
+  }
+});
+
+// Top produtos (descrições)
+app.get('/api/relatorio/produtos', async (req, res) => {
+  try {
+    const { periodo, dataInicio, dataFim } = req.query;
+
+    const now = new Date();
+    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const anoAtual = `${now.getFullYear()}`;
+
+    let whereClause = '';
+    let params = [];
+
+    if (periodo === 'mes') {
+      whereClause = "WHERE substr(data_inicio, 1, 7) = ?";
+      params = [mesAtual];
+    } else if (periodo === 'ano') {
+      whereClause = "WHERE substr(data_inicio, 1, 4) = ?";
+      params = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      whereClause = "WHERE data_inicio BETWEEN ? AND ?";
+      params = [dataInicio, dataFim];
+    }
+
+    const fichas = await dbAll(`SELECT produtos FROM fichas ${whereClause}`, params);
+
+    // Contar produtos por descrição
+    const produtosMap = {};
+    fichas.forEach(ficha => {
+      if (ficha.produtos) {
+        try {
+          const produtos = typeof ficha.produtos === 'string' ? JSON.parse(ficha.produtos) : ficha.produtos;
+          produtos.forEach(p => {
+            const desc = (p.descricao || 'Sem descrição').trim();
+            if (!produtosMap[desc]) {
+              produtosMap[desc] = 0;
+            }
+            produtosMap[desc] += parseInt(p.quantidade) || 0;
+          });
+        } catch (e) {}
+      }
+    });
+
+    const resultado = Object.entries(produtosMap)
+      .map(([produto, quantidade]) => ({ produto, quantidade }))
+      .sort((a, b) => b.quantidade - a.quantidade)
+      .slice(0, 10);
+
+    res.json(resultado);
+  } catch (error) {
+    console.error('Erro ao buscar produtos:', error);
+    res.status(500).json({ error: 'Erro ao buscar top produtos' });
+  }
+});
+
+// Top clientes
+app.get('/api/relatorio/clientes-top', async (req, res) => {
+  try {
+    const { periodo, dataInicio, dataFim } = req.query;
+
+    const now = new Date();
+    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const anoAtual = `${now.getFullYear()}`;
+
+    let whereClause = "WHERE cliente IS NOT NULL AND cliente != ''";
+    let params = [];
+
+    if (periodo === 'mes') {
+      whereClause += " AND substr(data_inicio, 1, 7) = ?";
+      params = [mesAtual];
+    } else if (periodo === 'ano') {
+      whereClause += " AND substr(data_inicio, 1, 4) = ?";
+      params = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      whereClause += " AND data_inicio BETWEEN ? AND ?";
+      params = [dataInicio, dataFim];
+    }
+
+    const fichas = await dbAll(`SELECT cliente, produtos FROM fichas ${whereClause}`, params);
+
+    // Agrupar por cliente
+    const clientesMap = {};
+    fichas.forEach(ficha => {
+      if (!clientesMap[ficha.cliente]) {
+        clientesMap[ficha.cliente] = { total_pedidos: 0, total_itens: 0 };
+      }
+      clientesMap[ficha.cliente].total_pedidos++;
+
+      if (ficha.produtos) {
+        try {
+          const produtos = typeof ficha.produtos === 'string' ? JSON.parse(ficha.produtos) : ficha.produtos;
+          produtos.forEach(p => {
+            clientesMap[ficha.cliente].total_itens += parseInt(p.quantidade) || 0;
+          });
+        } catch (e) {}
+      }
+    });
+
+    const resultado = Object.entries(clientesMap)
+      .map(([cliente, dados]) => ({
+        cliente,
+        total_pedidos: dados.total_pedidos,
+        total_itens: dados.total_itens
+      }))
+      .sort((a, b) => b.total_itens - a.total_itens)
+      .slice(0, 10);
+
+    res.json(resultado);
+  } catch (error) {
+    console.error('Erro ao buscar clientes:', error);
+    res.status(500).json({ error: 'Erro ao buscar top clientes' });
+  }
+});
+
+// Distribuição por tamanho
+app.get('/api/relatorio/tamanhos', async (req, res) => {
+  try {
+    const { periodo, dataInicio, dataFim } = req.query;
+
+    const now = new Date();
+    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const anoAtual = `${now.getFullYear()}`;
+
+    let whereClause = '';
+    let params = [];
+
+    if (periodo === 'mes') {
+      whereClause = "WHERE substr(data_inicio, 1, 7) = ?";
+      params = [mesAtual];
+    } else if (periodo === 'ano') {
+      whereClause = "WHERE substr(data_inicio, 1, 4) = ?";
+      params = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      whereClause = "WHERE data_inicio BETWEEN ? AND ?";
+      params = [dataInicio, dataFim];
+    }
+
+    const fichas = await dbAll(`SELECT produtos FROM fichas ${whereClause}`, params);
+
+    // Contar por tamanho
+    const tamanhosMap = {};
+    fichas.forEach(ficha => {
+      if (ficha.produtos) {
+        try {
+          const produtos = typeof ficha.produtos === 'string' ? JSON.parse(ficha.produtos) : ficha.produtos;
+          produtos.forEach(p => {
+            const tam = (p.tamanho || 'N/A').toUpperCase().trim();
+            if (!tamanhosMap[tam]) {
+              tamanhosMap[tam] = 0;
+            }
+            tamanhosMap[tam] += parseInt(p.quantidade) || 0;
+          });
+        } catch (e) {}
+      }
+    });
+
+    // Ordenar por ordem comum de tamanhos
+    const ordemTamanhos = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XXG', 'XXXG', 'EG', 'EGG', '2', '4', '6', '8', '10', '12', '14', '16'];
+
+    const resultado = Object.entries(tamanhosMap)
+      .map(([tamanho, quantidade]) => ({ tamanho, quantidade }))
+      .sort((a, b) => {
+        const idxA = ordemTamanhos.indexOf(a.tamanho);
+        const idxB = ordemTamanhos.indexOf(b.tamanho);
+        if (idxA === -1 && idxB === -1) return a.tamanho.localeCompare(b.tamanho);
+        if (idxA === -1) return 1;
+        if (idxB === -1) return -1;
+        return idxA - idxB;
+      });
+
+    res.json(resultado);
+  } catch (error) {
+    console.error('Erro ao buscar tamanhos:', error);
+    res.status(500).json({ error: 'Erro ao buscar distribuição por tamanho' });
+  }
+});
+
+// Comparativo com período anterior
+app.get('/api/relatorio/comparativo', async (req, res) => {
+  try {
+    const { periodo, dataInicio, dataFim } = req.query;
+
+    const now = new Date();
+    let atual = { inicio: '', fim: '' };
+    let anterior = { inicio: '', fim: '' };
+
+    if (periodo === 'mes') {
+      const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const mesAnterior = now.getMonth() === 0 
+        ? `${now.getFullYear() - 1}-12`
+        : `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`;
+
+      atual.inicio = `${mesAtual}-01`;
+      atual.fim = `${mesAtual}-31`;
+      anterior.inicio = `${mesAnterior}-01`;
+      anterior.fim = `${mesAnterior}-31`;
+    } else if (periodo === 'ano') {
+      atual.inicio = `${now.getFullYear()}-01-01`;
+      atual.fim = `${now.getFullYear()}-12-31`;
+      anterior.inicio = `${now.getFullYear() - 1}-01-01`;
+      anterior.fim = `${now.getFullYear() - 1}-12-31`;
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      const inicio = new Date(dataInicio);
+      const fim = new Date(dataFim);
+      const diff = fim - inicio;
+
+      atual.inicio = dataInicio;
+      atual.fim = dataFim;
+
+      const anteriorFim = new Date(inicio);
+      anteriorFim.setDate(anteriorFim.getDate() - 1);
+      const anteriorInicio = new Date(anteriorFim);
+      anteriorInicio.setTime(anteriorInicio.getTime() - diff);
+
+      anterior.inicio = anteriorInicio.toISOString().split('T')[0];
+      anterior.fim = anteriorFim.toISOString().split('T')[0];
+    } else {
+      // Geral: comparar últimos 30 dias com 30 dias anteriores
+      const hoje = now.toISOString().split('T')[0];
+      const trintaDiasAtras = new Date(now);
+      trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
+      const sessentaDiasAtras = new Date(now);
+      sessentaDiasAtras.setDate(sessentaDiasAtras.getDate() - 60);
+
+      atual.inicio = trintaDiasAtras.toISOString().split('T')[0];
+      atual.fim = hoje;
+      anterior.inicio = sessentaDiasAtras.toISOString().split('T')[0];
+      anterior.fim = trintaDiasAtras.toISOString().split('T')[0];
+    }
+
+    // Buscar dados do período atual
+    const fichasAtual = await dbAll(
+      `SELECT produtos, status, cliente FROM fichas WHERE data_inicio BETWEEN ? AND ?`,
+      [atual.inicio, atual.fim]
+    );
+
+    // Buscar dados do período anterior
+    const fichasAnterior = await dbAll(
+      `SELECT produtos, status, cliente FROM fichas WHERE data_inicio BETWEEN ? AND ?`,
+      [anterior.inicio, anterior.fim]
+    );
+
+    // Calcular métricas
+    function calcularMetricas(fichas) {
+      let pedidos = fichas.length;
+      let itens = 0;
+      let entregues = 0;
+      const clientes = new Set();
+
+      fichas.forEach(f => {
+        if (f.status === 'entregue') entregues++;
+        if (f.cliente) clientes.add(f.cliente);
+        if (f.produtos) {
+          try {
+            const produtos = typeof f.produtos === 'string' ? JSON.parse(f.produtos) : f.produtos;
+            produtos.forEach(p => {
+              itens += parseInt(p.quantidade) || 0;
+            });
+          } catch (e) {}
+        }
+      });
+
+      return {
+        pedidos,
+        itens,
+        clientes: clientes.size,
+        taxaEntrega: pedidos > 0 ? Math.round((entregues / pedidos) * 100) : 0
+      };
+    }
+
+    const metricasAtual = calcularMetricas(fichasAtual);
+    const metricasAnterior = calcularMetricas(fichasAnterior);
+
+    // Calcular variações
+    function calcularVariacao(atual, anterior) {
+      if (anterior === 0) return atual > 0 ? 100 : 0;
+      return Math.round(((atual - anterior) / anterior) * 100);
+    }
+
+    res.json({
+      atual: metricasAtual,
+      anterior: metricasAnterior,
+      variacao: {
+        pedidos: calcularVariacao(metricasAtual.pedidos, metricasAnterior.pedidos),
+        itens: calcularVariacao(metricasAtual.itens, metricasAnterior.itens),
+        clientes: calcularVariacao(metricasAtual.clientes, metricasAnterior.clientes),
+        taxaEntrega: metricasAtual.taxaEntrega - metricasAnterior.taxaEntrega
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao buscar comparativo:', error);
+    res.status(500).json({ error: 'Erro ao buscar comparativo' });
+  }
+});
+
+// Indicadores de eficiência
+app.get('/api/relatorio/eficiencia', async (req, res) => {
+  try {
+    const { periodo, dataInicio, dataFim } = req.query;
+
+    const now = new Date();
+    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const anoAtual = `${now.getFullYear()}`;
+
+    let whereClause = '';
+    let params = [];
+
+    if (periodo === 'mes') {
+      whereClause = "WHERE substr(data_inicio, 1, 7) = ?";
+      params = [mesAtual];
+    } else if (periodo === 'ano') {
+      whereClause = "WHERE substr(data_inicio, 1, 4) = ?";
+      params = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      whereClause = "WHERE data_inicio BETWEEN ? AND ?";
+      params = [dataInicio, dataFim];
+    }
+
+    // Buscar fichas entregues para calcular tempo médio
+    const fichasEntregues = await dbAll(`
+      SELECT data_inicio, data_entregue 
+      FROM fichas 
+      ${whereClause ? whereClause + ' AND' : 'WHERE'} 
+      status = 'entregue' AND data_entregue IS NOT NULL AND data_inicio IS NOT NULL
+    `, params);
+
+    let tempoMedio = 0;
+    if (fichasEntregues.length > 0) {
+      let totalDias = 0;
+      fichasEntregues.forEach(f => {
+        try {
+          const inicio = new Date(f.data_inicio);
+          const entrega = new Date(f.data_entregue);
+          const dias = Math.ceil((entrega - inicio) / (1000 * 60 * 60 * 24));
+          if (dias >= 0) totalDias += dias;
+        } catch (e) {}
+      });
+      tempoMedio = Math.round(totalDias / fichasEntregues.length);
+    }
+
+    // Buscar pedidos atrasados (pendentes com data_entrega no passado)
+    const hoje = now.toISOString().split('T')[0];
+    let atrasadosParams = [...params];
+    let atrasadosWhere = whereClause ? whereClause + ' AND' : 'WHERE';
+
+    const atrasados = await dbGet(`
+      SELECT COUNT(*) as total 
+      FROM fichas 
+      ${atrasadosWhere} status != 'entregue' AND data_entrega < ?
+    `, [...atrasadosParams, hoje]);
+
+    // Buscar pedidos de eventos
+    const eventos = await dbGet(`
+      SELECT COUNT(*) as total 
+      FROM fichas 
+      ${whereClause ? whereClause + ' AND' : 'WHERE'} evento = 'sim'
+    `, params);
+
+    // Buscar clientes recorrentes (mais de 1 pedido)
+    const recorrentes = await dbGet(`
+      SELECT COUNT(*) as total FROM (
+        SELECT cliente 
+        FROM fichas 
+        ${whereClause ? whereClause + ' AND' : 'WHERE'} cliente IS NOT NULL AND cliente != ''
+        GROUP BY cliente 
+        HAVING COUNT(*) > 1
+      )
+    `, params);
+
+    res.json({
+      tempoMedioEntrega: tempoMedio,
+      pedidosAtrasados: atrasados?.total || 0,
+      pedidosEventos: eventos?.total || 0,
+      clientesRecorrentes: recorrentes?.total || 0
+    });
+  } catch (error) {
+    console.error('Erro ao buscar eficiência:', error);
+    res.status(500).json({ error: 'Erro ao buscar indicadores de eficiência' });
+  }
+});
+
 // Rota catch-all
 app.get('*', (req, res) => {
   if (!req.path.startsWith('/api')) {

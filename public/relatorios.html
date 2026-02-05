@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 
@@ -159,15 +160,149 @@
                 </section>
             </div>
 
-            <!-- RESUMO MENSAL (se ano selecionado) -->
-            <section class="card" id="resumoMensalCard" style="display: none;">
+            <!-- FILTRO POR VENDEDOR - NOVO -->
+            <section class="card">
                 <div class="card-header">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Resumo Mensal</span>
+                    <i class="fas fa-users"></i>
+                    <span>Análise por Vendedor</span>
+                    <div class="card-header-actions">
+                        <select id="filtroVendedor" class="filter-select">
+                            <option value="">Todos os vendedores</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <div class="chart-container">
-                        <canvas id="chartMensal"></canvas>
+                    <div id="vendedoresLoading" class="loading-placeholder">
+                        <i class="fas fa-spinner fa-spin"></i> Carregando...
+                    </div>
+                    <div id="vendedoresContainer" class="ranking-list" style="display: none;">
+                        <!-- Dados dos vendedores serão inseridos via JS -->
+                    </div>
+                    <div id="vendedoresEmpty" class="empty-placeholder" style="display: none;">
+                        <i class="fas fa-user-slash"></i>
+                        <p>Nenhum vendedor encontrado no período</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- FILTRO POR MATERIAL - NOVO -->
+            <section class="card">
+                <div class="card-header">
+                    <i class="fas fa-layer-group"></i>
+                    <span>Análise por Material</span>
+                    <div class="card-header-actions">
+                        <select id="filtroMaterial" class="filter-select">
+                            <option value="">Todos os materiais</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="materiaisLoading" class="loading-placeholder">
+                        <i class="fas fa-spinner fa-spin"></i> Carregando...
+                    </div>
+                    <div id="materiaisContainer" class="ranking-list" style="display: none;">
+                        <!-- Dados dos materiais serão inseridos via JS -->
+                    </div>
+                    <div id="materiaisEmpty" class="empty-placeholder" style="display: none;">
+                        <i class="fas fa-inbox"></i>
+                        <p>Nenhum material encontrado no período</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RANKING DE PRODUTOS -->
+            <div class="two-columns">
+                <section class="card">
+                    <div class="card-header">
+                        <i class="fas fa-tshirt"></i>
+                        <span>Top Produtos</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="produtosRanking" class="mini-ranking">
+                            <div class="empty-placeholder">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <p>Carregando...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="card-header">
+                        <i class="fas fa-users"></i>
+                        <span>Top Clientes</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="clientesRanking" class="mini-ranking">
+                            <div class="empty-placeholder">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <p>Carregando...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- DISTRIBUIÇÃO POR TAMANHO -->
+            <section class="card">
+                <div class="card-header">
+                    <i class="fas fa-ruler"></i>
+                    <span>Distribuição por Tamanho</span>
+                </div>
+                <div class="card-body">
+                    <div id="tamanhosContainer" class="tamanhos-chart">
+                        <div class="empty-placeholder">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Carregando...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- COMPARATIVO COM PERÍODO ANTERIOR -->
+            <section class="card">
+                <div class="card-header">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Comparativo com Período Anterior</span>
+                </div>
+                <div class="card-body">
+                    <div id="comparativoContainer" class="comparativo-grid">
+                        <div class="comparativo-item">
+                            <div class="comp-label">Pedidos</div>
+                            <div class="comp-values">
+                                <span class="comp-atual" id="compPedidosAtual">0</span>
+                                <span class="comp-arrow" id="compPedidosArrow"><i class="fas fa-minus"></i></span>
+                                <span class="comp-anterior" id="compPedidosAnterior">0</span>
+                            </div>
+                            <div class="comp-percent" id="compPedidosPercent">0%</div>
+                        </div>
+                        <div class="comparativo-item">
+                            <div class="comp-label">Itens</div>
+                            <div class="comp-values">
+                                <span class="comp-atual" id="compItensAtual">0</span>
+                                <span class="comp-arrow" id="compItensArrow"><i class="fas fa-minus"></i></span>
+                                <span class="comp-anterior" id="compItensAnterior">0</span>
+                            </div>
+                            <div class="comp-percent" id="compItensPercent">0%</div>
+                        </div>
+                        <div class="comparativo-item">
+                            <div class="comp-label">Clientes</div>
+                            <div class="comp-values">
+                                <span class="comp-atual" id="compClientesAtual">0</span>
+                                <span class="comp-arrow" id="compClientesArrow"><i class="fas fa-minus"></i></span>
+                                <span class="comp-anterior" id="compClientesAnterior">0</span>
+                            </div>
+                            <div class="comp-percent" id="compClientesPercent">0%</div>
+                        </div>
+                        <div class="comparativo-item">
+                            <div class="comp-label">Taxa Entrega</div>
+                            <div class="comp-values">
+                                <span class="comp-atual" id="compTaxaAtual">0%</span>
+                                <span class="comp-arrow" id="compTaxaArrow"><i class="fas fa-minus"></i></span>
+                                <span class="comp-anterior" id="compTaxaAnterior">0%</span>
+                            </div>
+                            <div class="comp-percent" id="compTaxaPercent">0pp</div>
+                        </div>
                     </div>
                 </div>
             </section>
