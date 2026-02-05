@@ -1,19 +1,16 @@
 /**
- * Toast Global - Sistema de notificações unificado
- * Inclua este arquivo ANTES dos outros scripts
+ * Toast Global - Sistema de notificações
  */
 
 (function() {
   'use strict';
 
-  // Configurações
   const CONFIG = {
-    duracao: 3000,        // Tempo em ms que o toast fica visível
-    posicao: 'bottom',    // 'bottom' = centro inferior
-    animacao: 'slide-up'  // 'slide-up' = sobe de baixo
+    duracao: 3000,
+    posicao: 'bottom',
+    animacao: 'slide-up'
   };
 
-  // Ícones por tipo
   const ICONS = {
     success: 'fa-check-circle',
     error: 'fa-exclamation-circle',
@@ -21,7 +18,6 @@
     info: 'fa-info-circle'
   };
 
-  // Cores por tipo
   const CORES = {
     success: 'linear-gradient(135deg, #10b981, #059669)',
     error: 'linear-gradient(135deg, #ef4444, #dc2626)',
@@ -29,7 +25,6 @@
     info: 'linear-gradient(135deg, #3b82f6, #2563eb)'
   };
 
-  // Injetar estilos CSS uma única vez
   function injetarEstilos() {
     if (document.getElementById('toast-global-styles')) return;
 
@@ -98,7 +93,6 @@
         }
       }
 
-      /* Responsivo - em telas pequenas ocupa mais espaço */
       @media (max-width: 480px) {
         .toast-global {
           left: 16px;
@@ -142,18 +136,14 @@
     document.head.appendChild(style);
   }
 
-  // Função principal do toast
   function mostrarToast(mensagem, tipo = 'success') {
-    // Garantir que os estilos existem
     injetarEstilos();
 
-    // Remover toast existente
     const existente = document.querySelector('.toast-global');
     if (existente) {
       existente.remove();
     }
 
-    // Criar novo toast
     const toast = document.createElement('div');
     toast.className = 'toast-global';
     toast.style.background = CORES[tipo] || CORES.info;
@@ -164,19 +154,16 @@
 
     document.body.appendChild(toast);
 
-    // Trigger animation (pequeno delay para o DOM processar)
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         toast.classList.add('show');
       });
     });
 
-    // Remover após duração
     setTimeout(() => {
       toast.classList.remove('show');
       toast.classList.add('hide');
 
-      // Remover do DOM após animação
       setTimeout(() => {
         if (toast.parentNode) {
           toast.remove();
@@ -187,7 +174,6 @@
     return toast;
   }
 
-  // Atalhos para tipos específicos
   function mostrarSucesso(mensagem) {
     return mostrarToast(mensagem, 'success');
   }
@@ -204,14 +190,9 @@
     return mostrarToast(mensagem, 'info');
   }
 
-  // Exportar globalmente
   window.mostrarToast = mostrarToast;
   window.mostrarSucesso = mostrarSucesso;
   window.mostrarErro = mostrarErro;
   window.mostrarAviso = mostrarAviso;
   window.mostrarInfo = mostrarInfo;
-
-  // Log de inicialização
-  console.log('🔔 Toast Global inicializado');
-
 })();

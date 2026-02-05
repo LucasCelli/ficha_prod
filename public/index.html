@@ -1,5 +1,4 @@
-﻿
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
@@ -113,7 +112,7 @@
                                     style="text-transform: uppercase;">
                             </td>
                             <td>
-                                <input type="text" class="form-control quantidade" min="1" value="1">
+                                <input type="text" inputmode="decimal" class="form-control quantidade" pattern="[0-9+\-*/\s]*" placeholder="">
                             </td>
                             <td>
                                 <input list="produtosList" class="form-control descricao"
@@ -461,25 +460,40 @@
                     <div><span class="label">Cor Material:</span> <span id="print-corMaterial"></span></div>
                     <div><span class="label">Tipo Manga:</span> <span id="print-manga"></span></div>
                     <div><span class="label">Acab. Manga:</span> <span id="print-acabamentoManga"></span></div>
-                    <div id="print-larguraMangaDiv" style="display: none;"><span class="label">Largura Acab. Manga:</span> <span id="print-larguraManga"></span></div>
-                    <div id="print-corAcabamentoMangaDiv" style="display: none;"><span class="label">Cor Acab. Manga:</span> <span id="print-corAcabamentoManga"></span></div>
+                    <div id="print-larguraMangaDiv" style="display: none;"><span class="label">Largura Acab.
+                            Manga:</span> <span id="print-larguraManga"></span></div>
+                    <div id="print-corAcabamentoMangaDiv" style="display: none;"><span class="label">Cor Acab.
+                            Manga:</span> <span id="print-corAcabamentoManga"></span></div>
                     <div><span class="label">Tipo Gola:</span> <span id="print-gola"></span></div>
-                    <div id="print-corGolaDiv" style="display: none;"><span class="label">Cor da Gola:</span> <span id="print-corGola"></span></div>
-                    <div id="print-acabamentoGolaDiv"><span class="label">Acab. Gola:</span> <span id="print-acabamentoGola"></span></div>
-                    <div id="print-larguraGolaDiv" style="display: none;"><span class="label">Largura Acab. Gola:</span> <span id="print-larguraGola"></span></div>
-                    <div id="print-reforcoGolaDiv" style="display: none;"><span class="label">Reforço na Gola:</span> <span id="print-reforcoGola"></span></div>
-                    <div id="print-corReforcoDiv" style="display: none;"><span class="label">Cor do Reforço:</span> <span id="print-corReforco"></span></div>
-                    <div id="print-corPeitilhoInternoDiv" style="display: none;"><span class="label">Cor Peitilho Interno:</span> <span id="print-corPeitilhoInterno"></span></div>
-                    <div id="print-corPeitilhoExternoDiv" style="display: none;"><span class="label">Cor Peitilho Externo:</span> <span id="print-corPeitilhoExterno"></span></div>
-                    <div id="print-aberturaLateralDiv" style="display: none;"><span class="label">Abertura Lateral:</span> <span id="print-aberturaLateral"></span></div>
-                    <div id="print-corAberturaLateralDiv" style="display: none;"><span class="label">Cor Abertura Lateral:</span> <span id="print-corAberturaLateral"></span></div>
+                    <div id="print-corGolaDiv" style="display: none;"><span class="label">Cor da Gola:</span> <span
+                            id="print-corGola"></span></div>
+                    <div id="print-acabamentoGolaDiv"><span class="label">Acab. Gola:</span> <span
+                            id="print-acabamentoGola"></span></div>
+                    <div id="print-larguraGolaDiv" style="display: none;"><span class="label">Largura Acab. Gola:</span>
+                        <span id="print-larguraGola"></span></div>
+                    <div id="print-reforcoGolaDiv" style="display: none;"><span class="label">Reforço na Gola:</span>
+                        <span id="print-reforcoGola"></span></div>
+                    <div id="print-corReforcoDiv" style="display: none;"><span class="label">Cor do Reforço:</span>
+                        <span id="print-corReforco"></span></div>
+                    <div id="print-corPeitilhoInternoDiv" style="display: none;"><span class="label">Cor Peitilho
+                            Interno:</span> <span id="print-corPeitilhoInterno"></span></div>
+                    <div id="print-corPeitilhoExternoDiv" style="display: none;"><span class="label">Cor Peitilho
+                            Externo:</span> <span id="print-corPeitilhoExterno"></span></div>
+                    <div id="print-aberturaLateralDiv" style="display: none;"><span class="label">Abertura
+                            Lateral:</span> <span id="print-aberturaLateral"></span></div>
+                    <div id="print-corAberturaLateralDiv" style="display: none;"><span class="label">Cor Abertura
+                            Lateral:</span> <span id="print-corAberturaLateral"></span></div>
                     <div><span class="label">Bolso:</span> <span id="print-bolso"></span></div>
                     <div><span class="label">Filete:</span> <span id="print-filete"></span></div>
-                    <div id="print-fileteLocalDiv" style="display: none;"><span class="label">Local Filete:</span> <span id="print-fileteLocal"></span></div>
-                    <div id="print-fileteCorDiv" style="display: none;"><span class="label">Cor Filete:</span> <span id="print-fileteCor"></span></div>
+                    <div id="print-fileteLocalDiv" style="display: none;"><span class="label">Local Filete:</span> <span
+                            id="print-fileteLocal"></span></div>
+                    <div id="print-fileteCorDiv" style="display: none;"><span class="label">Cor Filete:</span> <span
+                            id="print-fileteCor"></span></div>
                     <div><span class="label">Faixa Refletiva:</span> <span id="print-faixa"></span></div>
-                    <div id="print-faixaLocalDiv" style="display: none;"><span class="label">Local Faixa:</span> <span id="print-faixaLocal"></span></div>
-                    <div id="print-faixaCorDiv" style="display: none;"><span class="label">Cor Faixa:</span> <span id="print-faixaCor"></span></div>
+                    <div id="print-faixaLocalDiv" style="display: none;"><span class="label">Local Faixa:</span> <span
+                            id="print-faixaLocal"></span></div>
+                    <div id="print-faixaCorDiv" style="display: none;"><span class="label">Cor Faixa:</span> <span
+                            id="print-faixaCor"></span></div>
                     <div><span class="label">Personalização:</span> <span id="print-arte"></span></div>
                     <div><span class="label">Composição:</span> <span id="print-composicao"></span></div>
                 </div>

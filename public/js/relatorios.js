@@ -1,6 +1,5 @@
 /**
- * Relatórios e Estatísticas - Versão Limpa
- * Com filtros por material, vendedor e análises detalhadas
+ * Relatórios e Estatísticas
  */
 (function () {
   'use strict';
@@ -23,13 +22,11 @@
       initEventListeners();
       await carregarRelatorio();
     } catch (error) {
-      console.error('❌ Erro ao inicializar relatórios:', error);
       mostrarErro('Erro ao conectar com o servidor');
     }
   }
 
   function initEventListeners() {
-    // Seletor de período
     document.querySelectorAll('.btn-periodo').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.btn-periodo').forEach(b => b.classList.remove('active'));
@@ -51,7 +48,6 @@
       carregarRelatorio();
     });
 
-    // Filtros de vendedor e material
     document.getElementById('filtroVendedor')?.addEventListener('change', (e) => {
       const vendedor = e.target.value;
       if (vendedor) {
@@ -70,7 +66,6 @@
       }
     });
 
-    // Botões de exportação
     document.getElementById('btnExportarPDF')?.addEventListener('click', exportarPDF);
     document.getElementById('btnExportarExcel')?.addEventListener('click', exportarExcel);
     document.getElementById('btnImprimir')?.addEventListener('click', imprimirRelatorio);
@@ -99,23 +94,17 @@
         }
       }
 
-      // URL base do relatório
       const url = `${db.baseURL}/relatorio?${buildUrlParams()}`;
-
-      console.log('🔍 Buscando relatório:', url);
 
       const response = await fetch(url);
       if (!response.ok) throw new Error('Erro ao buscar relatório');
 
       relatorioAtual = await response.json();
-      console.log('📊 Relatório recebido:', relatorioAtual);
 
-      // Atualizar UI principal
       atualizarEstatisticas(relatorioAtual);
       atualizarVendedorDestaque(relatorioAtual);
       atualizarTaxaEntrega(relatorioAtual);
 
-      // Carregar dados detalhados em paralelo
       await Promise.all([
         carregarDadosVendedores(),
         carregarDadosMateriais(),
@@ -126,12 +115,11 @@
       ]);
 
     } catch (error) {
-      console.error('❌ Erro ao carregar relatório:', error);
       mostrarErro('Erro ao carregar relatório');
     }
   }
 
-  // ==================== ESTATÍSTICAS PRINCIPAIS ====================
+  // Estatísticas Principais
 
   function atualizarEstatisticas(dados) {
     const statPedidosEntregues = document.getElementById('statPedidosEntregues');
@@ -190,7 +178,7 @@
     }
   }
 
-  // ==================== ANÁLISE POR VENDEDOR ====================
+  // Análise por Vendedor
 
   async function carregarDadosVendedores() {
     const container = document.getElementById('vendedoresContainer');
@@ -204,15 +192,12 @@
       if (empty) empty.style.display = 'none';
 
       const url = `${db.baseURL}/relatorio/vendedores?${buildUrlParams()}`;
-      console.log('🔍 Buscando vendedores:', url);
 
       const response = await fetch(url);
       if (!response.ok) throw new Error('Erro ao buscar vendedores');
 
       const dados = await response.json();
-      console.log('👥 Vendedores recebidos:', dados);
 
-      // Normalizar dados (backend usa snake_case, frontend espera camelCase)
       dadosVendedores = dados.map(v => ({
         vendedor: v.vendedor,
         totalPedidos: v.total_pedidos || v.totalPedidos || 0,
@@ -221,7 +206,6 @@
         pendentes: (v.total_pedidos || v.totalPedidos || 0) - (v.entregues || 0)
       }));
 
-      // Preencher select de filtro
       if (select) {
         select.innerHTML = '<option value="">Todos os vendedores</option>';
         dadosVendedores.forEach(v => {
@@ -239,7 +223,6 @@
       }
 
     } catch (error) {
-      console.error('❌ Erro ao carregar vendedores:', error);
       if (loading) loading.style.display = 'none';
       if (empty) empty.style.display = 'block';
     }
@@ -289,7 +272,7 @@
     renderizarVendedores(filtrado);
   }
 
-  // ==================== ANÁLISE POR MATERIAL ====================
+  // Análise por Material
 
   async function carregarDadosMateriais() {
     const container = document.getElementById('materiaisContainer');
@@ -303,22 +286,18 @@
       if (empty) empty.style.display = 'none';
 
       const url = `${db.baseURL}/relatorio/materiais?${buildUrlParams()}`;
-      console.log('🔍 Buscando materiais:', url);
 
       const response = await fetch(url);
       if (!response.ok) throw new Error('Erro ao buscar materiais');
 
       const dados = await response.json();
-      console.log('🧵 Materiais recebidos:', dados);
 
-      // Normalizar dados
       dadosMateriais = dados.map(m => ({
         material: m.material,
         totalPedidos: m.total_pedidos || m.totalPedidos || 0,
         totalItens: m.total_itens || m.totalItens || 0
       }));
 
-      // Preencher select de filtro
       if (select) {
         select.innerHTML = '<option value="">Todos os materiais</option>';
         dadosMateriais.forEach(m => {
@@ -336,7 +315,6 @@
       }
 
     } catch (error) {
-      console.error('❌ Erro ao carregar materiais:', error);
       if (loading) loading.style.display = 'none';
       if (empty) empty.style.display = 'block';
     }
@@ -384,7 +362,7 @@
     renderizarMateriais(filtrado);
   }
 
-  // ==================== RANKINGS ====================
+  // Rankings
 
   async function carregarRankingProdutos() {
     const container = document.getElementById('produtosRanking');
@@ -392,13 +370,11 @@
 
     try {
       const url = `${db.baseURL}/relatorio/produtos?${buildUrlParams()}`;
-      console.log('🔍 Buscando produtos:', url);
 
       const response = await fetch(url);
       if (!response.ok) throw new Error('Erro');
 
       const produtos = await response.json();
-      console.log('👕 Produtos recebidos:', produtos);
 
       if (produtos.length === 0) {
         container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-tshirt"></i><p>Nenhum produto</p></div>';
@@ -414,7 +390,6 @@
       `).join('');
 
     } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
       container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-exclamation-circle"></i><p>Erro ao carregar</p></div>';
     }
   }
@@ -425,13 +400,11 @@
 
     try {
       const url = `${db.baseURL}/relatorio/clientes-top?${buildUrlParams()}`;
-      console.log('🔍 Buscando clientes:', url);
 
       const response = await fetch(url);
       if (!response.ok) throw new Error('Erro');
 
       const clientes = await response.json();
-      console.log('👤 Clientes recebidos:', clientes);
 
       if (clientes.length === 0) {
         container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-users"></i><p>Nenhum cliente</p></div>';
@@ -447,12 +420,11 @@
       `).join('');
 
     } catch (error) {
-      console.error('Erro ao carregar clientes:', error);
       container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-exclamation-circle"></i><p>Erro ao carregar</p></div>';
     }
   }
 
-  // ==================== DISTRIBUIÇÃO POR TAMANHO ====================
+  // Distribuição por Tamanho
 
   async function carregarDistribuicaoTamanhos() {
     const container = document.getElementById('tamanhosContainer');
@@ -460,13 +432,11 @@
 
     try {
       const url = `${db.baseURL}/relatorio/tamanhos?${buildUrlParams()}`;
-      console.log('🔍 Buscando tamanhos:', url);
 
       const response = await fetch(url);
       if (!response.ok) throw new Error('Erro');
 
       const tamanhos = await response.json();
-      console.log('📏 Tamanhos recebidos:', tamanhos);
 
       if (tamanhos.length === 0) {
         container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-ruler"></i><p>Nenhum dado de tamanho</p></div>';
@@ -494,23 +464,20 @@
       `;
 
     } catch (error) {
-      console.error('Erro ao carregar tamanhos:', error);
       container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-exclamation-circle"></i><p>Erro ao carregar</p></div>';
     }
   }
 
-  // ==================== COMPARATIVO ====================
+  // Comparativo
 
   async function carregarComparativo() {
     try {
       const url = `${db.baseURL}/relatorio/comparativo?${buildUrlParams()}`;
-      console.log('🔍 Buscando comparativo:', url);
 
       const response = await fetch(url);
       if (!response.ok) throw new Error('Erro');
 
       const comp = await response.json();
-      console.log('📊 Comparativo recebido:', comp);
 
       const atual = comp.atual || {};
       const anterior = comp.anterior || {};
@@ -521,7 +488,6 @@
       atualizarComparativoTaxa(atual.taxaEntrega, anterior.taxaEntrega);
 
     } catch (error) {
-      console.error('Erro ao carregar comparativo:', error);
       atualizarComparativoItem('Pedidos', 0, 0);
       atualizarComparativoItem('Itens', 0, 0);
       atualizarComparativoItem('Clientes', 0, 0);
@@ -603,7 +569,7 @@
     }
   }
 
-  // ==================== EXPORTAÇÕES ====================
+  // Exportações
 
   function imprimirRelatorio() {
     if (!relatorioAtual) {
@@ -712,7 +678,6 @@
       const total = entregues + pendentes;
       const taxa = total > 0 ? Math.round((entregues / total) * 100) : 0;
 
-      // Cabeçalho
       doc.setFont('helvetica');
       doc.setFillColor(59, 130, 246);
       doc.rect(0, 0, 210, 35, 'F');
@@ -729,7 +694,6 @@
       doc.setDrawColor(200, 200, 200);
       doc.line(20, 50, 190, 50);
 
-      // Cards
       doc.setTextColor(50, 50, 50);
       doc.setFontSize(14);
       doc.text('Resumo do Período', 20, 62);
@@ -739,7 +703,6 @@
       const cardHeight = 30;
       const cardGap = 5;
 
-      // Card 1 - Entregues
       doc.setFillColor(209, 250, 229);
       doc.roundedRect(20, cardY, cardWidth, cardHeight, 3, 3, 'F');
       doc.setTextColor(5, 150, 105);
@@ -748,7 +711,6 @@
       doc.setFontSize(18);
       doc.text(String(entregues), 40, cardY + 23, { align: 'center' });
 
-      // Card 2 - Pendentes
       doc.setFillColor(254, 243, 199);
       doc.roundedRect(20 + cardWidth + cardGap, cardY, cardWidth, cardHeight, 3, 3, 'F');
       doc.setTextColor(217, 119, 6);
@@ -757,7 +719,6 @@
       doc.setFontSize(18);
       doc.text(String(pendentes), 40 + cardWidth + cardGap, cardY + 23, { align: 'center' });
 
-      // Card 3 - Itens
       doc.setFillColor(219, 234, 254);
       doc.roundedRect(20 + (cardWidth + cardGap) * 2, cardY, cardWidth, cardHeight, 3, 3, 'F');
       doc.setTextColor(37, 99, 235);
@@ -766,7 +727,6 @@
       doc.setFontSize(18);
       doc.text(String(relatorioAtual.itensConfeccionados || 0), 40 + (cardWidth + cardGap) * 2, cardY + 23, { align: 'center' });
 
-      // Card 4 - Clientes
       doc.setFillColor(237, 233, 254);
       doc.roundedRect(20 + (cardWidth + cardGap) * 3, cardY, cardWidth, cardHeight, 3, 3, 'F');
       doc.setTextColor(124, 58, 237);
@@ -775,7 +735,6 @@
       doc.setFontSize(18);
       doc.text(String(relatorioAtual.novosClientes || 0), 40 + (cardWidth + cardGap) * 3, cardY + 23, { align: 'center' });
 
-      // Vendedor Destaque
       doc.setTextColor(50, 50, 50);
       doc.setFontSize(14);
       doc.text('Vendedor Destaque', 20, 120);
@@ -790,7 +749,6 @@
       doc.setTextColor(107, 114, 128);
       doc.text(`${relatorioAtual.topVendedorTotal || 0} vendas`, 25, 145);
 
-      // Taxa de Entrega
       doc.setTextColor(50, 50, 50);
       doc.setFontSize(14);
       doc.text('Taxa de Entrega', 110, 120);
@@ -812,7 +770,6 @@
       doc.setTextColor(107, 114, 128);
       doc.text(`${entregues} de ${total} pedidos`, 150, 148, { align: 'center' });
 
-      // Rodapé
       doc.setDrawColor(200, 200, 200);
       doc.line(20, 270, 190, 270);
       doc.setTextColor(150, 150, 150);
@@ -824,7 +781,6 @@
 
       mostrarToast('PDF exportado com sucesso!', 'success');
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
       mostrarErro('Erro ao gerar PDF. Tente novamente.');
     }
   }
@@ -873,7 +829,6 @@
     csv.push(['Entregues:', entregues]);
     csv.push(['Total:', total]);
 
-    // Adicionar dados de vendedores
     if (dadosVendedores.length > 0) {
       csv.push([]);
       csv.push(['ANÁLISE POR VENDEDOR']);
@@ -884,7 +839,6 @@
       });
     }
 
-    // Adicionar dados de materiais
     if (dadosMateriais.length > 0) {
       csv.push([]);
       csv.push(['ANÁLISE POR MATERIAL']);
@@ -908,7 +862,7 @@
     mostrarToast('Excel exportado com sucesso!', 'success');
   }
 
-  // ==================== UTILITÁRIOS ====================
+  // Utilitários
 
   function getPeriodoNome() {
     if (periodoAtual === 'mes') return 'Este Mês';
@@ -947,8 +901,6 @@
   function mostrarToast(mensagem, tipo = 'info') {
     if (typeof window.mostrarToast === 'function') {
       window.mostrarToast(mensagem, tipo);
-    } else {
-      console.log(`[${tipo.toUpperCase()}] ${mensagem}`);
     }
   }
 })();

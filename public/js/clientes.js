@@ -1,5 +1,5 @@
 /**
- * Gestão de Clientes - Seguindo padrão do Dashboard
+ * Gestão de Clientes
  */
 
 (function() {
@@ -19,41 +19,31 @@
   async function initClientes() {
     try {
       await db.init();
-      console.log('✅ Página de clientes inicializada');
-
       await carregarClientes();
       initEventListeners();
     } catch (error) {
-      console.error('❌ Erro ao inicializar:', error);
       mostrarToast('Erro ao conectar com o servidor', 'error');
     }
   }
 
   function initEventListeners() {
-    // Busca
     const searchInput = document.getElementById('searchCliente');
     searchInput.addEventListener('input', debounce(aplicarFiltros, 300));
 
-    // Ordenação
     const ordenarSelect = document.getElementById('ordenarPor');
     ordenarSelect.addEventListener('change', (e) => {
       ordenacaoAtual = e.target.value;
       aplicarFiltros();
     });
 
-    // Limpar filtros
     document.getElementById('btnLimparFiltros').addEventListener('click', limparFiltros);
-
-    // Paginação
     document.getElementById('btnPrevPage').addEventListener('click', () => mudarPagina(-1));
     document.getElementById('btnNextPage').addEventListener('click', () => mudarPagina(1));
 
-    // Modal de edição
     document.getElementById('editForm').addEventListener('submit', salvarEdicao);
     document.getElementById('btnCancelarEdit').addEventListener('click', fecharModalEdit);
     document.querySelector('#editModal .modal-overlay').addEventListener('click', fecharModalEdit);
 
-    // Modal de exclusão
     document.getElementById('btnCancelarDelete').addEventListener('click', fecharModalDelete);
     document.getElementById('btnConfirmarDelete').addEventListener('click', confirmarDelete);
     document.querySelector('#deleteModal .modal-overlay').addEventListener('click', fecharModalDelete);
@@ -68,15 +58,10 @@
       }
 
       clientesCache = await response.json();
-
-      // Atualizar estatísticas
       atualizarEstatisticas();
-
-      // Aplicar filtros e renderizar
       aplicarFiltros();
 
     } catch (error) {
-      console.error('❌ Erro ao carregar clientes:', error);
       mostrarToast('Erro ao carregar clientes', 'error');
     }
   }
@@ -86,7 +71,6 @@
     const totalPedidos = clientesCache.reduce((sum, c) => sum + (c.total_pedidos || 0), 0);
     const mediaPedidos = totalClientes > 0 ? (totalPedidos / totalClientes).toFixed(1) : 0;
 
-    // Clientes novos este mês
     const now = new Date();
     const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const novosEsteMes = clientesCache.filter(c => 
@@ -102,7 +86,6 @@
   function aplicarFiltros() {
     const termoBusca = document.getElementById('searchCliente').value.toLowerCase().trim();
 
-    // Filtrar
     clientesFiltrados = clientesCache.filter(cliente => {
       if (termoBusca && !cliente.nome.toLowerCase().includes(termoBusca)) {
         return false;
@@ -110,13 +93,8 @@
       return true;
     });
 
-    // Ordenar
     ordenarClientes();
-
-    // Resetar para página 1
     paginaAtual = 1;
-
-    // Renderizar
     renderizarClientes();
     atualizarPaginacao();
   }
@@ -163,7 +141,6 @@
     const emptyState = document.getElementById('emptyState');
     const resultadosCount = document.getElementById('resultadosCount');
 
-    // Atualizar contador
     resultadosCount.textContent = `${clientesFiltrados.length} ${clientesFiltrados.length === 1 ? 'resultado' : 'resultados'}`;
 
     if (clientesFiltrados.length === 0) {
@@ -175,14 +152,12 @@
 
     emptyState.style.display = 'none';
 
-    // Paginação
     const inicio = (paginaAtual - 1) * itensPorPagina;
     const fim = inicio + itensPorPagina;
     const clientesPagina = clientesFiltrados.slice(inicio, fim);
 
     container.innerHTML = clientesPagina.map(cliente => criarCardCliente(cliente)).join('');
 
-    // Event listeners para os botões
     container.querySelectorAll('.btn-editar').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = parseInt(btn.dataset.id);
@@ -205,7 +180,6 @@
       });
     });
 
-    // Mostrar paginação
     document.getElementById('paginacao').style.display = clientesFiltrados.length > itensPorPagina ? 'flex' : 'none';
   }
 
@@ -272,7 +246,7 @@
     aplicarFiltros();
   }
 
-  // ==================== MODAL EDITAR ====================
+  // Modal Editar
 
   function abrirModalEdit(id) {
     const cliente = clientesCache.find(c => c.id === id);
@@ -322,12 +296,11 @@
       await carregarClientes();
 
     } catch (error) {
-      console.error('❌ Erro ao salvar:', error);
       mostrarToast(error.message || 'Erro ao atualizar cliente', 'error');
     }
   }
 
-  // ==================== MODAL DELETE ====================
+  // Modal Delete
 
   function abrirModalDelete(id, nome) {
     clienteParaDeletar = id;
@@ -348,7 +321,6 @@
         method: 'DELETE'
       });
 
-      // Verificar content-type antes de tentar parsear JSON
       const contentType = response.headers.get('content-type');
 
       if (!response.ok) {
@@ -357,9 +329,7 @@
           try {
             const error = await response.json();
             errorMsg = error.error || errorMsg;
-          } catch (e) {
-            // Ignorar erro de parse
-          }
+          } catch (e) {}
         }
         throw new Error(errorMsg);
       }
@@ -369,21 +339,19 @@
       await carregarClientes();
 
     } catch (error) {
-      console.error('❌ Erro ao excluir:', error);
-      // Evitar mostrar erro de parse JSON no toast
       const msg = error.message || 'Erro ao excluir cliente';
       const msgLimpa = msg.includes('Unexpected token') ? 'Erro ao excluir cliente' : msg;
       mostrarToast(msgLimpa, 'error');
     }
   }
 
-  // ==================== VER FICHAS ====================
+  // Ver Fichas
 
   function verFichasCliente(nomeCliente) {
     window.location.href = `dashboard.html?cliente=${encodeURIComponent(nomeCliente)}`;
   }
 
-  // ==================== UTILITÁRIOS ====================
+  // Utilitários
 
   function formatarData(dataISO) {
     if (!dataISO) return '-';

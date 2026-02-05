@@ -4,7 +4,6 @@
 
 class APIClient {
   constructor() {
-    // Detectar URL base automaticamente
     this.baseURL = this.detectBaseURL();
     this.initialized = false;
   }
@@ -12,20 +11,16 @@ class APIClient {
   detectBaseURL() {
     const hostname = window.location.hostname;
 
-    // Produção (Render, Railway, etc)
     if (hostname.includes('render.com') || 
         hostname.includes('railway.app') ||
         hostname.includes('onrender.com')) {
       return window.location.origin + '/api';
     }
 
-    // Desenvolvimento local
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      // Tentar a porta do servidor primeiro
       return 'http://localhost:3000/api';
     }
 
-    // Fallback: usar a mesma origem
     return window.location.origin + '/api';
   }
 
@@ -33,40 +28,33 @@ class APIClient {
     if (this.initialized) return true;
 
     try {
-      // Testar conexão com o servidor
       const response = await fetch(`${this.baseURL}/health`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
 
       if (response.ok) {
-        console.log('✅ Conectado ao servidor:', this.baseURL);
         this.initialized = true;
         return true;
       }
-    } catch (error) {
-      console.warn('⚠️ Servidor não disponível em:', this.baseURL);
-    }
+    } catch (error) {}
 
-    // Tentar porta alternativa em desenvolvimento
     if (window.location.hostname === 'localhost') {
       const altURL = 'http://localhost:3000/api';
       try {
         const response = await fetch(`${altURL}/health`);
         if (response.ok) {
           this.baseURL = altURL;
-          console.log('✅ Conectado ao servidor:', this.baseURL);
           this.initialized = true;
           return true;
         }
       } catch (e) {}
     }
 
-    console.error('❌ Não foi possível conectar ao servidor');
     return false;
   }
 
-  // ==================== FICHAS ====================
+  // Fichas
 
   async listarFichas() {
     const response = await fetch(`${this.baseURL}/fichas`);
@@ -90,7 +78,6 @@ class APIClient {
 
     const method = dados.id ? 'PUT' : 'POST';
 
-    // Preparar dados para envio (garantir formato correto)
     const dadosEnvio = {
       cliente: dados.cliente || '',
       vendedor: dados.vendedor || '',
@@ -100,60 +87,36 @@ class APIClient {
       evento: dados.evento || 'nao',
       status: dados.status || 'pendente',
       produtos: dados.produtos || [],
-
-      // Material
       material: dados.material || '',
       composicao: dados.composicao || '',
       corMaterial: dados.corMaterial || '',
-
-      // Manga
       manga: dados.manga || '',
       acabamentoManga: dados.acabamentoManga || '',
       larguraManga: dados.larguraManga || '',
       corAcabamentoManga: dados.corAcabamentoManga || '',
-
-      // Gola
       gola: dados.gola || '',
       corGola: dados.corGola || '',
       acabamentoGola: dados.acabamentoGola || '',
       larguraGola: dados.larguraGola || '',
-
-      // Polo específico
       corPeitilhoInterno: dados.corPeitilhoInterno || '',
       corPeitilhoExterno: dados.corPeitilhoExterno || '',
       aberturaLateral: dados.aberturaLateral || 'nao',
       corAberturaLateral: dados.corAberturaLateral || '',
-
-      // Reforço gola
       reforcoGola: dados.reforcoGola || 'nao',
       corReforco: dados.corReforco || '',
-
-      // Bolso
       bolso: dados.bolso || '',
-
-      // Filete
       filete: dados.filete || 'nao',
       fileteLocal: dados.fileteLocal || '',
       fileteCor: dados.fileteCor || '',
-
-      // Faixa
       faixa: dados.faixa || 'nao',
       faixaLocal: dados.faixaLocal || '',
       faixaCor: dados.faixaCor || '',
-
-      // Arte
       arte: dados.arte || '',
       corSublimacao: dados.corSublimacao || '',
-
-      // Observações
       observacoes: dados.observacoes || '',
-
-      // Imagens
       imagemData: dados.imagemData || '',
       imagensData: dados.imagensData || '[]'
     };
-
-    console.log('📤 Enviando dados para o servidor:', Object.keys(dadosEnvio).length, 'campos');
 
     const response = await fetch(url, {
       method,
@@ -197,7 +160,7 @@ class APIClient {
     return true;
   }
 
-  // ==================== CLIENTES ====================
+  // Clientes
 
   async buscarClientes(termo = '') {
     const url = termo 
@@ -209,7 +172,7 @@ class APIClient {
     return response.json();
   }
 
-  // ==================== ESTATÍSTICAS E RELATÓRIOS ====================
+  // Estatísticas e Relatórios
 
   async buscarEstatisticas() {
     const response = await fetch(`${this.baseURL}/estatisticas`);
@@ -228,44 +191,31 @@ class APIClient {
     return response.json();
   }
 
-  // ==================== BACKUP ====================
+  // Backup
 
   async exportarBackup() {
-    try {
-      const fichas = await this.listarFichas();
-      const clientes = await this.buscarClientes();
+    const fichas = await this.listarFichas();
+    const clientes = await this.buscarClientes();
 
-      return {
-        fichas,
-        clientes,
-        dataExportacao: new Date().toISOString(),
-        versao: 2.0
-      };
-    } catch (error) {
-      console.error('❌ Erro ao exportar backup:', error);
-      throw error;
-    }
+    return {
+      fichas,
+      clientes,
+      dataExportacao: new Date().toISOString(),
+      versao: 2.0
+    };
   }
 
   async importarBackup(dados) {
-    try {
-      if (!dados.fichas || !Array.isArray(dados.fichas)) {
-        throw new Error('Formato de backup inválido');
-      }
+    if (!dados.fichas || !Array.isArray(dados.fichas)) {
+      throw new Error('Formato de backup inválido');
+    }
 
-      for (const ficha of dados.fichas) {
-        delete ficha.id;
-        await this.salvarFicha(ficha);
-      }
-
-      console.log('✅ Backup importado com sucesso');
-    } catch (error) {
-      console.error('❌ Erro ao importar backup:', error);
-      throw error;
+    for (const ficha of dados.fichas) {
+      delete ficha.id;
+      await this.salvarFicha(ficha);
     }
   }
 }
 
-// Instância global
 const db = new APIClient();
 window.db = db;

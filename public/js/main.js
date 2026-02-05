@@ -10,7 +10,6 @@
     materiais: []
   };
 
-  // Array para armazenar as imagens
   let imagens = [];
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -38,34 +37,15 @@
   async function loadCatalog() {
     try {
       const response = await fetch(CATALOG_URL);
-
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-
-      const data = await response.json();
-      catalog = data;
-
-      console.log('✅ Catálogo carregado com sucesso:', catalog);
-
+      if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
+      catalog = await response.json();
     } catch (error) {
-      console.error('❌ Erro ao carregar catálogo:', error);
-      console.warn('⚠️ Usando dados de fallback mínimos');
-
       catalog = {
         tamanhos: ['PP', 'P', 'M', 'G', 'GG', 'XG'],
         produtos: ['Camiseta Básica', 'Polo', 'Baby Look'],
         materiais: [
-          {
-            id: 'malha_fria_pv',
-            nome: 'Malha Fria (PV)',
-            composicao: '65% Poliéster / 35% Viscose'
-          },
-          {
-            id: 'dry_fit',
-            nome: 'Dry Fit',
-            composicao: '100% Poliéster'
-          }
+          { id: 'malha_fria_pv', nome: 'Malha Fria (PV)', composicao: '65% Poliéster / 35% Viscose' },
+          { id: 'dry_fit', nome: 'Dry Fit', composicao: '100% Poliéster' }
         ]
       };
     }
@@ -80,67 +60,42 @@
   function preencherProdutosList() {
     const datalist = document.getElementById('produtosList');
     if (!datalist) return;
-
     datalist.innerHTML = '';
-
-    if (!catalog.produtos || catalog.produtos.length === 0) {
-      console.warn('⚠️ Nenhum produto encontrado no catálogo');
-      return;
-    }
-
+    if (!catalog.produtos || catalog.produtos.length === 0) return;
     catalog.produtos.forEach(prod => {
       const opt = document.createElement('option');
       opt.value = prod;
       datalist.appendChild(opt);
     });
-
-    console.log(`✅ ${catalog.produtos.length} produtos carregados no datalist`);
   }
 
   function preencherMateriaisDatalist() {
     const datalist = document.getElementById('materiaisList');
     if (!datalist) return;
-
     datalist.innerHTML = '';
-
-    if (!catalog.materiais || catalog.materiais.length === 0) {
-      console.warn('⚠️ Nenhum material encontrado no catálogo');
-      return;
-    }
-
+    if (!catalog.materiais || catalog.materiais.length === 0) return;
     catalog.materiais.forEach(mat => {
       const opt = document.createElement('option');
       opt.value = mat.nome;
       opt.dataset.composicao = mat.composicao || '';
       datalist.appendChild(opt);
     });
-
-    console.log(`✅ ${catalog.materiais.length} materiais carregados no datalist`);
   }
 
   function preencherTamanhosDatalist() {
     let datalist = document.getElementById('tamanhosList');
-
     if (!datalist) {
       datalist = document.createElement('datalist');
       datalist.id = 'tamanhosList';
       document.body.appendChild(datalist);
     }
-
     datalist.innerHTML = '';
-
-    if (!catalog.tamanhos || catalog.tamanhos.length === 0) {
-      console.warn('⚠️ Nenhum tamanho encontrado no catálogo');
-      return;
-    }
-
+    if (!catalog.tamanhos || catalog.tamanhos.length === 0) return;
     catalog.tamanhos.forEach(tam => {
       const opt = document.createElement('option');
       opt.value = tam;
       datalist.appendChild(opt);
     });
-
-    console.log(`✅ ${catalog.tamanhos.length} tamanhos carregados no datalist`);
   }
 
   function initDefaultDates() {
@@ -148,14 +103,24 @@
     const dataInicio = document.getElementById('dataInicio');
     const dataEntrega = document.getElementById('dataEntrega');
 
+    // Formato YYYY-MM-DD no fuso local
+    const hojeStr = hoje.getFullYear() + '-' +
+      String(hoje.getMonth() + 1).padStart(2, '0') + '-' +
+      String(hoje.getDate()).padStart(2, '0');
+
     if (dataInicio && !dataInicio.value) {
-      dataInicio.valueAsDate = hoje;
+      dataInicio.value = hojeStr;
     }
 
     if (dataEntrega && !dataEntrega.value) {
       const umaSemanaDepois = new Date(hoje);
       umaSemanaDepois.setDate(hoje.getDate() + 7);
-      dataEntrega.valueAsDate = umaSemanaDepois;
+
+      const entregaStr = umaSemanaDepois.getFullYear() + '-' +
+        String(umaSemanaDepois.getMonth() + 1).padStart(2, '0') + '-' +
+        String(umaSemanaDepois.getDate()).padStart(2, '0');
+
+      dataEntrega.value = entregaStr;
     }
   }
 
@@ -191,7 +156,6 @@
 
       const dateInicio = new Date(inicio);
       const dateEntrega = new Date(entrega);
-
       const diffTime = dateEntrega - dateInicio;
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -219,7 +183,7 @@
     calcularPrazo();
   }
 
-  // ==================== DRAG AND DROP (PRODUTOS) ====================
+  // Drag and Drop
 
   let draggedRow = null;
   let dropPosition = null;
@@ -258,7 +222,6 @@
 
     draggedRow = row;
     row.classList.add('dragging');
-
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', '');
 
@@ -346,22 +309,16 @@
     setTimeout(() => {
       draggedRow.classList.remove('just-dropped');
     }, 300);
-
-    console.log('✅ Produto reposicionado');
   }
 
-  // ==================== ORDENAÇÃO AUTOMÁTICA ====================
+  // Ordenação
 
   function ordenarProdutosPorTamanho() {
     const tabelaBody = document.getElementById('produtosTable');
     if (!tabelaBody) return;
 
     const rows = Array.from(tabelaBody.querySelectorAll('tr'));
-
-    if (rows.length <= 1) {
-      console.log('⚠️ Nada para ordenar');
-      return;
-    }
+    if (rows.length <= 1) return;
 
     const ordemTamanhos = {};
     catalog.tamanhos.forEach((tam, index) => {
@@ -414,10 +371,7 @@
     }
 
     rows.sort(comparar);
-
     rows.forEach(row => tabelaBody.appendChild(row));
-
-    console.log('✅ Produtos ordenados por tamanho');
 
     tabelaBody.classList.add('sorted-flash');
     setTimeout(() => {
@@ -427,7 +381,7 @@
 
   window.ordenarProdutosPorTamanho = ordenarProdutosPorTamanho;
 
-  // ==================== TABELA DE PRODUTOS ====================
+  // Tabela de Produtos
 
   function initProductTable() {
     const tabelaBody = document.getElementById('produtosTable');
@@ -441,7 +395,6 @@
 
     function adicionarLinhaProduto(produto) {
       const row = template.content.firstElementChild.cloneNode(true);
-
       row.draggable = false;
 
       const firstTd = row.querySelector('td');
@@ -501,7 +454,6 @@
         const tamanho = row.querySelector('.tamanho')?.value || '';
         const quantidade = row.querySelector('.quantidade')?.value || 1;
         const descricao = row.querySelector('.descricao')?.value || '';
-
         adicionarLinhaProduto({ tamanho, quantidade, descricao });
       }
 
@@ -521,7 +473,6 @@
       if (e.target.classList.contains('quantidade')) {
         atualizarTotalItens();
       }
-      // Forçar uppercase no campo tamanho
       if (e.target.classList.contains('tamanho')) {
         const start = e.target.selectionStart;
         const end = e.target.selectionEnd;
@@ -530,6 +481,20 @@
       }
     });
 
+    // Filtrar letras
+    tabelaBody.addEventListener('input', e => {
+      if (e.target.classList.contains('quantidade')) {
+        e.target.value = e.target.value.replace(/[^0-9+\-*/.\s]/g, '');
+        atualizarTotalItens();
+      }
+      if (e.target.classList.contains('tamanho')) {
+        const start = e.target.selectionStart;
+        e.target.value = e.target.value.toUpperCase();
+        e.target.setSelectionRange(start, start);
+      }
+    });
+
+    // Calcular no Enter
     tabelaBody.addEventListener('keydown', e => {
       if (e.target.classList.contains('quantidade') && e.key === 'Enter') {
         e.preventDefault();
@@ -552,7 +517,6 @@
   function adicionarBotaoOrdenar() {
     const btnAdicionar = document.getElementById('adicionarProduto');
     if (!btnAdicionar) return;
-
     if (document.getElementById('ordenarProdutos')) return;
 
     const btnOrdenar = document.createElement('button');
@@ -587,29 +551,21 @@
     if (!input || !input.value) return;
 
     const expressao = input.value.trim();
-
     if (!/[\+\-\*\/]/.test(expressao)) return;
 
     try {
-      if (!/^[\d\s\+\-\*\/\(\)\.]+$/.test(expressao)) {
-        console.warn('Expressão inválida:', expressao);
-        return;
-      }
+      if (!/^[\d\s\+\-\*\/\(\)\.]+$/.test(expressao)) return;
 
       const resultado = Function(`'use strict'; return (${expressao})`)();
 
       if (typeof resultado === 'number' && !isNaN(resultado) && isFinite(resultado)) {
         input.value = Math.round(resultado);
         atualizarTotalItens();
-      } else {
-        console.warn('Resultado inválido:', resultado);
       }
-    } catch (erro) {
-      console.warn('Erro ao calcular expressão:', erro);
-    }
+    } catch (erro) { }
   }
 
-  // ==================== ESPECIFICAÇÕES - MATERIAL E MANGA ====================
+  // Material e Manga
 
   function initSpecsAutoFill() {
     const inputMaterial = document.getElementById('material');
@@ -620,7 +576,6 @@
 
     inputMaterial.addEventListener('input', () => {
       const valorDigitado = inputMaterial.value;
-
       const options = datalist.querySelectorAll('option');
       for (let opt of options) {
         if (opt.value === valorDigitado) {
@@ -630,7 +585,6 @@
       }
     });
 
-    // ==================== ACABAMENTO DA MANGA ====================
     const acabamentoManga = document.getElementById('acabamentoManga');
     const larguraMangaContainer = document.getElementById('larguraMangaContainer');
     const corAcabamentoMangaContainer = document.getElementById('corAcabamentoMangaContainer');
@@ -653,10 +607,9 @@
     }
   }
 
-  // ==================== CONTROLES DA GOLA (COMPLETO) ====================
+  // Controles da Gola
 
   function initGolaControls() {
-    // Elementos
     const tipoGola = document.getElementById('gola');
     const corGolaContainer = document.getElementById('corGolaContainer');
     const acabamentoGolaContainer = document.getElementById('acabamentoGolaContainer');
@@ -665,8 +618,6 @@
     const reforcoGolaContainer = document.getElementById('reforcoGolaContainer');
     const reforcoGola = document.getElementById('reforcoGola');
     const corReforcoContainer = document.getElementById('corReforcoContainer');
-
-    // Campos específicos Polo
     const corPeitilhoInternoContainer = document.getElementById('corPeitilhoInternoContainer');
     const corPeitilhoExternoContainer = document.getElementById('corPeitilhoExternoContainer');
     const aberturaLateralContainer = document.getElementById('aberturaLateralContainer');
@@ -678,27 +629,22 @@
       const isPolo = gola === 'polo' || gola === 'v_polo';
       const temGola = gola !== '';
 
-      // Cor da Gola - aparece sempre que tem gola selecionada
       if (corGolaContainer) {
         corGolaContainer.style.display = temGola ? 'block' : 'none';
       }
 
-      // Para Polo: esconde acabamento e largura da gola
       if (acabamentoGolaContainer) {
         acabamentoGolaContainer.style.display = isPolo ? 'none' : 'block';
       }
       if (larguraGolaContainer) {
-        // Só mostra se NÃO for polo E tiver acabamento selecionado
         const acabamento = acabamentoGola?.value || '';
         larguraGolaContainer.style.display = (!isPolo && acabamento) ? 'block' : 'none';
       }
 
-      // Reforço na Gola - aparece para TODAS as golas (incluindo polo)
       if (reforcoGolaContainer) {
         reforcoGolaContainer.style.display = temGola ? 'block' : 'none';
       }
 
-      // Campos específicos de Polo
       if (corPeitilhoInternoContainer) {
         corPeitilhoInternoContainer.style.display = isPolo ? 'block' : 'none';
       }
@@ -709,12 +655,10 @@
         aberturaLateralContainer.style.display = isPolo ? 'block' : 'none';
       }
 
-      // Se não for polo, esconde cor da abertura lateral
       if (!isPolo && corAberturaLateralContainer) {
         corAberturaLateralContainer.style.display = 'none';
       }
 
-      // Atualiza campos dependentes
       atualizarCorReforco();
       atualizarCorAberturaLateral();
     }
@@ -730,7 +674,6 @@
     }
 
     function atualizarCorReforco() {
-      // reforcoGola agora é SELECT (sim/nao)
       const reforcoMarcado = reforcoGola?.value === 'sim';
       if (corReforcoContainer) {
         corReforcoContainer.style.display = reforcoMarcado ? 'block' : 'none';
@@ -738,7 +681,6 @@
     }
 
     function atualizarCorAberturaLateral() {
-      // aberturaLateral agora é SELECT (sim/nao)
       const aberturaAtiva = aberturaLateral?.value === 'sim';
       const gola = tipoGola?.value || '';
       const isPolo = gola === 'polo' || gola === 'v_polo';
@@ -748,40 +690,25 @@
       }
     }
 
-    // Event listeners
-    if (tipoGola) {
-      tipoGola.addEventListener('change', atualizarCamposGola);
-    }
-    if (acabamentoGola) {
-      acabamentoGola.addEventListener('change', atualizarLarguraGola);
-    }
-    if (reforcoGola) {
-      reforcoGola.addEventListener('change', atualizarCorReforco);
-    }
-    if (aberturaLateral) {
-      aberturaLateral.addEventListener('change', atualizarCorAberturaLateral);
-    }
+    if (tipoGola) tipoGola.addEventListener('change', atualizarCamposGola);
+    if (acabamentoGola) acabamentoGola.addEventListener('change', atualizarLarguraGola);
+    if (reforcoGola) reforcoGola.addEventListener('change', atualizarCorReforco);
+    if (aberturaLateral) aberturaLateral.addEventListener('change', atualizarCorAberturaLateral);
 
-    // Inicializar
     atualizarCamposGola();
   }
 
-  // ==================== FILETE E FAIXA REFLETIVA ====================
+  // Filete e Faixa
 
   function initFileteFaixaControls() {
-    // Filete
     const fileteSelect = document.getElementById('filete');
     const fileteLocalContainer = document.getElementById('fileteLocalContainer');
     const fileteCorContainer = document.getElementById('fileteCorContainer');
 
     function atualizarCamposFilete() {
       const temFilete = fileteSelect?.value === 'sim';
-      if (fileteLocalContainer) {
-        fileteLocalContainer.style.display = temFilete ? 'block' : 'none';
-      }
-      if (fileteCorContainer) {
-        fileteCorContainer.style.display = temFilete ? 'block' : 'none';
-      }
+      if (fileteLocalContainer) fileteLocalContainer.style.display = temFilete ? 'block' : 'none';
+      if (fileteCorContainer) fileteCorContainer.style.display = temFilete ? 'block' : 'none';
     }
 
     if (fileteSelect) {
@@ -789,19 +716,14 @@
       atualizarCamposFilete();
     }
 
-    // Faixa Refletiva
     const faixaSelect = document.getElementById('faixa');
     const faixaLocalContainer = document.getElementById('faixaLocalContainer');
     const faixaCorContainer = document.getElementById('faixaCorContainer');
 
     function atualizarCamposFaixa() {
       const temFaixa = faixaSelect?.value === 'sim';
-      if (faixaLocalContainer) {
-        faixaLocalContainer.style.display = temFaixa ? 'block' : 'none';
-      }
-      if (faixaCorContainer) {
-        faixaCorContainer.style.display = temFaixa ? 'block' : 'none';
-      }
+      if (faixaLocalContainer) faixaLocalContainer.style.display = temFaixa ? 'block' : 'none';
+      if (faixaCorContainer) faixaCorContainer.style.display = temFaixa ? 'block' : 'none';
     }
 
     if (faixaSelect) {
@@ -872,7 +794,7 @@
     });
   }
 
-  // ==================== SISTEMA DE MÚLTIPLAS IMAGENS ====================
+  // Múltiplas Imagens
 
   function initMultipleImages() {
     const dropArea = document.getElementById('imageUpload');
@@ -882,13 +804,9 @@
 
     if (!dropArea || !fileInput || !container) return;
 
-    // Atualizar contador
     function atualizarContador() {
-      if (counter) {
-        counter.textContent = `(${imagens.length}/${MAX_IMAGES})`;
-      }
+      if (counter) counter.textContent = `(${imagens.length}/${MAX_IMAGES})`;
 
-      // Mostrar/esconder área de upload
       if (imagens.length >= MAX_IMAGES) {
         dropArea.classList.add('hidden');
       } else {
@@ -896,7 +814,6 @@
       }
     }
 
-    // Renderizar imagens
     function renderizarImagens() {
       container.innerHTML = '';
 
@@ -925,19 +842,16 @@
 
         container.appendChild(card);
 
-        // Event: Deletar
         card.querySelector('.image-delete-btn').addEventListener('click', () => {
           imagens.splice(index, 1);
           renderizarImagens();
           atualizarContador();
         });
 
-        // Event: Atualizar descrição
         card.querySelector('input').addEventListener('input', (e) => {
           imagens[index].descricao = e.target.value;
         });
 
-        // Events: Drag and drop para reordenar
         card.addEventListener('dragstart', handleImageDragStart);
         card.addEventListener('dragend', handleImageDragEnd);
         card.addEventListener('dragover', handleImageDragOver);
@@ -948,7 +862,6 @@
       atualizarContador();
     }
 
-    // Drag handlers para imagens
     let draggedImageIndex = null;
 
     function handleImageDragStart(e) {
@@ -987,15 +900,12 @@
       const targetIndex = parseInt(card.dataset.index);
 
       if (draggedImageIndex !== null && targetIndex !== draggedImageIndex) {
-        // Reordenar array
         const [movedItem] = imagens.splice(draggedImageIndex, 1);
         imagens.splice(targetIndex, 0, movedItem);
         renderizarImagens();
-        console.log('✅ Imagens reordenadas');
       }
     }
 
-    // Adicionar imagem
     function adicionarImagem(src, descricao = '') {
       if (imagens.length >= MAX_IMAGES) {
         alert(`Máximo de ${MAX_IMAGES} imagens permitido.`);
@@ -1007,15 +917,11 @@
       return true;
     }
 
-    // Processar arquivos
     function processarArquivos(files) {
       if (!files || !files.length) return;
 
       Array.from(files).forEach(file => {
-        if (!file.type.startsWith('image/')) {
-          console.warn('Arquivo não é uma imagem:', file.name);
-          return;
-        }
+        if (!file.type.startsWith('image/')) return;
 
         if (imagens.length >= MAX_IMAGES) {
           alert(`Máximo de ${MAX_IMAGES} imagens atingido.`);
@@ -1028,7 +934,6 @@
       });
     }
 
-    // Events
     dropArea.addEventListener('click', () => fileInput.click());
     dropArea.addEventListener('keypress', e => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -1065,7 +970,6 @@
       processarArquivos(e.dataTransfer.files);
     });
 
-    // Paste (Ctrl+V)
     document.addEventListener('paste', e => {
       const items = e.clipboardData?.items;
       if (!items) return;
@@ -1089,7 +993,6 @@
       }
     });
 
-    // Exportar funções
     if (!window.getImagens) {
       window.getImagens = () => imagens;
     }
@@ -1101,11 +1004,10 @@
     }
     window.adicionarImagem = adicionarImagem;
 
-    // Inicializar
     atualizarContador();
   }
 
-  // ==================== SALVAR E CARREGAR ====================
+  // Salvar e Carregar
 
   function initSaveLoad() {
     const btnSalvar = document.getElementById('btnSalvar');
@@ -1126,41 +1028,31 @@
     });
 
     const arteVal = document.getElementById('arte')?.value || '';
-    const corSublimacao =
-      arteVal.includes('sublimacao') ? document.getElementById('cor')?.value || null : null;
+    const corSublimacao = arteVal.includes('sublimacao') ? document.getElementById('cor')?.value || null : null;
 
-    // Acabamento manga
     const acabamentoMangaVal = document.getElementById('acabamentoManga')?.value || '';
     const temAcabamentoManga = acabamentoMangaVal === 'vies' || acabamentoMangaVal === 'punho';
     const larguraManga = temAcabamentoManga ? (document.getElementById('larguraManga')?.value || '') : '';
     const corAcabamentoManga = temAcabamentoManga ? (document.getElementById('corAcabamentoManga')?.value || '') : '';
 
-    // Gola
     const golaVal = document.getElementById('gola')?.value || '';
     const isPolo = golaVal === 'polo' || golaVal === 'v_polo';
     const temGola = golaVal !== '';
 
-    // Cor da gola (para todas as golas)
     const corGola = temGola ? (document.getElementById('corGola')?.value || '') : '';
-
-    // Acabamento gola (não salva para polo)
     const acabamentoGolaVal = isPolo ? '' : (document.getElementById('acabamentoGola')?.value || '');
     const larguraGola = (!isPolo && acabamentoGolaVal) ? (document.getElementById('larguraGola')?.value || '') : '';
 
-    // Reforço na gola (agora é select sim/nao, disponível para TODAS as golas incluindo polo)
     const reforcoGolaVal = temGola ? (document.getElementById('reforcoGola')?.value || 'nao') : 'nao';
     const corReforco = reforcoGolaVal === 'sim' ? (document.getElementById('corReforco')?.value || '') : '';
 
-    // Abertura lateral (só para polo, agora é select sim/nao)
     const aberturaLateralVal = isPolo ? (document.getElementById('aberturaLateral')?.value || 'nao') : 'nao';
     const corAberturaLateral = (isPolo && aberturaLateralVal === 'sim') ? (document.getElementById('corAberturaLateral')?.value || '') : '';
 
-    // Filete
     const fileteVal = document.getElementById('filete')?.value || 'nao';
     const fileteLocal = fileteVal === 'sim' ? (document.getElementById('fileteLocal')?.value || '') : '';
     const fileteCor = fileteVal === 'sim' ? (document.getElementById('fileteCor')?.value || '') : '';
 
-    // Faixa
     const faixaVal = document.getElementById('faixa')?.value || 'nao';
     const faixaLocal = faixaVal === 'sim' ? (document.getElementById('faixaLocal')?.value || '') : '';
     const faixaCor = faixaVal === 'sim' ? (document.getElementById('faixaCor')?.value || '') : '';
@@ -1200,9 +1092,7 @@
       composicao: document.getElementById('composicao')?.value || '',
       corSublimacao,
       observacoes: document.getElementById('observacoes')?.value || '',
-      // Array de imagens com descrições
       imagens: window.getImagens ? window.getImagens() : [],
-      // Manter compatibilidade com formato antigo
       imagem: (window.getImagens && window.getImagens().length > 0) ? window.getImagens()[0].src : ''
     };
   }
@@ -1238,7 +1128,6 @@
           const ficha = JSON.parse(ev.target.result);
           preencherFicha(ficha);
         } catch (err) {
-          console.error(err);
           alert('❌ Erro ao ler arquivo JSON.');
         }
       };
@@ -1287,38 +1176,31 @@
     setVal('larguraManga', ficha.larguraManga);
     setVal('corAcabamentoManga', ficha.corAcabamentoManga);
 
-    // Gola - primeiro setar o tipo para disparar a lógica de visibilidade
     setVal('gola', ficha.gola);
     document.getElementById('gola')?.dispatchEvent(new Event('change'));
 
-    // Depois preencher os campos condicionais
     setVal('corGola', ficha.corGola);
     setVal('acabamentoGola', ficha.acabamentoGola);
     setVal('larguraGola', ficha.larguraGola);
 
-    // Reforço na gola (agora é select)
     setVal('reforcoGola', ficha.reforcoGola || 'nao');
     document.getElementById('reforcoGola')?.dispatchEvent(new Event('change'));
     setVal('corReforco', ficha.corReforco);
 
-    // Campos polo
     setVal('corPeitilhoInterno', ficha.corPeitilhoInterno);
     setVal('corPeitilhoExterno', ficha.corPeitilhoExterno);
 
-    // Abertura lateral (agora é select)
     setVal('aberturaLateral', ficha.aberturaLateral || 'nao');
     document.getElementById('aberturaLateral')?.dispatchEvent(new Event('change'));
     setVal('corAberturaLateral', ficha.corAberturaLateral);
 
     setVal('bolso', ficha.bolso || 'nenhum');
 
-    // Filete
     setVal('filete', ficha.filete || 'nao');
     setVal('fileteLocal', ficha.fileteLocal || '');
     setVal('fileteCor', ficha.fileteCor || '');
     document.getElementById('filete')?.dispatchEvent(new Event('change'));
 
-    // Faixa
     setVal('faixa', ficha.faixa || 'nao');
     setVal('faixaLocal', ficha.faixaLocal || '');
     setVal('faixaCor', ficha.faixaCor || '');
@@ -1342,11 +1224,9 @@
       }
     }
 
-    // Carregar múltiplas imagens
     if (window.setImagens) {
       let imagensCarregadas = [];
 
-      // Tentar carregar do novo formato (imagensData como JSON string)
       const imagensData = ficha.imagensData || ficha.imagens_data;
       if (imagensData) {
         try {
@@ -1355,17 +1235,13 @@
           } else if (Array.isArray(imagensData)) {
             imagensCarregadas = imagensData;
           }
-        } catch (e) {
-          console.warn('Erro ao parsear imagens:', e);
-        }
+        } catch (e) { }
       }
 
-      // Fallback: tentar campo imagens (array direto)
       if (imagensCarregadas.length === 0 && ficha.imagens && Array.isArray(ficha.imagens)) {
         imagensCarregadas = ficha.imagens;
       }
 
-      // Fallback: formato antigo (imagemData única)
       if (imagensCarregadas.length === 0) {
         const imagemData = ficha.imagemData || ficha.imagem_data || ficha.imagem;
         if (imagemData && typeof imagemData === 'string' && imagemData.startsWith('data:')) {
@@ -1374,13 +1250,12 @@
       }
 
       window.setImagens(imagensCarregadas);
-      console.log('✅ Imagens carregadas:', imagensCarregadas.length);
     }
 
     atualizarIconPreview();
   }
 
-  // ==================== IMPRESSÃO ====================
+  // Impressão
 
   function initPrint() {
     const btn = document.getElementById('btnImprimir');
@@ -1396,18 +1271,13 @@
   function gerarVersaoImpressao() {
     const hoje = new Date();
     const dataEmissao = hoje.toLocaleDateString('pt-BR') + ' ' + hoje.toLocaleTimeString('pt-BR');
-
     const isEvento = document.getElementById('evento')?.value === 'sim';
 
-    // Função auxiliar para definir texto
     const setText = (id, val, fallback = '') => {
       const el = document.getElementById(id);
-      if (el) {
-        el.textContent = val || fallback;
-      }
+      if (el) el.textContent = val || fallback;
     };
 
-    // Função auxiliar para texto com highlight (eventos)
     const setTextWithHighlight = (id, val, shouldHighlight, fallback = '') => {
       const el = document.getElementById(id);
       if (el) {
@@ -1420,47 +1290,31 @@
       }
     };
 
-    // Função auxiliar para mostrar/esconder divs
     const showDiv = (divId, show) => {
       const div = document.getElementById(divId);
       if (div) div.style.display = show ? 'block' : 'none';
     };
 
-    // Função para pegar texto do select (opção selecionada)
     const getSelectText = id => {
       const sel = document.getElementById(id);
       if (!sel || sel.selectedIndex < 0) return '';
       const opt = sel.options[sel.selectedIndex];
-      // Retorna vazio se for a opção padrão "-"
       if (opt.value === '' || opt.value === 'nenhum') return '';
       return opt.text;
     };
 
-    // Função para pegar valor do input
     const getInputValue = id => {
       const el = document.getElementById(id);
       return el?.value || '';
     };
 
-    // ═══════════════ DADOS DO PEDIDO ═══════════════
     setText('print-dataEmissao', dataEmissao);
     setText('print-numeroVenda', getInputValue('numeroVenda'), '-');
     setText('print-cliente', getInputValue('cliente'), '-');
     setText('print-vendedor', getInputValue('vendedor'), '-');
 
-    setTextWithHighlight(
-      'print-dataInicio',
-      formatarDataBrasil(getInputValue('dataInicio')),
-      isEvento,
-      '-'
-    );
-
-    setTextWithHighlight(
-      'print-dataEntrega',
-      formatarDataBrasil(getInputValue('dataEntrega')),
-      isEvento,
-      '-'
-    );
+    setTextWithHighlight('print-dataInicio', formatarDataBrasil(getInputValue('dataInicio')), isEvento, '-');
+    setTextWithHighlight('print-dataEntrega', formatarDataBrasil(getInputValue('dataEntrega')), isEvento, '-');
 
     const eventoEl = document.getElementById('print-evento');
     if (eventoEl) {
@@ -1471,7 +1325,6 @@
       }
     }
 
-    // Calcular prazo
     const dataEntregaVal = getInputValue('dataEntrega');
     const prazoEl = document.getElementById('print-prazo');
     if (prazoEl && dataEntregaVal) {
@@ -1506,7 +1359,6 @@
       prazoEl.textContent = '-';
     }
 
-    // ═══════════════ PRODUTOS ═══════════════
     const printBody = document.getElementById('print-produtosTable');
     if (printBody) {
       printBody.innerHTML = '';
@@ -1527,23 +1379,18 @@
 
     setText('print-totalItens', document.getElementById('totalItens')?.textContent || '0', '0');
 
-    // ═══════════════ ESPECIFICAÇÕES TÉCNICAS ═══════════════
-
-    // Material
     const materialVal = getInputValue('material');
     setText('print-material', materialVal, '-');
 
     const corMaterialVal = getInputValue('corMaterial');
     setText('print-corMaterial', corMaterialVal, '-');
 
-    // Manga
     const mangaText = getSelectText('manga');
     setText('print-manga', mangaText, '-');
 
     const acabamentoMangaText = getSelectText('acabamentoManga');
     setText('print-acabamentoManga', acabamentoMangaText, '-');
 
-    // Campos condicionais da manga (viés ou punho)
     const acabamentoMangaVal = getInputValue('acabamentoManga');
     const temAcabamentoMangaExtra = acabamentoMangaVal === 'vies' || acabamentoMangaVal === 'punho';
 
@@ -1555,7 +1402,6 @@
     setText('print-corAcabamentoManga', corAcabamentoMangaVal);
     showDiv('print-corAcabamentoMangaDiv', temAcabamentoMangaExtra && !!corAcabamentoMangaVal);
 
-    // Gola
     const golaVal = getInputValue('gola');
     const golaText = getSelectText('gola');
     const isPolo = golaVal === 'polo' || golaVal === 'v_polo';
@@ -1563,22 +1409,18 @@
 
     setText('print-gola', golaText, '-');
 
-    // Cor da gola (para todas as golas)
     const corGolaVal = getInputValue('corGola');
     setText('print-corGola', corGolaVal);
     showDiv('print-corGolaDiv', temGola && !!corGolaVal);
 
-    // Acabamento da gola (NÃO aparece para polo)
     const acabamentoGolaText = getSelectText('acabamentoGola');
     setText('print-acabamentoGola', acabamentoGolaText);
     showDiv('print-acabamentoGolaDiv', !isPolo && !!acabamentoGolaText);
 
-    // Largura acabamento gola
     const larguraGolaVal = getInputValue('larguraGola');
     setText('print-larguraGola', larguraGolaVal ? larguraGolaVal + ' cm' : '');
     showDiv('print-larguraGolaDiv', !isPolo && !!larguraGolaVal);
 
-    // Reforço na gola (disponível para TODAS as golas, incluindo polo)
     const reforcoGolaVal = document.getElementById('reforcoGola')?.value || 'nao';
     const temReforco = temGola && reforcoGolaVal === 'sim';
     setText('print-reforcoGola', temReforco ? 'Sim' : '');
@@ -1588,7 +1430,6 @@
     setText('print-corReforco', corReforcoVal);
     showDiv('print-corReforcoDiv', temReforco && !!corReforcoVal);
 
-    // Campos específicos Polo
     const corPeitilhoInternoVal = getInputValue('corPeitilhoInterno');
     setText('print-corPeitilhoInterno', corPeitilhoInternoVal);
     showDiv('print-corPeitilhoInternoDiv', isPolo && !!corPeitilhoInternoVal);
@@ -1597,7 +1438,6 @@
     setText('print-corPeitilhoExterno', corPeitilhoExternoVal);
     showDiv('print-corPeitilhoExternoDiv', isPolo && !!corPeitilhoExternoVal);
 
-    // Abertura lateral (só para polo)
     const aberturaLateralVal = document.getElementById('aberturaLateral')?.value || 'nao';
     const temAbertura = isPolo && aberturaLateralVal === 'sim';
     setText('print-aberturaLateral', temAbertura ? 'Sim' : '');
@@ -1607,11 +1447,9 @@
     setText('print-corAberturaLateral', corAberturaLateralVal);
     showDiv('print-corAberturaLateralDiv', temAbertura && !!corAberturaLateralVal);
 
-    // Bolso
     const bolsoText = getSelectText('bolso');
     setText('print-bolso', bolsoText, '-');
 
-    // Filete
     const fileteVal = document.getElementById('filete')?.value || 'nao';
     const temFilete = fileteVal === 'sim';
     setText('print-filete', temFilete ? 'Sim' : 'Não');
@@ -1624,7 +1462,6 @@
     setText('print-fileteCor', fileteCorVal);
     showDiv('print-fileteCorDiv', temFilete && !!fileteCorVal);
 
-    // Faixa
     const faixaVal = document.getElementById('faixa')?.value || 'nao';
     const temFaixa = faixaVal === 'sim';
     setText('print-faixa', temFaixa ? 'Sim' : 'Não');
@@ -1637,7 +1474,6 @@
     setText('print-faixaCor', faixaCorVal);
     showDiv('print-faixaCorDiv', temFaixa && !!faixaCorVal);
 
-    // Arte
     const arteText = getSelectText('arte');
     setText('print-arte', arteText, '-');
 
@@ -1647,7 +1483,6 @@
     const observacoesVal = getInputValue('observacoes');
     setText('print-observacoes', observacoesVal, 'Nenhuma');
 
-    // ═══════════════ IMAGENS ═══════════════
     const printImagesContainer = document.getElementById('print-imagesContainer');
     const printImagesSection = document.getElementById('print-imagesSection');
 
@@ -1657,13 +1492,9 @@
       const imgs = window.getImagens ? window.getImagens() : [];
 
       if (imgs.length === 0) {
-        if (printImagesSection) {
-          printImagesSection.style.display = 'none';
-        }
+        if (printImagesSection) printImagesSection.style.display = 'none';
       } else {
-        if (printImagesSection) {
-          printImagesSection.style.display = 'block';
-        }
+        if (printImagesSection) printImagesSection.style.display = 'block';
 
         imgs.forEach((img, index) => {
           const div = document.createElement('div');
@@ -1679,7 +1510,6 @@
       }
     }
 
-    // ═══════════════ EXIBIR E IMPRIMIR ═══════════════
     const normal = document.getElementById('normal-version');
     const printV = document.getElementById('print-version');
 
@@ -1696,7 +1526,6 @@
     }
   }
 
-  // EXPORTAR FUNÇÕES GLOBALMENTE
   window.gerarVersaoImpressao = gerarVersaoImpressao;
   window.salvarFicha = salvarFicha;
   window.carregarFichaDeArquivo = carregarFichaDeArquivo;

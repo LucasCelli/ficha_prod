@@ -1,6 +1,5 @@
 /**
  * Integração do formulário com o banco de dados
- * Adiciona funcionalidades de salvar, carregar e autocomplete
  */
 
 (function () {
@@ -66,15 +65,10 @@
   async function initDatabaseIntegration() {
     try {
       await db.init();
-      console.log('✅ Integração com banco de dados inicializada');
-
       await initClienteAutocomplete();
       await verificarParametrosURL();
       configurarBotoesAcao();
-
-    } catch (error) {
-      console.error('❌ Erro na integração com banco de dados:', error);
-    }
+    } catch (error) {}
   }
 
   async function initClienteAutocomplete() {
@@ -97,8 +91,6 @@
       option.value = typeof cliente === 'object' ? cliente.nome : cliente;
       datalist.appendChild(option);
     });
-
-    console.log(`✅ ${clientes.length} clientes carregados para autocomplete`);
 
     inputCliente.addEventListener('input', async (e) => {
       const termo = e.target.value;
@@ -238,7 +230,6 @@
       }, 1000);
 
     } catch (error) {
-      console.error('❌ Erro ao duplicar ficha:', error);
       mostrarToast('Erro ao duplicar ficha', 'error');
     }
   }
@@ -255,9 +246,6 @@
 
       if (fichaAtualId) {
         dados.id = fichaAtualId;
-        console.log(`📝 Atualizando ficha existente #${fichaAtualId}`);
-      } else {
-        console.log('📝 Criando nova ficha');
       }
 
       const id = await db.salvarFicha(dados);
@@ -283,20 +271,15 @@
       await initClienteAutocomplete();
 
     } catch (error) {
-      console.error('❌ Erro ao salvar ficha:', error);
       mostrarToast('Erro ao salvar ficha no banco de dados', 'error');
     }
   }
 
   function coletarDadosFormulario() {
-    // Coletar imagens do novo sistema de múltiplas imagens
     let imagensData = [];
     if (typeof window.getImagens === 'function') {
       imagensData = window.getImagens();
     }
-
-    // DEBUG: Log das imagens coletadas
-    console.log('📸 Coletando imagens para salvar:', imagensData.length, 'imagem(ns)');
 
     const dados = {
       cliente: document.getElementById('cliente')?.value || '',
@@ -333,9 +316,7 @@
       arte: document.getElementById('arte')?.value || '',
       corSublimacao: document.getElementById('cor')?.value || '#ffffff',
       observacoes: document.getElementById('observacoes')?.value || '',
-      // NOVO: Salvar array de imagens como JSON string
       imagensData: JSON.stringify(imagensData),
-      // Manter compatibilidade: primeira imagem no campo antigo
       imagemData: imagensData.length > 0 ? imagensData[0].src : ''
     };
 
@@ -385,15 +366,8 @@
       }
 
       fichaAtualId = id;
-      console.log(`✅ Editando ficha #${fichaAtualId}`);
-
-      // DEBUG: Log do que veio do banco
-      console.log('📦 Dados brutos do banco:', fichaBanco);
 
       const ficha = converterBancoParaForm(fichaBanco);
-
-      // DEBUG: Log após conversão
-      console.log('🔄 Dados após conversão:', ficha);
 
       setTimeout(() => {
         preencherFormulario(ficha);
@@ -406,7 +380,6 @@
       }
 
     } catch (error) {
-      console.error('❌ Erro ao carregar ficha:', error);
       mostrarToast('Erro ao carregar ficha para edição', 'error');
     }
   }
@@ -422,15 +395,8 @@
       }
 
       fichaAtualId = id;
-      console.log(`✅ Visualizando ficha #${fichaAtualId}`);
-
-      // DEBUG: Log do que veio do banco
-      console.log('📦 Dados brutos do banco:', fichaBanco);
 
       const ficha = converterBancoParaForm(fichaBanco);
-
-      // DEBUG: Log após conversão
-      console.log('🔄 Dados após conversão:', ficha);
 
       setTimeout(() => {
         preencherFormulario(ficha);
@@ -446,7 +412,6 @@
       document.body.classList.add('modo-visualizacao');
 
     } catch (error) {
-      console.error('❌ Erro ao carregar ficha:', error);
       mostrarToast('Erro ao carregar ficha para visualização', 'error');
     }
   }
@@ -506,63 +471,29 @@
     document.body.classList.remove('modo-visualizacao');
   }
 
-  // ==================== FUNÇÃO CORRIGIDA PARA PARSEAR IMAGENS ====================
+  // Parser de imagens
 
   function parsearImagensData(imagensData) {
-    // Se não tem dados, retorna array vazio
-    if (!imagensData) {
-      console.log('📸 imagensData está vazio/null');
-      return [];
-    }
+    if (!imagensData) return [];
 
-    // Se já é um array, retorna direto
-    if (Array.isArray(imagensData)) {
-      console.log('📸 imagensData já é array com', imagensData.length, 'item(ns)');
-      return imagensData;
-    }
+    if (Array.isArray(imagensData)) return imagensData;
 
-    // Se é string
     if (typeof imagensData === 'string') {
-      // String vazia
-      if (imagensData.trim() === '') {
-        console.log('📸 imagensData é string vazia');
-        return [];
-      }
+      if (imagensData.trim() === '' || imagensData.trim() === '[]') return [];
 
-      // String "[]" 
-      if (imagensData.trim() === '[]') {
-        console.log('📸 imagensData é "[]"');
-        return [];
-      }
-
-      // Tentar parsear JSON
       try {
         const parsed = JSON.parse(imagensData);
-
-        // Verificar se o resultado é array
-        if (Array.isArray(parsed)) {
-          console.log('📸 imagensData parseado com sucesso:', parsed.length, 'imagem(ns)');
-          return parsed;
-        }
-
-        // Se parseou mas não é array, pode ser outro tipo de dado
-        console.warn('📸 imagensData parseado mas não é array:', typeof parsed);
+        if (Array.isArray(parsed)) return parsed;
         return [];
-
       } catch (e) {
-        console.warn('📸 Erro ao parsear imagensData:', e.message);
-        console.warn('📸 Conteúdo original:', imagensData.substring(0, 100) + '...');
         return [];
       }
     }
 
-    console.warn('📸 imagensData tem tipo inesperado:', typeof imagensData);
     return [];
   }
 
   function preencherFormulario(ficha) {
-    console.log('🔧 Preenchendo formulário com:', ficha);
-
     const camposTexto = [
       'cliente', 'vendedor', 'dataInicio', 'numeroVenda', 
       'dataEntrega', 'evento', 'material', 'composicao',
@@ -586,9 +517,6 @@
       }
     });
 
-    // aberturaLateral e reforcoGola agora são selects, não checkboxes
-    // Já são tratados em camposTexto acima
-
     const corSublimacao = ficha.corSublimacao || ficha.cor_sublimacao;
     if (corSublimacao) {
       const corInput = document.getElementById('cor');
@@ -598,7 +526,7 @@
       if (corPreview) corPreview.style.backgroundColor = corSublimacao;
     }
 
-    // Preencher produtos
+    // Produtos
     const produtos = ficha.produtos;
     if (produtos) {
       const produtosArray = typeof produtos === 'string' ? JSON.parse(produtos) : produtos;
@@ -634,48 +562,28 @@
       }
     }
 
-    // ==================== CORREÇÃO: Carregar múltiplas imagens ====================
+    // Imagens
     if (typeof window.setImagens === 'function') {
       let imagensCarregadas = [];
 
-      // DEBUG: Mostrar o que veio em cada campo
-      console.log('📸 DEBUG - Campos de imagem recebidos:');
-      console.log('  - ficha.imagensData:', typeof ficha.imagensData, ficha.imagensData ? (typeof ficha.imagensData === 'string' ? ficha.imagensData.substring(0,50) + '...' : ficha.imagensData) : '(vazio)');
-      console.log('  - ficha.imagens_data:', typeof ficha.imagens_data, ficha.imagens_data ? (typeof ficha.imagens_data === 'string' ? ficha.imagens_data.substring(0,50) + '...' : ficha.imagens_data) : '(vazio)');
-      console.log('  - ficha.imagemData:', typeof ficha.imagemData, ficha.imagemData ? ficha.imagemData.substring(0,50) + '...' : '(vazio)');
-      console.log('  - ficha.imagem_data:', typeof ficha.imagem_data, ficha.imagem_data ? ficha.imagem_data.substring(0,50) + '...' : '(vazio)');
-
-      // 1. Tentar carregar do novo formato (imagensData)
       const imagensDataRaw = ficha.imagensData || ficha.imagens_data;
       imagensCarregadas = parsearImagensData(imagensDataRaw);
 
-      // 2. Se não conseguiu do novo formato, tentar formato antigo
       if (imagensCarregadas.length === 0) {
-        console.log('📸 Tentando fallback para formato antigo...');
-
         const imagemData = ficha.imagemData || ficha.imagem_data;
 
         if (imagemData && typeof imagemData === 'string' && imagemData.length > 0) {
-          // Verificar se é base64 válido ou URL do Cloudinary
           if (imagemData.startsWith('data:image') || imagemData.startsWith('http')) {
-            console.log('📸 Usando fallback: imagem única do campo antigo');
             imagensCarregadas = [{ src: imagemData, descricao: '' }];
-          } else {
-            console.log('📸 Campo imagemData não é base64/URL válido');
           }
         }
       }
 
-      // Setar imagens no sistema
       window.setImagens(imagensCarregadas);
-      console.log(`✅ ${imagensCarregadas.length} imagem(ns) carregada(s) no formulário`);
-    } else {
-      console.warn('⚠️ window.setImagens não está disponível');
     }
 
-    // Mostrar campos condicionais após preenchimento
+    // Mostrar campos condicionais
     setTimeout(() => {
-      // Manga - mostrar campos extras se viés ou punho
       const acabamentoMangaVal = ficha.acabamentoManga;
       if (acabamentoMangaVal === 'vies' || acabamentoMangaVal === 'punho') {
         const larguraMangaContainer = document.getElementById('larguraMangaContainer');
@@ -684,42 +592,35 @@
         if (corAcabamentoMangaContainer) corAcabamentoMangaContainer.style.display = 'block';
       }
 
-      // Gola
       const golaVal = ficha.gola;
       const isPolo = golaVal === 'polo' || golaVal === 'v_polo';
       const temGola = golaVal && golaVal !== '';
 
-      // Cor da Gola (para todas as golas)
       if (temGola) {
         const corGolaContainer = document.getElementById('corGolaContainer');
         if (corGolaContainer) corGolaContainer.style.display = 'block';
       }
 
-      // Acabamento da Gola (NÃO para polo)
       if (temGola && !isPolo) {
         const acabamentoGolaContainer = document.getElementById('acabamentoGolaContainer');
         if (acabamentoGolaContainer) acabamentoGolaContainer.style.display = 'block';
 
-        // Largura do acabamento
         if (ficha.acabamentoGola) {
           const larguraGolaContainer = document.getElementById('larguraGolaContainer');
           if (larguraGolaContainer) larguraGolaContainer.style.display = 'block';
         }
       }
 
-      // Reforço na Gola (para todas as golas)
       if (temGola) {
         const reforcoGolaContainer = document.getElementById('reforcoGolaContainer');
         if (reforcoGolaContainer) reforcoGolaContainer.style.display = 'block';
 
-        // Cor do reforço
         if (ficha.reforcoGola === 'sim') {
           const corReforcoContainer = document.getElementById('corReforcoContainer');
           if (corReforcoContainer) corReforcoContainer.style.display = 'block';
         }
       }
 
-      // Campos específicos POLO
       if (isPolo) {
         const corPeitilhoInternoContainer = document.getElementById('corPeitilhoInternoContainer');
         const corPeitilhoExternoContainer = document.getElementById('corPeitilhoExternoContainer');
@@ -729,14 +630,12 @@
         if (corPeitilhoExternoContainer) corPeitilhoExternoContainer.style.display = 'block';
         if (aberturaLateralContainer) aberturaLateralContainer.style.display = 'block';
 
-        // Cor da abertura lateral
         if (ficha.aberturaLateral === 'sim') {
           const corAberturaLateralContainer = document.getElementById('corAberturaLateralContainer');
           if (corAberturaLateralContainer) corAberturaLateralContainer.style.display = 'block';
         }
       }
 
-      // Filete
       if (ficha.filete === 'sim') {
         const fileteLocalContainer = document.getElementById('fileteLocalContainer');
         const fileteCorContainer = document.getElementById('fileteCorContainer');
@@ -744,7 +643,6 @@
         if (fileteCorContainer) fileteCorContainer.style.display = 'block';
       }
 
-      // Faixa
       if (ficha.faixa === 'sim') {
         const faixaLocalContainer = document.getElementById('faixaLocalContainer');
         const faixaCorContainer = document.getElementById('faixaCorContainer');
@@ -752,11 +650,10 @@
         if (faixaCorContainer) faixaCorContainer.style.display = 'block';
       }
     }, 150);
-
-    console.log('✅ Formulário preenchido!');
   }
 
-  // ==================== TOAST GLOBAL CENTRALIZADO ====================
+  // Toast
+
   function mostrarToast(mensagem, tipo = 'success') {
     const existente = document.querySelector('.toast-custom');
     if (existente) existente.remove();
@@ -818,7 +715,6 @@
     }, 3000);
   }
 
-  // Expor toast globalmente para outros scripts usarem
   window.mostrarToast = mostrarToast;
 
   window.dbIntegration = {

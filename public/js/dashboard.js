@@ -1,5 +1,5 @@
 /**
- * Dashboard de Fichas Técnicas - Versão com Backend
+ * Dashboard de Fichas Técnicas
  */
 
 (function () {
@@ -14,47 +14,31 @@
 
   async function initDashboard() {
     try {
-      // Inicializar API
       await db.init();
-
-      // Carregar fichas
       await carregarFichas();
-
-      // Configurar event listeners
       initEventListeners();
-
-      // Atualizar estatísticas
       await atualizarEstatisticas();
-
-      // Verificar parâmetros da URL (filtro por cliente)
       verificarParametrosURL();
-
     } catch (error) {
-      console.error('❌ Erro ao inicializar dashboard:', error);
       mostrarErro('Erro ao carregar dados do servidor');
     }
   }
 
   function initEventListeners() {
-    // Pesquisa
     const searchInput = document.getElementById('searchInput');
     searchInput.addEventListener('input', debounce(aplicarFiltros, 300));
 
-    // Filtros de data
     const filterDataInicio = document.getElementById('filterDataInicio');
     const filterDataFim = document.getElementById('filterDataFim');
     filterDataInicio.addEventListener('change', aplicarFiltros);
     filterDataFim.addEventListener('change', aplicarFiltros);
 
-    // Limpar filtros
     const btnLimparFiltros = document.getElementById('btnLimparFiltros');
     btnLimparFiltros.addEventListener('click', limparFiltros);
 
-    // Exportar backup
     const btnExportarBackup = document.getElementById('btnExportarBackup');
     btnExportarBackup.addEventListener('click', exportarBackup);
 
-    // Importar backup
     const btnImportarBackup = document.getElementById('btnImportarBackup');
     btnImportarBackup.addEventListener('click', () => {
       document.getElementById('importFileInput').click();
@@ -63,13 +47,11 @@
     const importFileInput = document.getElementById('importFileInput');
     importFileInput.addEventListener('change', importarBackup);
 
-    // Modal de exclusão
     const btnCancelarDelete = document.getElementById('btnCancelarDelete');
     const btnConfirmarDelete = document.getElementById('btnConfirmarDelete');
     btnCancelarDelete.addEventListener('click', fecharModalDelete);
     btnConfirmarDelete.addEventListener('click', confirmarDelete);
 
-    // Fechar modal clicando no overlay
     document.querySelector('#deleteModal .modal-overlay').addEventListener('click', fecharModalDelete);
   }
 
@@ -88,7 +70,6 @@
       fichasCache = await db.listarFichas();
       renderizarFichas(fichasCache);
     } catch (error) {
-      console.error('❌ Erro ao carregar fichas:', error);
       mostrarErro('Erro ao carregar fichas');
     }
   }
@@ -98,7 +79,6 @@
     const emptyState = document.getElementById('emptyState');
     const resultadosCount = document.getElementById('resultadosCount');
 
-    // Atualizar contador
     resultadosCount.textContent = `${fichas.length} ${fichas.length === 1 ? 'resultado' : 'resultados'}`;
 
     if (!fichas || fichas.length === 0) {
@@ -111,7 +91,6 @@
 
     container.innerHTML = fichas.map(ficha => criarCardFicha(ficha)).join('');
 
-    // Adicionar event listeners aos botões
     container.querySelectorAll('.btn-visualizar').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = parseInt(btn.dataset.id);
@@ -208,9 +187,7 @@
     const dataInicio = document.getElementById('filterDataInicio').value;
     const dataFim = document.getElementById('filterDataFim').value;
 
-    // Filtrar localmente para maior responsividade
     let fichasFiltradas = fichasCache.filter(ficha => {
-      // Filtro de busca (cliente, número da venda, vendedor)
       if (searchTerm) {
         const cliente = (ficha.cliente || '').toLowerCase();
         const numeroVenda = (ficha.numero_venda || '').toLowerCase();
@@ -223,12 +200,10 @@
         }
       }
 
-      // Filtro de data início
       if (dataInicio && ficha.data_inicio) {
         if (ficha.data_inicio < dataInicio) return false;
       }
 
-      // Filtro de data fim
       if (dataFim && ficha.data_inicio) {
         if (ficha.data_inicio > dataFim) return false;
       }
@@ -244,7 +219,6 @@
     document.getElementById('filterDataInicio').value = '';
     document.getElementById('filterDataFim').value = '';
 
-    // Limpar parâmetros da URL
     window.history.replaceState({}, '', window.location.pathname);
 
     renderizarFichas(fichasCache);
@@ -258,9 +232,7 @@
       document.getElementById('statPendentes').textContent = stats.pendentes || 0;
       document.getElementById('statClientes').textContent = stats.totalClientes || 0;
       document.getElementById('statEsteMes').textContent = stats.esteMes || 0;
-    } catch (error) {
-      console.error('Erro ao atualizar estatísticas:', error);
-    }
+    } catch (error) {}
   }
 
   function visualizarFicha(id) {
@@ -277,14 +249,10 @@
 
     try {
       await db.marcarComoEntregue(id);
-
-      // Recarregar fichas
       await carregarFichas();
       await atualizarEstatisticas();
-
       mostrarSucesso('Pedido marcado como entregue!');
     } catch (error) {
-      console.error('❌ Erro ao marcar como entregue:', error);
       mostrarErro('Erro ao marcar pedido como entregue');
     }
   }
@@ -304,16 +272,11 @@
 
     try {
       await db.deletarFicha(fichaParaDeletar);
-
-      // Recarregar fichas
       await carregarFichas();
       await atualizarEstatisticas();
-
       fecharModalDelete();
-
       mostrarSucesso('Ficha excluída com sucesso!');
     } catch (error) {
-      console.error('❌ Erro ao deletar ficha:', error);
       mostrarErro('Erro ao excluir ficha');
     }
   }
@@ -335,7 +298,6 @@
 
       mostrarSucesso('Backup exportado com sucesso!');
     } catch (error) {
-      console.error('❌ Erro ao exportar backup:', error);
       mostrarErro('Erro ao exportar backup');
     }
   }
@@ -360,22 +322,19 @@
       if (!confirmar) return;
 
       await db.importarBackup(dados);
-
-      // Recarregar fichas
       await carregarFichas();
       await atualizarEstatisticas();
 
       mostrarSucesso(`${dados.fichas.length} ficha(s) importada(s) com sucesso!`);
 
     } catch (error) {
-      console.error('❌ Erro ao importar backup:', error);
       mostrarErro('Erro ao importar backup. Verifique o arquivo.');
     }
 
     event.target.value = '';
   }
 
-  // UTILITÁRIOS
+  // Utilitários
 
   function formatarData(dataStr) {
     if (!dataStr) return '-';
