@@ -301,3 +301,42 @@
   color: var(--text-soft);
   font-weight: 500;
 }
+
+/* Paginação */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.pagination .btn {
+  padding: 8px 14px;
+}
+
+.pagination .btn:hover {
+  opacity: 0.85;
+}
+
+.pagination .page-info {
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  font-weight: 500;
+}
+
+@media (max-width: 480px) {
+  .pagination {
+    gap: 12px;
+  }
+
+  .pagination .btn span {
+    display: none;
+  }
+
+  .pagination .page-info {
+    font-size: 0.85rem;
+  }
+}

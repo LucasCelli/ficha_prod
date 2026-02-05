@@ -6,7 +6,10 @@
   'use strict';
 
   let fichasCache = [];
+  let fichasFiltradas = [];
   let fichaParaDeletar = null;
+  let paginaAtual = 1;
+  const itensPorPagina = 10;
 
   document.addEventListener('DOMContentLoaded', async () => {
     await initDashboard();
@@ -15,6 +18,7 @@
   async function initDashboard() {
     try {
       await db.init();
+      criarPaginacao(); // Criar paginação primeiro
       await carregarFichas();
       initEventListeners();
       await atualizarEstatisticas();
@@ -23,6 +27,7 @@
       mostrarErro('Erro ao carregar dados do servidor');
     }
   }
+
 
   function initEventListeners() {
     const searchInput = document.getElementById('searchInput');
@@ -65,10 +70,83 @@
     }
   }
 
+  // Paginação
+
+  function criarPaginacao() {
+    const container = document.getElementById('pagination');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    const btnPrev = document.createElement('button');
+    btnPrev.id = 'btnPrevPage';
+    btnPrev.className = 'btn btn-secondary';
+    btnPrev.innerHTML = '<i class="fas fa-chevron-left"></i> Anterior';
+    btnPrev.addEventListener('click', () => mudarPagina(-1));
+
+    const pageInfo = document.createElement('span');
+    pageInfo.id = 'pageInfo';
+    pageInfo.className = 'page-info';
+
+    const btnNext = document.createElement('button');
+    btnNext.id = 'btnNextPage';
+    btnNext.className = 'btn btn-secondary';
+    btnNext.innerHTML = 'Próxima <i class="fas fa-chevron-right"></i>';
+    btnNext.addEventListener('click', () => mudarPagina(1));
+
+    container.appendChild(btnPrev);
+    container.appendChild(pageInfo);
+    container.appendChild(btnNext);
+  }
+
+  function mudarPagina(direcao) {
+    const totalPaginas = Math.ceil(fichasFiltradas.length / itensPorPagina);
+    const novaPagina = paginaAtual + direcao;
+
+    if (novaPagina >= 1 && novaPagina <= totalPaginas) {
+      paginaAtual = novaPagina;
+      renderizarPagina();
+    }
+  }
+
+  function atualizarPaginacao() {
+    const totalPaginas = Math.ceil(fichasFiltradas.length / itensPorPagina) || 1;
+    const container = document.getElementById('pagination');
+    const pageInfo = document.getElementById('pageInfo');
+    const btnPrev = document.getElementById('btnPrevPage');
+    const btnNext = document.getElementById('btnNextPage');
+
+    if (!container) return;
+
+    // Ocultar paginação se só tem 1 página
+    if (totalPaginas <= 1) {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = 'flex';
+    pageInfo.textContent = `Página ${paginaAtual} de ${totalPaginas}`;
+    btnPrev.style.display = paginaAtual === 1 ? 'none' : 'inline-flex';
+    btnNext.style.display = paginaAtual === totalPaginas ? 'none' : 'inline-flex';
+  }
+
+  function renderizarPagina() {
+    const startIdx = (paginaAtual - 1) * itensPorPagina;
+    const endIdx = startIdx + itensPorPagina;
+    const fichasPagina = fichasFiltradas.slice(startIdx, endIdx);
+
+    renderizarFichas(fichasPagina);
+    atualizarPaginacao();
+  }
+
+  // Fichas
+
   async function carregarFichas() {
     try {
       fichasCache = await db.listarFichas();
-      renderizarFichas(fichasCache);
+      fichasFiltradas = [...fichasCache];
+      paginaAtual = 1;
+      renderizarPagina();
     } catch (error) {
       mostrarErro('Erro ao carregar fichas');
     }
@@ -79,7 +157,8 @@
     const emptyState = document.getElementById('emptyState');
     const resultadosCount = document.getElementById('resultadosCount');
 
-    resultadosCount.textContent = `${fichas.length} ${fichas.length === 1 ? 'resultado' : 'resultados'}`;
+    const totalFiltrado = fichasFiltradas.length;
+    resultadosCount.textContent = `${totalFiltrado} ${totalFiltrado === 1 ? 'resultado' : 'resultados'}`;
 
     if (!fichas || fichas.length === 0) {
       container.innerHTML = '';
@@ -182,12 +261,14 @@
     `;
   }
 
-  async function aplicarFiltros() {
+  // Filtros
+
+  function aplicarFiltros() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
     const dataInicio = document.getElementById('filterDataInicio').value;
     const dataFim = document.getElementById('filterDataFim').value;
 
-    let fichasFiltradas = fichasCache.filter(ficha => {
+    fichasFiltradas = fichasCache.filter(ficha => {
       if (searchTerm) {
         const cliente = (ficha.cliente || '').toLowerCase();
         const numeroVenda = (ficha.numero_venda || '').toLowerCase();
@@ -211,7 +292,8 @@
       return true;
     });
 
-    renderizarFichas(fichasFiltradas);
+    paginaAtual = 1;
+    renderizarPagina();
   }
 
   function limparFiltros() {
@@ -221,8 +303,12 @@
 
     window.history.replaceState({}, '', window.location.pathname);
 
-    renderizarFichas(fichasCache);
+    fichasFiltradas = [...fichasCache];
+    paginaAtual = 1;
+    renderizarPagina();
   }
+
+  // Estatísticas
 
   async function atualizarEstatisticas() {
     try {
@@ -232,8 +318,10 @@
       document.getElementById('statPendentes').textContent = stats.pendentes || 0;
       document.getElementById('statClientes').textContent = stats.totalClientes || 0;
       document.getElementById('statEsteMes').textContent = stats.esteMes || 0;
-    } catch (error) {}
+    } catch (error) { }
   }
+
+  // Ações
 
   function visualizarFicha(id) {
     window.location.href = `index.html?visualizar=${id}`;
@@ -250,6 +338,7 @@
     try {
       await db.marcarComoEntregue(id);
       await carregarFichas();
+      aplicarFiltros();
       await atualizarEstatisticas();
       mostrarSucesso('Pedido marcado como entregue!');
     } catch (error) {
@@ -273,6 +362,7 @@
     try {
       await db.deletarFicha(fichaParaDeletar);
       await carregarFichas();
+      aplicarFiltros();
       await atualizarEstatisticas();
       fecharModalDelete();
       mostrarSucesso('Ficha excluída com sucesso!');
@@ -280,6 +370,8 @@
       mostrarErro('Erro ao excluir ficha');
     }
   }
+
+  // Backup
 
   async function exportarBackup() {
     try {

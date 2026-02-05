@@ -77,6 +77,50 @@
     "Mochila",
     "Abadá"
   ],
+  "cores": [
+    "Sublimação",
+    "Preto",
+    "Branco",
+    "Azul Royal",
+    "Azul Marinho",
+    "Azul Turquesa",
+    "Azul Celeste",
+    "Azul Bebê",
+    "Azul Petróleo",
+    "Cinza Mescla",
+    "Cinza Chumbo",
+    "Cinza Médio",
+    "Verde Bandeira",
+    "Verde Musgo",
+    "Verde Limão",
+    "Verde Jade",
+    "Amarelo Canário",
+    "Amarelo Ouro",
+    "Rosa Pink",
+    "Rosa Bebê",
+    "Roxo",
+    "Lilás",
+    "Vermelho",
+    "Bordô",
+    "Marsala",
+    "Bege",
+    "Dourado"
+  ],
+  "fileteLocal": [
+    "Gola",
+    "Cava da Manga",
+    "Barra da Manga",
+    "Cava e Barra da Manga",
+    "Na Vista dos Botões",
+    "Gola, Cava e Barra da Manga"
+  ],
+  "larguras": [
+    "Largura 2.5",
+    "Largura 3.5",
+    "Largura 4.0",
+    "Largura 4.5",
+    "Largura 5.5"
+  ],
   "materiais": [
     {
       "id": "malha_fria_pv",

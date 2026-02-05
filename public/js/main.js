@@ -7,6 +7,9 @@
   let catalog = {
     tamanhos: [],
     produtos: [],
+    cores: [],
+    fileteLocal: [],
+    larguras: [],
     materiais: []
   };
 
@@ -55,6 +58,7 @@
     preencherProdutosList();
     preencherMateriaisDatalist();
     preencherTamanhosDatalist();
+    preencherCoresDatalist()
   }
 
   function preencherProdutosList() {
@@ -92,6 +96,22 @@
     datalist.innerHTML = '';
     if (!catalog.tamanhos || catalog.tamanhos.length === 0) return;
     catalog.tamanhos.forEach(tam => {
+      const opt = document.createElement('option');
+      opt.value = tam;
+      datalist.appendChild(opt);
+    });
+  }
+
+  function preencherCoresDatalist() {
+    let datalist = document.getElementById('coresList');
+    if (!datalist) {
+      datalist = document.createElement('datalist');
+      datalist.id = 'coresList';
+      document.body.appendChild(datalist);
+    }
+    datalist.innerHTML = '';
+    if (!catalog.cores || catalog.cores.length === 0) return;
+    catalog.cores.forEach(tam => {
       const opt = document.createElement('option');
       opt.value = tam;
       datalist.appendChild(opt);
@@ -1106,7 +1126,7 @@
 
     const a = document.createElement('a');
     a.href = dataStr;
-    a.download = `ficha_tecnica_${ficha.numeroVenda || 'sem_numero'}.json`;
+    a.download = `ficha_${(ficha.cliente || 'sem_nome').toLowerCase()}${ficha.numeroVenda ? '_' + ficha.numeroVenda : ''}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -1339,22 +1359,17 @@
 
       if (diffDays < 0) {
         prazoTexto = `ATRASADO (${Math.abs(diffDays)} dia${Math.abs(diffDays) > 1 ? 's' : ''})`;
-        prazoStyle = 'color: #dc2626; font-weight: bold;';
       } else if (diffDays === 0) {
         prazoTexto = 'ENTREGA HOJE!';
-        prazoStyle = 'color: #dc2626; font-weight: bold;';
       } else if (diffDays <= 3) {
         prazoTexto = `${diffDays} dia${diffDays > 1 ? 's' : ''} restante${diffDays > 1 ? 's' : ''}`;
-        prazoStyle = 'color: #dc2626; font-weight: bold;';
       } else if (diffDays <= 7) {
         prazoTexto = `${diffDays} dias restantes`;
-        prazoStyle = 'color: #f59e0b; font-weight: bold;';
       } else {
         prazoTexto = `${diffDays} dias restantes`;
-        prazoStyle = 'color: #059669; font-weight: bold;';
       }
 
-      prazoEl.innerHTML = `<span style="${prazoStyle}">${prazoTexto}</span>`;
+      prazoEl.innerHTML = `<span>${prazoTexto}</span>`;
     } else if (prazoEl) {
       prazoEl.textContent = '-';
     }
