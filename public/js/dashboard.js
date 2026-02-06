@@ -30,6 +30,17 @@
 
 
   function initEventListeners() {
+    const statusFilterBtns = document.querySelectorAll('.status-filter .btn');
+    statusFilterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Remove active de todos os botões
+        statusFilterBtns.forEach(b => b.classList.remove('active'));
+        // Adiciona active apenas no botão clicado
+        btn.classList.add('active');
+        aplicarFiltros();
+      });
+    });
+
     const searchInput = document.getElementById('searchInput');
     searchInput.addEventListener('input', debounce(aplicarFiltros, 300));
 
@@ -191,6 +202,13 @@
       });
     });
 
+    container.querySelectorAll('.btn-desmarcar-entrega').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = parseInt(btn.dataset.id);
+        await desmarcarComoEntregue(id);
+      });
+    });
+
     container.querySelectorAll('.btn-deletar').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = parseInt(btn.dataset.id);
@@ -207,58 +225,62 @@
     const isPendente = ficha.status === 'pendente';
 
     return `
-      <div class="ficha-item ${isPendente ? '' : 'ficha-entregue'}">
-        <div class="ficha-main">
-          <div class="ficha-header">
-            <span class="ficha-cliente">${ficha.cliente || 'Cliente não informado'}</span>
-            ${ficha.numero_venda ? `<span class="ficha-numero">#${ficha.numero_venda}</span>` : ''}
-            ${isEvento ? '<span class="ficha-evento-badge"><i class="fas fa-star"></i> Evento</span>' : ''}
-            ${!isPendente ? '<span class="ficha-status-badge entregue"><i class="fas fa-check"></i> Entregue</span>' : ''}
-          </div>
-
-          <div class="ficha-details">
-            ${ficha.vendedor ? `
-              <div class="ficha-detail">
-                <i class="fas fa-user"></i>
-                <span>${ficha.vendedor}</span>
-              </div>
-            ` : ''}
-
-            <div class="ficha-detail">
-              <i class="fas fa-calendar"></i>
-              <span>Início: ${dataInicio}</span>
-            </div>
-
-            <div class="ficha-detail">
-              <i class="fas fa-calendar-check"></i>
-              <span>Entrega: ${dataEntrega}</span>
-            </div>
-
-            <div class="ficha-detail">
-              <i class="fas fa-boxes"></i>
-              <span>${totalItens} ${totalItens === 1 ? 'item' : 'itens'}</span>
-            </div>
-          </div>
+    <div class="ficha-item ${isPendente ? '' : 'ficha-entregue'}">
+      <div class="ficha-main">
+        <div class="ficha-header">
+          <span class="ficha-cliente">${ficha.cliente || 'Cliente não informado'}</span>
+          ${ficha.numero_venda ? `<span class="ficha-numero">#${ficha.numero_venda}</span>` : ''}
+          ${isEvento ? '<span class="ficha-evento-badge"><i class="fas fa-star"></i> Evento</span>' : ''}
+          ${!isPendente ? '<span class="ficha-status-badge entregue"><i class="fas fa-check"></i> Entregue</span>' : ''}
         </div>
 
-        <div class="ficha-actions">
-          ${isPendente ? `
-            <button class="btn btn-success btn-entregar" data-id="${ficha.id}" title="Marcar como Entregue">
-              <i class="fas fa-check-circle"></i>
-            </button>
+        <div class="ficha-details">
+          ${ficha.vendedor ? `
+            <div class="ficha-detail">
+              <i class="fas fa-user"></i>
+              <span>${ficha.vendedor}</span>
+            </div>
           ` : ''}
-          <button class="btn btn-primary btn-visualizar" data-id="${ficha.id}" title="Visualizar">
-            <i class="fas fa-eye"></i>
-          </button>
-          <button class="btn btn-secondary btn-editar" data-id="${ficha.id}" title="Editar">
-            <i class="fas fa-edit"></i>
-          </button>
-          <button class="btn btn-danger btn-deletar" data-id="${ficha.id}" title="Excluir">
-            <i class="fas fa-trash"></i>
-          </button>
+
+          <div class="ficha-detail">
+            <i class="fas fa-calendar"></i>
+            <span>Início: ${dataInicio}</span>
+          </div>
+
+          <div class="ficha-detail">
+            <i class="fas fa-calendar-check"></i>
+            <span>Entrega: ${dataEntrega}</span>
+          </div>
+
+          <div class="ficha-detail">
+            <i class="fas fa-boxes"></i>
+            <span>${totalItens} ${totalItens === 1 ? 'item' : 'itens'}</span>
+          </div>
         </div>
       </div>
-    `;
+
+      <div class="ficha-actions">
+        ${isPendente ? `
+          <button class="btn btn-success btn-entregar" data-id="${ficha.id}" title="Marcar como Entregue">
+            <i class="fas fa-check-circle"></i>
+          </button>
+        ` : `
+          <button class="btn btn-warning btn-desmarcar-entrega" data-id="${ficha.id}" title="Desmarcar como Entregue">
+            <i class="fas fa-undo"></i>
+          </button>
+        `}
+        <button class="btn btn-primary btn-visualizar" data-id="${ficha.id}" title="Visualizar">
+          <i class="fas fa-eye"></i>
+        </button>
+        <button class="btn btn-secondary btn-editar" data-id="${ficha.id}" title="Editar">
+          <i class="fas fa-edit"></i>
+        </button>
+        <button class="btn btn-danger btn-deletar" data-id="${ficha.id}" title="Excluir">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    </div>
+  `;
   }
 
   // Filtros
@@ -267,6 +289,7 @@
     const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
     const dataInicio = document.getElementById('filterDataInicio').value;
     const dataFim = document.getElementById('filterDataFim').value;
+    const filtroStatusAtivo = document.querySelector('.status-filter .btn.active').id;
 
     fichasFiltradas = fichasCache.filter(ficha => {
       if (searchTerm) {
@@ -289,7 +312,18 @@
         if (ficha.data_inicio > dataFim) return false;
       }
 
-      return true;
+      switch (filtroStatusAtivo) {
+        case 'btnFiltroTodos':
+          return true;
+        case 'btnFiltroPendentes':
+          return ficha.status === 'pendente';
+        case 'btnFiltroEntregues':
+          return ficha.status !== 'pendente';
+        case 'btnFiltroEvento':
+          return ficha.evento === 'sim';
+        default:
+          return true;
+      }
     });
 
     paginaAtual = 1;
@@ -368,6 +402,21 @@
       mostrarSucesso('Ficha excluída com sucesso!');
     } catch (error) {
       mostrarErro('Erro ao excluir ficha');
+    }
+  }
+
+  async function desmarcarComoEntregue(id) {
+    const confirmar = confirm('Deseja desmarcar este pedido como entregue?');
+    if (!confirmar) return;
+
+    try {
+      await db.marcarComoPendente(id);
+      await carregarFichas();
+      aplicarFiltros();
+      await atualizarEstatisticas();
+      mostrarSucesso('Pedido desmarcado como entregue!');
+    } catch (error) {
+      mostrarErro('Erro ao desmarcar pedido como entregue');
     }
   }
 

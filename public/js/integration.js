@@ -157,6 +157,10 @@
         if (typeof carregarFichaDeArquivo === 'function') carregarFichaDeArquivo();
       });
 
+      const btnNovaFicha = criarBotao('btnNovaFicha', 'btn-success', 'fa-plus', 'Nova Ficha', () => {
+        window.location.href = 'index.html';
+      });
+
       const btnDashboard = criarBotao('btnDashboard', 'btn-primary', 'fa-chart-line', 'Dashboard', () => {
         window.location.href = 'dashboard.html';
       });
@@ -167,6 +171,7 @@
       container.appendChild(btnBaixar);
       container.appendChild(btnCarregar);
       container.appendChild(btnDashboard);
+      container.appendChild(btnNovaFicha);
 
     } else {
       const btnSalvar = criarBotao('btnSalvarDB', 'btn-success', 'fa-save', 'Salvar Ficha', salvarNoBanco);

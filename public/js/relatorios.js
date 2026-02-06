@@ -206,6 +206,8 @@
         pendentes: (v.total_pedidos || v.totalPedidos || 0) - (v.entregues || 0)
       }));
 
+      dadosVendedores.sort((a, b) => b.totalPedidos - a.totalPedidos);
+
       if (select) {
         select.innerHTML = '<option value="">Todos os vendedores</option>';
         dadosVendedores.forEach(v => {
@@ -227,6 +229,7 @@
       if (empty) empty.style.display = 'block';
     }
   }
+
 
   function renderizarVendedores(vendedores) {
     const container = document.getElementById('vendedoresContainer');
@@ -404,7 +407,13 @@
       const response = await fetch(url);
       if (!response.ok) throw new Error('Erro');
 
-      const clientes = await response.json();
+      let clientes = await response.json();
+
+      clientes.sort((a, b) => {
+        const totalA = a.total_pedidos || a.totalPedidos || 0;
+        const totalB = b.total_pedidos || b.totalPedidos || 0;
+        return totalB - totalA;
+      });
 
       if (clientes.length === 0) {
         container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-users"></i><p>Nenhum cliente</p></div>';
@@ -423,6 +432,7 @@
       container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-exclamation-circle"></i><p>Erro ao carregar</p></div>';
     }
   }
+
 
   // Distribuição por Tamanho
 
@@ -449,17 +459,17 @@
       container.innerHTML = `
         <div class="tamanhos-bars">
           ${tamanhos.map(t => {
-            const altura = maxQtd > 0 ? ((t.quantidade || 0) / maxQtd * 100) : 0;
-            const percent = totalQtd > 0 ? ((t.quantidade || 0) / totalQtd * 100).toFixed(1) : 0;
-            return `
+        const altura = maxQtd > 0 ? ((t.quantidade || 0) / maxQtd * 100) : 0;
+        const percent = totalQtd > 0 ? ((t.quantidade || 0) / totalQtd * 100).toFixed(1) : 0;
+        return `
               <div class="tamanho-bar-container">
+              <span class="tamanho-label">${t.tamanho}</span>
                 <div class="tamanho-bar" style="height: ${Math.max(altura, 5)}%;" title="${t.tamanho}: ${formatarNumero(t.quantidade)} (${percent}%)">
                   <span class="tamanho-qtd">${formatarNumero(t.quantidade || 0)}</span>
                 </div>
-                <span class="tamanho-label">${t.tamanho}</span>
               </div>
             `;
-          }).join('')}
+      }).join('')}
         </div>
       `;
 

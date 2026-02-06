@@ -136,10 +136,21 @@
   height: 4px;
 }
 
-.stat-card-large.green::before { background: linear-gradient(90deg, var(--rel-success), var(--rel-success-dark)); }
-.stat-card-large.orange::before { background: linear-gradient(90deg, var(--rel-warning), var(--rel-warning-dark)); }
-.stat-card-large.blue::before { background: linear-gradient(90deg, var(--rel-info), var(--rel-info-dark)); }
-.stat-card-large.purple::before { background: linear-gradient(90deg, var(--rel-purple), var(--rel-purple-dark)); }
+.stat-card-large.green::before {
+  background: linear-gradient(90deg, var(--rel-success), var(--rel-success-dark));
+}
+
+.stat-card-large.orange::before {
+  background: linear-gradient(90deg, var(--rel-warning), var(--rel-warning-dark));
+}
+
+.stat-card-large.blue::before {
+  background: linear-gradient(90deg, var(--rel-info), var(--rel-info-dark));
+}
+
+.stat-card-large.purple::before {
+  background: linear-gradient(90deg, var(--rel-purple), var(--rel-purple-dark));
+}
 
 .stat-header {
   display: flex;
@@ -344,9 +355,17 @@
 }
 
 /* Top 3 - Medalhas */
-.ranking-item.top-1 { background: linear-gradient(135deg, var(--rel-warning-light) 0%, #fde68a 100%); }
-.ranking-item.top-2 { background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); }
-.ranking-item.top-3 { background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%); }
+.ranking-item.top-1 {
+  background: linear-gradient(135deg, var(--rel-warning-light) 0%, #fde68a 100%);
+}
+
+.ranking-item.top-2 {
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+}
+
+.ranking-item.top-3 {
+  background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
+}
 
 .ranking-position {
   width: 36px;
@@ -362,9 +381,17 @@
   flex-shrink: 0;
 }
 
-.ranking-item.top-1 .ranking-position { background: linear-gradient(135deg, var(--rel-gold), var(--rel-gold-dark)); }
-.ranking-item.top-2 .ranking-position { background: linear-gradient(135deg, var(--rel-silver), var(--rel-silver-dark)); }
-.ranking-item.top-3 .ranking-position { background: linear-gradient(135deg, var(--rel-bronze), var(--rel-bronze-dark)); }
+.ranking-item.top-1 .ranking-position {
+  background: linear-gradient(135deg, var(--rel-gold), var(--rel-gold-dark));
+}
+
+.ranking-item.top-2 .ranking-position {
+  background: linear-gradient(135deg, var(--rel-silver), var(--rel-silver-dark));
+}
+
+.ranking-item.top-3 .ranking-position {
+  background: linear-gradient(135deg, var(--rel-bronze), var(--rel-bronze-dark));
+}
 
 .ranking-info {
   flex: 1;
@@ -400,9 +427,20 @@
   font-weight: 600;
 }
 
-.ranking-badge.taxa-alta { background: var(--rel-success-light); color: var(--rel-success-dark); }
-.ranking-badge.taxa-media { background: var(--rel-warning-light); color: var(--rel-warning-dark); }
-.ranking-badge.taxa-baixa { background: var(--rel-danger-light); color: var(--rel-danger-dark); }
+.ranking-badge.taxa-alta {
+  background: var(--rel-success-light);
+  color: var(--rel-success-dark);
+}
+
+.ranking-badge.taxa-media {
+  background: var(--rel-warning-light);
+  color: var(--rel-warning-dark);
+}
+
+.ranking-badge.taxa-baixa {
+  background: var(--rel-danger-light);
+  color: var(--rel-danger-dark);
+}
 
 .ranking-stats {
   display: flex;
@@ -473,9 +511,17 @@
   flex-shrink: 0;
 }
 
-.mini-ranking-item:nth-child(1) .mini-pos { background: var(--rel-gold); }
-.mini-ranking-item:nth-child(2) .mini-pos { background: var(--rel-silver); }
-.mini-ranking-item:nth-child(3) .mini-pos { background: var(--rel-bronze); }
+.mini-ranking-item:nth-child(1) .mini-pos {
+  background: var(--rel-gold);
+}
+
+.mini-ranking-item:nth-child(2) .mini-pos {
+  background: var(--rel-silver);
+}
+
+.mini-ranking-item:nth-child(3) .mini-pos {
+  background: var(--rel-bronze);
+}
 
 .mini-name {
   flex: 1;
@@ -525,15 +571,17 @@
   transition: height 0.5s ease;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding-top: var(--rel-gap-sm);
+  align-items: flex-end;
+  padding-bottom: var(--rel-gap-sm);
 }
 
 .tamanho-qtd {
   font-size: 0.7rem;
   font-weight: 700;
-  color: var(--rel-white);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  color: var(--rel-primary);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  position: absolute;
+  bottom: -20px;
 }
 
 .tamanho-label {
@@ -588,9 +636,17 @@
   transition: color 0.3s;
 }
 
-.comp-arrow.up { color: var(--rel-success); }
-.comp-arrow.down { color: var(--rel-danger); }
-.comp-arrow.neutral { color: var(--rel-silver); }
+.comp-arrow.up {
+  color: var(--rel-success);
+}
+
+.comp-arrow.down {
+  color: var(--rel-danger);
+}
+
+.comp-arrow.neutral {
+  color: var(--rel-silver);
+}
 
 .comp-anterior {
   font-size: 0.95rem;
@@ -605,9 +661,20 @@
   display: inline-block;
 }
 
-.comp-percent.up { background: var(--rel-success-light); color: var(--rel-success-dark); }
-.comp-percent.down { background: var(--rel-danger-light); color: var(--rel-danger-dark); }
-.comp-percent.neutral { background: var(--rel-bg-hover); color: var(--rel-text-soft); }
+.comp-percent.up {
+  background: var(--rel-success-light);
+  color: var(--rel-success-dark);
+}
+
+.comp-percent.down {
+  background: var(--rel-danger-light);
+  color: var(--rel-danger-dark);
+}
+
+.comp-percent.neutral {
+  background: var(--rel-bg-hover);
+  color: var(--rel-text-soft);
+}
 
 /* ==================== AÇÕES ==================== */
 .card-body.actions {
@@ -730,6 +797,7 @@
 
 /* ==================== IMPRESSÃO ==================== */
 @media print {
+
   .header-actions,
   .btn-periodo,
   .custom-period,
