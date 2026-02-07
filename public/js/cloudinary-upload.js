@@ -1,12 +1,17 @@
 /**
  * Cloudinary Upload Module
  * Gerencia upload de imagens para o Cloudinary
+ * Usa toast.js global para notificações
  */
 
-(function() {
+(function () {
   'use strict';
 
   let cloudinaryConfig = null;
+
+  // ═══════════════════════════════════════════════════════════════════
+  // CLOUDINARY INIT
+  // ═══════════════════════════════════════════════════════════════════
 
   async function initCloudinary() {
     try {
@@ -33,10 +38,17 @@
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  // UPLOAD FILE
+  // ═══════════════════════════════════════════════════════════════════
+
   async function uploadFile(file, options = {}) {
+    const { silent = false } = options;
+
     if (!cloudinaryConfig) {
       const initResult = await initCloudinary();
       if (!initResult) {
+        if (!silent) mostrarErro('Cloudinary não configurado');
         return { success: false, error: 'Cloudinary não configurado' };
       }
     }
@@ -80,6 +92,8 @@
 
       const result = await uploadResponse.json();
 
+      if (!silent) mostrarSucesso('Layout adicionado com sucesso!');
+
       return {
         success: true,
         url: result.secure_url,
@@ -91,6 +105,8 @@
       };
 
     } catch (error) {
+      if (!silent) mostrarErro(`Falha no envio: ${error.message}`);
+
       return {
         success: false,
         error: error.message
@@ -98,10 +114,17 @@
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  // UPLOAD BASE64
+  // ═══════════════════════════════════════════════════════════════════
+
   async function uploadBase64(base64Data, options = {}) {
+    const { silent = false } = options;
+
     if (!cloudinaryConfig) {
       const initResult = await initCloudinary();
       if (!initResult) {
+        if (!silent) mostrarErro('Cloudinary não configurado');
         return { success: false, error: 'Cloudinary não configurado' };
       }
     }
@@ -145,6 +168,8 @@
 
       const result = await uploadResponse.json();
 
+      if (!silent) mostrarSucesso('Layout adicionado com sucesso!');
+
       return {
         success: true,
         url: result.secure_url,
@@ -154,6 +179,8 @@
       };
 
     } catch (error) {
+      if (!silent) mostrarErro(`Falha no envio: ${error.message}`);
+
       return {
         success: false,
         error: error.message
@@ -161,14 +188,29 @@
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  // UPLOAD MULTIPLE
+  // ═══════════════════════════════════════════════════════════════════
+
   async function uploadMultiple(files, onProgress = null) {
     const results = [];
     let completed = 0;
+    let successCount = 0;
+    let failCount = 0;
+
+    mostrarInfo(`Enviando ${files.length} ${files.length === 1 ? 'imagem' : 'imagens'}...`);
 
     for (const file of files) {
-      const result = await uploadFile(file);
+      // Upload silencioso individual — toast só no final
+      const result = await uploadFile(file, { silent: true });
       results.push(result);
       completed++;
+
+      if (result.success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
 
       if (onProgress) {
         onProgress({
@@ -180,8 +222,27 @@
       }
     }
 
+    // Toast final com resumo
+    if (failCount === 0) {
+      mostrarSucesso(
+        `${successCount} ${successCount === 1 ? 'imagem enviada' : 'imagens enviadas'} com sucesso!`
+      );
+    } else if (successCount === 0) {
+      mostrarErro(
+        `Falha ao enviar ${failCount} ${failCount === 1 ? 'imagem' : 'imagens'}`
+      );
+    } else {
+      mostrarAviso(
+        `${successCount} enviada${successCount > 1 ? 's' : ''}, ${failCount} com falha`
+      );
+    }
+
     return results;
   }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // DELETE IMAGE
+  // ═══════════════════════════════════════════════════════════════════
 
   async function deleteImage(publicId) {
     try {
@@ -195,12 +256,18 @@
         throw new Error('Erro ao deletar imagem');
       }
 
+      mostrarSucesso('Imagem removida com sucesso!');
       return { success: true };
 
     } catch (error) {
+      mostrarErro(`Erro ao remover: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // URL HELPERS
+  // ═══════════════════════════════════════════════════════════════════
 
   function getOptimizedUrl(publicIdOrUrl, options = {}) {
     if (!cloudinaryConfig) {
@@ -242,7 +309,7 @@
 
   function isCloudinaryUrl(url) {
     return url && (
-      url.includes('cloudinary.com') || 
+      url.includes('cloudinary.com') ||
       url.includes('res.cloudinary.com')
     );
   }
@@ -250,6 +317,10 @@
   function isBase64(str) {
     return str && str.startsWith('data:');
   }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // PUBLIC API
+  // ═══════════════════════════════════════════════════════════════════
 
   window.CloudinaryUpload = {
     init: initCloudinary,

@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+﻿
+<!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
@@ -11,6 +12,7 @@
     <link rel="stylesheet" href="css/drag-drop.css">
     <link rel="stylesheet" href="css/images.css">
     <link rel="stylesheet" href="css/cloudinary-styles.css">
+    <link rel="stylesheet" href="css/rich-text-editor.css">
 </head>
 
 <body>
@@ -112,7 +114,8 @@
                                     style="text-transform: uppercase;">
                             </td>
                             <td>
-                                <input type="text" inputmode="decimal" class="form-control quantidade" pattern="[0-9+\-*/\s]*" placeholder="">
+                                <input type="text" inputmode="decimal" class="form-control quantidade"
+                                    pattern="[0-9+\-*/\s]*" placeholder="">
                             </td>
                             <td>
                                 <input list="produtosList" class="form-control descricao"
@@ -175,14 +178,15 @@
 
                         <div class="form-group">
                             <label for="manga">Tipo de Manga</label>
-                            <select id="manga" class="form-control">
-                                <option value="">-</option>
-                                <option value="curta">Curta</option>
-                                <option value="longa">Longa</option>
-                                <option value="raglan_curta">Raglan Curta</option>
-                                <option value="raglan_longa">Raglan Longa</option>
-                                <option value="tres_quartos">3/4</option>
-                            </select>
+                            <input id="manga" list="mangaList" class="form-control">
+                            <datalist id="mangaList">
+                                <option>Curta</option>
+                                <option>Longa</option>
+                                <option>Curta e Longa</option>
+                                <option>Raglan Curta</option>
+                                <option>Raglan Longa</option>
+                                <option>3/4</option>
+                            </datalist>
                         </div>
 
                         <div class="form-group">
@@ -190,7 +194,6 @@
                             <select id="acabamentoManga" class="form-control">
                                 <option value="">-</option>
                                 <option value="barra">Barra</option>
-                                <option value="vies">Viés</option>
                                 <option value="punho">Punho</option>
                             </select>
                         </div>
@@ -198,12 +201,19 @@
                         <!-- Campos condicionais da manga (viés ou punho) -->
                         <div class="form-group" id="larguraMangaContainer" style="display: none;">
                             <label for="larguraManga">Largura Acab. Manga</label>
-                            <input type="text" id="larguraManga" class="form-control" placeholder="Ex: 3,5">
+                            <input type="text" id="larguraManga" list="acabList" class="form-control" placeholder="Ex: 3,5">
+                            <datalist id="acabList">
+                                <option>Ribana 2.5</option>
+                                <option>Ribana 3.5</option>
+                                <option>Ribana 4.5</option>
+                                <option>Ribana 5.5</option>
+                                </datalist>
                         </div>
 
                         <div class="form-group" id="corAcabamentoMangaContainer" style="display: none;">
                             <label for="corAcabamentoManga">Cor Acab. Manga</label>
-                            <input type="text" id="corAcabamentoManga" class="form-control" list="coresList" placeholder="Ex: Branco, Preto, Azul Marinho">
+                            <input type="text" id="corAcabamentoManga" class="form-control" list="coresList"
+                                placeholder="Ex: Branco, Preto, Azul Marinho">
                             <datalist id="coresList"></datalist>
                         </div>
 
@@ -216,9 +226,9 @@
                                 <option value="">-</option>
                                 <option value="redonda">Gola Redonda</option>
                                 <option value="v">Gola V</option>
+                                <option value="polo">Gola Polo</option>
                                 <option value="padre_ziper">Gola Padre com Zíper</option>
                                 <option value="padre_esportiva">Gola Padre Esportiva</option>
-                                <option value="polo">Gola Polo</option>
                                 <option value="v_polo">Gola V Polo</option>
                             </select>
                         </div>
@@ -226,7 +236,8 @@
                         <!-- Cor da Gola (sempre que tiver gola selecionada) -->
                         <div class="form-group" id="corGolaContainer" style="display: none;">
                             <label for="corGola">Cor da Gola</label>
-                            <input type="text" id="corGola" class="form-control" list="coresList" placeholder="Ex: Branco, Preto, Azul Marinho">
+                            <input type="text" id="corGola" class="form-control" list="coresList"
+                                placeholder="Ex: Branco, Preto, Azul Marinho">
                             <datalist id="coresList"></datalist>
                         </div>
 
@@ -260,20 +271,23 @@
 
                         <div class="form-group" id="corReforcoContainer" style="display: none;">
                             <label for="corReforco">Cor do Reforço</label>
-                            <input type="text" id="corReforco" class="form-control" list="coresList" placeholder="Ex: Branco, Preto, Azul Marinho">
+                            <input type="text" id="corReforco" class="form-control" list="coresList"
+                                placeholder="Ex: Branco, Preto, Azul Marinho">
                             <datalist id="coresList"></datalist>
                         </div>
 
                         <!-- ══════════════ CAMPOS ESPECÍFICOS POLO ══════════════ -->
                         <div class="form-group" id="corPeitilhoInternoContainer" style="display: none;">
                             <label for="corPeitilhoInterno">Cor do Peitilho Interno</label>
-                            <input type="text" id="corPeitilhoInterno" class="form-control" list="coresList" placeholder="Ex: Branco, Preto, Azul Marinho">
+                            <input type="text" id="corPeitilhoInterno" class="form-control" list="coresList"
+                                placeholder="Ex: Branco, Preto, Azul Marinho">
                             <datalist id="coresList"></datalist>
                         </div>
 
                         <div class="form-group" id="corPeitilhoExternoContainer" style="display: none;">
                             <label for="corPeitilhoExterno">Cor do Peitilho Externo</label>
-                            <input type="text" id="corPeitilhoExterno" class="form-control" list="coresList" placeholder="Ex: Branco, Preto, Azul Marinho">
+                            <input type="text" id="corPeitilhoExterno" class="form-control" list="coresList"
+                                placeholder="Ex: Branco, Preto, Azul Marinho">
                             <datalist id="coresList"></datalist>
                         </div>
 
@@ -288,7 +302,8 @@
 
                         <div class="form-group" id="corAberturaLateralContainer" style="display: none;">
                             <label for="corAberturaLateral">Cor da Abertura Lateral</label>
-                            <input type="text" id="corAberturaLateral" class="form-control" list="coresList" placeholder="Ex: Branco, Preto, Azul Marinho">
+                            <input type="text" id="corAberturaLateral" class="form-control" list="coresList"
+                                placeholder="Ex: Branco, Preto, Azul Marinho">
                             <datalist id="coresList"></datalist>
                         </div>
 
@@ -323,7 +338,8 @@
 
                         <div class="form-group" id="fileteCorContainer" style="display: none;">
                             <label for="fileteCor">Cor do Filete</label>
-                            <input type="text" id="fileteCor" class="form-control" list="coresList" placeholder="Ex: Branco, Preto, Azul Marinho">
+                            <input type="text" id="fileteCor" class="form-control" list="coresList"
+                                placeholder="Ex: Branco, Preto, Azul Marinho">
                             <datalist id="coresList"></datalist>
                         </div>
 
@@ -381,7 +397,8 @@
                     <div class="form-group" style="margin-top: 16px;">
                         <label for="observacoes">Observações</label>
                         <textarea id="observacoes" class="form-control" rows="3"
-                            placeholder="Ex: Algumas camisetas com manga longa, outras com manga curta..."></textarea>
+                            placeholder="Ex: Algumas camisetas com manga longa, outras com manga curta..."
+                            style="display: none;"></textarea>
                     </div>
                 </div>
             </section>
@@ -478,11 +495,14 @@
                     <div id="print-acabamentoGolaDiv"><span class="label">Acab. Gola:</span> <span
                             id="print-acabamentoGola"></span></div>
                     <div id="print-larguraGolaDiv" style="display: none;"><span class="label">Largura Acab. Gola:</span>
-                        <span id="print-larguraGola"></span></div>
+                        <span id="print-larguraGola"></span>
+                    </div>
                     <div id="print-reforcoGolaDiv" style="display: none;"><span class="label">Reforço na Gola:</span>
-                        <span id="print-reforcoGola"></span></div>
+                        <span id="print-reforcoGola"></span>
+                    </div>
                     <div id="print-corReforcoDiv" style="display: none;"><span class="label">Cor do Reforço:</span>
-                        <span id="print-corReforco"></span></div>
+                        <span id="print-corReforco"></span>
+                    </div>
                     <div id="print-corPeitilhoInternoDiv" style="display: none;"><span class="label">Cor Peitilho
                             Interno:</span> <span id="print-corPeitilhoInterno"></span></div>
                     <div id="print-corPeitilhoExternoDiv" style="display: none;"><span class="label">Cor Peitilho
@@ -525,6 +545,7 @@
     <script src="js/cloudinary-upload.js"></script>
     <script src="js/main.js" defer></script>
     <script src="js/integration.js"></script>
+    <script src="js/rich-text-editor.js"></script>
 
 </body>
 

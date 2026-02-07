@@ -35,6 +35,7 @@
     initSaveLoad();
     initPrint();
     initPrazoCalculator();
+    initObservacoesAutoFill();
   }
 
   async function loadCatalog() {
@@ -1294,8 +1295,12 @@
     const isEvento = document.getElementById('evento')?.value === 'sim';
 
     const setText = (id, val, fallback = '') => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = val || fallback;
+      try {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val || fallback;
+      } catch (error) {
+        console.error('Erro em setText:', id, error);
+      }
     };
 
     const setTextWithHighlight = (id, val, shouldHighlight, fallback = '') => {
@@ -1311,21 +1316,49 @@
     };
 
     const showDiv = (divId, show) => {
-      const div = document.getElementById(divId);
-      if (div) div.style.display = show ? 'block' : 'none';
+      try {
+        const div = document.getElementById(divId);
+        if (div) div.style.display = show ? 'block' : 'none';
+      } catch (error) {
+        console.error('Erro em showDiv:', divId, error);
+      }
     };
 
     const getSelectText = id => {
-      const sel = document.getElementById(id);
-      if (!sel || sel.selectedIndex < 0) return '';
-      const opt = sel.options[sel.selectedIndex];
-      if (opt.value === '' || opt.value === 'nenhum') return '';
-      return opt.text;
+      try {
+        const sel = document.getElementById(id);
+        if (!sel) return '';
+
+        // Se não for select, retornar valor
+        if (sel.tagName && sel.tagName.toLowerCase() !== 'select') {
+          return sel.value || '';
+        }
+
+        // Verificar se tem opções
+        if (!sel.options || sel.selectedIndex < 0) return '';
+
+        const opt = sel.options[sel.selectedIndex];
+
+        // Verificar se opção é válida
+        if (!opt || opt.value === '' || opt.value === 'nenhum' || opt.value === '-') {
+          return '';
+        }
+
+        return opt.text || '';
+      } catch (error) {
+        console.error('Erro em getSelectText:', id, error);
+        return '';
+      }
     };
 
     const getInputValue = id => {
-      const el = document.getElementById(id);
-      return el?.value || '';
+      try {
+        const el = document.getElementById(id);
+        return el ? (el.value || '') : '';
+      } catch (error) {
+        console.error('Erro em getInputValue:', id, error);
+        return '';
+      }
     };
 
     setText('print-dataEmissao', dataEmissao);
@@ -1495,8 +1528,16 @@
     const composicaoVal = getInputValue('composicao');
     setText('print-composicao', composicaoVal, '-');
 
-    const observacoesVal = getInputValue('observacoes');
-    setText('print-observacoes', observacoesVal, 'Nenhuma');
+    const printObservacoesEl = document.getElementById('print-observacoes');
+    if (printObservacoesEl) {
+      if (window.richTextEditor) {
+        const htmlContent = window.richTextEditor.getContent();
+        printObservacoesEl.innerHTML = htmlContent || 'Nenhuma';
+      } else {
+        const observacoesVal = getInputValue('observacoes');
+        printObservacoesEl.innerHTML = observacoesVal || 'Nenhuma';
+      }
+    }
 
     const printImagesContainer = document.getElementById('print-imagesContainer');
     const printImagesSection = document.getElementById('print-imagesSection');
@@ -1540,6 +1581,278 @@
       window.print();
     }
   }
+
+  function initObservacoesAutoFill() {
+
+    // ─── helpers ───────────────────────────────────────────────────────
+    function getVal(id) {
+      const el = document.getElementById(id);
+      if (!el) return '';
+      if (el.tagName.toLowerCase() === 'select') {
+        const opt = el.options[el.selectedIndex];
+        if (!opt || opt.value === '' || opt.value === 'nenhum' || opt.value === 'nao' || opt.value === '-') return '';
+        return opt.text.trim();
+      }
+      return (el.value || '').trim();
+    }
+
+    function getRaw(id) {
+      const el = document.getElementById(id);
+      if (!el) return '';
+      return (el.value || '').trim();
+    }
+
+    // ─── detectar produto da tabela ───────────────────────────────────
+    function getProdutoDaTabela() {
+      const rows = document.querySelectorAll('#produtosTable tr');
+      if (!rows || rows.length === 0) return '';
+
+      const descricoes = new Set();
+
+      rows.forEach(row => {
+        const descInput = row.querySelector('.descricao');
+        if (descInput) {
+          const val = (descInput.value || '').trim().toUpperCase();
+          if (val) descricoes.add(val);
+        }
+      });
+
+      // Se tem mais de 1 produto diferente, não gerar descrição
+      if (descricoes.size > 1) return null;
+
+      // Se tem exatamente 1, retorna ele
+      if (descricoes.size === 1) return [...descricoes][0];
+
+      // Se não tem nenhum, tenta pegar do campo produto
+      return '';
+    }
+
+    // ─── construção do texto ──────────────────────────────────────────
+    function atualizarObservacoes() {
+      const observacoesInput = document.getElementById('observacoes');
+      if (!observacoesInput) return;
+
+      // Verifica produtos da tabela
+      const produtoTabela = getProdutoDaTabela();
+
+      // Se retornou null = produtos diferentes, limpa e sai
+      if (produtoTabela === null) {
+        observacoesInput.value = '';
+        if (window.richTextEditor) {
+          window.richTextEditor.setContent('');
+        }
+        return;
+      }
+
+      const partes = [];
+
+      // ── 1. PRODUTO ──────────────────────────────────────────────────
+      const produtoCampo = getVal('produto');
+      const produtoFinal = produtoTabela || produtoCampo;
+      if (produtoFinal) partes.push(produtoFinal);
+
+      // ── 2. TECIDO + COR DO MATERIAL ─────────────────────────────────
+      const material = getVal('material');
+      const corMaterial = getVal('corMaterial');
+
+      if (material || corMaterial) {
+        let bloco = 'TECIDO';
+
+        if (material) bloco += ` ${material}`;
+
+        // Só adiciona corMaterial se NÃO for Sublimação/Sublimado
+        const corLower = corMaterial.toLowerCase();
+        if (corMaterial && corLower !== 'sublimação' && corLower !== 'sublimado') {
+          bloco += ` ${corMaterial}`;
+        }
+
+        partes.push(bloco.trim());
+      }
+
+      // ── 3. MANGA + ACABAMENTO + LARGURA + COR ──────────────────────
+      const manga = getVal('manga');
+      if (manga) {
+        let bloco = `MANGA ${manga}`;
+
+        const acabamentoMangaRaw = getRaw('acabamentoManga');
+        const acabamentoMangaText = getVal('acabamentoManga');
+        const larguraManga = getVal('larguraManga');
+        const corAcabManga = getVal('corAcabamentoManga');
+
+        if (acabamentoMangaRaw === 'punho' || acabamentoMangaRaw === 'vies') {
+          const tipo = acabamentoMangaRaw === 'punho' ? 'PUNHO' : 'VIÉS';
+          bloco += ` COM ${tipo}`;
+          if (larguraManga) bloco += ` ${larguraManga}`;
+          if (corAcabManga) bloco += ` ${corAcabManga}`;
+        } else if (acabamentoMangaText) {
+          bloco += `EM ${acabamentoMangaText}`;
+        }
+
+        partes.push(bloco);
+      }
+
+      // ── 4. GOLA ────────────────────────────────────────────────────
+      const golaRaw = getRaw('gola');
+      const golaText = getVal('gola');
+
+      if (golaRaw) {
+        const isPolo = golaRaw === 'polo' || golaRaw === 'v_polo';
+
+        if (!isPolo && golaText) {
+          let bloco = golaText;
+
+          const corGola = getVal('corGola');
+          if (corGola) bloco += ` ${corGola}`;
+
+          const acabamentoGolaRaw = getRaw('acabamentoGola');
+          const acabamentoGolaText = getVal('acabamentoGola');
+          const larguraGola = getVal('larguraGola');
+
+          if (acabamentoGolaRaw) {
+            bloco += ` EM ${acabamentoGolaText}`;
+            if (larguraGola) bloco += ` ${larguraGola}CM`;
+          }
+
+          const reforcoGola = getRaw('reforcoGola');
+          const corReforco = getVal('corReforco');
+          if (reforcoGola === 'sim') {
+            bloco += ` COM REFORÇO`;
+            if (corReforco) bloco += ` ${corReforco}`;
+          }
+
+          partes.push(bloco);
+
+        } else if (isPolo) {
+          let bloco = golaText;
+
+          const corGola = getVal('corGola');
+          if (corGola) bloco += ` ${corGola}`;
+
+          const corPeitilhoInterno = getVal('corPeitilhoInterno');
+          const corPeitilhoExterno = getVal('corPeitilhoExterno');
+
+          if (corPeitilhoInterno && corPeitilhoExterno) {
+            bloco += ` PEITILHO INTERNO ${corPeitilhoInterno} E EXTERNO ${corPeitilhoExterno}`;
+          } else if (corPeitilhoInterno) {
+            bloco += ` PEITILHO INTERNO ${corPeitilhoInterno}`;
+          } else if (corPeitilhoExterno) {
+            bloco += ` PEITILHO EXTERNO ${corPeitilhoExterno}`;
+          }
+
+          const aberturaLateral = getRaw('aberturaLateral');
+          const corAberturaLateral = getVal('corAberturaLateral');
+          if (aberturaLateral === 'sim') {
+            bloco += ` COM ABERTURA LATERAL`;
+            if (corAberturaLateral) bloco += ` ${corAberturaLateral}`;
+          }
+
+          const reforcoGola = getRaw('reforcoGola');
+          const corReforco = getVal('corReforco');
+          if (reforcoGola === 'sim') {
+            bloco += ` COM REFORÇO`;
+            if (corReforco) bloco += ` ${corReforco}`;
+          }
+
+          partes.push(bloco);
+        }
+      }
+
+      // ── 5. BOLSO ───────────────────────────────────────────────────
+      const bolsoRaw = getRaw('bolso');
+      const bolsoText = getVal('bolso');
+      if (bolsoRaw && bolsoRaw !== 'nenhum' && bolsoText) {
+        partes.push(`COM BOLSO ${bolsoText}`);
+      }
+
+      // ── 6. FILETE ──────────────────────────────────────────────────
+      const fileteRaw = getRaw('filete');
+      if (fileteRaw === 'sim') {
+        let bloco = 'FILETE';
+        const fileteLocal = getVal('fileteLocal');
+        const fileteCor = getVal('fileteCor');
+        if (fileteLocal) bloco += ` ${fileteLocal}`;
+        if (fileteCor) bloco += ` ${fileteCor}`;
+        partes.push(bloco);
+      }
+
+      // ── 7. FAIXA ──────────────────────────────────────────────────
+      const faixaRaw = getRaw('faixa');
+      if (faixaRaw === 'sim') {
+        let bloco = 'FAIXA';
+        const faixaLocal = getVal('faixaLocal');
+        const faixaCor = getVal('faixaCor');
+        if (faixaLocal) bloco += ` ${faixaLocal}`;
+        if (faixaCor) bloco += ` ${faixaCor}`;
+        partes.push(bloco);
+      }
+
+      // ── 8. ARTE / PERSONALIZAÇÃO ───────────────────────────────────
+      const arteRaw = getRaw('arte');
+      const arteText = getVal('arte');
+      if (arteRaw && arteText) {
+        partes.push(`PERSONALIZADO EM ${arteText}`);
+      }
+
+      // ── MONTAR TEXTO FINAL ─────────────────────────────────────────
+      const textoFinal = partes.length > 0
+        ? partes.join(' / ').toUpperCase()
+        : '';
+
+      observacoesInput.value = textoFinal;
+
+      if (window.richTextEditor) {
+        window.richTextEditor.setContent(textoFinal);
+      }
+    }
+
+    // ─── event listeners ──────────────────────────────────────────────
+    const idsParaMonitorar = [
+      'produto', 'material', 'corMaterial',
+      'manga', 'acabamentoManga', 'larguraManga', 'corAcabamentoManga',
+      'gola', 'corGola', 'acabamentoGola', 'larguraGola',
+      'reforcoGola', 'corReforco',
+      'corPeitilhoInterno', 'corPeitilhoExterno',
+      'aberturaLateral', 'corAberturaLateral',
+      'bolso',
+      'filete', 'fileteLocal', 'fileteCor',
+      'faixa', 'faixaLocal', 'faixaCor',
+      'arte'
+    ];
+
+    idsParaMonitorar.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', atualizarObservacoes);
+        el.addEventListener('change', atualizarObservacoes);
+      }
+    });
+
+    // ─── monitorar mudanças na tabela de produtos ─────────────────────
+    const tabelaBody = document.getElementById('produtosTable');
+    if (tabelaBody) {
+      const observer = new MutationObserver(() => {
+        // Re-attach listeners nas descrições novas
+        tabelaBody.querySelectorAll('.descricao').forEach(input => {
+          if (!input.dataset.obsLinked) {
+            input.dataset.obsLinked = 'true';
+            input.addEventListener('input', atualizarObservacoes);
+            input.addEventListener('change', atualizarObservacoes);
+          }
+        });
+        atualizarObservacoes();
+      });
+
+      observer.observe(tabelaBody, { childList: true, subtree: true });
+
+      // Attach nos que já existem
+      tabelaBody.querySelectorAll('.descricao').forEach(input => {
+        input.dataset.obsLinked = 'true';
+        input.addEventListener('input', atualizarObservacoes);
+        input.addEventListener('change', atualizarObservacoes);
+      });
+    }
+  }
+
 
   window.gerarVersaoImpressao = gerarVersaoImpressao;
   window.salvarFicha = salvarFicha;
