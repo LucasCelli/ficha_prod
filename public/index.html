@@ -1,11 +1,10 @@
-﻿
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ficha Técnica de Produção Têxtil</title>
+    <title>Ficha Técnica - Priscila Confecções</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
@@ -13,14 +12,18 @@
     <link rel="stylesheet" href="css/images.css">
     <link rel="stylesheet" href="css/cloudinary-styles.css">
     <link rel="stylesheet" href="css/rich-text-editor.css">
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 </head>
 
 <body>
     <!-- VERSÃO NORMAL -->
     <div id="normal-version" class="container">
         <header>
-            <h1><i class="fas fa-tshirt"></i> Ficha Técnica de Produção</h1>
-            <p>Sistema para criação de fichas técnicas para produtos têxteis</p>
+            <h1><i class="fas fa-tshirt"></i> Ficha Técnica de Produção | Priscila Confecções & Uniformes</h1>
+            <p>Para uma produção impecável: preencha sua ficha com o máximo de detalhes e atenção, mantendo sempre o
+                padrão de escrita. Por segurança, não recarregue a página durante o processo e lembre-se de baixar uma
+                cópia local antes de clicar em salvar. Esses pequenos cuidados garantem que seu trabalho fique protegido
+                e pronto para a próxima etapa!</p>
         </header>
 
         <main>
@@ -201,13 +204,14 @@
                         <!-- Campos condicionais da manga (viés ou punho) -->
                         <div class="form-group" id="larguraMangaContainer" style="display: none;">
                             <label for="larguraManga">Largura Acab. Manga</label>
-                            <input type="text" id="larguraManga" list="acabList" class="form-control" placeholder="Ex: 3,5">
+                            <input type="text" id="larguraManga" list="acabList" class="form-control"
+                                placeholder="Ex: 3,5">
                             <datalist id="acabList">
                                 <option>Ribana 2.5</option>
                                 <option>Ribana 3.5</option>
                                 <option>Ribana 4.5</option>
                                 <option>Ribana 5.5</option>
-                                </datalist>
+                            </datalist>
                         </div>
 
                         <div class="form-group" id="corAcabamentoMangaContainer" style="display: none;">
@@ -443,7 +447,7 @@
     <!-- VERSÃO DE IMPRESSÃO -->
     <div id="print-version" class="print-container" style="display: none;">
         <header class="print-header">
-            <h1>Ficha Técnica de Produção</h1>
+            <h1>Ficha Técnica | Priscila Confecções & Uniformes</h1>
             <p>Data de Emissão: <span id="print-dataEmissao"></span></p>
         </header>
 
@@ -466,9 +470,9 @@
                 <table class="print-table">
                     <thead>
                         <tr>
-                            <th>Tam.</th>
-                            <th>Qtd</th>
-                            <th>Descrição</th>
+                            <th>TAM.</th>
+                            <th>QTD.</th>
+                            <th>PRODUTO</th>
                         </tr>
                     </thead>
                     <tbody id="print-produtosTable"></tbody>

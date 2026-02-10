@@ -133,7 +133,6 @@ async function initDatabase() {
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_vendedor ON fichas(vendedor)`);
 
     // ==================== MIGRAÇÕES ====================
-    // Adicionar colunas que podem não existir em bancos antigos
     const migrações = [
       'imagens_data TEXT',
       'cor_acabamento_manga TEXT',
@@ -583,163 +582,6 @@ app.get('/api/estatisticas', async (req, res) => {
   }
 });
 
-// Relatório por período
-app.get('/api/relatorio', async (req, res) => {
-  try {
-    const { periodo, dataInicio, dataFim } = req.query;
-
-    const now = new Date();
-    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const anoAtual = `${now.getFullYear()}`;
-
-    const relatorio = {};
-
-    // Fichas entregues
-    let sqlEntregues = '';
-    let paramsEntregues = [];
-
-    if (periodo === 'mes') {
-      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 7) = ?`;
-      paramsEntregues = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 4) = ?`;
-      paramsEntregues = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND date(data_entregue) BETWEEN ? AND ?`;
-      paramsEntregues = [dataInicio, dataFim];
-    } else {
-      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue'`;
-    }
-
-    const entreguesResult = await dbGet(sqlEntregues, paramsEntregues);
-    relatorio.fichasEntregues = entreguesResult?.total || 0;
-
-    // Fichas pendentes
-    let sqlPendentes = '';
-    let paramsPendentes = [];
-
-    if (periodo === 'mes') {
-      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND substr(data_inicio, 1, 7) = ?`;
-      paramsPendentes = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND substr(data_inicio, 1, 4) = ?`;
-      paramsPendentes = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND data_inicio BETWEEN ? AND ?`;
-      paramsPendentes = [dataInicio, dataFim];
-    } else {
-      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente'`;
-    }
-
-    const pendentesResult = await dbGet(sqlPendentes, paramsPendentes);
-    relatorio.fichasPendentes = pendentesResult?.total || 0;
-
-    // Itens confeccionados
-    let sqlItens = '';
-    let paramsItens = [];
-
-    if (periodo === 'mes') {
-      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 7) = ?`;
-      paramsItens = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 4) = ?`;
-      paramsItens = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND date(data_entregue) BETWEEN ? AND ?`;
-      paramsItens = [dataInicio, dataFim];
-    } else {
-      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue'`;
-    }
-
-    const fichasParaItens = await dbAll(sqlItens, paramsItens);
-
-    let itensConfeccionados = 0;
-    fichasParaItens.forEach(ficha => {
-      if (ficha.produtos) {
-        try {
-          const produtos = typeof ficha.produtos === 'string' ? JSON.parse(ficha.produtos) : ficha.produtos;
-          produtos.forEach(p => {
-            itensConfeccionados += parseInt(p.quantidade) || 0;
-          });
-        } catch (e) {}
-      }
-    });
-    relatorio.itensConfeccionados = itensConfeccionados;
-
-    // Novos clientes
-    let sqlClientes = '';
-    let paramsClientes = [];
-
-    if (periodo === 'mes') {
-      sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE substr(primeiro_pedido, 1, 7) = ?`;
-      paramsClientes = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE substr(primeiro_pedido, 1, 4) = ?`;
-      paramsClientes = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE primeiro_pedido BETWEEN ? AND ?`;
-      paramsClientes = [dataInicio, dataFim];
-    } else {
-      sqlClientes = `SELECT COUNT(*) as total FROM clientes`;
-    }
-
-    const clientesResult = await dbGet(sqlClientes, paramsClientes);
-    relatorio.novosClientes = clientesResult?.total || 0;
-
-    // Top vendedor
-    let sqlVendedor = '';
-    let paramsVendedor = [];
-
-    if (periodo === 'mes') {
-      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 7) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
-      paramsVendedor = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 4) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
-      paramsVendedor = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND data_inicio BETWEEN ? AND ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
-      paramsVendedor = [dataInicio, dataFim];
-    } else {
-      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
-    }
-
-    const topVendedor = await dbGet(sqlVendedor, paramsVendedor);
-    relatorio.topVendedor = topVendedor ? topVendedor.vendedor : null;
-    relatorio.topVendedorTotal = topVendedor ? topVendedor.total : 0;
-
-    console.log('📊 Relatório gerado:', relatorio);
-    res.json(relatorio);
-
-  } catch (error) {
-    console.error('Erro ao gerar relatório:', error);
-    res.status(500).json({ error: 'Erro ao gerar relatório' });
-  }
-});
-
-// Função auxiliar para atualizar dados do cliente
-async function atualizarCliente(nomeCliente, dataInicio) {
-  try {
-    const hoje = new Date().toISOString().split('T')[0];
-    const data = dataInicio || hoje;
-
-    const clienteExiste = await dbGet('SELECT * FROM clientes WHERE nome = ?', [nomeCliente]);
-
-    if (clienteExiste) {
-      await dbRun(
-        `UPDATE clientes SET ultimo_pedido = ?, total_pedidos = total_pedidos + 1 WHERE nome = ?`,
-        [data, nomeCliente]
-      );
-    } else {
-      await dbRun(
-        `INSERT INTO clientes (nome, primeiro_pedido, ultimo_pedido, total_pedidos) VALUES (?, ?, ?, 1)`,
-        [nomeCliente, data, data]
-      );
-    }
-  } catch (error) {
-    console.error('Erro ao atualizar cliente:', error);
-  }
-}
-
 // ==================== ROTAS CLOUDINARY ====================
 
 // Obter configuração pública do Cloudinary
@@ -980,10 +822,33 @@ app.delete('/api/cloudinary/image/:publicId', async (req, res) => {
   }
 });
 
+// Função auxiliar para atualizar dados do cliente
+async function atualizarCliente(nomeCliente, dataInicio) {
+  try {
+    const hoje = new Date().toISOString().split('T')[0];
+    const data = dataInicio || hoje;
+
+    const clienteExiste = await dbGet('SELECT * FROM clientes WHERE nome = ?', [nomeCliente]);
+
+    if (clienteExiste) {
+      await dbRun(
+        `UPDATE clientes SET ultimo_pedido = ?, total_pedidos = total_pedidos + 1 WHERE nome = ?`,
+        [data, nomeCliente]
+      );
+    } else {
+      await dbRun(
+        `INSERT INTO clientes (nome, primeiro_pedido, ultimo_pedido, total_pedidos) VALUES (?, ?, ?, 1)`,
+        [nomeCliente, data, data]
+      );
+    }
+  } catch (error) {
+    console.error('Erro ao atualizar cliente:', error);
+  }
+}
 
 // ==================== ROTAS DE RELATÓRIO DETALHADO ====================
 
-// Relatório principal
+// Relatório principal (ÚNICA definição - usa data_entregue para entregues, data_inicio para pendentes)
 app.get('/api/relatorio', async (req, res) => {
   try {
     const { periodo, dataInicio, dataFim } = req.query;
@@ -992,91 +857,142 @@ app.get('/api/relatorio', async (req, res) => {
     const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const anoAtual = `${now.getFullYear()}`;
 
-    let whereClause = '';
-    let params = [];
+    const relatorio = {};
+
+    // ---- Fichas entregues (filtradas por data_entregue) ----
+    let sqlEntregues = '';
+    let paramsEntregues = [];
 
     if (periodo === 'mes') {
-      whereClause = "WHERE substr(data_inicio, 1, 7) = ?";
-      params = [mesAtual];
+      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 7) = ?`;
+      paramsEntregues = [mesAtual];
     } else if (periodo === 'ano') {
-      whereClause = "WHERE substr(data_inicio, 1, 4) = ?";
-      params = [anoAtual];
+      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 4) = ?`;
+      paramsEntregues = [anoAtual];
     } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      whereClause = "WHERE data_inicio BETWEEN ? AND ?";
-      params = [dataInicio, dataFim];
+      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND date(data_entregue) BETWEEN ? AND ?`;
+      paramsEntregues = [dataInicio, dataFim];
+    } else {
+      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue'`;
     }
 
-    // Buscar estatísticas básicas
-    const stats = await dbGet(`
-      SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN status = 'entregue' THEN 1 ELSE 0 END) as entregues,
-        SUM(CASE WHEN status != 'entregue' OR status IS NULL THEN 1 ELSE 0 END) as pendentes
-      FROM fichas ${whereClause}
-    `, params);
+    const entreguesResult = await dbGet(sqlEntregues, paramsEntregues);
+    relatorio.fichasEntregues = entreguesResult?.total || 0;
 
-    // Buscar fichas para calcular itens
-    const fichas = await dbAll(`SELECT produtos FROM fichas ${whereClause}`, params);
+    // ---- Fichas pendentes (filtradas por data_inicio) ----
+    let sqlPendentes = '';
+    let paramsPendentes = [];
+
+    if (periodo === 'mes') {
+      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND substr(data_inicio, 1, 7) = ?`;
+      paramsPendentes = [mesAtual];
+    } else if (periodo === 'ano') {
+      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND substr(data_inicio, 1, 4) = ?`;
+      paramsPendentes = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND data_inicio BETWEEN ? AND ?`;
+      paramsPendentes = [dataInicio, dataFim];
+    } else {
+      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente'`;
+    }
+
+    const pendentesResult = await dbGet(sqlPendentes, paramsPendentes);
+    relatorio.fichasPendentes = pendentesResult?.total || 0;
+
+    // ---- Itens confeccionados (entregues, filtrados por data_entregue) ----
+    let sqlItens = '';
+    let paramsItens = [];
+
+    if (periodo === 'mes') {
+      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 7) = ?`;
+      paramsItens = [mesAtual];
+    } else if (periodo === 'ano') {
+      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 4) = ?`;
+      paramsItens = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND date(data_entregue) BETWEEN ? AND ?`;
+      paramsItens = [dataInicio, dataFim];
+    } else {
+      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue'`;
+    }
+
+    const fichasParaItens = await dbAll(sqlItens, paramsItens);
 
     let itensConfeccionados = 0;
-    fichas.forEach(f => {
-      if (f.produtos) {
+    fichasParaItens.forEach(ficha => {
+      if (ficha.produtos) {
         try {
-          const produtos = typeof f.produtos === 'string' ? JSON.parse(f.produtos) : f.produtos;
+          const produtos = typeof ficha.produtos === 'string' ? JSON.parse(ficha.produtos) : ficha.produtos;
           produtos.forEach(p => {
             itensConfeccionados += parseInt(p.quantidade) || 0;
           });
         } catch (e) {}
       }
     });
+    relatorio.itensConfeccionados = itensConfeccionados;
 
-    // Buscar novos clientes no período
-    let novosClientesQuery = '';
+    // ---- Novos clientes ----
+    let sqlClientes = '';
+    let paramsClientes = [];
+
     if (periodo === 'mes') {
-      novosClientesQuery = `SELECT COUNT(DISTINCT cliente) as total FROM fichas WHERE cliente IS NOT NULL AND cliente != '' AND substr(data_inicio, 1, 7) = ?`;
+      sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE substr(primeiro_pedido, 1, 7) = ?`;
+      paramsClientes = [mesAtual];
     } else if (periodo === 'ano') {
-      novosClientesQuery = `SELECT COUNT(DISTINCT cliente) as total FROM fichas WHERE cliente IS NOT NULL AND cliente != '' AND substr(data_inicio, 1, 4) = ?`;
+      sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE substr(primeiro_pedido, 1, 4) = ?`;
+      paramsClientes = [anoAtual];
     } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      novosClientesQuery = `SELECT COUNT(DISTINCT cliente) as total FROM fichas WHERE cliente IS NOT NULL AND cliente != '' AND data_inicio BETWEEN ? AND ?`;
+      sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE primeiro_pedido BETWEEN ? AND ?`;
+      paramsClientes = [dataInicio, dataFim];
     } else {
-      novosClientesQuery = `SELECT COUNT(DISTINCT cliente) as total FROM fichas WHERE cliente IS NOT NULL AND cliente != ''`;
-      params = [];
+      sqlClientes = `SELECT COUNT(*) as total FROM clientes`;
     }
 
-    const novosClientes = await dbGet(novosClientesQuery, params);
+    const clientesResult = await dbGet(sqlClientes, paramsClientes);
+    relatorio.novosClientes = clientesResult?.total || 0;
 
-    // Buscar top vendedor
-    let topVendedorQuery = '';
+    // ---- Top vendedor ----
+    let sqlVendedor = '';
+    let paramsVendedor = [];
+
     if (periodo === 'mes') {
-      topVendedorQuery = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 7) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 7) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+      paramsVendedor = [mesAtual];
     } else if (periodo === 'ano') {
-      topVendedorQuery = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 4) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 4) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+      paramsVendedor = [anoAtual];
     } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      topVendedorQuery = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND data_inicio BETWEEN ? AND ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND data_inicio BETWEEN ? AND ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
+      paramsVendedor = [dataInicio, dataFim];
     } else {
-      topVendedorQuery = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
-      params = [];
+      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
     }
 
-    const topVendedor = await dbGet(topVendedorQuery, params);
+    const topVendedor = await dbGet(sqlVendedor, paramsVendedor);
+    relatorio.topVendedor = topVendedor ? topVendedor.vendedor : null;
+    relatorio.topVendedorTotal = topVendedor ? topVendedor.total : 0;
 
+    // Calcular totalFichas como soma segura
+    const totalFichas = relatorio.fichasEntregues + relatorio.fichasPendentes;
+
+    console.log('📊 Relatório gerado:', relatorio);
     res.json({
-      totalFichas: stats?.total || 0,
-      fichasEntregues: stats?.entregues || 0,
-      fichasPendentes: stats?.pendentes || 0,
-      itensConfeccionados,
-      novosClientes: novosClientes?.total || 0,
-      topVendedor: topVendedor?.vendedor || null,
-      topVendedorTotal: topVendedor?.total || 0
+      totalFichas,
+      fichasEntregues: relatorio.fichasEntregues,
+      fichasPendentes: relatorio.fichasPendentes,
+      itensConfeccionados: relatorio.itensConfeccionados,
+      novosClientes: relatorio.novosClientes,
+      topVendedor: relatorio.topVendedor,
+      topVendedorTotal: relatorio.topVendedorTotal
     });
 
   } catch (error) {
-    console.error('Erro ao buscar relatório:', error);
-    res.status(500).json({ error: 'Erro ao buscar relatório' });
+    console.error('Erro ao gerar relatório:', error);
+    res.status(500).json({ error: 'Erro ao gerar relatório' });
   }
 });
 
-// Análise por vendedor
+// Análise por vendedor (usa data_inicio para total de pedidos, data_entregue para entregues)
 app.get('/api/relatorio/vendedores', async (req, res) => {
   try {
     const { periodo, dataInicio, dataFim } = req.query;
@@ -1085,6 +1001,7 @@ app.get('/api/relatorio/vendedores', async (req, res) => {
     const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const anoAtual = `${now.getFullYear()}`;
 
+    // Filtro por data_inicio para pedidos totais
     let whereClause = "WHERE vendedor IS NOT NULL AND vendedor != ''";
     let params = [];
 
@@ -1099,20 +1016,43 @@ app.get('/api/relatorio/vendedores', async (req, res) => {
       params = [dataInicio, dataFim];
     }
 
-    // Buscar todas as fichas com vendedor
-    const fichas = await dbAll(`SELECT vendedor, produtos, status FROM fichas ${whereClause}`, params);
+    // Buscar todas as fichas com vendedor (total de pedidos)
+    const fichas = await dbAll(`SELECT vendedor, produtos, status, data_entregue FROM fichas ${whereClause}`, params);
 
-    // Agrupar por vendedor
+    // Filtro por data_entregue para contar entregues no período
+    let whereEntregue = "WHERE vendedor IS NOT NULL AND vendedor != '' AND status = 'entregue' AND data_entregue IS NOT NULL";
+    let paramsEntregue = [];
+
+    if (periodo === 'mes') {
+      whereEntregue += " AND substr(date(data_entregue), 1, 7) = ?";
+      paramsEntregue = [mesAtual];
+    } else if (periodo === 'ano') {
+      whereEntregue += " AND substr(date(data_entregue), 1, 4) = ?";
+      paramsEntregue = [anoAtual];
+    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+      whereEntregue += " AND date(data_entregue) BETWEEN ? AND ?";
+      paramsEntregue = [dataInicio, dataFim];
+    }
+
+    // Buscar fichas entregues no período pela data de entrega
+    const fichasEntregues = await dbAll(`SELECT vendedor FROM fichas ${whereEntregue}`, paramsEntregue);
+
+    // Contar entregues por vendedor (pela data_entregue)
+    const entreguesPorVendedor = {};
+    fichasEntregues.forEach(ficha => {
+      if (!entreguesPorVendedor[ficha.vendedor]) {
+        entreguesPorVendedor[ficha.vendedor] = 0;
+      }
+      entreguesPorVendedor[ficha.vendedor]++;
+    });
+
+    // Agrupar por vendedor (pedidos totais pela data_inicio)
     const vendedoresMap = {};
     fichas.forEach(ficha => {
       if (!vendedoresMap[ficha.vendedor]) {
         vendedoresMap[ficha.vendedor] = { total_pedidos: 0, total_itens: 0, entregues: 0 };
       }
       vendedoresMap[ficha.vendedor].total_pedidos++;
-
-      if (ficha.status === 'entregue') {
-        vendedoresMap[ficha.vendedor].entregues++;
-      }
 
       if (ficha.produtos) {
         try {
@@ -1124,12 +1064,17 @@ app.get('/api/relatorio/vendedores', async (req, res) => {
       }
     });
 
+    // Atribuir entregues pela data_entregue
+    Object.keys(vendedoresMap).forEach(vendedor => {
+      vendedoresMap[vendedor].entregues = entreguesPorVendedor[vendedor] || 0;
+    });
+
     const resultado = Object.entries(vendedoresMap)
       .map(([vendedor, dados]) => ({
         vendedor,
         total_pedidos: dados.total_pedidos,
         total_itens: dados.total_itens,
-        entregues: dados.entregues
+        entregues: Math.min(dados.entregues, dados.total_pedidos)
       }))
       .sort((a, b) => b.total_itens - a.total_itens);
 

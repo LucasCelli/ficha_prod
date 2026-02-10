@@ -405,7 +405,7 @@ textarea.form-control {
 
   .print-header {
     text-align: center;
-    margin-bottom: 3mm;
+    margin-bottom: -3mm;
   }
 
   .print-header h1 {

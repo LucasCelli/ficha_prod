@@ -18,57 +18,77 @@
   async function initDashboard() {
     try {
       await db.init();
-      criarPaginacao(); // Criar paginação primeiro
+      criarPaginacao();
+      initEventListeners(); // CORREÇÃO: Inicializar listeners ANTES de carregar dados
       await carregarFichas();
-      initEventListeners();
       await atualizarEstatisticas();
       verificarParametrosURL();
     } catch (error) {
+      console.error('Erro ao inicializar dashboard:', error);
       mostrarErro('Erro ao carregar dados do servidor');
     }
   }
 
-
   function initEventListeners() {
+    // CORREÇÃO: Garantir que pelo menos um botão de filtro esteja ativo
     const statusFilterBtns = document.querySelectorAll('.status-filter .btn');
+    
+    // Ativar o botão "Todos" por padrão se nenhum estiver ativo
+    const btnAtivo = document.querySelector('.status-filter .btn.active');
+    if (!btnAtivo && statusFilterBtns.length > 0) {
+      statusFilterBtns[0].classList.add('active');
+    }
+
     statusFilterBtns.forEach(btn => {
       btn.addEventListener('click', () => {
-        // Remove active de todos os botões
         statusFilterBtns.forEach(b => b.classList.remove('active'));
-        // Adiciona active apenas no botão clicado
         btn.classList.add('active');
         aplicarFiltros();
       });
     });
 
     const searchInput = document.getElementById('searchInput');
-    searchInput.addEventListener('input', debounce(aplicarFiltros, 300));
+    if (searchInput) {
+      searchInput.addEventListener('input', debounce(aplicarFiltros, 300));
+    }
 
     const filterDataInicio = document.getElementById('filterDataInicio');
     const filterDataFim = document.getElementById('filterDataFim');
-    filterDataInicio.addEventListener('change', aplicarFiltros);
-    filterDataFim.addEventListener('change', aplicarFiltros);
+    if (filterDataInicio) filterDataInicio.addEventListener('change', aplicarFiltros);
+    if (filterDataFim) filterDataFim.addEventListener('change', aplicarFiltros);
 
     const btnLimparFiltros = document.getElementById('btnLimparFiltros');
-    btnLimparFiltros.addEventListener('click', limparFiltros);
+    if (btnLimparFiltros) {
+      btnLimparFiltros.addEventListener('click', limparFiltros);
+    }
 
     const btnExportarBackup = document.getElementById('btnExportarBackup');
-    btnExportarBackup.addEventListener('click', exportarBackup);
+    if (btnExportarBackup) {
+      btnExportarBackup.addEventListener('click', exportarBackup);
+    }
 
     const btnImportarBackup = document.getElementById('btnImportarBackup');
-    btnImportarBackup.addEventListener('click', () => {
-      document.getElementById('importFileInput').click();
-    });
+    if (btnImportarBackup) {
+      btnImportarBackup.addEventListener('click', () => {
+        const importInput = document.getElementById('importFileInput');
+        if (importInput) importInput.click();
+      });
+    }
 
     const importFileInput = document.getElementById('importFileInput');
-    importFileInput.addEventListener('change', importarBackup);
+    if (importFileInput) {
+      importFileInput.addEventListener('change', importarBackup);
+    }
 
     const btnCancelarDelete = document.getElementById('btnCancelarDelete');
     const btnConfirmarDelete = document.getElementById('btnConfirmarDelete');
-    btnCancelarDelete.addEventListener('click', fecharModalDelete);
-    btnConfirmarDelete.addEventListener('click', confirmarDelete);
+    if (btnCancelarDelete) btnCancelarDelete.addEventListener('click', fecharModalDelete);
+    if (btnConfirmarDelete) btnConfirmarDelete.addEventListener('click', confirmarDelete);
 
-    document.querySelector('#deleteModal .modal-overlay').addEventListener('click', fecharModalDelete);
+    const modalOverlay = document.querySelector('#deleteModal .modal-overlay');
+    if (modalOverlay) {
+      modalOverlay.addEventListener('click', fecharModalDelete);
+    }
   }
 
   function verificarParametrosURL() {
@@ -76,8 +96,11 @@
     const clienteFiltro = params.get('cliente');
 
     if (clienteFiltro) {
-      document.getElementById('searchInput').value = clienteFiltro;
-      aplicarFiltros();
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput) {
+        searchInput.value = clienteFiltro;
+        aplicarFiltros();
+      }
     }
   }
 
@@ -129,16 +152,21 @@
 
     if (!container) return;
 
-    // Ocultar paginação se só tem 1 página
     if (totalPaginas <= 1) {
       container.style.display = 'none';
       return;
     }
 
     container.style.display = 'flex';
-    pageInfo.textContent = `Página ${paginaAtual} de ${totalPaginas}`;
-    btnPrev.style.display = paginaAtual === 1 ? 'none' : 'inline-flex';
-    btnNext.style.display = paginaAtual === totalPaginas ? 'none' : 'inline-flex';
+    if (pageInfo) {
+      pageInfo.textContent = `Página ${paginaAtual} de ${totalPaginas}`;
+    }
+    if (btnPrev) {
+      btnPrev.style.display = paginaAtual === 1 ? 'none' : 'inline-flex';
+    }
+    if (btnNext) {
+      btnNext.style.display = paginaAtual === totalPaginas ? 'none' : 'inline-flex';
+    }
   }
 
   function renderizarPagina() {
@@ -159,6 +187,7 @@
       paginaAtual = 1;
       renderizarPagina();
     } catch (error) {
+      console.error('Erro ao carregar fichas:', error);
       mostrarErro('Erro ao carregar fichas');
     }
   }
@@ -168,16 +197,20 @@
     const emptyState = document.getElementById('emptyState');
     const resultadosCount = document.getElementById('resultadosCount');
 
+    if (!container) return;
+
     const totalFiltrado = fichasFiltradas.length;
-    resultadosCount.textContent = `${totalFiltrado} ${totalFiltrado === 1 ? 'resultado' : 'resultados'}`;
+    if (resultadosCount) {
+      resultadosCount.textContent = `${totalFiltrado} ${totalFiltrado === 1 ? 'resultado' : 'resultados'}`;
+    }
 
     if (!fichas || fichas.length === 0) {
       container.innerHTML = '';
-      emptyState.style.display = 'block';
+      if (emptyState) emptyState.style.display = 'block';
       return;
     }
 
-    emptyState.style.display = 'none';
+    if (emptyState) emptyState.style.display = 'none';
 
     container.innerHTML = fichas.map(ficha => criarCardFicha(ficha)).join('');
 
@@ -286,12 +319,20 @@
   // Filtros
 
   function aplicarFiltros() {
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
-    const dataInicio = document.getElementById('filterDataInicio').value;
-    const dataFim = document.getElementById('filterDataFim').value;
-    const filtroStatusAtivo = document.querySelector('.status-filter .btn.active').id;
+    const searchInput = document.getElementById('searchInput');
+    const filterDataInicio = document.getElementById('filterDataInicio');
+    const filterDataFim = document.getElementById('filterDataFim');
+
+    const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const dataInicio = filterDataInicio ? filterDataInicio.value : '';
+    const dataFim = filterDataFim ? filterDataFim.value : '';
+    
+    // CORREÇÃO: Verificar se o elemento existe antes de acessar .id
+    const btnAtivo = document.querySelector('.status-filter .btn.active');
+    const filtroStatusAtivo = btnAtivo ? btnAtivo.id : 'btnFiltroTodos';
 
     fichasFiltradas = fichasCache.filter(ficha => {
+      // Filtro de busca por texto
       if (searchTerm) {
         const cliente = (ficha.cliente || '').toLowerCase();
         const numeroVenda = (ficha.numero_venda || '').toLowerCase();
@@ -304,14 +345,17 @@
         }
       }
 
+      // Filtro de data inicial
       if (dataInicio && ficha.data_inicio) {
         if (ficha.data_inicio < dataInicio) return false;
       }
 
+      // Filtro de data final
       if (dataFim && ficha.data_inicio) {
         if (ficha.data_inicio > dataFim) return false;
       }
 
+      // Filtro de status
       switch (filtroStatusAtivo) {
         case 'btnFiltroTodos':
           return true;
@@ -331,9 +375,19 @@
   }
 
   function limparFiltros() {
-    document.getElementById('searchInput').value = '';
-    document.getElementById('filterDataInicio').value = '';
-    document.getElementById('filterDataFim').value = '';
+    const searchInput = document.getElementById('searchInput');
+    const filterDataInicio = document.getElementById('filterDataInicio');
+    const filterDataFim = document.getElementById('filterDataFim');
+    const statusFilterBtns = document.querySelectorAll('.status-filter .btn');
+
+    if (searchInput) searchInput.value = '';
+    if (filterDataInicio) filterDataInicio.value = '';
+    if (filterDataFim) filterDataFim.value = '';
+
+    // Resetar filtro de status para "Todos"
+    statusFilterBtns.forEach(btn => btn.classList.remove('active'));
+    const btnTodos = document.getElementById('btnFiltroTodos');
+    if (btnTodos) btnTodos.classList.add('active');
 
     window.history.replaceState({}, '', window.location.pathname);
 
@@ -348,11 +402,18 @@
     try {
       const stats = await db.buscarEstatisticas();
 
-      document.getElementById('statTotalFichas').textContent = stats.totalFichas || 0;
-      document.getElementById('statPendentes').textContent = stats.pendentes || 0;
-      document.getElementById('statClientes').textContent = stats.totalClientes || 0;
-      document.getElementById('statEsteMes').textContent = stats.esteMes || 0;
-    } catch (error) { }
+      const statTotalFichas = document.getElementById('statTotalFichas');
+      const statPendentes = document.getElementById('statPendentes');
+      const statClientes = document.getElementById('statClientes');
+      const statEsteMes = document.getElementById('statEsteMes');
+
+      if (statTotalFichas) statTotalFichas.textContent = stats.totalFichas || 0;
+      if (statPendentes) statPendentes.textContent = stats.pendentes || 0;
+      if (statClientes) statClientes.textContent = stats.totalClientes || 0;
+      if (statEsteMes) statEsteMes.textContent = stats.esteMes || 0;
+    } catch (error) {
+      console.error('Erro ao atualizar estatísticas:', error);
+    }
   }
 
   // Ações
@@ -376,18 +437,21 @@
       await atualizarEstatisticas();
       mostrarSucesso('Pedido marcado como entregue!');
     } catch (error) {
+      console.error('Erro ao marcar como entregue:', error);
       mostrarErro('Erro ao marcar pedido como entregue');
     }
   }
 
   function abrirModalDelete(id) {
     fichaParaDeletar = id;
-    document.getElementById('deleteModal').style.display = 'flex';
+    const modal = document.getElementById('deleteModal');
+    if (modal) modal.style.display = 'flex';
   }
 
   function fecharModalDelete() {
     fichaParaDeletar = null;
-    document.getElementById('deleteModal').style.display = 'none';
+    const modal = document.getElementById('deleteModal');
+    if (modal) modal.style.display = 'none';
   }
 
   async function confirmarDelete() {
@@ -401,6 +465,7 @@
       fecharModalDelete();
       mostrarSucesso('Ficha excluída com sucesso!');
     } catch (error) {
+      console.error('Erro ao deletar ficha:', error);
       mostrarErro('Erro ao excluir ficha');
     }
   }
@@ -416,6 +481,7 @@
       await atualizarEstatisticas();
       mostrarSucesso('Pedido desmarcado como entregue!');
     } catch (error) {
+      console.error('Erro ao desmarcar como entregue:', error);
       mostrarErro('Erro ao desmarcar pedido como entregue');
     }
   }
@@ -439,6 +505,7 @@
 
       mostrarSucesso('Backup exportado com sucesso!');
     } catch (error) {
+      console.error('Erro ao exportar backup:', error);
       mostrarErro('Erro ao exportar backup');
     }
   }
@@ -469,6 +536,7 @@
       mostrarSucesso(`${dados.fichas.length} ficha(s) importada(s) com sucesso!`);
 
     } catch (error) {
+      console.error('Erro ao importar backup:', error);
       mostrarErro('Erro ao importar backup. Verifique o arquivo.');
     }
 

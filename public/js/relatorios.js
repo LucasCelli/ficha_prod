@@ -152,7 +152,7 @@
     const entregues = dados.fichasEntregues || 0;
     const pendentes = dados.fichasPendentes || 0;
     const total = entregues + pendentes;
-    const taxa = total > 0 ? Math.round((entregues / total) * 100) : 0;
+    const taxa = total > 0 ? Math.min(100, Math.round((entregues / total) * 100)) : 0;
 
     const taxaValue = document.getElementById('taxaValue');
     const taxaEntregues = document.getElementById('taxaEntregues');
@@ -203,7 +203,7 @@
         totalPedidos: v.total_pedidos || v.totalPedidos || 0,
         totalItens: v.total_itens || v.totalItens || 0,
         entregues: v.entregues || 0,
-        pendentes: (v.total_pedidos || v.totalPedidos || 0) - (v.entregues || 0)
+        pendentes: Math.max(0, (v.total_pedidos || v.totalPedidos || 0) - (v.entregues || 0))
       }));
 
       dadosVendedores.sort((a, b) => b.totalPedidos - a.totalPedidos);
@@ -244,7 +244,7 @@
 
     container.innerHTML = vendedores.map((v, index) => {
       const porcentagemBarra = maxItens > 0 ? ((v.totalItens || 0) / maxItens * 100) : 0;
-      const taxaEntrega = v.totalPedidos > 0 ? Math.round((v.entregues / v.totalPedidos) * 100) : 0;
+      const taxaEntrega = v.totalPedidos > 0 ? Math.min(100, Math.round((v.entregues / v.totalPedidos) * 100)) : 0;
       const taxaClass = taxaEntrega >= 80 ? 'taxa-alta' : taxaEntrega >= 50 ? 'taxa-media' : 'taxa-baixa';
 
       return `
@@ -258,7 +258,7 @@
             <div class="ranking-stats">
               <span><i class="fas fa-file-alt"></i> ${v.totalPedidos || 0} pedidos</span>
               <span><i class="fas fa-tshirt"></i> ${formatarNumero(v.totalItens || 0)} itens</span>
-              <span><i class="fas fa-check-circle"></i> ${v.entregues || 0} entregues</span>
+              <span><i class="fas fa-check-circle"></i> ${Math.min(v.entregues || 0, v.totalPedidos || 0)} entregues</span>
               <span><i class="fas fa-clock"></i> ${v.pendentes || 0} pendentes</span>
             </div>
             <div class="ranking-bar">
@@ -592,7 +592,7 @@
     const entregues = relatorioAtual.fichasEntregues || 0;
     const pendentes = relatorioAtual.fichasPendentes || 0;
     const total = entregues + pendentes;
-    const taxa = total > 0 ? Math.round((entregues / total) * 100) : 0;
+    const taxa = total > 0 ? Math.min(100, Math.round((entregues / total) * 100)) : 0;
 
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
@@ -686,7 +686,7 @@
       const entregues = relatorioAtual.fichasEntregues || 0;
       const pendentes = relatorioAtual.fichasPendentes || 0;
       const total = entregues + pendentes;
-      const taxa = total > 0 ? Math.round((entregues / total) * 100) : 0;
+      const taxa = total > 0 ? Math.min(100, Math.round((entregues / total) * 100)) : 0;
 
       doc.setFont('helvetica');
       doc.setFillColor(59, 130, 246);
@@ -833,7 +833,7 @@
     const entregues = relatorioAtual.fichasEntregues || 0;
     const pendentes = relatorioAtual.fichasPendentes || 0;
     const total = entregues + pendentes;
-    const taxa = total > 0 ? Math.round((entregues / total) * 100) : 0;
+    const taxa = total > 0 ? Math.min(100, Math.round((entregues / total) * 100)) : 0;
 
     csv.push(['Taxa:', `${taxa}%`]);
     csv.push(['Entregues:', entregues]);
@@ -844,7 +844,7 @@
       csv.push(['ANÁLISE POR VENDEDOR']);
       csv.push(['Vendedor', 'Pedidos', 'Itens', 'Entregues', 'Pendentes', 'Taxa Entrega']);
       dadosVendedores.forEach(v => {
-        const taxaV = v.totalPedidos > 0 ? Math.round((v.entregues / v.totalPedidos) * 100) : 0;
+        const taxaV = v.totalPedidos > 0 ? Math.min(100, Math.round((v.entregues / v.totalPedidos) * 100)) : 0;
         csv.push([v.vendedor, v.totalPedidos, v.totalItens, v.entregues, v.pendentes, `${taxaV}%`]);
       });
     }

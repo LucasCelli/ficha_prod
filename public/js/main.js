@@ -15,11 +15,64 @@
 
   let imagens = [];
 
+  // ==================== CLOUDINARY CONFIG ====================
+  let cloudinaryConfig = null;
+
+  async function loadCloudinaryConfig() {
+    try {
+      const response = await fetch('/api/cloudinary/config');
+      if (response.ok) {
+        cloudinaryConfig = await response.json();
+        console.log('✅ Cloudinary configurado:', cloudinaryConfig.cloudName);
+      }
+    } catch (error) {
+      console.warn('⚠️ Cloudinary não disponível, usando base64');
+    }
+  }
+
+  async function uploadToCloudinary(base64Data) {
+    if (!cloudinaryConfig) {
+      console.warn('Cloudinary não configurado, mantendo base64');
+      return { success: true, url: base64Data, isBase64: true };
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', base64Data);
+      formData.append('upload_preset', cloudinaryConfig.uploadPreset);
+      formData.append('folder', 'fichas');
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`,
+        {
+          method: 'POST',
+          body: formData
+        }
+      );
+
+      if (!response.ok) throw new Error('Upload falhou');
+
+      const result = await response.json();
+      console.log('✅ Imagem enviada ao Cloudinary:', result.public_id);
+
+      return {
+        success: true,
+        url: result.secure_url,
+        publicId: result.public_id,
+        isBase64: false
+      };
+    } catch (error) {
+      console.error('❌ Erro no upload Cloudinary:', error);
+      return { success: true, url: base64Data, isBase64: true };
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     initApp();
   });
 
   async function initApp() {
+    await loadCloudinaryConfig();
     await loadCatalog();
     initDefaultDates();
     initEventoAlert();
@@ -124,7 +177,6 @@
     const dataInicio = document.getElementById('dataInicio');
     const dataEntrega = document.getElementById('dataEntrega');
 
-    // Formato YYYY-MM-DD no fuso local
     const hojeStr = hoje.getFullYear() + '-' +
       String(hoje.getMonth() + 1).padStart(2, '0') + '-' +
       String(hoje.getDate()).padStart(2, '0');
@@ -502,7 +554,6 @@
       }
     });
 
-    // Filtrar letras
     tabelaBody.addEventListener('input', e => {
       if (e.target.classList.contains('quantidade')) {
         e.target.value = e.target.value.replace(/[^0-9+\-*/.\s]/g, '');
@@ -515,7 +566,6 @@
       }
     });
 
-    // Calcular no Enter
     tabelaBody.addEventListener('keydown', e => {
       if (e.target.classList.contains('quantidade') && e.key === 'Enter') {
         e.preventDefault();
@@ -927,22 +977,33 @@
       }
     }
 
-    function adicionarImagem(src, descricao = '') {
+    // CORREÇÃO: Adicionar imagem com upload para Cloudinary
+    async function adicionarImagem(src, descricao = '') {
       if (imagens.length >= MAX_IMAGES) {
         alert(`Máximo de ${MAX_IMAGES} imagens permitido.`);
         return false;
       }
 
-      imagens.push({ src, descricao });
+      // UPLOAD PARA CLOUDINARY
+      console.log('📤 Fazendo upload para Cloudinary...');
+      const uploadResult = await uploadToCloudinary(src);
+
+      imagens.push({
+        src: uploadResult.url,
+        publicId: uploadResult.publicId || null,
+        descricao,
+        isBase64: uploadResult.isBase64 || false
+      });
+
       renderizarImagens();
       return true;
     }
 
-    function processarArquivos(files) {
+    async function processarArquivos(files) {
       if (!files || !files.length) return;
 
-      Array.from(files).forEach(file => {
-        if (!file.type.startsWith('image/')) return;
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith('image/')) continue;
 
         if (imagens.length >= MAX_IMAGES) {
           alert(`Máximo de ${MAX_IMAGES} imagens atingido.`);
@@ -950,18 +1011,14 @@
         }
 
         const reader = new FileReader();
-        reader.onload = e => adicionarImagem(e.target.result);
+        reader.onload = async e => {
+          await adicionarImagem(e.target.result);
+        };
         reader.readAsDataURL(file);
-      });
+      }
     }
 
-    dropArea.addEventListener('click', () => fileInput.click());
-    dropArea.addEventListener('keypress', e => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        fileInput.click();
-      }
-    });
+    dropArea.addEventListener('click', () => fileInput.click(), { once: true });
 
     fileInput.addEventListener('change', () => {
       processarArquivos(fileInput.files);
@@ -972,26 +1029,27 @@
       dropArea.addEventListener(name, e => {
         e.preventDefault();
         e.stopPropagation();
-      });
+      }, { once: true });
     });
 
     ['dragenter', 'dragover'].forEach(name => {
       dropArea.addEventListener(name, () => {
         dropArea.classList.add('image-upload--active');
-      });
+      }, { once: true });
     });
 
     ['dragleave', 'drop'].forEach(name => {
       dropArea.addEventListener(name, () => {
         dropArea.classList.remove('image-upload--active');
-      });
+      }, { once: true });
     });
 
     dropArea.addEventListener('drop', e => {
       processarArquivos(e.dataTransfer.files);
     });
 
-    document.addEventListener('paste', e => {
+    // CORREÇÃO: Adicionar upload para Cloudinary ao colar imagem
+    document.addEventListener('paste', async e => {
       const items = e.clipboardData?.items;
       if (!items) return;
 
@@ -1007,7 +1065,10 @@
           }
 
           const reader = new FileReader();
-          reader.onload = ev => adicionarImagem(ev.target.result);
+          reader.onload = async ev => {
+            console.log('📋 Imagem colada, fazendo upload...');
+            await adicionarImagem(ev.target.result);
+          };
           reader.readAsDataURL(blob);
           break;
         }
@@ -1114,7 +1175,7 @@
       corSublimacao,
       observacoes: document.getElementById('observacoes')?.value || '',
       imagens: window.getImagens ? window.getImagens() : [],
-      imagem: (window.getImagens && window.getImagens().length > 0) ? window.getImagens()[0].src : ''
+      imagensData: JSON.stringify(window.getImagens ? window.getImagens() : [])
     };
   }
 
@@ -1329,17 +1390,14 @@
         const sel = document.getElementById(id);
         if (!sel) return '';
 
-        // Se não for select, retornar valor
         if (sel.tagName && sel.tagName.toLowerCase() !== 'select') {
           return sel.value || '';
         }
 
-        // Verificar se tem opções
         if (!sel.options || sel.selectedIndex < 0) return '';
 
         const opt = sel.options[sel.selectedIndex];
 
-        // Verificar se opção é válida
         if (!opt || opt.value === '' || opt.value === 'nenhum' || opt.value === '-') {
           return '';
         }
@@ -1388,7 +1446,6 @@
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       let prazoTexto = '';
-      let prazoStyle = '';
 
       if (diffDays < 0) {
         prazoTexto = `ATRASADO (${Math.abs(diffDays)} dia${Math.abs(diffDays) > 1 ? 's' : ''})`;
@@ -1584,7 +1641,6 @@
 
   function initObservacoesAutoFill() {
 
-    // ─── helpers ───────────────────────────────────────────────────────
     function getVal(id) {
       const el = document.getElementById(id);
       if (!el) return '';
@@ -1602,7 +1658,6 @@
       return (el.value || '').trim();
     }
 
-    // ─── detectar produto da tabela ───────────────────────────────────
     function getProdutoDaTabela() {
       const rows = document.querySelectorAll('#produtosTable tr');
       if (!rows || rows.length === 0) return '';
@@ -1617,25 +1672,17 @@
         }
       });
 
-      // Se tem mais de 1 produto diferente, não gerar descrição
       if (descricoes.size > 1) return null;
-
-      // Se tem exatamente 1, retorna ele
       if (descricoes.size === 1) return [...descricoes][0];
-
-      // Se não tem nenhum, tenta pegar do campo produto
       return '';
     }
 
-    // ─── construção do texto ──────────────────────────────────────────
     function atualizarObservacoes() {
       const observacoesInput = document.getElementById('observacoes');
       if (!observacoesInput) return;
 
-      // Verifica produtos da tabela
       const produtoTabela = getProdutoDaTabela();
 
-      // Se retornou null = produtos diferentes, limpa e sai
       if (produtoTabela === null) {
         observacoesInput.value = '';
         if (window.richTextEditor) {
@@ -1646,12 +1693,10 @@
 
       const partes = [];
 
-      // ── 1. PRODUTO ──────────────────────────────────────────────────
       const produtoCampo = getVal('produto');
       const produtoFinal = produtoTabela || produtoCampo;
       if (produtoFinal) partes.push(produtoFinal);
 
-      // ── 2. TECIDO + COR DO MATERIAL ─────────────────────────────────
       const material = getVal('material');
       const corMaterial = getVal('corMaterial');
 
@@ -1660,7 +1705,6 @@
 
         if (material) bloco += ` ${material}`;
 
-        // Só adiciona corMaterial se NÃO for Sublimação/Sublimado
         const corLower = corMaterial.toLowerCase();
         if (corMaterial && corLower !== 'sublimação' && corLower !== 'sublimado') {
           bloco += ` ${corMaterial}`;
@@ -1669,7 +1713,6 @@
         partes.push(bloco.trim());
       }
 
-      // ── 3. MANGA + ACABAMENTO + LARGURA + COR ──────────────────────
       const manga = getVal('manga');
       if (manga) {
         let bloco = `MANGA ${manga}`;
@@ -1685,13 +1728,12 @@
           if (larguraManga) bloco += ` ${larguraManga}`;
           if (corAcabManga) bloco += ` ${corAcabManga}`;
         } else if (acabamentoMangaText) {
-          bloco += `EM ${acabamentoMangaText}`;
+          bloco += ` EM ${acabamentoMangaText}`;
         }
 
         partes.push(bloco);
       }
 
-      // ── 4. GOLA ────────────────────────────────────────────────────
       const golaRaw = getRaw('gola');
       const golaText = getVal('gola');
 
@@ -1757,14 +1799,12 @@
         }
       }
 
-      // ── 5. BOLSO ───────────────────────────────────────────────────
       const bolsoRaw = getRaw('bolso');
       const bolsoText = getVal('bolso');
       if (bolsoRaw && bolsoRaw !== 'nenhum' && bolsoText) {
         partes.push(`COM BOLSO ${bolsoText}`);
       }
 
-      // ── 6. FILETE ──────────────────────────────────────────────────
       const fileteRaw = getRaw('filete');
       if (fileteRaw === 'sim') {
         let bloco = 'FILETE';
@@ -1775,7 +1815,6 @@
         partes.push(bloco);
       }
 
-      // ── 7. FAIXA ──────────────────────────────────────────────────
       const faixaRaw = getRaw('faixa');
       if (faixaRaw === 'sim') {
         let bloco = 'FAIXA';
@@ -1786,14 +1825,12 @@
         partes.push(bloco);
       }
 
-      // ── 8. ARTE / PERSONALIZAÇÃO ───────────────────────────────────
       const arteRaw = getRaw('arte');
       const arteText = getVal('arte');
       if (arteRaw && arteText) {
         partes.push(`PERSONALIZADO EM ${arteText}`);
       }
 
-      // ── MONTAR TEXTO FINAL ─────────────────────────────────────────
       const textoFinal = partes.length > 0
         ? partes.join(' / ').toUpperCase()
         : '';
@@ -1805,7 +1842,6 @@
       }
     }
 
-    // ─── event listeners ──────────────────────────────────────────────
     const idsParaMonitorar = [
       'produto', 'material', 'corMaterial',
       'manga', 'acabamentoManga', 'larguraManga', 'corAcabamentoManga',
@@ -1827,11 +1863,9 @@
       }
     });
 
-    // ─── monitorar mudanças na tabela de produtos ─────────────────────
     const tabelaBody = document.getElementById('produtosTable');
     if (tabelaBody) {
       const observer = new MutationObserver(() => {
-        // Re-attach listeners nas descrições novas
         tabelaBody.querySelectorAll('.descricao').forEach(input => {
           if (!input.dataset.obsLinked) {
             input.dataset.obsLinked = 'true';
@@ -1844,7 +1878,6 @@
 
       observer.observe(tabelaBody, { childList: true, subtree: true });
 
-      // Attach nos que já existem
       tabelaBody.querySelectorAll('.descricao').forEach(input => {
         input.dataset.obsLinked = 'true';
         input.addEventListener('input', atualizarObservacoes);
@@ -1859,5 +1892,49 @@
   window.carregarFichaDeArquivo = carregarFichaDeArquivo;
   window.coletarFicha = coletarFicha;
   window.preencherFicha = preencherFicha;
+
+  // Prevenção de Reloads
+  (function () {
+    let dadosNaoSalvos = false;
+
+    function marcarDadosNaoSalvos() {
+      dadosNaoSalvos = true;
+    }
+
+    function limparDadosNaoSalvos() {
+      dadosNaoSalvos = false;
+    }
+
+    window.onbeforeunload = function (evento) {
+      if (dadosNaoSalvos) {
+        const mensagem = "Você tem alterações não salvas. Se sair agora, perderá todas as modificações.";
+        evento.returnValue = mensagem;
+        return mensagem;
+      }
+    };
+
+    function monitorarCampos() {
+      document.querySelectorAll('input:not([type="submit"]):not([type="button"]), textarea, select, [contenteditable="true"]')
+        .forEach(campo => {
+          campo.addEventListener('input', marcarDadosNaoSalvos);
+          campo.addEventListener('change', marcarDadosNaoSalvos);
+        });
+    }
+
+    function inicializar() {
+      monitorarCampos();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', inicializar);
+    } else {
+      inicializar();
+    }
+
+    window.prevenirSaidaSemSalvar = {
+      marcarDadosNaoSalvos,
+      limparDadosNaoSalvos
+    };
+  })();
 
 })();
