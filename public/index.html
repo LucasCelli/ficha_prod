@@ -197,21 +197,17 @@
                             <select id="acabamentoManga" class="form-control">
                                 <option value="">-</option>
                                 <option value="barra">Barra</option>
-                                <option value="punho">Punho</option>
+                                <option value="punho_ribana">Punho de Ribana</option>
+                                <option value="punho_vies_sublimado">Punho Sublimado</option>
                             </select>
                         </div>
 
                         <!-- Campos condicionais da manga (viés ou punho) -->
                         <div class="form-group" id="larguraMangaContainer" style="display: none;">
                             <label for="larguraManga">Largura Acab. Manga</label>
-                            <input type="text" id="larguraManga" list="acabList" class="form-control"
+                            <input type="text" id="larguraManga" list="largurasList" class="form-control"
                                 placeholder="Ex: 3,5">
-                            <datalist id="acabList">
-                                <option>Ribana 2.5</option>
-                                <option>Ribana 3.5</option>
-                                <option>Ribana 4.5</option>
-                                <option>Ribana 5.5</option>
-                            </datalist>
+                            <datalist id="largurasList"></datalist>
                         </div>
 
                         <div class="form-group" id="corAcabamentoMangaContainer" style="display: none;">
@@ -261,7 +257,8 @@
                         <!-- Largura do acabamento da gola (NÃO aparece para Polo) -->
                         <div class="form-group" id="larguraGolaContainer" style="display: none;">
                             <label for="larguraGola">Largura Acab. Gola</label>
-                            <input type="text" id="larguraGola" class="form-control" placeholder="Ex: 2,5">
+                            <input type="text" list="largurasList" id="larguraGola" class="form-control"
+                                placeholder="Ex: 2,5">
                         </div>
 
                         <!-- Reforço na Gola (select Sim/Não) -->
@@ -318,12 +315,13 @@
                             <label for="bolso">Bolso</label>
                             <select id="bolso" class="form-control">
                                 <option value="nenhum">-</option>
-                                <option value="peito">Bolso de Peito</option>
+                                <option value="peito">Bolso no Peito</option>
                                 <option value="traseiros">Bolsos Traseiros</option>
                                 <option value="canguru">Bolso Canguru</option>
                                 <option value="cargueiro">Bolso Cargueiro</option>
                                 <option value="embutido">Bolso na frente embutido</option>
                                 <option value="externo">Bolso na frente externo</option>
+                                <option value="frente_traseiro">Bolsos na frente e atrás</option>
                             </select>
                         </div>
 
@@ -446,7 +444,7 @@
 
     <!-- VERSÃO DE IMPRESSÃO -->
     <div id="print-version" class="print-container" style="display: none;">
-        <header class="print-header">
+        <header id="printHeader" class="print-header">
             <h1>Ficha Técnica | Priscila Confecções & Uniformes</h1>
             <p>Data de Emissão: <span id="print-dataEmissao"></span></p>
         </header>

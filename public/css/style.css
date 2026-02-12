@@ -498,7 +498,9 @@ textarea.form-control {
     object-fit: contain;
   }
 }
-
+#printHeader.hidden {
+  display: none !important;
+}
 
 /* Grupo de especificações com título */
 .specs-group {
@@ -545,7 +547,7 @@ textarea.form-control {
   border-left: 3px solid #3b82f6;
 }
 
-#print-version .print-grid-single > div[style*="display: none"] {
+#print-version .print-grid-single>div[style*="display: none"] {
   display: none !important;
 }
 

@@ -100,6 +100,7 @@
       catalog = {
         tamanhos: ['PP', 'P', 'M', 'G', 'GG', 'XG'],
         produtos: ['Camiseta Básica', 'Polo', 'Baby Look'],
+        larguras: ['Largura 2.5', 'Largura 3.5', 'Largura 4.0', 'Largura 4.5'],
         materiais: [
           { id: 'malha_fria_pv', nome: 'Malha Fria (PV)', composicao: '65% Poliéster / 35% Viscose' },
           { id: 'dry_fit', nome: 'Dry Fit', composicao: '100% Poliéster' }
@@ -108,11 +109,41 @@
     }
   }
 
+  function isAcabamentoMangaComExtras(valor) {
+    return [
+      'punho',
+      'vies',
+      'punho_ribana',
+      'punho_vies_sublimado',
+      'vies_sublimado'
+    ].includes(valor);
+  }
+
+  function getTipoAcabamentoManga(valor) {
+    if (valor.startsWith('punho')) return 'PUNHO';
+    if (valor.includes('vies')) return 'VIÉS';
+    return '';
+  }
+
+  function getDescricaoAcabamentoManga(valor, textoSelecionado) {
+    const map = {
+      punho_ribana: 'PUNHO DE RIBANA',
+      punho_vies_sublimado: 'PUNHO SUBLIMADO',
+      vies_sublimado: 'VIÉS SUBLIMADO',
+      punho: 'PUNHO',
+      vies: 'VIÉS'
+    };
+    if (map[valor]) return map[valor];
+    if (textoSelecionado) return textoSelecionado.toUpperCase();
+    return getTipoAcabamentoManga(valor);
+  }
+
   function initCatalogInUI() {
     preencherProdutosList();
     preencherMateriaisDatalist();
     preencherTamanhosDatalist();
-    preencherCoresDatalist()
+    preencherCoresDatalist();
+    preencherLargurasDatalist();
   }
 
   function preencherProdutosList() {
@@ -168,6 +199,22 @@
     catalog.cores.forEach(tam => {
       const opt = document.createElement('option');
       opt.value = tam;
+      datalist.appendChild(opt);
+    });
+  }
+
+  function preencherLargurasDatalist() {
+    let datalist = document.getElementById('largurasList');
+    if (!datalist) {
+      datalist = document.createElement('datalist');
+      datalist.id = 'largurasList';
+      document.body.appendChild(datalist);
+    }
+    datalist.innerHTML = '';
+    if (!catalog.larguras || catalog.larguras.length === 0) return;
+    catalog.larguras.forEach(largura => {
+      const opt = document.createElement('option');
+      opt.value = largura;
       datalist.appendChild(opt);
     });
   }
@@ -662,7 +709,7 @@
 
     function atualizarCamposManga() {
       const valor = acabamentoManga?.value || '';
-      const mostrarExtras = valor === 'vies' || valor === 'punho';
+      const mostrarExtras = isAcabamentoMangaComExtras(valor);
 
       if (larguraMangaContainer) {
         larguraMangaContainer.style.display = mostrarExtras ? 'block' : 'none';
@@ -878,15 +925,13 @@
     function atualizarContador() {
       if (counter) counter.textContent = `(${imagens.length}/${MAX_IMAGES})`;
 
-      if (imagens.length >= MAX_IMAGES) {
-        dropArea.classList.add('hidden');
-      } else {
-        dropArea.classList.remove('hidden');
-      }
+      const hide = imagens.length >= MAX_IMAGES;
+      dropArea.classList.toggle('hidden', hide);
     }
 
     function renderizarImagens() {
       container.innerHTML = '';
+      container.classList.toggle('compact-four', imagens.length === MAX_IMAGES);
 
       imagens.forEach((img, index) => {
         const card = document.createElement('div');
@@ -1113,7 +1158,7 @@
     const corSublimacao = arteVal.includes('sublimacao') ? document.getElementById('cor')?.value || null : null;
 
     const acabamentoMangaVal = document.getElementById('acabamentoManga')?.value || '';
-    const temAcabamentoManga = acabamentoMangaVal === 'vies' || acabamentoMangaVal === 'punho';
+    const temAcabamentoManga = isAcabamentoMangaComExtras(acabamentoMangaVal);
     const larguraManga = temAcabamentoManga ? (document.getElementById('larguraManga')?.value || '') : '';
     const corAcabamentoManga = temAcabamentoManga ? (document.getElementById('corAcabamentoManga')?.value || '') : '';
 
@@ -1497,10 +1542,10 @@
     setText('print-acabamentoManga', acabamentoMangaText, '-');
 
     const acabamentoMangaVal = getInputValue('acabamentoManga');
-    const temAcabamentoMangaExtra = acabamentoMangaVal === 'vies' || acabamentoMangaVal === 'punho';
+    const temAcabamentoMangaExtra = isAcabamentoMangaComExtras(acabamentoMangaVal);
 
     const larguraMangaVal = getInputValue('larguraManga');
-    setText('print-larguraManga', larguraMangaVal ? larguraMangaVal + ' cm' : '');
+    setText('print-larguraManga', larguraMangaVal);
     showDiv('print-larguraMangaDiv', temAcabamentoMangaExtra && !!larguraMangaVal);
 
     const corAcabamentoMangaVal = getInputValue('corAcabamentoManga');
@@ -1523,7 +1568,7 @@
     showDiv('print-acabamentoGolaDiv', !isPolo && !!acabamentoGolaText);
 
     const larguraGolaVal = getInputValue('larguraGola');
-    setText('print-larguraGola', larguraGolaVal ? larguraGolaVal + ' cm' : '');
+    setText('print-larguraGola', larguraGolaVal);
     showDiv('print-larguraGolaDiv', !isPolo && !!larguraGolaVal);
 
     const reforcoGolaVal = document.getElementById('reforcoGola')?.value || 'nao';
@@ -1598,11 +1643,11 @@
 
     const printImagesContainer = document.getElementById('print-imagesContainer');
     const printImagesSection = document.getElementById('print-imagesSection');
+    const imgs = window.getImagens ? window.getImagens() : [];
 
     if (printImagesContainer) {
       printImagesContainer.innerHTML = '';
-
-      const imgs = window.getImagens ? window.getImagens() : [];
+      printImagesContainer.classList.toggle('compact-four', imgs.length === MAX_IMAGES);
 
       if (imgs.length === 0) {
         if (printImagesSection) printImagesSection.style.display = 'none';
@@ -1722,8 +1767,8 @@
         const larguraManga = getVal('larguraManga');
         const corAcabManga = getVal('corAcabamentoManga');
 
-        if (acabamentoMangaRaw === 'punho' || acabamentoMangaRaw === 'vies') {
-          const tipo = acabamentoMangaRaw === 'punho' ? 'PUNHO' : 'VIÉS';
+        if (isAcabamentoMangaComExtras(acabamentoMangaRaw)) {
+          const tipo = getDescricaoAcabamentoManga(acabamentoMangaRaw, acabamentoMangaText);
           bloco += ` COM ${tipo}`;
           if (larguraManga) bloco += ` ${larguraManga}`;
           if (corAcabManga) bloco += ` ${corAcabManga}`;
@@ -1752,7 +1797,7 @@
 
           if (acabamentoGolaRaw) {
             bloco += ` EM ${acabamentoGolaText}`;
-            if (larguraGola) bloco += ` ${larguraGola}CM`;
+            if (larguraGola) bloco += ` ${larguraGola}`;
           }
 
           const reforcoGola = getRaw('reforcoGola');
