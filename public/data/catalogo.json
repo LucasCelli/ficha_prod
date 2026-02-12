@@ -103,6 +103,7 @@
     "Verde Musgo",
     "Verde Limão",
     "Verde Jade",
+    "Verde Claro",
     "Amarelo Canário",
     "Amarelo Ouro",
     "Rosa Pink",
@@ -113,6 +114,16 @@
     "Bordô",
     "Marsala",
     "Bege",
+    "Royal Mescla",
+    "Marinho Mescla",
+    "Chumbo Mescla",
+    "Jeans",
+    "Ultramarine",
+    "Cobalto",
+    "Marinho",
+    "Off-White",
+    "Salmão",
+    "Grafite",
     "Dourado"
   ],
   "fileteLocal": [
@@ -174,7 +185,17 @@
     {
       "id": "camisaria",
       "nome": "Tecido de Camisaria",
-      "composicao": "/"
+      "composicao": "Consultar Catálogo"
+    },
+    {
+      "id": "piquet_pv",
+      "nome": "Piquet PV",
+      "composicao": "65% Poliéster / 35% Viscose"
+    },
+    {
+      "id": "pv",
+      "nome": "Malha PV",
+      "composicao": "65% Poliéster / 35% Viscose"
     },
     {
       "id": "dry_colmeia",
@@ -219,7 +240,12 @@
     {
       "id": "tactel",
       "nome": "Tactel",
-      "composicao": "/"
+      "composicao": "100% Poliéster"
+    },
+    {
+      "id": "tactel_elastano",
+      "nome": "Tactel com Elastano",
+      "composicao": "98% Poliéster / 2% Elastano"
     },
     {
       "id": "dry_3d",
@@ -245,6 +271,46 @@
       "id": "crepe",
       "nome": "Crepe",
       "composicao": "100% Poliéster"
+    },
+    {
+      "id": "profit",
+      "nome": "Profit Camisaria",
+      "composicao": "67% Poliéster / 33% Algodão"
+    },
+    {
+      "id": "comfort_plus",
+      "nome": "Comfort Plus Camisaria",
+      "composicao": "37% Poliéster / 63% Algodão"
+    },
+    {
+      "id": "london",
+      "nome": "London Camisaria",
+      "composicao": "37% Poliéster / 63% Algodão"
+    },
+    {
+      "id": "spagueti",
+      "nome": "Spagueti Camisaria",
+      "composicao": "23% Poliéster / 77% Algodão"
+    },
+    {
+      "id": "tricoline",
+      "nome": "Tricoline Camisaria",
+      "composicao": "77% Poliéster / 19% Algodão / 4% Elastano"
+    },
+    {
+      "id": "barcelona",
+      "nome": "Barcelona Camisaria",
+      "composicao": "73% Poliéster / 23% Algodão / 4% Elastano"
+    },
+    {
+      "id": "fusili",
+      "nome": "Fusili Camisaria",
+      "composicao": "50% Poliéster / 50% Algodão"
+    },
+    {
+      "id": "microvichy",
+      "nome": "Micro Vichy Camisaria",
+      "composicao": "57% Poliéster / 43% Algodão"
     }
   ]
 }
