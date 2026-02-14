@@ -671,129 +671,112 @@
       return;
     }
 
-    if (typeof window.jspdf === 'undefined') {
-      mostrarToast('Carregando biblioteca PDF...', 'info');
-      await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
     try {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
+      if (typeof window.jspdf === 'undefined') {
+        await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+        await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.15/jspdf.plugin.autotable.min.js');
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
 
-      const periodo = getPeriodoNome();
+      if (typeof window.jspdf === 'undefined') {
+        throw new Error('Biblioteca jsPDF não carregada');
+      }
+
+      const mesesPt = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+      const dataAtual = new Date();
+      const periodo = `${mesesPt[dataAtual.getMonth()]} de ${dataAtual.getFullYear()}`;
+
+      const doc = new window.jspdf.jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
       const dataGeracao = new Date().toLocaleString('pt-BR');
       const entregues = relatorioAtual.fichasEntregues || 0;
       const pendentes = relatorioAtual.fichasPendentes || 0;
       const total = entregues + pendentes;
       const taxa = total > 0 ? Math.min(100, Math.round((entregues / total) * 100)) : 0;
 
-      doc.setFont('helvetica');
-      doc.setFillColor(59, 130, 246);
-      doc.rect(0, 0, 210, 35, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
-      doc.text('Relatório de Produção', 105, 18, { align: 'center' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const centerX = pageWidth / 2;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(33, 97, 140);
+      doc.text('Relatório de Produção | Priscila Confecções & Uniformes', centerX, 20, { align: 'center' });
+
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(12);
-      doc.text(periodo, 105, 28, { align: 'center' });
+      doc.setTextColor(100);
+      doc.text(`Período: ${periodo}`, centerX, 30, { align: 'center' });
+      doc.text(`Gerado em: ${dataGeracao}`, centerX, 37, { align: 'center' });
 
-      doc.setTextColor(100, 100, 100);
+      const summaryData = [
+        ['Métrica', 'Total'],
+        ['Pedidos Entregues', String(entregues)],
+        ['Pedidos Pendentes', String(pendentes)],
+        ['Total de Pedidos', String(total)],
+        ['Taxa de Entrega', `${taxa}%`],
+        ['Itens Confeccionados', String(relatorioAtual.itensConfeccionados || 0)],
+        ['Novos Clientes', String(relatorioAtual.novosClientes || 0)]
+      ];
+
+      doc.autoTable({
+        startY: 50,
+        head: [summaryData[0]],
+        body: summaryData.slice(1),
+        theme: 'striped',
+        headStyles: { fillColor: [33, 97, 140] },
+        columnStyles: { 0: { fontStyle: 'bold' } }
+      });
+
+      const topVendedores = (dadosVendedores || [])
+        .slice(0, 5)
+        .map(v => [
+          String(v.vendedor || 'N/A'),
+          String(v.totalPedidos || 0),
+          String(v.totalItens || 0),
+          String(v.entregues || 0),
+          `${v.totalPedidos > 0 ?
+            Math.min(100, Math.round((v.entregues / v.totalPedidos) * 100)) : 0}%`
+        ]);
+
+      doc.autoTable({
+        head: [['Vendedor', 'Pedidos', 'Itens', 'Entregues', 'Taxa']],
+        body: topVendedores,
+        theme: 'striped',
+        headStyles: { fillColor: [33, 97, 140] }
+      });
+
+      const topMateriais = (dadosMateriais || [])
+        .slice(0, 5)
+        .map(m => [
+          String(m.material || 'N/A'),
+          String(m.totalPedidos || 0),
+          String(m.totalItens || 0)
+        ]);
+
+      doc.autoTable({
+        head: [['Material', 'Pedidos', 'Itens']],
+        body: topMateriais,
+        theme: 'striped',
+        headStyles: { fillColor: [33, 97, 140] }
+      });
+
       doc.setFontSize(10);
-      doc.text(`Gerado em: ${dataGeracao}`, 105, 45, { align: 'center' });
+      doc.setTextColor(100);
+      doc.text(`Página 1 de 1`, centerX, 287, { align: 'center' });
 
-      doc.setDrawColor(200, 200, 200);
-      doc.line(20, 50, 190, 50);
-
-      doc.setTextColor(50, 50, 50);
-      doc.setFontSize(14);
-      doc.text('Resumo do Período', 20, 62);
-
-      const cardY = 70;
-      const cardWidth = 40;
-      const cardHeight = 30;
-      const cardGap = 5;
-
-      doc.setFillColor(209, 250, 229);
-      doc.roundedRect(20, cardY, cardWidth, cardHeight, 3, 3, 'F');
-      doc.setTextColor(5, 150, 105);
-      doc.setFontSize(8);
-      doc.text('Entregues', 40, cardY + 10, { align: 'center' });
-      doc.setFontSize(18);
-      doc.text(String(entregues), 40, cardY + 23, { align: 'center' });
-
-      doc.setFillColor(254, 243, 199);
-      doc.roundedRect(20 + cardWidth + cardGap, cardY, cardWidth, cardHeight, 3, 3, 'F');
-      doc.setTextColor(217, 119, 6);
-      doc.setFontSize(8);
-      doc.text('Pendentes', 40 + cardWidth + cardGap, cardY + 10, { align: 'center' });
-      doc.setFontSize(18);
-      doc.text(String(pendentes), 40 + cardWidth + cardGap, cardY + 23, { align: 'center' });
-
-      doc.setFillColor(219, 234, 254);
-      doc.roundedRect(20 + (cardWidth + cardGap) * 2, cardY, cardWidth, cardHeight, 3, 3, 'F');
-      doc.setTextColor(37, 99, 235);
-      doc.setFontSize(8);
-      doc.text('Itens', 40 + (cardWidth + cardGap) * 2, cardY + 10, { align: 'center' });
-      doc.setFontSize(18);
-      doc.text(String(relatorioAtual.itensConfeccionados || 0), 40 + (cardWidth + cardGap) * 2, cardY + 23, { align: 'center' });
-
-      doc.setFillColor(237, 233, 254);
-      doc.roundedRect(20 + (cardWidth + cardGap) * 3, cardY, cardWidth, cardHeight, 3, 3, 'F');
-      doc.setTextColor(124, 58, 237);
-      doc.setFontSize(8);
-      doc.text('Novos Clientes', 40 + (cardWidth + cardGap) * 3, cardY + 10, { align: 'center' });
-      doc.setFontSize(18);
-      doc.text(String(relatorioAtual.novosClientes || 0), 40 + (cardWidth + cardGap) * 3, cardY + 23, { align: 'center' });
-
-      doc.setTextColor(50, 50, 50);
-      doc.setFontSize(14);
-      doc.text('Vendedor Destaque', 20, 120);
-
-      doc.setFillColor(249, 250, 251);
-      doc.roundedRect(20, 125, 80, 25, 3, 3, 'F');
-
-      doc.setTextColor(31, 41, 55);
-      doc.setFontSize(12);
-      doc.text(relatorioAtual.topVendedor || 'Nenhum', 25, 137);
-      doc.setFontSize(10);
-      doc.setTextColor(107, 114, 128);
-      doc.text(`${relatorioAtual.topVendedorTotal || 0} vendas`, 25, 145);
-
-      doc.setTextColor(50, 50, 50);
-      doc.setFontSize(14);
-      doc.text('Taxa de Entrega', 110, 120);
-
-      doc.setFillColor(249, 250, 251);
-      doc.roundedRect(110, 125, 80, 25, 3, 3, 'F');
-
-      if (taxa >= 80) {
-        doc.setTextColor(16, 185, 129);
-      } else if (taxa >= 50) {
-        doc.setTextColor(245, 158, 11);
-      } else {
-        doc.setTextColor(239, 68, 68);
-      }
-
-      doc.setFontSize(20);
-      doc.text(`${taxa}%`, 150, 140, { align: 'center' });
-      doc.setFontSize(10);
-      doc.setTextColor(107, 114, 128);
-      doc.text(`${entregues} de ${total} pedidos`, 150, 148, { align: 'center' });
-
-      doc.setDrawColor(200, 200, 200);
-      doc.line(20, 270, 190, 270);
-      doc.setTextColor(150, 150, 150);
-      doc.setFontSize(9);
-      doc.text('Sistema de Fichas Técnicas - Relatório gerado automaticamente', 105, 280, { align: 'center' });
-
-      const nomeArquivo = `relatorio-${periodo.replace(/[\s\/]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(nomeArquivo);
+      doc.save(`relatorio-${periodo.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.pdf`);
 
       mostrarToast('PDF exportado com sucesso!', 'success');
     } catch (error) {
-      mostrarErro('Erro ao gerar PDF. Tente novamente.');
+      console.error('Erro ao gerar PDF:', error);
+      mostrarErro(error.message || 'Erro ao gerar PDF');
     }
   }
+
 
   function carregarScript(src) {
     return new Promise((resolve, reject) => {
@@ -805,71 +788,530 @@
     });
   }
 
-  function exportarExcel() {
+  async function exportarExcel() {
     if (!relatorioAtual) {
       mostrarErro('Nenhum relatório carregado');
       return;
     }
 
-    const periodo = getPeriodoNome();
-    const csv = [];
+    // Carregar biblioteca ExcelJS
+    if (typeof ExcelJS === 'undefined') {
+      await carregarScript('https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js');
+    }
 
-    csv.push(['RELATÓRIO DE PRODUÇÃO']);
-    csv.push(['Período:', periodo]);
-    csv.push(['Data de Geração:', new Date().toLocaleString('pt-BR')]);
-    csv.push([]);
-    csv.push(['RESUMO PRINCIPAL']);
-    csv.push(['Pedidos Entregues:', relatorioAtual.fichasEntregues || 0]);
-    csv.push(['Pedidos Pendentes:', relatorioAtual.fichasPendentes || 0]);
-    csv.push(['Itens Confeccionados:', relatorioAtual.itensConfeccionados || 0]);
-    csv.push(['Novos Clientes:', relatorioAtual.novosClientes || 0]);
-    csv.push([]);
-    csv.push(['VENDEDOR DESTAQUE']);
-    csv.push(['Nome:', relatorioAtual.topVendedor || '-']);
-    csv.push(['Vendas:', relatorioAtual.topVendedorTotal || 0]);
-    csv.push([]);
-    csv.push(['TAXA DE ENTREGA']);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const mesesPt = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+      const dataAtual = new Date();
+      const periodo = `${mesesPt[dataAtual.getMonth()]} de ${dataAtual.getFullYear()}`;
+      const dataGeracao = new Date().toLocaleString('pt-BR');
 
-    const entregues = relatorioAtual.fichasEntregues || 0;
-    const pendentes = relatorioAtual.fichasPendentes || 0;
-    const total = entregues + pendentes;
-    const taxa = total > 0 ? Math.min(100, Math.round((entregues / total) * 100)) : 0;
+      // Calcular métricas principais
+      const entregues = relatorioAtual.fichasEntregues || 0;
+      const pendentes = relatorioAtual.fichasPendentes || 0;
+      const total = entregues + pendentes;
+      const taxa = total > 0 ? Math.min(100, Math.round((entregues / total) * 100)) : 0;
 
-    csv.push(['Taxa:', `${taxa}%`]);
-    csv.push(['Entregues:', entregues]);
-    csv.push(['Total:', total]);
+      // Metadados do workbook
+      workbook.creator = 'Sistema de Produção';
+      workbook.created = new Date();
 
-    if (dadosVendedores.length > 0) {
-      csv.push([]);
-      csv.push(['ANÁLISE POR VENDEDOR']);
-      csv.push(['Vendedor', 'Pedidos', 'Itens', 'Entregues', 'Pendentes', 'Taxa Entrega']);
-      dadosVendedores.forEach(v => {
-        const taxaV = v.totalPedidos > 0 ? Math.min(100, Math.round((v.entregues / v.totalPedidos) * 100)) : 0;
-        csv.push([v.vendedor, v.totalPedidos, v.totalItens, v.entregues, v.pendentes, `${taxaV}%`]);
+      // ==================== PLANILHA ÚNICA: DASHBOARD ====================
+      criarDashboardCompleto(workbook, {
+        periodo,
+        dataGeracao,
+        entregues,
+        pendentes,
+        total,
+        taxa,
+        itensConfeccionados: relatorioAtual.itensConfeccionados || 0,
+        novosClientes: relatorioAtual.novosClientes || 0,
+        topVendedor: relatorioAtual.topVendedor || '-',
+        topVendedorTotal: relatorioAtual.topVendedorTotal || 0
+      });
+
+      // ==================== PLANILHA 2: DADOS DETALHADOS ====================
+      if (relatorioAtual.detalhes && relatorioAtual.detalhes.length > 0) {
+        criarPlanilhaDetalhada(workbook, relatorioAtual.detalhes);
+      }
+
+      // Gerar e baixar arquivo
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const nomeArquivo = `relatorio-producao-${periodo.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = nomeArquivo;
+      link.click();
+
+      mostrarToast('Relatório exportado com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao exportar Excel:', error);
+      mostrarErro('Erro ao gerar relatório: ' + error.message);
+    }
+  }
+
+  // ==================== FUNÇÃO DE DASHBOARD UNIFICADO ====================
+
+  function criarDashboardCompleto(workbook, dados) {
+    const worksheet = workbook.addWorksheet('Dashboard', {
+      pageSetup: { paperSize: 9, orientation: 'landscape' }
+    });
+
+    // Configurar larguras das colunas para acomodar 3 tabelas lado a lado
+    worksheet.columns = [
+      // RESUMO (A-B)
+      { width: 28 },
+      { width: 22 },
+      // Espaço (C)
+      { width: 3 },
+      // VENDEDORES (D-I)
+      { width: 28 },
+      { width: 12 },
+      { width: 12 },
+      { width: 12 },
+      { width: 12 },
+      { width: 15 },
+      // Espaço (J)
+      { width: 3 },
+      // MATERIAIS (K-N)
+      { width: 32 },
+      { width: 15 },
+      { width: 15 },
+      { width: 15 }
+    ];
+
+    // ==================== TABELA 1: RESUMO EXECUTIVO (Colunas A-B) ====================
+
+    // Título principal
+    const tituloRow = worksheet.addRow(['RELATÓRIO DE PRODUÇÃO']);
+    worksheet.mergeCells('A1:B1');
+    tituloRow.getCell(1).style = {
+      font: { bold: true, size: 16, color: { argb: 'FFFFFFFF' } },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } },
+      alignment: { horizontal: 'center', vertical: 'middle' },
+      border: getBordaCompleta()
+    };
+    tituloRow.height = 30;
+
+    worksheet.addRow([]);
+
+    // Informações do período
+    addStyledRowRange(worksheet, 3, 'A', 'B', ['Período:', dados.periodo], { boldFirst: true });
+    addStyledRowRange(worksheet, 4, 'A', 'B', ['Gerado em:', dados.dataGeracao], { boldFirst: true });
+    worksheet.addRow([]);
+
+    // Seção de métricas principais
+    const headerMetricas = worksheet.getRow(6);
+    headerMetricas.getCell(1).value = 'RESUMO DE DESEMPENHO';
+    worksheet.mergeCells('A6:B6');
+    headerMetricas.getCell(1).style = {
+      font: { bold: true, size: 12, color: { argb: 'FFFFFFFF' } },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } },
+      alignment: { horizontal: 'center', vertical: 'middle' },
+      border: getBordaCompleta()
+    };
+    headerMetricas.height = 25;
+
+    worksheet.addRow([]);
+
+    // Cabeçalho da tabela
+    const headerRow = worksheet.getRow(8);
+    headerRow.getCell(1).value = 'Métrica';
+    headerRow.getCell(2).value = 'Valor';
+    headerRow.getCell(1).style = headerRow.getCell(2).style = {
+      font: { bold: true, size: 11, color: { argb: 'FFFFFFFF' } },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5B9BD5' } },
+      alignment: { horizontal: 'center', vertical: 'middle' },
+      border: getBordaCompleta()
+    };
+    headerRow.height = 20;
+
+    // Dados das métricas
+    const metricas = [
+      ['Pedidos Entregues', dados.entregues],
+      ['Pedidos Pendentes', dados.pendentes],
+      ['Total de Pedidos', dados.total],
+      ['Taxa de Entrega', `${dados.taxa}%`],
+      ['Itens Confeccionados', dados.itensConfeccionados],
+      ['Novos Clientes', dados.novosClientes]
+    ];
+
+    metricas.forEach((metrica, index) => {
+      const rowNum = 9 + index;
+      const row = worksheet.getRow(rowNum);
+      row.getCell(1).value = metrica[0];
+      row.getCell(2).value = metrica[1];
+
+      row.getCell(1).style = {
+        font: { size: 10, bold: true },
+        alignment: { horizontal: 'left', vertical: 'middle' },
+        border: getBordaCompleta(),
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: index % 2 === 0 ? 'FFFFFFFF' : 'FFF2F2F2' } }
+      };
+
+      row.getCell(2).style = {
+        font: { size: 10 },
+        alignment: { horizontal: 'center', vertical: 'middle' },
+        border: getBordaCompleta(),
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: index % 2 === 0 ? 'FFFFFFFF' : 'FFF2F2F2' } }
+      };
+
+      // Formatação especial para taxa de entrega
+      if (metrica[0] === 'Taxa de Entrega') {
+        row.getCell(2).style.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: getTaxaColor(dados.taxa) }
+        };
+        row.getCell(2).style.font = { bold: true, size: 11 };
+      }
+    });
+
+    worksheet.addRow([]);
+
+    // Vendedor destaque
+    const headerVendedor = worksheet.getRow(16);
+    headerVendedor.getCell(1).value = 'VENDEDOR DESTAQUE DO PERÍODO';
+    worksheet.mergeCells('A16:B16');
+    headerVendedor.getCell(1).style = {
+      font: { bold: true, size: 12, color: { argb: 'FFFFFFFF' } },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } },
+      alignment: { horizontal: 'center', vertical: 'middle' },
+      border: getBordaCompleta()
+    };
+    headerVendedor.height = 25;
+
+    worksheet.addRow([]);
+    addStyledRowRange(worksheet, 18, 'A', 'B', ['Nome', dados.topVendedor], { boldFirst: true });
+    addStyledRowRange(worksheet, 19, 'A', 'B', ['Total de Vendas', dados.topVendedorTotal], { boldFirst: true });
+
+    // ==================== TABELA 2: VENDEDORES (Colunas D-I) ====================
+
+    // Título
+    const tituloVendedores = worksheet.getRow(1);
+    tituloVendedores.getCell(4).value = 'ANÁLISE DE DESEMPENHO POR VENDEDOR';
+    worksheet.mergeCells('D1:I1');
+    tituloVendedores.getCell(4).style = {
+      font: { bold: true, size: 14, color: { argb: 'FFFFFFFF' } },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } },
+      alignment: { horizontal: 'center', vertical: 'middle' },
+      border: getBordaCompleta()
+    };
+    tituloVendedores.height = 28;
+
+    // Cabeçalho
+    const headerVend = worksheet.getRow(3);
+    const colsVend = ['Vendedor', 'Pedidos', 'Itens', 'Entregues', 'Pendentes', 'Taxa Entrega'];
+    colsVend.forEach((col, idx) => {
+      headerVend.getCell(4 + idx).value = col;
+      headerVend.getCell(4 + idx).style = {
+        font: { bold: true, size: 11, color: { argb: 'FFFFFFFF' } },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } },
+        alignment: { horizontal: 'center', vertical: 'middle' },
+        border: getBordaCompleta()
+      };
+    });
+    headerVend.height = 20;
+
+    // Dados
+    if (typeof dadosVendedores !== 'undefined' && dadosVendedores.length > 0) {
+      dadosVendedores.forEach((v, index) => {
+        const taxaV = v.totalPedidos > 0 ?
+          Math.min(100, Math.round((v.entregues / v.totalPedidos) * 100)) : 0;
+
+        const rowNum = 4 + index;
+        const row = worksheet.getRow(rowNum);
+
+        const valores = [v.vendedor, v.totalPedidos, v.totalItens, v.entregues, v.pendentes, taxaV / 100];
+        valores.forEach((val, colIdx) => {
+          row.getCell(4 + colIdx).value = val;
+          row.getCell(4 + colIdx).style = {
+            font: { size: 10 },
+            alignment: {
+              horizontal: colIdx === 0 ? 'left' : 'center',
+              vertical: 'middle'
+            },
+            border: getBordaCompleta(),
+            fill: {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: index % 2 === 0 ? 'FFFFFFFF' : 'FFF2F2F2' }
+            }
+          };
+
+          if (colIdx === 5) {
+            row.getCell(4 + colIdx).numFmt = '0%';
+          }
+        });
+      });
+
+      // Linha de total
+      const totalRowNum = 4 + dadosVendedores.length + 1;
+      const totais = calcularTotaisVendedores(dadosVendedores);
+      const taxaTotal = totais.pedidos > 0 ?
+        Math.min(100, Math.round((totais.entregues / totais.pedidos) * 100)) : 0;
+
+      const totalRow = worksheet.getRow(totalRowNum);
+      const valoresTotal = ['TOTAL GERAL', totais.pedidos, totais.itens, totais.entregues, totais.pendentes, taxaTotal / 100];
+
+      valoresTotal.forEach((val, colIdx) => {
+        totalRow.getCell(4 + colIdx).value = val;
+        totalRow.getCell(4 + colIdx).style = {
+          font: { bold: true, size: 11, color: { argb: 'FFFFFFFF' } },
+          fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF70AD47' } },
+          alignment: {
+            horizontal: colIdx === 0 ? 'left' : 'center',
+            vertical: 'middle'
+          },
+          border: getBordaCompleta()
+        };
+
+        if (colIdx === 5) {
+          totalRow.getCell(4 + colIdx).numFmt = '0%';
+        }
       });
     }
 
-    if (dadosMateriais.length > 0) {
-      csv.push([]);
-      csv.push(['ANÁLISE POR MATERIAL']);
-      csv.push(['Material', 'Pedidos', 'Itens']);
-      dadosMateriais.forEach(m => {
-        csv.push([m.material, m.totalPedidos, m.totalItens]);
+    // ==================== TABELA 3: MATERIAIS (Colunas K-N) ====================
+
+    // Título
+    const tituloMateriais = worksheet.getRow(1);
+    tituloMateriais.getCell(11).value = 'ANÁLISE DE PRODUÇÃO POR MATERIAL';
+    worksheet.mergeCells('K1:N1');
+    tituloMateriais.getCell(11).style = {
+      font: { bold: true, size: 14, color: { argb: 'FFFFFFFF' } },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } },
+      alignment: { horizontal: 'center', vertical: 'middle' },
+      border: getBordaCompleta()
+    };
+
+    // Cabeçalho
+    const headerMat = worksheet.getRow(3);
+    const colsMat = ['Material', 'Pedidos', 'Itens', '% do Total'];
+    colsMat.forEach((col, idx) => {
+      headerMat.getCell(11 + idx).value = col;
+      headerMat.getCell(11 + idx).style = {
+        font: { bold: true, size: 11, color: { argb: 'FFFFFFFF' } },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } },
+        alignment: { horizontal: 'center', vertical: 'middle' },
+        border: getBordaCompleta()
+      };
+    });
+
+    // Dados
+    if (typeof dadosMateriais !== 'undefined' && dadosMateriais.length > 0) {
+      const totalItens = dadosMateriais.reduce((sum, m) => sum + m.totalItens, 0);
+
+      dadosMateriais.forEach((m, index) => {
+        const percentual = totalItens > 0 ? (m.totalItens / totalItens) : 0;
+
+        const rowNum = 4 + index;
+        const row = worksheet.getRow(rowNum);
+
+        const valores = [m.material, m.totalPedidos, m.totalItens, percentual];
+        valores.forEach((val, colIdx) => {
+          row.getCell(11 + colIdx).value = val;
+          row.getCell(11 + colIdx).style = {
+            font: { size: 10 },
+            alignment: {
+              horizontal: colIdx === 0 ? 'left' : 'center',
+              vertical: 'middle'
+            },
+            border: getBordaCompleta(),
+            fill: {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: index % 2 === 0 ? 'FFFFFFFF' : 'FFF2F2F2' }
+            }
+          };
+
+          if (colIdx === 3) {
+            row.getCell(11 + colIdx).numFmt = '0.0%';
+          }
+        });
+      });
+
+      // Total
+      const totalRowNum = 4 + dadosMateriais.length + 1;
+      const totais = calcularTotaisMateriais(dadosMateriais);
+      const totalRow = worksheet.getRow(totalRowNum);
+
+      const valoresTotal = ['TOTAL GERAL', totais.pedidos, totais.itens, 1];
+      valoresTotal.forEach((val, colIdx) => {
+        totalRow.getCell(11 + colIdx).value = val;
+        totalRow.getCell(11 + colIdx).style = {
+          font: { bold: true, size: 11, color: { argb: 'FFFFFFFF' } },
+          fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF70AD47' } },
+          alignment: {
+            horizontal: colIdx === 0 ? 'left' : 'center',
+            vertical: 'middle'
+          },
+          border: getBordaCompleta()
+        };
+
+        if (colIdx === 3) {
+          totalRow.getCell(11 + colIdx).numFmt = '0%';
+        }
       });
     }
+  }
 
-    const csvContent = csv.map(row => row.join(';')).join('\n');
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+  function addStyledRowRange(worksheet, rowNum, startCol, endCol, values, options = {}) {
+    const row = worksheet.getRow(rowNum);
+    const startColNum = startCol.charCodeAt(0) - 64;
 
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `relatorio-${periodo.replace(/[\s\/]/g, '-')}-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    values.forEach((val, idx) => {
+      row.getCell(startColNum + idx).value = val;
+      row.getCell(startColNum + idx).style = {
+        font: {
+          size: 10,
+          bold: options.boldFirst && idx === 0
+        },
+        alignment: { horizontal: 'left', vertical: 'middle' }
+      };
+    });
+  }
 
-    mostrarToast('Excel exportado com sucesso!', 'success');
+  // ==================== FUNÇÕES DE CRIAÇÃO DE PLANILHAS (ANTIGAS - REMOVIDAS) ====================
+
+  function criarPlanilhaDetalhada(workbook, detalhes) {
+    const worksheet = workbook.addWorksheet('Dados Detalhados');
+
+    // Configurar larguras
+    worksheet.columns = [
+      { width: 12 },
+      { width: 28 },
+      { width: 22 },
+      { width: 22 },
+      { width: 12 },
+      { width: 15 },
+      { width: 15 }
+    ];
+
+    // Título
+    const tituloRow = worksheet.addRow(['DADOS DETALHADOS DE PEDIDOS']);
+    worksheet.mergeCells('A1:G1');
+    tituloRow.getCell(1).style = {
+      font: { bold: true, size: 14, color: { argb: 'FFFFFFFF' } },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } },
+      alignment: { horizontal: 'center', vertical: 'middle' },
+      border: getBordaCompleta()
+    };
+    tituloRow.height = 28;
+
+    worksheet.addRow([]);
+
+    // Cabeçalho
+    const headerRow = worksheet.addRow(['ID Pedido', 'Cliente', 'Vendedor', 'Material', 'Quantidade', 'Status', 'Data']);
+    headerRow.eachCell((cell) => {
+      cell.style = {
+        font: { bold: true, size: 10, color: { argb: 'FFFFFFFF' } },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } },
+        alignment: { horizontal: 'center', vertical: 'middle' },
+        border: getBordaCompleta()
+      };
+    });
+    headerRow.height = 20;
+
+    // Dados
+    detalhes.forEach((item, index) => {
+      const row = worksheet.addRow([
+        item.id || '',
+        item.cliente || '',
+        item.vendedor || '',
+        item.material || '',
+        item.quantidade || 0,
+        item.status || '',
+        item.data || ''
+      ]);
+
+      row.eachCell((cell) => {
+        cell.style = {
+          font: { size: 9 },
+          alignment: { horizontal: 'left', vertical: 'middle' },
+          border: getBordaCompleta(),
+          fill: {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: index % 2 === 0 ? 'FFFFFFFF' : 'FFF2F2F2' }
+          }
+        };
+      });
+    });
+  }
+
+  // ==================== FUNÇÕES AUXILIARES ====================
+
+  function getBordaCompleta() {
+    return {
+      top: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+      bottom: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+      left: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+      right: { style: 'thin', color: { argb: 'FFD3D3D3' } }
+    };
+  }
+
+  function getTaxaColor(taxa) {
+    if (taxa >= 90) return 'FFC6EFCE'; // Verde claro
+    if (taxa >= 70) return 'FFFFEB9C'; // Amarelo claro
+    return 'FFFFC7CE'; // Vermelho claro
+  }
+
+  function getIndicadorDesempenho(taxa) {
+    if (taxa >= 90) return '✓ Excelente';
+    if (taxa >= 70) return '○ Bom';
+    if (taxa >= 50) return '△ Regular';
+    return '✗ Crítico';
+  }
+
+  function classificarTaxa(taxa) {
+    if (taxa >= 90) return 'Excelente';
+    if (taxa >= 70) return 'Bom';
+    if (taxa >= 50) return 'Regular';
+    return 'Crítico';
+  }
+
+  function addStyledRow(worksheet, values, options = {}) {
+    const row = worksheet.addRow(values);
+    row.eachCell((cell, colNumber) => {
+      cell.style = {
+        font: {
+          size: 10,
+          bold: options.boldFirst && colNumber === 1
+        },
+        alignment: { horizontal: 'left', vertical: 'middle' }
+      };
+    });
+    return row;
+  }
+
+  function calcularTotaisVendedores(dados) {
+    return dados.reduce((acc, v) => ({
+      pedidos: acc.pedidos + v.totalPedidos,
+      itens: acc.itens + v.totalItens,
+      entregues: acc.entregues + v.entregues,
+      pendentes: acc.pendentes + v.pendentes
+    }), { pedidos: 0, itens: 0, entregues: 0, pendentes: 0 });
+  }
+
+  function calcularTotaisMateriais(dados) {
+    return dados.reduce((acc, m) => ({
+      pedidos: acc.pedidos + m.totalPedidos,
+      itens: acc.itens + m.totalItens
+    }), { pedidos: 0, itens: 0 });
+  }
+
+  async function carregarScript(src) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
   }
 
   // Utilitários
