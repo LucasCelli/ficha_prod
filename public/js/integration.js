@@ -438,6 +438,21 @@
       btn.style.display = 'none';
     });
 
+    const richEditor = document.getElementById('richTextEditor');
+    if (richEditor) {
+      richEditor.setAttribute('contenteditable', 'false');
+      richEditor.style.pointerEvents = 'none';
+      richEditor.style.opacity = '0.9';
+      richEditor.style.backgroundColor = '#f8f9fa';
+      richEditor.style.cursor = 'not-allowed';
+    }
+
+    const richToolbar = document.querySelector('.rich-text-toolbar');
+    if (richToolbar) {
+      richToolbar.style.pointerEvents = 'none';
+      richToolbar.style.opacity = '0.55';
+    }
+
     const style = document.createElement('style');
     style.id = 'estiloVisualizacao';
     style.textContent = `
@@ -473,6 +488,21 @@
     botoesOcultar.forEach(btn => {
       btn.style.display = '';
     });
+
+    const richEditor = document.getElementById('richTextEditor');
+    if (richEditor) {
+      richEditor.setAttribute('contenteditable', 'true');
+      richEditor.style.pointerEvents = '';
+      richEditor.style.opacity = '';
+      richEditor.style.backgroundColor = '';
+      richEditor.style.cursor = '';
+    }
+
+    const richToolbar = document.querySelector('.rich-text-toolbar');
+    if (richToolbar) {
+      richToolbar.style.pointerEvents = '';
+      richToolbar.style.opacity = '';
+    }
 
     const estilo = document.getElementById('estiloVisualizacao');
     if (estilo) estilo.remove();

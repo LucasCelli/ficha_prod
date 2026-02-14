@@ -36,11 +36,6 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Middleware para JSON responses com UTF-8
-app.use((req, res, next) => {
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  next();
-});
 
 // Servir arquivos estáticos
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -58,9 +53,13 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 // ==================== CONEXÃO TURSO ====================
+if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
+  throw new Error('Configuração ausente: defina TURSO_DATABASE_URL e TURSO_AUTH_TOKEN no ambiente.');
+}
+
 const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || 'libsql://fichas-lucascelli.aws-us-east-1.turso.io',
-  authToken: process.env.TURSO_AUTH_TOKEN || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzAxMzA5NzQsImlkIjoiZTMwYmY5NTktN2M5Yy00NDRiLWI3OTctYWVhMzg1ZmYzNGQ3IiwicmlkIjoiMTEwOTA3ZmMtNmMxMi00MWEzLThkNjMtYTZjMzM1YTQ0MjRmIn0.xIc3ziBEzsZ-HdBnYeVJXrxS2bSEXTB2nWie2uaKwuX0TyhiHuvGIM1Mn8w4xoX7Q5LulVCOf8_l8xnFtW8pAA'
+  url: process.env.TURSO_DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN
 });
 
 // Inicializar banco de dados

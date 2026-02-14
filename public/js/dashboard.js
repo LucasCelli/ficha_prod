@@ -13,6 +13,7 @@
   let tituloModalVisualizacao = null;
   let botaoImprimirModal = null;
   let loadingModalVisualizacao = null;
+  let timeoutLoadingModal = null;
   let paginaAtual = 1;
   const itensPorPagina = 10;
 
@@ -493,6 +494,7 @@
     btnClose?.addEventListener('click', fecharModalVisualizacao);
     botaoImprimirModal?.addEventListener('click', imprimirFichaModal);
     iframeVisualizacao?.addEventListener('load', () => setLoadingPreview(false));
+    iframeVisualizacao?.addEventListener('error', () => setLoadingPreview('error'));
 
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && modalVisualizacao && modalVisualizacao.style.display !== 'none') {
@@ -516,16 +518,46 @@
     if (!modalVisualizacao || !iframeVisualizacao) return;
     modalVisualizacao.style.display = 'none';
     iframeVisualizacao.src = 'about:blank';
-    setLoadingPreview(true);
+    setLoadingPreview(false);
     document.body.classList.remove('preview-modal-open');
   }
 
   function setLoadingPreview(loading) {
     if (!modalVisualizacao) return;
-    modalVisualizacao.classList.toggle('is-loading', loading);
-    if (botaoImprimirModal) botaoImprimirModal.disabled = loading;
+    if (timeoutLoadingModal) {
+      clearTimeout(timeoutLoadingModal);
+      timeoutLoadingModal = null;
+    }
+
+    const isError = loading === 'error';
+    const isLoading = loading === true || isError;
+
+    modalVisualizacao.classList.toggle('is-loading', isLoading);
+    modalVisualizacao.classList.toggle('has-error', isError);
+    if (botaoImprimirModal) botaoImprimirModal.disabled = isLoading;
+
     if (loadingModalVisualizacao) {
-      loadingModalVisualizacao.style.display = loading ? 'flex' : 'none';
+      loadingModalVisualizacao.style.display = isLoading ? 'flex' : 'none';
+      const texto = loadingModalVisualizacao.querySelector('span');
+      const icone = loadingModalVisualizacao.querySelector('i');
+
+      if (isError) {
+        if (texto) texto.textContent = 'Falha ao carregar a visualização.';
+        if (icone) {
+          icone.className = 'fas fa-exclamation-triangle';
+        }
+      } else {
+        if (texto) texto.textContent = 'Carregando preview...';
+        if (icone) {
+          icone.className = 'fas fa-spinner fa-spin';
+        }
+      }
+    }
+
+    if (loading === true) {
+      timeoutLoadingModal = setTimeout(() => {
+        setLoadingPreview('error');
+      }, 15000);
     }
   }
 

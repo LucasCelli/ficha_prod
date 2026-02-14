@@ -437,6 +437,12 @@ body.preview-modal-open {
   opacity: 0;
 }
 
+.preview-modal.has-error .preview-modal-loading {
+  background: linear-gradient(180deg, #fff7ed, #ffedd5);
+  border-color: #fdba74;
+  color: #9a3412;
+}
+
 .preview-modal-print:disabled {
   opacity: 0.6;
   cursor: not-allowed;
