@@ -343,7 +343,7 @@
       // Sobrescrever a função de impressão
       const originalGerarVersaoImpressao = window.gerarVersaoImpressao;
       if (originalGerarVersaoImpressao) {
-        window.gerarVersaoImpressao = function() {
+        window.gerarVersaoImpressao = function(...args) {
           // Atualizar observações antes de imprimir
           if (window.richTextEditor) {
             const printObservacoesEl = document.getElementById('print-observacoes');
@@ -358,7 +358,7 @@
           }
           
           // Chamar função original
-          originalGerarVersaoImpressao.call(this);
+          originalGerarVersaoImpressao.apply(this, args);
         };
       }
     }, 100);

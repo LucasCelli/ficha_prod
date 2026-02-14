@@ -193,6 +193,11 @@
       "composicao": "65% Poliéster / 35% Viscose"
     },
     {
+      "id": "poliamida",
+      "nome": "Poliamida",
+      "composicao": "100% Poliamida"
+    },
+    {
       "id": "pv",
       "nome": "Malha PV",
       "composicao": "65% Poliéster / 35% Viscose"

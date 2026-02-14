@@ -407,6 +407,10 @@
         preencherFormulario(ficha);
         desabilitarCampos();
         configurarBotoesAcao();
+
+        if (typeof window.gerarVersaoImpressao === 'function') {
+          setTimeout(() => window.gerarVersaoImpressao(true), 120);
+        }
       }, 100);
 
       const header = document.querySelector('header h1');
@@ -499,6 +503,9 @@
   }
 
   function preencherFormulario(ficha) {
+    window.__preenchendoFicha = true;
+    const observacoesSalvas = ficha.observacoesHtml || ficha.observacoes || '';
+
     const camposTexto = [
       'cliente', 'vendedor', 'dataInicio', 'numeroVenda', 
       'dataEntrega', 'evento', 'material', 'composicao',
@@ -508,7 +515,7 @@
       'aberturaLateral', 'corAberturaLateral',
       'reforcoGola', 'corReforco', 
       'bolso', 'filete', 'fileteLocal', 'fileteCor',
-      'faixa', 'faixaLocal', 'faixaCor', 'arte', 'observacoes'
+      'faixa', 'faixaLocal', 'faixaCor', 'arte'
     ];
 
     camposTexto.forEach(campo => {
@@ -654,6 +661,17 @@
         if (faixaLocalContainer) faixaLocalContainer.style.display = 'block';
         if (faixaCorContainer) faixaCorContainer.style.display = 'block';
       }
+
+      const observacoesInput = document.getElementById('observacoes');
+      if (observacoesInput) {
+        observacoesInput.value = observacoesSalvas;
+      }
+
+      if (window.richTextEditor) {
+        window.richTextEditor.setContent(observacoesSalvas);
+      }
+
+      window.__preenchendoFicha = false;
     }, 150);
   }
 
@@ -731,3 +749,4 @@
   };
 
 })();
+

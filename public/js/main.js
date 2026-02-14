@@ -1395,7 +1395,9 @@
     return `${dia}/${mes}/${ano}`;
   }
 
-  function gerarVersaoImpressao() {
+  function gerarVersaoImpressao(apenasPreview = false) {
+    const paramsUrl = new URLSearchParams(window.location.search);
+    const manterVersaoImpressao = paramsUrl.has('visualizar');
     const hoje = new Date();
     const dataEmissao = hoje.toLocaleDateString('pt-BR') + ' ' + hoje.toLocaleTimeString('pt-BR');
     const isEvento = document.getElementById('evento')?.value === 'sim';
@@ -1674,17 +1676,31 @@
     if (normal && printV) {
       normal.style.display = 'none';
       printV.style.display = 'block';
+
+      if (apenasPreview) {
+        document.body.classList.add('preview-impressao');
+        return;
+      }
+
+      document.body.classList.remove('preview-impressao');
       window.print();
-      setTimeout(() => {
-        normal.style.display = 'block';
-        printV.style.display = 'none';
-      }, 100);
-    } else {
+      if (manterVersaoImpressao) {
+        document.body.classList.add('preview-impressao');
+      }
+      if (!manterVersaoImpressao) {
+        setTimeout(() => {
+          normal.style.display = 'block';
+          printV.style.display = 'none';
+          document.body.classList.remove('preview-impressao');
+        }, 100);
+      }
+    } else if (!apenasPreview) {
       window.print();
     }
   }
 
   function initObservacoesAutoFill() {
+    let ultimoTextoAuto = '';
 
     function getVal(id) {
       const el = document.getElementById(id);
@@ -1707,34 +1723,25 @@
       const rows = document.querySelectorAll('#produtosTable tr');
       if (!rows || rows.length === 0) return '';
 
-      const descricoes = new Set();
-
-      rows.forEach(row => {
+      for (const row of rows) {
         const descInput = row.querySelector('.descricao');
         if (descInput) {
           const val = (descInput.value || '').trim().toUpperCase();
-          if (val) descricoes.add(val);
+          if (val) return val;
         }
-      });
-
-      if (descricoes.size > 1) return null;
-      if (descricoes.size === 1) return [...descricoes][0];
+      }
       return '';
     }
 
     function atualizarObservacoes() {
+      if (window.__preenchendoFicha) return;
+
       const observacoesInput = document.getElementById('observacoes');
       if (!observacoesInput) return;
+      const textoAtual = (observacoesInput.value || '').trim();
+      const podeSobrescrever = !textoAtual || textoAtual === ultimoTextoAuto;
 
       const produtoTabela = getProdutoDaTabela();
-
-      if (produtoTabela === null) {
-        observacoesInput.value = '';
-        if (window.richTextEditor) {
-          window.richTextEditor.setContent('');
-        }
-        return;
-      }
 
       const partes = [];
 
@@ -1847,7 +1854,7 @@
       const bolsoRaw = getRaw('bolso');
       const bolsoText = getVal('bolso');
       if (bolsoRaw && bolsoRaw !== 'nenhum' && bolsoText) {
-        partes.push(`COM BOLSO ${bolsoText}`);
+        partes.push(`COM ${bolsoText}`);
       }
 
       const fileteRaw = getRaw('filete');
@@ -1880,7 +1887,9 @@
         ? partes.join(' / ').toUpperCase()
         : '';
 
+      if (!podeSobrescrever) return;
       observacoesInput.value = textoFinal;
+      ultimoTextoAuto = textoFinal;
 
       if (window.richTextEditor) {
         window.richTextEditor.setContent(textoFinal);
@@ -1941,6 +1950,8 @@
   // Prevenção de Reloads
   (function () {
     let dadosNaoSalvos = false;
+    const params = new URLSearchParams(window.location.search);
+    const modoSomenteLeitura = params.has('visualizar') || params.get('preview') === 'impressao';
 
     function marcarDadosNaoSalvos() {
       dadosNaoSalvos = true;
@@ -1951,6 +1962,7 @@
     }
 
     window.onbeforeunload = function (evento) {
+      if (modoSomenteLeitura) return undefined;
       if (dadosNaoSalvos) {
         const mensagem = "Você tem alterações não salvas. Se sair agora, perderá todas as modificações.";
         evento.returnValue = mensagem;
@@ -1959,6 +1971,7 @@
     };
 
     function monitorarCampos() {
+      if (modoSomenteLeitura) return;
       document.querySelectorAll('input:not([type="submit"]):not([type="button"]), textarea, select, [contenteditable="true"]')
         .forEach(campo => {
           campo.addEventListener('input', marcarDadosNaoSalvos);
@@ -1983,3 +1996,5 @@
   })();
 
 })();
+
+

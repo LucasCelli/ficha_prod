@@ -8,6 +8,11 @@
   let fichasCache = [];
   let fichasFiltradas = [];
   let fichaParaDeletar = null;
+  let modalVisualizacao = null;
+  let iframeVisualizacao = null;
+  let tituloModalVisualizacao = null;
+  let botaoImprimirModal = null;
+  let loadingModalVisualizacao = null;
   let paginaAtual = 1;
   const itensPorPagina = 10;
 
@@ -30,6 +35,7 @@
   }
 
   function initEventListeners() {
+    initModalVisualizacao();
     // CORREÇÃO: Garantir que pelo menos um botão de filtro esteja ativo
     const statusFilterBtns = document.querySelectorAll('.status-filter .btn');
     
@@ -215,9 +221,18 @@
     container.innerHTML = fichas.map(ficha => criarCardFicha(ficha)).join('');
 
     container.querySelectorAll('.btn-visualizar').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', e => {
+        e.preventDefault();
         const id = parseInt(btn.dataset.id);
         visualizarFicha(id);
+      });
+    });
+
+    container.querySelectorAll('.ficha-cliente-link').forEach(link => {
+      link.addEventListener('click', e => {
+        e.preventDefault();
+        const id = parseInt(link.dataset.id);
+        if (!Number.isNaN(id)) visualizarFicha(id);
       });
     });
 
@@ -256,12 +271,20 @@
     const totalItens = calcularTotalItens(ficha.produtos || []);
     const isEvento = ficha.evento === 'sim';
     const isPendente = ficha.status === 'pendente';
+    const miniaturaSrc = obterMiniaturaFicha(ficha);
 
     return `
     <div class="ficha-item ${isPendente ? '' : 'ficha-entregue'}">
+      <div class="ficha-thumb ${miniaturaSrc ? 'has-image' : 'no-image'}">
+        ${miniaturaSrc
+        ? `<img src="${miniaturaSrc}" alt="Miniatura da ficha de ${ficha.cliente || 'cliente'}" loading="lazy">`
+        : '<i class="fas fa-image" aria-hidden="true"></i>'}
+      </div>
       <div class="ficha-main">
         <div class="ficha-header">
-          <span class="ficha-cliente">${ficha.cliente || 'Cliente não informado'}</span>
+          <a class="ficha-cliente ficha-cliente-link" href="index.html?visualizar=${ficha.id}" data-id="${ficha.id}" title="Visualizar ficha">
+            ${ficha.cliente || 'Cliente não informado'}
+          </a>
           ${ficha.numero_venda ? `<span class="ficha-numero">#${ficha.numero_venda}</span>` : ''}
           ${isEvento ? '<span class="ficha-evento-badge"><i class="fas fa-star"></i> Evento</span>' : ''}
           ${!isPendente ? '<span class="ficha-status-badge entregue"><i class="fas fa-check"></i> Entregue</span>' : ''}
@@ -419,7 +442,108 @@
   // Ações
 
   function visualizarFicha(id) {
-    window.location.href = `index.html?visualizar=${id}`;
+    abrirModalVisualizacao(id);
+  }
+
+  function initModalVisualizacao() {
+    if (modalVisualizacao) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'preview-modal';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+      <div class="preview-modal-overlay"></div>
+      <div class="preview-modal-content">
+        <div class="preview-modal-header">
+          <div class="preview-modal-title-wrap">
+            <strong class="preview-modal-title">Pré-visualização de Impressão</strong>
+            <span class="preview-modal-subtitle">Ficha <span class="preview-modal-ficha-id">#-</span></span>
+          </div>
+          <div class="preview-modal-actions">
+            <button type="button" class="preview-modal-print" title="Imprimir ficha">
+              <i class="fas fa-print"></i>
+              <span>Imprimir ficha</span>
+            </button>
+            <button type="button" class="preview-modal-close" title="Fechar">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        <div class="preview-modal-body">
+          <div class="preview-modal-loading">
+            <i class="fas fa-spinner fa-spin"></i>
+            <span>Carregando preview...</span>
+          </div>
+          <iframe class="preview-modal-iframe" title="Visualização da ficha" loading="lazy"></iframe>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    modalVisualizacao = modal;
+    iframeVisualizacao = modal.querySelector('.preview-modal-iframe');
+    tituloModalVisualizacao = modal.querySelector('.preview-modal-ficha-id');
+    botaoImprimirModal = modal.querySelector('.preview-modal-print');
+    loadingModalVisualizacao = modal.querySelector('.preview-modal-loading');
+
+    const overlay = modal.querySelector('.preview-modal-overlay');
+    const btnClose = modal.querySelector('.preview-modal-close');
+    overlay?.addEventListener('click', fecharModalVisualizacao);
+    btnClose?.addEventListener('click', fecharModalVisualizacao);
+    botaoImprimirModal?.addEventListener('click', imprimirFichaModal);
+    iframeVisualizacao?.addEventListener('load', () => setLoadingPreview(false));
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && modalVisualizacao && modalVisualizacao.style.display !== 'none') {
+        fecharModalVisualizacao();
+      }
+    });
+  }
+
+  function abrirModalVisualizacao(id) {
+    if (!modalVisualizacao || !iframeVisualizacao) initModalVisualizacao();
+    if (!modalVisualizacao || !iframeVisualizacao) return;
+
+    setLoadingPreview(true);
+    iframeVisualizacao.src = `index.html?visualizar=${id}`;
+    if (tituloModalVisualizacao) tituloModalVisualizacao.textContent = `#${id}`;
+    modalVisualizacao.style.display = 'flex';
+    document.body.classList.add('preview-modal-open');
+  }
+
+  function fecharModalVisualizacao() {
+    if (!modalVisualizacao || !iframeVisualizacao) return;
+    modalVisualizacao.style.display = 'none';
+    iframeVisualizacao.src = 'about:blank';
+    setLoadingPreview(true);
+    document.body.classList.remove('preview-modal-open');
+  }
+
+  function setLoadingPreview(loading) {
+    if (!modalVisualizacao) return;
+    modalVisualizacao.classList.toggle('is-loading', loading);
+    if (botaoImprimirModal) botaoImprimirModal.disabled = loading;
+    if (loadingModalVisualizacao) {
+      loadingModalVisualizacao.style.display = loading ? 'flex' : 'none';
+    }
+  }
+
+  function imprimirFichaModal() {
+    if (!iframeVisualizacao || !iframeVisualizacao.contentWindow) return;
+
+    try {
+      const win = iframeVisualizacao.contentWindow;
+      if (typeof win.gerarVersaoImpressao === 'function') {
+        win.gerarVersaoImpressao(false);
+      } else {
+        win.print();
+      }
+    } catch {
+      try {
+        iframeVisualizacao.contentWindow.print();
+      } catch {}
+    }
   }
 
   function editarFicha(id) {
@@ -565,6 +689,41 @@
     }, 0);
   }
 
+  function obterMiniaturaFicha(ficha) {
+    const imagens = extrairImagensFicha(ficha);
+    if (!Array.isArray(imagens) || imagens.length === 0) return '';
+
+    const primeira = imagens[0];
+    if (typeof primeira === 'string') return primeira;
+    if (primeira && typeof primeira === 'object') {
+      return primeira.src || primeira.url || '';
+    }
+    return '';
+  }
+
+  function extrairImagensFicha(ficha) {
+    if (Array.isArray(ficha.imagens) && ficha.imagens.length > 0) {
+      return ficha.imagens;
+    }
+
+    const imagensData = ficha.imagens_data || ficha.imagensData;
+    if (!imagensData) return [];
+
+    if (Array.isArray(imagensData)) {
+      return imagensData;
+    }
+
+    if (typeof imagensData === 'string') {
+      try {
+        const parsed = JSON.parse(imagensData);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    return [];
+  }
   function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -585,3 +744,9 @@
     mostrarToast(mensagem, 'error');
   }
 })();
+
+
+
+
+
+
