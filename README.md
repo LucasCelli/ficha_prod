@@ -1,189 +1,228 @@
-# 📋 Sistema de Fichas Técnicas v0.5-beta
+# Sistema de Fichas Tecnicas
 
-Sistema moderno de gestão de fichas técnicas para confecção de roupas personalizadas.
+Aplicacao web para cadastro, acompanhamento e impressao de fichas tecnicas de confeccao, com armazenamento em Turso (libSQL) e imagens no Cloudinary.
 
-## 🚀 Tecnologias
+## Visao Geral
 
-| Tecnologia | Descrição |
-|------------|-----------|
-| **Node.js 18+** | Runtime JavaScript |
-| **Express 4.x** | Framework web |
-| **Turso (libSQL)** | Banco de dados SQLite distribuído |
-| **Cloudinary** | Armazenamento de imagens na nuvem |
-| **dotenv** | Variáveis de ambiente |
+O sistema foi desenhado para operar o ciclo completo da ficha:
 
-## 📁 Estrutura
+- criar e editar ficha tecnica
+- anexar layouts/imagens (ate 4 por ficha)
+- controlar status (pendente/entregue)
+- visualizar e imprimir em modo pronto para producao
+- duplicar ficha para novo id
+- acompanhar indicadores e relatorios
+- exportar dados (PDF, Excel, JSON)
 
-```
-fichas-tecnicas/
-├── server.js              # Servidor Express + API
-├── package.json
-├── .env                   # Credenciais (não commitar!)
-└── public/
-    ├── index.html         # Formulário de fichas
-    ├── dashboard.html     # Listagem e gestão
-    ├── clientes.html      # Gestão de clientes
-    ├── relatorios.html    # Relatórios
-    ├── migracao-cloudinary.html
-    ├── css/
-    │   ├── styles.css
-    │   ├── dashboard.css
-    │   └── cloudinary-styles.css
-    └── js/
-        ├── api-client.js           # Cliente da API
-        ├── main.js                 # Lógica do formulário
-        ├── integration.js          # Integração com backend
-        ├── dashboard.js            # Lógica do dashboard
-        ├── clientes.js             # Gestão de clientes
-        ├── cloudinary-upload.js    # Upload para Cloudinary
-        └── image-handler-cloudinary.js
+## Stack Tecnica
+
+- Node.js 18+
+- Express 4
+- Turso (@libsql/client)
+- Cloudinary (upload e gestao de imagens)
+- Frontend em HTML/CSS/JS vanilla
+
+## Estrutura do Projeto
+
+```text
+.
+|-- server.js
+|-- package.json
+`-- public/
+    |-- index.html
+    |-- dashboard.html
+    |-- clientes.html
+    |-- relatorios.html
+    |-- css/
+    `-- js/
 ```
 
-## ⚡ Início Rápido
+Arquivos principais:
+
+- `server.js`: API, regras de negocio, integracao Turso/Cloudinary
+- `public/js/main.js`: formulario da ficha, impressao, preenchimento
+- `public/js/integration.js`: ligacao formulario <-> API
+- `public/js/dashboard.js`: listagem, modal de visualizacao, duplicacao
+- `public/js/image-handler-cloudinary.js`: UI de imagens no formulario
+- `public/js/cloudinary-upload.js`: upload/remocao no Cloudinary
+- `public/js/relatorios.js`: dashboards de relatorios + exportacoes
+- `public/js/rich-text-editor.js`: editor rico de observacoes
+
+## Funcionalidades Atuais
+
+### Fichas
+
+- CRUD completo de fichas
+- campos tecnicos para modelagem e composicao
+- tabela de produtos por tamanho/quantidade/descricao
+- status pendente/entregue com data de entrega
+- destaque para fichas de evento
+- duplicacao de ficha com novo id
+
+### Visualizacao e Impressao
+
+- modal de pre-visualizacao de impressao no dashboard
+- loading do modal sincronizado com render final da pre-visualizacao
+- impressao com layout dedicado (`print-version`)
+- observacoes (editor rico) refletidas corretamente na impressao
+
+### Duplicacao no Modal
+
+- botao `Duplicar ficha` no modal de visualizacao
+- ao duplicar, cria nova ficha (sem reaproveitar id)
+- redireciona direto para `index.html?editar=<novoId>`
+
+### Imagens e Cloudinary
+
+- upload por clique, drag-and-drop e colar (Ctrl+V)
+- ate 4 imagens por ficha
+- suporte a URL/publicId/descricao por imagem
+- remocao segura para imagens compartilhadas:
+  - se a imagem estiver em outra ficha, remove apenas da ficha atual
+  - exibicao de aviso informando que a ficha original nao foi alterada
+
+### Clientes
+
+- autocomplete de clientes no formulario
+- listagem com historico e total de pedidos/fichas
+- edicao e exclusao de clientes
+
+### Relatorios
+
+- visao por periodo (mes, ano, customizado)
+- analise por vendedor e por material
+- top produtos, top clientes, distribuicao por tamanho
+- comparativo com periodo anterior
+- exportacao PDF/Excel e impressao
+- terminologia orientada a "fichas" na interface (evita confusao com "vendas")
+
+### Backup
+
+- exportar backup JSON
+- importar backup JSON
+
+## Como Rodar Localmente
 
 ```bash
-# 1. Instalar dependências
 npm install
-
-# 2. Configurar .env (ver abaixo)
-
-# 3. Iniciar servidor
 npm start
-
-# 4. Acessar
-http://localhost:3000
 ```
 
-## 🔧 Configuração (.env)
+Acesse:
+
+- `http://localhost:3000`
+
+Modo desenvolvimento:
+
+```bash
+npm run dev
+```
+
+## Variaveis de Ambiente
+
+Crie um `.env` na raiz:
 
 ```env
-# Turso Database
 TURSO_DATABASE_URL=libsql://seu-banco.turso.io
 TURSO_AUTH_TOKEN=seu_token
 
-# Cloudinary
 CLOUDINARY_CLOUD_NAME=seu_cloud_name
 CLOUDINARY_API_KEY=sua_api_key
 CLOUDINARY_API_SECRET=seu_api_secret
+# opcional (padrao: fichas_upload)
+CLOUDINARY_UPLOAD_PRESET=fichas_upload
+
+# opcional (padrao: 3000)
+PORT=3000
 ```
 
-## 📡 API Endpoints
+## API (Resumo)
 
-### Fichas Técnicas
-| Método | Endpoint | Descrição |
-|--------|----------|-----------|
-| `GET` | `/api/fichas` | Listar fichas (com filtros) |
-| `GET` | `/api/fichas/:id` | Buscar ficha por ID |
-| `POST` | `/api/fichas` | Criar nova ficha |
-| `PUT` | `/api/fichas/:id` | Atualizar ficha |
-| `PATCH` | `/api/fichas/:id/entregar` | Marcar como entregue |
-| `PATCH` | `/api/fichas/:id/pendente` | Voltar para pendente |
-| `DELETE` | `/api/fichas/:id` | Excluir ficha |
+### Health
+
+- `GET /api/health`
+
+### Fichas
+
+- `GET /api/fichas`
+- `GET /api/fichas/:id`
+- `POST /api/fichas`
+- `PUT /api/fichas/:id`
+- `PATCH /api/fichas/:id/entregar`
+- `PATCH /api/fichas/:id/pendente`
+- `DELETE /api/fichas/:id`
+
+Filtros suportados em `GET /api/fichas`:
+
+- `status`
+- `cliente`
+- `vendedor`
+- `dataInicio` (YYYY-MM-DD)
+- `dataFim` (YYYY-MM-DD)
 
 ### Clientes
-| Método | Endpoint | Descrição |
-|--------|----------|-----------|
-| `GET` | `/api/clientes` | Autocomplete de clientes |
-| `GET` | `/api/clientes/lista` | Listar todos com detalhes |
-| `PUT` | `/api/clientes/:id` | Atualizar cliente |
-| `DELETE` | `/api/clientes/:id` | Excluir cliente |
 
-### Estatísticas e Relatórios
-| Método | Endpoint | Descrição |
-|--------|----------|-----------|
-| `GET` | `/api/estatisticas` | Estatísticas gerais |
-| `GET` | `/api/relatorio` | Relatório por período |
+- `GET /api/clientes`
+- `GET /api/clientes/lista`
+- `PUT /api/clientes/:id`
+- `DELETE /api/clientes/:id`
+
+### Estatisticas e Relatorios
+
+- `GET /api/estatisticas`
+- `GET /api/relatorio`
+- `GET /api/relatorio/vendedores`
+- `GET /api/relatorio/materiais`
+- `GET /api/relatorio/produtos`
+- `GET /api/relatorio/clientes-top`
+- `GET /api/relatorio/tamanhos`
+- `GET /api/relatorio/comparativo`
+- `GET /api/relatorio/eficiencia`
 
 ### Cloudinary
-| Método | Endpoint | Descrição |
-|--------|----------|-----------|
-| `GET` | `/api/cloudinary/config` | Config pública |
-| `POST` | `/api/cloudinary/signature` | Gerar assinatura de upload |
-| `POST` | `/api/cloudinary/migrar` | Migrar imagens base64 |
-| `DELETE` | `/api/cloudinary/image/:id` | Deletar imagem |
 
-## 🔍 Filtros Disponíveis
+- `GET /api/cloudinary/config`
+- `POST /api/cloudinary/signature`
+- `POST /api/cloudinary/migrar`
+- `DELETE /api/cloudinary/image/:publicId`
+  - query opcional: `excludeFichaId`
 
-```
-GET /api/fichas?status=pendente&cliente=João&dataInicio=2024-01-01
-```
+## Banco de Dados (Principal)
 
-| Parâmetro | Tipo | Descrição |
-|-----------|------|-----------|
-| `status` | string | `pendente` ou `entregue` |
-| `cliente` | string | Busca parcial no nome |
-| `vendedor` | string | Nome do vendedor |
-| `dataInicio` | date | Filtrar a partir de (YYYY-MM-DD) |
-| `dataFim` | date | Filtrar até (YYYY-MM-DD) |
+### Tabela `fichas`
 
-## 🖼️ Sistema de Imagens
+Campos relevantes:
 
-- Upload direto para **Cloudinary** (não sobrecarrega o banco)
-- Otimização automática: `c_limit,w_1500,h_1500,q_auto:good`
-- Suporta até **4 imagens** por ficha
-- Drag & drop, paste (Ctrl+V), click para upload
-- Thumbnails otimizados para listagem
+- identificacao e datas (`id`, `data_inicio`, `data_entrega`, `data_entregue`)
+- dados comerciais (`cliente`, `vendedor`, `numero_venda`, `status`, `evento`)
+- especificacoes tecnicas (material, manga, gola, bolso, filete, faixa etc.)
+- observacoes (`observacoes`)
+- imagens (`imagem_data`, `imagens_data`)
+- produtos em JSON (`produtos`)
 
-## 📊 Funcionalidades
+### Tabela `clientes`
 
-- ✅ CRUD completo de fichas técnicas
-- ✅ Gestão de clientes com histórico
-- ✅ Status de pedidos (pendente/entregue)
-- ✅ Marcação de pedidos para eventos
-- ✅ Upload de múltiplas imagens
-- ✅ Relatórios por período
-- ✅ Exportar/importar backup JSON
-- ✅ Autocomplete de clientes
-- ✅ Filtros avançados
-- ✅ Responsivo (mobile-friendly)
+- `id`, `nome`, `primeiro_pedido`, `ultimo_pedido`, `total_pedidos`, `data_criacao`
 
-## 🗄️ Estrutura do Banco
+## Fluxos Importantes
 
-### Tabela: fichas
-```sql
-id, cliente, vendedor, data_inicio, numero_venda, data_entrega,
-evento, status, material, composicao, cor_material, manga,
-acabamento_manga, largura_manga, gola, acabamento_gola,
-cor_peitilho_interno, cor_peitilho_externo, abertura_lateral,
-reforco_gola, cor_reforco, bolso, filete, faixa, arte,
-cor_sublimacao, observacoes, imagem_data, imagens_data,
-produtos (JSON), data_criacao, data_atualizacao, data_entregue
-```
+### 1) Duplicar ficha sem risco de sobrescrever id
 
-### Tabela: clientes
-```sql
-id, nome (unique), primeiro_pedido, ultimo_pedido,
-total_pedidos, data_criacao
-```
+Duplicacao sempre remove `id` antes de salvar, garantindo nova ficha.
 
-## 📜 Scripts
+### 2) Remover imagem em ficha duplicada
 
-```bash
-npm start    # Inicia o servidor
-npm run dev  # Modo desenvolvimento (hot reload)
-```
+Quando a imagem e compartilhada, o backend impede exclusao fisica no Cloudinary e retorna sucesso de remocao local.
 
-## 📝 Changelog
+### 3) Preview no modal do dashboard
 
-### v0.5-beta (atual)
-- ✨ Integração com Cloudinary para imagens
-- ✨ Otimização automática de uploads
-- ✨ Migração de imagens base64 existentes
-- 🐛 Correção no carregamento de múltiplas imagens
+O loading do modal so encerra quando o iframe sinaliza que a versao de impressao foi montada, evitando flash de pagina sem estilo final.
 
-### v0.4-beta
-- ✨ Suporte a múltiplas imagens por ficha
-- ✨ Drag & drop e paste de imagens
+## Scripts
 
-### v0.3-beta
-- ✨ Migração para Turso (banco distribuído)
-- ✨ Gestão de clientes separada
+- `npm start`: sobe o servidor
+- `npm run dev`: sobe com watch para desenvolvimento
 
-### v0.2-beta
-- ✨ Dashboard de fichas
-- ✨ Filtros e relatórios
+## Observacao
 
-### v0.1-beta
-- 🎉 Versão inicial
-- ✨ Formulário de fichas técnicas
-- ✨ Salvamento local
+Se voce alterar comportamento de relatorios, lembre que o sistema usa "fichas" como unidade de comparacao na interface para evitar vies por vendedor que apenas cadastrou mais fichas para o mesmo pedido.
