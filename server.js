@@ -76,6 +76,14 @@ function normalizeFichaPayload(dados) {
   };
 }
 
+const KANBAN_STATUS_VALUES = new Set([
+  'pendente',
+  'exportando',
+  'fila_impressao',
+  'sublimando',
+  'na_costura'
+]);
+
 // Middlewares
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -121,6 +129,7 @@ async function initDatabase() {
         data_entrega DATE,
         evento TEXT DEFAULT 'nao',
         status TEXT DEFAULT 'pendente',
+        kanban_status TEXT DEFAULT 'pendente',
         material TEXT,
         composicao TEXT,
         cor_material TEXT,
@@ -191,7 +200,8 @@ async function initDatabase() {
       'filete_local TEXT',
       'filete_cor TEXT',
       'faixa_local TEXT',
-      'faixa_cor TEXT'
+      'faixa_cor TEXT',
+      "kanban_status TEXT DEFAULT 'pendente'"
     ];
 
     for (const coluna of migrações) {
@@ -201,6 +211,17 @@ async function initDatabase() {
       } catch (e) {
         // Coluna já existe, ignorar
       }
+    }
+
+    try {
+      await db.execute(`
+        UPDATE fichas
+        SET kanban_status = 'pendente'
+        WHERE kanban_status IS NULL OR trim(kanban_status) = ''
+      `);
+      await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_kanban_status ON fichas(kanban_status)`);
+    } catch (e) {
+      // Ignora se a coluna ainda não existir por qualquer motivo.
     }
 
     console.log('✅ Banco de dados Turso inicializado com sucesso');
@@ -460,6 +481,44 @@ app.patch('/api/fichas/:id/pendente', async (req, res) => {
   } catch (error) {
     console.error('Erro ao marcar como pendente:', error);
     res.status(500).json({ error: 'Erro ao marcar como pendente' });
+  }
+});
+
+// Atualizar status do kanban
+app.patch('/api/fichas/:id/kanban-status', async (req, res) => {
+  try {
+    const fichaExiste = await dbGet('SELECT id FROM fichas WHERE id = ?', [req.params.id]);
+
+    if (!fichaExiste) {
+      return res.status(404).json({ error: 'Ficha não encontrada' });
+    }
+
+    const requestedStatus = req.body?.status ?? req.body?.kanbanStatus;
+    const kanbanStatus = typeof requestedStatus === 'string'
+      ? requestedStatus.trim().toLowerCase()
+      : '';
+
+    if (!KANBAN_STATUS_VALUES.has(kanbanStatus)) {
+      return res.status(400).json({
+        error: 'Status de kanban inválido. Use: pendente, exportando, fila_impressao, sublimando, na_costura.'
+      });
+    }
+
+    const now = new Date().toISOString();
+    await dbRun(
+      'UPDATE fichas SET kanban_status = ?, data_atualizacao = ? WHERE id = ?',
+      [kanbanStatus, now, req.params.id]
+    );
+
+    console.log(`✅ Ficha #${req.params.id} atualizada no kanban: ${kanbanStatus}`);
+    res.json({
+      id: parseInt(req.params.id, 10),
+      kanbanStatus,
+      message: 'Status do kanban atualizado com sucesso'
+    });
+  } catch (error) {
+    console.error('Erro ao atualizar status do kanban:', error);
+    res.status(500).json({ error: 'Erro ao atualizar status do kanban' });
   }
 });
 

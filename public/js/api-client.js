@@ -162,6 +162,21 @@ class APIClient {
     return true;
   }
 
+  async atualizarKanbanStatus(id, kanbanStatus) {
+    const response = await fetch(`${this.baseURL}/fichas/${id}/kanban-status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: kanbanStatus })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Erro ao atualizar status do kanban');
+    }
+
+    return response.json();
+  }
+
   // Clientes
 
   async buscarClientes(termo = '') {

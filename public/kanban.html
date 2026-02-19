@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <title>Quadro de Produção - Fichas Técnicas</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/kanban.css">
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+</head>
+
+<body>
+    <div class="container kanban-page-container">
+        <header>
+            <div class="header-content">
+                <div>
+                    <h1><i class="fas fa-table-columns"></i> Quadro de Produção</h1>
+                    <p>Fluxo visual de fichas técnicas por etapa</p>
+                </div>
+                <div class="header-actions">
+                    <a href="dashboard.html" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="clientes.html" class="btn btn-secondary">
+                        <i class="fas fa-users"></i>
+                        <span>Clientes</span>
+                    </a>
+                    <a href="relatorios.html" class="btn btn-warning">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Relatórios</span>
+                    </a>
+                    <a href="index.html" class="btn btn-primary">
+                        <i class="fas fa-plus"></i>
+                        <span>Nova Ficha</span>
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <main class="kanban-layout">
+            <section class="card kanban-filters-card is-collapsed">
+                <div class="card-header kanban-filters-header">
+                    <button type="button" id="btnToggleFiltrosKanban" class="kanban-filters-toggle" aria-expanded="false"
+                        aria-controls="kanbanFiltersBody">
+                        <span class="kanban-filters-title">
+                            <i class="fas fa-sliders"></i>
+                            <span>Filtros</span>
+                        </span>
+                        <i class="fas fa-chevron-down kanban-filters-chevron" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div class="card-body kanban-filters-body" id="kanbanFiltersBody" hidden>
+                    <div class="form-group">
+                        <label for="filterClienteKanban">
+                            <i class="fas fa-user"></i>
+                            Filtrar por cliente
+                        </label>
+                        <input type="text" id="filterClienteKanban" class="form-control"
+                            placeholder="Digite o nome do cliente...">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="searchPedidoKanban">
+                            <i class="fas fa-hashtag"></i>
+                            Buscar por pedido
+                        </label>
+                        <input type="text" id="searchPedidoKanban" class="form-control"
+                            placeholder="Número do pedido...">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sortDataKanban">
+                            <i class="fas fa-sort"></i>
+                            Ordenar por data
+                        </label>
+                        <select id="sortDataKanban" class="form-control">
+                            <option value="data_desc">Mais recente</option>
+                            <option value="data_asc">Mais antiga</option>
+                        </select>
+                    </div>
+
+                    <div class="kanban-sidebar-actions">
+                        <button type="button" id="btnLimparFiltrosKanban" class="btn btn-secondary">
+                            <i class="fas fa-eraser"></i>
+                            Limpar
+                        </button>
+                        <button type="button" id="btnAtualizarKanban" class="btn btn-primary">
+                            <i class="fas fa-rotate"></i>
+                            Atualizar
+                        </button>
+                    </div>
+
+                    <p class="kanban-sidebar-hint">
+                        <i class="fas fa-circle-info"></i>
+                        Arraste os cards entre colunas para atualizar o status de produção.
+                    </p>
+                </div>
+            </section>
+
+            <section class="card kanban-board-card">
+                <div class="card-header kanban-board-header">
+                    <div class="kanban-board-title">
+                        <i class="fas fa-grip"></i>
+                        <span>Quadro Kanban</span>
+                    </div>
+                    <span id="kanbanTotalCount" class="badge">0 fichas</span>
+                </div>
+                <div class="card-body kanban-board-body">
+                    <div class="kanban-board-scroll">
+                        <div id="kanbanBoard" class="kanban-board">
+                            <section class="kanban-column" data-status="pendente">
+                                <header class="kanban-column-header pendente">
+                                    <h2><i class="fas fa-hourglass-half"></i> Pendente</h2>
+                                    <span class="kanban-column-count" data-count-for="pendente">0</span>
+                                </header>
+                                <div class="kanban-column-list" id="kanban-list-pendente"></div>
+                            </section>
+
+                            <section class="kanban-column" data-status="exportando">
+                                <header class="kanban-column-header exportando">
+                                    <h2><i class="fas fa-file-export"></i> Exportando/Preparando Arte</h2>
+                                    <span class="kanban-column-count" data-count-for="exportando">0</span>
+                                </header>
+                                <div class="kanban-column-list" id="kanban-list-exportando"></div>
+                            </section>
+
+                            <section class="kanban-column" data-status="fila_impressao">
+                                <header class="kanban-column-header fila_impressao">
+                                    <h2><i class="fas fa-print"></i> Na Fila de Impressão/Imprimindo</h2>
+                                    <span class="kanban-column-count" data-count-for="fila_impressao">0</span>
+                                </header>
+                                <div class="kanban-column-list" id="kanban-list-fila_impressao"></div>
+                            </section>
+
+                            <section class="kanban-column" data-status="sublimando">
+                                <header class="kanban-column-header sublimando">
+                                    <h2><i class="fas fa-spray-can-sparkles"></i> Sublimando/Na Estamparia</h2>
+                                    <span class="kanban-column-count" data-count-for="sublimando">0</span>
+                                </header>
+                                <div class="kanban-column-list" id="kanban-list-sublimando"></div>
+                            </section>
+
+                            <section class="kanban-column" data-status="na_costura">
+                                <header class="kanban-column-header na_costura">
+                                    <h2><i class="fas fa-shirt"></i> Na Costura/Em Revisão</h2>
+                                    <span class="kanban-column-count" data-count-for="na_costura">0</span>
+                                </header>
+                                <div class="kanban-column-list" id="kanban-list-na_costura"></div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="js/toast.js"></script>
+    <script src="js/api-client.js"></script>
+    <script src="js/kanban.js"></script>
+</body>
+
+</html>
