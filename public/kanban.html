@@ -160,6 +160,26 @@
         </main>
     </div>
 
+    <div id="kanbanViewModal" class="kanban-view-modal" role="dialog" aria-modal="true"
+        aria-labelledby="kanbanViewModalTitle" hidden aria-hidden="true">
+        <div class="kanban-view-modal-overlay" data-close-modal="true"></div>
+        <div class="kanban-view-modal-content" role="document">
+            <div class="kanban-view-modal-header">
+                <div class="kanban-view-modal-title-wrap">
+                    <strong id="kanbanViewModalTitle" class="kanban-view-modal-title">Visualizacao da Ficha</strong>
+                    <span class="kanban-view-modal-subtitle">Ficha <span id="kanbanViewFichaId">#-</span></span>
+                </div>
+                <button type="button" id="btnCloseKanbanViewModal" class="kanban-view-modal-close" title="Fechar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="kanban-view-modal-body">
+                <iframe id="kanbanViewFrame" class="kanban-view-modal-iframe" title="Visualizacao da ficha"
+                    loading="lazy"></iframe>
+            </div>
+        </div>
+    </div>
+
     <script src="js/toast.js"></script>
     <script src="js/api-client.js"></script>
     <script src="js/kanban.js"></script>

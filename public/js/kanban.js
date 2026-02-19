@@ -37,6 +37,14 @@
     lastMovedFichaId: null
   };
 
+  const ui = {
+    viewModal: null,
+    viewOverlay: null,
+    viewFrame: null,
+    viewFichaId: null,
+    viewCloseBtn: null
+  };
+
   document.addEventListener('DOMContentLoaded', () => {
     initKanban().catch(error => {
       console.error('Erro ao inicializar quadro Kanban:', error);
@@ -70,6 +78,11 @@
     const btnLimpar = document.getElementById('btnLimparFiltrosKanban');
     const btnAtualizar = document.getElementById('btnAtualizarKanban');
     const kanbanBoard = document.getElementById('kanbanBoard');
+    ui.viewModal = document.getElementById('kanbanViewModal');
+    ui.viewOverlay = ui.viewModal ? ui.viewModal.querySelector('.kanban-view-modal-overlay') : null;
+    ui.viewFrame = document.getElementById('kanbanViewFrame');
+    ui.viewFichaId = document.getElementById('kanbanViewFichaId');
+    ui.viewCloseBtn = document.getElementById('btnCloseKanbanViewModal');
 
     if (btnToggleFiltros && filtrosBody && filtrosCard) {
       const setAccordionState = expanded => {
@@ -136,9 +149,20 @@
     }
 
     if (kanbanBoard) {
+      kanbanBoard.addEventListener('click', handleBoardClick);
       kanbanBoard.addEventListener('dragstart', handleDragStart);
       kanbanBoard.addEventListener('dragend', handleDragEnd);
     }
+
+    if (ui.viewCloseBtn) {
+      ui.viewCloseBtn.addEventListener('click', closeViewModal);
+    }
+
+    if (ui.viewOverlay) {
+      ui.viewOverlay.addEventListener('click', closeViewModal);
+    }
+
+    document.addEventListener('keydown', handleGlobalKeydown);
 
     document.querySelectorAll('.kanban-column').forEach(column => {
       column.addEventListener('dragenter', handleDragEnterColumn);
@@ -162,7 +186,8 @@
 
   function renderKanban() {
     const fichasFiltradas = getFichasFiltradasEOrdenadas();
-    const agrupadas = groupByColumn(fichasFiltradas);
+    const fichasSemRepeticao = dedupeByNumeroVenda(fichasFiltradas);
+    const agrupadas = groupByColumn(fichasSemRepeticao);
 
     COLUMN_DEFINITIONS.forEach(column => {
       const cards = agrupadas[column.key] || [];
@@ -170,7 +195,7 @@
       updateColumnCounter(column.key, cards.length);
     });
 
-    updateTotalCounter(fichasFiltradas.length);
+    updateTotalCounter(fichasSemRepeticao.length);
     animateMovedCardIfNeeded();
   }
 
@@ -213,6 +238,25 @@
     return grouped;
   }
 
+  function dedupeByNumeroVenda(fichas) {
+    const seenNumeroVenda = new Set();
+    const unique = [];
+
+    fichas.forEach(ficha => {
+      const numeroVenda = normalizeNumeroVenda(ficha?.numero_venda);
+      if (!numeroVenda) {
+        unique.push(ficha);
+        return;
+      }
+
+      if (seenNumeroVenda.has(numeroVenda)) return;
+      seenNumeroVenda.add(numeroVenda);
+      unique.push(ficha);
+    });
+
+    return unique;
+  }
+
   function renderColumn(statusKey, fichas) {
     const listEl = document.getElementById(`kanban-list-${statusKey}`);
     if (!listEl) return;
@@ -240,7 +284,12 @@
               <i class="fas fa-hashtag"></i>
               <span>${numeroPedido}</span>
             </span>
-            <span class="kanban-card-status ${cardStatus}" title="${escapeHtml(getStatusLabel(cardStatus))}">${statusLabel}</span>
+            <span class="kanban-card-tools">
+              <span class="kanban-card-status ${cardStatus}" title="${escapeHtml(getStatusLabel(cardStatus))}">${statusLabel}</span>
+              <button type="button" class="kanban-btn-view-icon" data-action="view" data-id="${fichaId}" title="Visualizar ficha" aria-label="Visualizar ficha #${fichaId}">
+                <i class="fas fa-eye"></i>
+              </button>
+            </span>
           </div>
           <div class="kanban-card-meta">
             <i class="fas fa-calendar-day"></i>
@@ -261,6 +310,42 @@
     const totalEl = document.getElementById('kanbanTotalCount');
     if (!totalEl) return;
     totalEl.textContent = `${total} ${total === 1 ? 'ficha' : 'fichas'}`;
+  }
+
+  function handleBoardClick(event) {
+    const viewButton = event.target.closest('button[data-action="view"]');
+    if (!viewButton) return;
+
+    const id = Number(viewButton.dataset.id);
+    if (!id) return;
+
+    openViewModal(id);
+  }
+
+  function handleGlobalKeydown(event) {
+    if (event.key !== 'Escape') return;
+    if (!ui.viewModal || ui.viewModal.hidden) return;
+    closeViewModal();
+  }
+
+  function openViewModal(fichaId) {
+    if (!ui.viewModal || !ui.viewFrame) return;
+
+    if (ui.viewFichaId) ui.viewFichaId.textContent = `#${fichaId}`;
+    ui.viewFrame.src = `index.html?visualizar=${fichaId}`;
+
+    ui.viewModal.hidden = false;
+    ui.viewModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('kanban-modal-open');
+  }
+
+  function closeViewModal() {
+    if (!ui.viewModal) return;
+
+    ui.viewModal.hidden = true;
+    ui.viewModal.setAttribute('aria-hidden', 'true');
+    if (ui.viewFrame) ui.viewFrame.src = 'about:blank';
+    document.body.classList.remove('kanban-modal-open');
   }
 
   function handleDragStart(event) {
@@ -496,6 +581,13 @@
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .trim();
+  }
+
+  function normalizeNumeroVenda(value) {
+    return String(value || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
   }
 
   function debounce(fn, delay) {
