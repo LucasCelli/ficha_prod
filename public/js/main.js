@@ -2008,6 +2008,9 @@
 
   function initObservacoesAutoFill() {
     let ultimoTextoAuto = '';
+    const modoEdicaoPorId = new URLSearchParams(window.location.search).has('editar');
+    let bloqueioAutoPreenchimento = false;
+    let aplicandoAutoPreenchimento = false;
 
     function abrirModalConfirmacaoAutopreencher() {
       return new Promise(resolve => {
@@ -2050,15 +2053,33 @@
       });
     }
 
-    function observacoesTemConteudo() {
-      if (window.richTextEditor && typeof window.richTextEditor.getPlainText === 'function') {
-        return !!(window.richTextEditor.getPlainText() || '').trim();
+    function htmlParaTexto(html) {
+      const temp = document.createElement('div');
+      temp.innerHTML = String(html || '');
+      return (temp.textContent || temp.innerText || '').trim();
+    }
+
+    function getEstadoObservacoesAtual() {
+      if (window.richTextEditor && typeof window.richTextEditor.getContent === 'function') {
+        const html = (window.richTextEditor.getContent() || '').trim();
+        return {
+          texto: htmlParaTexto(html)
+        };
       }
 
       const observacoesInput = document.getElementById('observacoes');
       const raw = observacoesInput ? (observacoesInput.value || '') : '';
-      const textoLimpo = raw.replace(/<[^>]*>/g, '').trim();
-      return !!textoLimpo;
+      return {
+        texto: raw.replace(/<[^>]*>/g, '').trim()
+      };
+    }
+
+    function observacoesTemConteudo() {
+      return !!getEstadoObservacoesAtual().texto;
+    }
+
+    function normalizarTextoComparacao(valor) {
+      return String(valor || '').replace(/\s+/g, ' ').trim();
     }
 
     function getVal(id) {
@@ -2097,8 +2118,8 @@
 
       const observacoesInput = document.getElementById('observacoes');
       if (!observacoesInput) return;
-      const textoAtual = (observacoesInput.value || '').trim();
-      const podeSobrescrever = !textoAtual || textoAtual === ultimoTextoAuto;
+      const estadoAtual = getEstadoObservacoesAtual();
+      if (!forcar && bloqueioAutoPreenchimento) return;
 
       const produtoTabela = getProdutoDaTabela();
       const partes = [];
@@ -2274,18 +2295,80 @@
         ? partes.join(' / ').toUpperCase()
         : '';
 
-      if (!forcar && !podeSobrescrever) return;
-      observacoesInput.value = textoFinal;
-      ultimoTextoAuto = textoFinal;
+      const textoAtualNorm = normalizarTextoComparacao(estadoAtual.texto);
+      const textoGeradoNorm = normalizarTextoComparacao(textoFinal);
+      const ultimoAutoNorm = normalizarTextoComparacao(ultimoTextoAuto);
+      const editadoManualmente = !!textoAtualNorm
+        && textoAtualNorm !== ultimoAutoNorm
+        && textoAtualNorm !== textoGeradoNorm;
 
-      if (window.richTextEditor) {
-        if (forcar && typeof window.richTextEditor.setContentWithSafeUndo === 'function') {
-          window.richTextEditor.setContentWithSafeUndo(textoFinal);
-        } else {
-          window.richTextEditor.setContent(textoFinal);
+      if (!forcar && editadoManualmente) {
+        bloqueioAutoPreenchimento = true;
+        return;
+      }
+      if (!forcar && textoAtualNorm === textoGeradoNorm) {
+        ultimoTextoAuto = textoFinal;
+        return;
+      }
+
+      if (forcar) {
+        bloqueioAutoPreenchimento = false;
+      }
+
+      aplicandoAutoPreenchimento = true;
+      try {
+        observacoesInput.value = textoFinal;
+        ultimoTextoAuto = textoFinal;
+
+        if (window.richTextEditor) {
+          if (forcar && typeof window.richTextEditor.setContentWithSafeUndo === 'function') {
+            window.richTextEditor.setContentWithSafeUndo(textoFinal);
+          } else {
+            window.richTextEditor.setContent(textoFinal);
+          }
         }
+      } finally {
+        aplicandoAutoPreenchimento = false;
       }
     }
+    const btnAutopreencherObs = document.getElementById('btnAutopreencherObservacoes');
+    if (btnAutopreencherObs) {
+      btnAutopreencherObs.addEventListener('click', async () => {
+        if (!observacoesTemConteudo()) {
+          atualizarObservacoes(true);
+          return;
+        }
+
+        const confirmou = await abrirModalConfirmacaoAutopreencher();
+        if (!confirmou) return;
+        atualizarObservacoes(true);
+      });
+    }
+
+    // Em modo editar por ID, desabilitamos totalmente auto-preenchimento por listeners.
+    // Mantemos apenas o botão "Auto-preencher" para ação explícita do usuário.
+    if (modoEdicaoPorId) {
+      return;
+    }
+
+    const marcarBloqueioManual = () => {
+      if (aplicandoAutoPreenchimento) return;
+      if (!observacoesTemConteudo()) return;
+      bloqueioAutoPreenchimento = true;
+    };
+
+    const observacoesInput = document.getElementById('observacoes');
+    if (observacoesInput) {
+      observacoesInput.addEventListener('input', marcarBloqueioManual);
+      observacoesInput.addEventListener('change', marcarBloqueioManual);
+    }
+
+    const editorEl = document.getElementById('richTextEditor');
+    if (editorEl) {
+      editorEl.addEventListener('input', marcarBloqueioManual);
+      editorEl.addEventListener('change', marcarBloqueioManual);
+    }
+
     const idsParaMonitorar = [
       'produto', 'material', 'corMaterial',
       'manga', 'acabamentoManga', 'larguraManga', 'corAcabamentoManga',
@@ -2307,20 +2390,6 @@
         el.addEventListener('change', atualizarObservacoes);
       }
     });
-
-    const btnAutopreencherObs = document.getElementById('btnAutopreencherObservacoes');
-    if (btnAutopreencherObs) {
-      btnAutopreencherObs.addEventListener('click', async () => {
-        if (!observacoesTemConteudo()) {
-          atualizarObservacoes(true);
-          return;
-        }
-
-        const confirmou = await abrirModalConfirmacaoAutopreencher();
-        if (!confirmou) return;
-        atualizarObservacoes(true);
-      });
-    }
 
     const tabelaBody = document.getElementById('produtosTable');
     if (tabelaBody) {
