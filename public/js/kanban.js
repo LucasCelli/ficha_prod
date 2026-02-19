@@ -11,29 +11,38 @@
     { key: 'sublimando', label: 'Sublimando/Na Estamparia' },
     { key: 'na_costura', label: 'Na Costura/Em Revisão' }
   ];
-  const CARD_STATUS_LABELS = {
-    pendente: 'Pend.',
-    exportando: 'Arte',
-    fila_impressao: 'Impr.',
-    sublimando: 'Estam.',
-    na_costura: 'Rev.'
-  };
+  const PERSONALIZACAO_LABELS = Object.freeze({
+    sublimacao: 'Sublimação',
+    serigrafia: 'Serigrafia',
+    bordado: 'Bordado',
+    dtf: 'DTF Têxtil',
+    transfer: 'Transfer',
+    sublimacao_serigrafia: 'Sublimação e Serigrafia',
+    serigrafia_dtf: 'Serigrafia e DTF',
+    serigrafia_bordado: 'Serigrafia e Bordado'
+  });
 
   const VALID_STATUS = new Set(COLUMN_DEFINITIONS.map(col => col.key));
   const NAME_EXCEPTIONS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
   const STORAGE_FILTER_KEY = 'kanban_filters_v1';
+  const PREVIEW_READY_MESSAGE = 'ficha-preview-ready';
 
   const state = {
     fichas: [],
+    isLoading: false,
     filters: {
       cliente: '',
       pedido: '',
-      sortDate: 'data_desc'
+      sortDate: 'manual'
     },
     drag: {
-      fichaId: null
+      fichaId: null,
+      sourceStatus: null,
+      previewStatus: null,
+      previewEl: null
     },
     pendingPersistById: Object.create(null),
+    pendingDeliverById: Object.create(null),
     lastMovedFichaId: null
   };
 
@@ -42,7 +51,10 @@
     viewOverlay: null,
     viewFrame: null,
     viewFichaId: null,
-    viewCloseBtn: null
+    viewCloseBtn: null,
+    viewLoading: null,
+    viewLoadingTimeout: null,
+    viewCurrentFichaId: null
   };
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -83,6 +95,7 @@
     ui.viewFrame = document.getElementById('kanbanViewFrame');
     ui.viewFichaId = document.getElementById('kanbanViewFichaId');
     ui.viewCloseBtn = document.getElementById('btnCloseKanbanViewModal');
+    ui.viewLoading = document.getElementById('kanbanViewLoading');
 
     if (btnToggleFiltros && filtrosBody && filtrosCard) {
       const setAccordionState = expanded => {
@@ -119,7 +132,7 @@
 
     if (sortData) {
       sortData.addEventListener('change', event => {
-        state.filters.sortDate = event.target.value || 'data_desc';
+        state.filters.sortDate = normalizeSortMode(event.target.value);
         saveFilters();
         renderKanban();
       });
@@ -130,7 +143,7 @@
         state.filters = {
           cliente: '',
           pedido: '',
-          sortDate: 'data_desc'
+          sortDate: 'manual'
         };
         hydrateFilterControls();
         saveFilters();
@@ -162,6 +175,12 @@
       ui.viewOverlay.addEventListener('click', closeViewModal);
     }
 
+    if (ui.viewFrame) {
+      ui.viewFrame.addEventListener('error', handleViewFrameError);
+    }
+
+    window.addEventListener('message', handleViewFrameMessage);
+
     document.addEventListener('keydown', handleGlobalKeydown);
 
     document.querySelectorAll('.kanban-column').forEach(column => {
@@ -173,24 +192,41 @@
   }
 
   async function carregarFichas() {
-    const fichas = await db.listarFichas();
-    state.fichas = (Array.isArray(fichas) ? fichas : []).map(normalizeFichaKanbanStatus);
+    state.isLoading = true;
+    renderKanban();
+
+    try {
+      const fichas = await db.listarFichas();
+      state.fichas = (Array.isArray(fichas) ? fichas : []).map(normalizeFichaKanbanStatus);
+    } finally {
+      state.isLoading = false;
+    }
   }
 
   function normalizeFichaKanbanStatus(ficha) {
     return {
       ...ficha,
-      kanban_status: normalizeBoardStatus(ficha?.kanban_status)
+      kanban_status: normalizeBoardStatus(ficha?.kanban_status),
+      kanban_ordem: normalizeBoardOrder(ficha?.kanban_ordem)
     };
   }
 
   function renderKanban() {
-    const fichasFiltradas = getFichasFiltradasEOrdenadas();
+    if (state.isLoading) {
+      COLUMN_DEFINITIONS.forEach(column => {
+        renderLoadingColumn(column.key);
+        updateColumnCounter(column.key, 0);
+      });
+      updateTotalCounterLoading();
+      return;
+    }
+
+    const fichasFiltradas = getFichasFiltradas();
     const fichasSemRepeticao = dedupeByNumeroVenda(fichasFiltradas);
     const agrupadas = groupByColumn(fichasSemRepeticao);
 
     COLUMN_DEFINITIONS.forEach(column => {
-      const cards = agrupadas[column.key] || [];
+      const cards = sortColumnFichasForDisplay(column.key, agrupadas[column.key] || []);
       renderColumn(column.key, cards);
       updateColumnCounter(column.key, cards.length);
     });
@@ -199,28 +235,91 @@
     animateMovedCardIfNeeded();
   }
 
-  function getFichasFiltradasEOrdenadas() {
+  function renderLoadingColumn(statusKey) {
+    const listEl = document.getElementById(`kanban-list-${statusKey}`);
+    if (!listEl) return;
+
+    listEl.innerHTML = `
+      <div class="kanban-card kanban-card-skeleton">
+        <div class="skeleton-line skeleton-title"></div>
+        <div class="skeleton-row">
+          <div class="skeleton-line skeleton-short"></div>
+          <div class="skeleton-pill"></div>
+        </div>
+        <div class="skeleton-line skeleton-medium"></div>
+      </div>
+      <div class="kanban-card kanban-card-skeleton">
+        <div class="skeleton-line skeleton-title"></div>
+        <div class="skeleton-row">
+          <div class="skeleton-line skeleton-short"></div>
+          <div class="skeleton-pill"></div>
+        </div>
+        <div class="skeleton-line skeleton-medium"></div>
+      </div>
+    `;
+  }
+
+  function getFichasFiltradas() {
     const clienteTerm = normalizeText(state.filters.cliente);
     const pedidoTerm = normalizeText(state.filters.pedido);
-    const sortMode = state.filters.sortDate === 'data_asc' ? 'data_asc' : 'data_desc';
 
     return state.fichas
       .filter(ficha => {
+        const statusFicha = String(ficha.status || '').toLowerCase();
+        if (statusFicha === 'entregue') return false;
+
         const cliente = normalizeText(ficha.cliente);
         const pedido = normalizeText(ficha.numero_venda);
 
         if (clienteTerm && !cliente.includes(clienteTerm)) return false;
         if (pedidoTerm && !pedido.includes(pedidoTerm)) return false;
         return true;
-      })
-      .sort((a, b) => {
-        const dataA = getSortTimestamp(a);
-        const dataB = getSortTimestamp(b);
-        if (sortMode === 'data_asc') {
-          return dataA - dataB || Number(a.id) - Number(b.id);
-        }
-        return dataB - dataA || Number(b.id) - Number(a.id);
       });
+  }
+
+  function sortColumnFichasForDisplay(statusKey, fichas) {
+    return [...fichas].sort((a, b) => compareFichasWithinColumn(a, b, statusKey));
+  }
+
+  function compareFichasWithinColumn(a, b) {
+    const sortMode = normalizeSortMode(state.filters.sortDate);
+    if (sortMode !== 'manual') {
+      const byDate = compareByDatePreference(a, b, sortMode);
+      if (byDate !== 0) return byDate;
+    }
+
+    const orderA = normalizeBoardOrder(a?.kanban_ordem);
+    const orderB = normalizeBoardOrder(b?.kanban_ordem);
+
+    if (orderA !== null && orderB !== null && orderA !== orderB) {
+      return orderA - orderB;
+    }
+
+    if (orderA !== null && orderB === null) return -1;
+    if (orderA === null && orderB !== null) return 1;
+
+    const byDate = compareByDatePreference(a, b, sortMode);
+    if (byDate !== 0) return byDate;
+
+    return Number(a?.id || 0) - Number(b?.id || 0);
+  }
+
+  function compareByDatePreference(a, b, sortMode = null) {
+    const mode = sortMode === 'data_asc' || sortMode === 'data_desc'
+      ? sortMode
+      : 'manual';
+    const dataA = getSortTimestamp(a);
+    const dataB = getSortTimestamp(b);
+
+    if (mode === 'data_asc') {
+      return dataB - dataA || Number(b?.id || 0) - Number(a?.id || 0);
+    }
+
+    if (mode === 'data_desc') {
+      return dataA - dataB || Number(a?.id || 0) - Number(b?.id || 0);
+    }
+
+    return dataB - dataA || Number(b?.id || 0) - Number(a?.id || 0);
   }
 
   function groupByColumn(fichas) {
@@ -239,22 +338,48 @@
   }
 
   function dedupeByNumeroVenda(fichas) {
-    const seenNumeroVenda = new Set();
-    const unique = [];
+    const semNumeroVenda = [];
+    const byNumeroVenda = new Map();
 
     fichas.forEach(ficha => {
       const numeroVenda = normalizeNumeroVenda(ficha?.numero_venda);
       if (!numeroVenda) {
-        unique.push(ficha);
+        semNumeroVenda.push(ficha);
         return;
       }
 
-      if (seenNumeroVenda.has(numeroVenda)) return;
-      seenNumeroVenda.add(numeroVenda);
-      unique.push(ficha);
+      const atual = byNumeroVenda.get(numeroVenda);
+      if (!atual) {
+        byNumeroVenda.set(numeroVenda, ficha);
+        return;
+      }
+
+      if (isFichaMaisRecente(ficha, atual)) {
+        byNumeroVenda.set(numeroVenda, ficha);
+      }
     });
 
-    return unique;
+    return [...semNumeroVenda, ...Array.from(byNumeroVenda.values())];
+  }
+
+  function isFichaMaisRecente(candidata, referencia) {
+    const timeCandidata = getRecencyTimestamp(candidata);
+    const timeReferencia = getRecencyTimestamp(referencia);
+    if (timeCandidata !== timeReferencia) return timeCandidata > timeReferencia;
+    return Number(candidata?.id) > Number(referencia?.id);
+  }
+
+  function getRecencyTimestamp(ficha) {
+    const tsKanban = Date.parse(String(ficha?.kanban_status_updated_at || ''));
+    if (!Number.isNaN(tsKanban)) return tsKanban;
+
+    const tsAtualizacao = Date.parse(String(ficha?.data_atualizacao || ''));
+    if (!Number.isNaN(tsAtualizacao)) return tsAtualizacao;
+
+    const tsCriacao = Date.parse(String(ficha?.data_criacao || ''));
+    if (!Number.isNaN(tsCriacao)) return tsCriacao;
+
+    return 0;
   }
 
   function renderColumn(statusKey, fichas) {
@@ -269,31 +394,51 @@
     listEl.innerHTML = fichas.map(ficha => {
       const fichaId = Number(ficha.id);
       const isSaving = Boolean(state.pendingPersistById[String(fichaId)]);
+      const isDelivering = Boolean(state.pendingDeliverById[String(fichaId)]);
+      const isBusy = isSaving || isDelivering;
       const cardStatus = getBoardStatus(ficha);
       const cliente = escapeHtml(formatDisplayName(ficha.cliente || 'Cliente nao informado'));
       const numeroPedido = escapeHtml(String(ficha.numero_venda || '-'));
-      const dataRef = getDisplayDate(ficha);
-      const statusLabel = getCardStatusLabel(cardStatus);
-      const cardClass = isSaving ? 'kanban-card is-saving' : 'kanban-card';
+      const personalizacao = getPersonalizacaoLabel(ficha.arte);
+      const personalizacaoHtml = personalizacao
+        ? `<span class="kanban-card-personalizacao">${escapeHtml(personalizacao)}</span>`
+        : '';
+      const entregaInfo = getEntregaInfo(ficha, cardStatus);
+      const showDeliverButton = statusKey === 'na_costura';
+      const isEvento = isEventoFicha(ficha);
+      const eventoPrefix = isEvento
+        ? '<i class="fas fa-star kanban-card-event-star" title="Pedido de evento" aria-hidden="true"></i>'
+        : '';
+      const urgencyClass = entregaInfo.urgencia !== 'default' ? `urgency-${entregaInfo.urgencia}` : '';
+      const cardClass = ['kanban-card', isBusy ? 'is-saving' : ''].filter(Boolean).join(' ');
+      const bodyClass = ['kanban-card-body', urgencyClass].filter(Boolean).join(' ');
+      const deliverButton = showDeliverButton
+        ? `<button type="button" class="kanban-btn-deliver-icon" data-action="deliver" data-id="${fichaId}" title="Marcar como entregue" aria-label="Marcar ficha #${fichaId} como entregue" ${isBusy ? 'disabled' : ''}>
+             <i class="fas fa-check"></i>
+           </button>`
+        : '';
 
       return `
-        <article class="${cardClass}" draggable="${isSaving ? 'false' : 'true'}" data-ficha-id="${fichaId}" data-status="${cardStatus}">
-          <h3 class="kanban-card-cliente">${cliente}</h3>
+        <article class="${cardClass}" draggable="${isBusy ? 'false' : 'true'}" data-ficha-id="${fichaId}" data-status="${cardStatus}">
+          <h3 class="kanban-card-cliente">${eventoPrefix}${cliente}</h3>
           <div class="kanban-card-header">
             <span class="kanban-card-pedido">
               <i class="fas fa-hashtag"></i>
               <span>${numeroPedido}</span>
+              ${personalizacaoHtml}
             </span>
             <span class="kanban-card-tools">
-              <span class="kanban-card-status ${cardStatus}" title="${escapeHtml(getStatusLabel(cardStatus))}">${statusLabel}</span>
+              ${deliverButton}
               <button type="button" class="kanban-btn-view-icon" data-action="view" data-id="${fichaId}" title="Visualizar ficha" aria-label="Visualizar ficha #${fichaId}">
                 <i class="fas fa-eye"></i>
               </button>
             </span>
           </div>
-          <div class="kanban-card-meta">
-            <i class="fas fa-calendar-day"></i>
-            <span>${escapeHtml(dataRef)}</span>
+          <div class="${bodyClass}">
+            <div class="kanban-card-meta">
+              <i class="fas fa-calendar-day"></i>
+              <span>${escapeHtml(entregaInfo.texto)}</span>
+            </div>
           </div>
         </article>
       `;
@@ -312,7 +457,21 @@
     totalEl.textContent = `${total} ${total === 1 ? 'ficha' : 'fichas'}`;
   }
 
-  function handleBoardClick(event) {
+  function updateTotalCounterLoading() {
+    const totalEl = document.getElementById('kanbanTotalCount');
+    if (!totalEl) return;
+    totalEl.textContent = 'Carregando...';
+  }
+
+  async function handleBoardClick(event) {
+    const deliverButton = event.target.closest('button[data-action="deliver"]');
+    if (deliverButton) {
+      const id = Number(deliverButton.dataset.id);
+      if (!id) return;
+      await handleDeliverClick(id);
+      return;
+    }
+
     const viewButton = event.target.closest('button[data-action="view"]');
     if (!viewButton) return;
 
@@ -322,16 +481,100 @@
     openViewModal(id);
   }
 
+  async function handleDeliverClick(fichaId) {
+    const key = String(fichaId);
+    if (state.pendingDeliverById[key]) return;
+
+    const ficha = findFichaById(fichaId);
+    if (!ficha) return;
+
+    state.pendingDeliverById[key] = true;
+    renderKanban();
+
+    try {
+      await db.marcarComoEntregue(fichaId);
+      ficha.status = 'entregue';
+
+      if (typeof window.mostrarInfo === 'function') {
+        window.mostrarInfo(`Ficha #${fichaId} marcada como entregue`);
+      }
+    } catch (error) {
+      console.error('Erro ao marcar ficha como entregue pelo Kanban:', error);
+      if (typeof window.mostrarErro === 'function') {
+        window.mostrarErro(`Nao foi possivel entregar a ficha #${fichaId}`);
+      }
+    } finally {
+      delete state.pendingDeliverById[key];
+      renderKanban();
+    }
+  }
+
   function handleGlobalKeydown(event) {
     if (event.key !== 'Escape') return;
     if (!ui.viewModal || ui.viewModal.hidden) return;
     closeViewModal();
   }
 
+  function handleViewFrameError() {
+    if (!ui.viewModal || ui.viewModal.hidden) return;
+    setViewModalLoading('error');
+  }
+
+  function handleViewFrameMessage(event) {
+    if (!ui.viewFrame || event.source !== ui.viewFrame.contentWindow) return;
+
+    const data = event.data;
+    if (!data || data.type !== PREVIEW_READY_MESSAGE) return;
+    if (!ui.viewModal || ui.viewModal.hidden) return;
+
+    const payloadId = data.fichaId != null ? String(data.fichaId) : '';
+    if (payloadId && ui.viewCurrentFichaId && payloadId !== ui.viewCurrentFichaId) return;
+
+    setViewModalLoading(false);
+  }
+
+  function setViewModalLoading(mode) {
+    if (!ui.viewModal) return;
+
+    if (ui.viewLoadingTimeout) {
+      clearTimeout(ui.viewLoadingTimeout);
+      ui.viewLoadingTimeout = null;
+    }
+
+    const isError = mode === 'error';
+    const isLoading = mode === true || isError;
+
+    ui.viewModal.classList.toggle('is-loading', isLoading);
+    ui.viewModal.classList.toggle('has-error', isError);
+
+    if (ui.viewLoading) {
+      ui.viewLoading.style.display = isLoading ? 'flex' : 'none';
+      const textEl = ui.viewLoading.querySelector('span');
+      const iconEl = ui.viewLoading.querySelector('i');
+
+      if (isError) {
+        if (textEl) textEl.textContent = 'Falha ao carregar a visualizacao.';
+        if (iconEl) iconEl.className = 'fas fa-exclamation-triangle';
+      } else {
+        if (textEl) textEl.textContent = 'Carregando preview...';
+        if (iconEl) iconEl.className = 'fas fa-spinner fa-spin';
+      }
+    }
+
+    if (mode === true) {
+      ui.viewLoadingTimeout = setTimeout(() => {
+        if (!ui.viewModal || ui.viewModal.hidden) return;
+        setViewModalLoading('error');
+      }, 15000);
+    }
+  }
+
   function openViewModal(fichaId) {
     if (!ui.viewModal || !ui.viewFrame) return;
 
+    ui.viewCurrentFichaId = String(fichaId);
     if (ui.viewFichaId) ui.viewFichaId.textContent = `#${fichaId}`;
+    setViewModalLoading(true);
     ui.viewFrame.src = `index.html?visualizar=${fichaId}`;
 
     ui.viewModal.hidden = false;
@@ -342,6 +585,8 @@
   function closeViewModal() {
     if (!ui.viewModal) return;
 
+    ui.viewCurrentFichaId = null;
+    setViewModalLoading(false);
     ui.viewModal.hidden = true;
     ui.viewModal.setAttribute('aria-hidden', 'true');
     if (ui.viewFrame) ui.viewFrame.src = 'about:blank';
@@ -354,12 +599,13 @@
 
     const fichaId = Number(card.dataset.fichaId);
     if (!fichaId) return;
-    if (state.pendingPersistById[String(fichaId)]) {
+    if (state.pendingPersistById[String(fichaId)] || state.pendingDeliverById[String(fichaId)]) {
       event.preventDefault();
       return;
     }
 
     state.drag.fichaId = fichaId;
+    state.drag.sourceStatus = String(card.dataset.status || '');
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', String(fichaId));
 
@@ -372,7 +618,9 @@
     if (card) card.classList.remove('is-dragging');
 
     clearDropHighlights();
+    clearDropPreview();
     state.drag.fichaId = null;
+    state.drag.sourceStatus = null;
     document.body.classList.remove('kanban-dragging');
   }
 
@@ -380,7 +628,10 @@
     if (!state.drag.fichaId) return;
     event.preventDefault();
     const column = event.currentTarget;
-    if (column) column.classList.add('is-drop-target');
+    if (column) {
+      column.classList.add('is-drop-target');
+      updateDropPreview(column, event.clientY);
+    }
   }
 
   function handleDragOverColumn(event) {
@@ -388,7 +639,10 @@
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
     const column = event.currentTarget;
-    if (column) column.classList.add('is-drop-target');
+    if (column) {
+      column.classList.add('is-drop-target');
+      updateDropPreview(column, event.clientY);
+    }
   }
 
   function handleDragLeaveColumn(event) {
@@ -396,6 +650,9 @@
     if (!column) return;
     if (event.relatedTarget && column.contains(event.relatedTarget)) return;
     column.classList.remove('is-drop-target');
+    if (state.drag.previewStatus === column.dataset.status) {
+      clearDropPreview();
+    }
   }
 
   async function handleDropColumn(event) {
@@ -413,31 +670,76 @@
     if (!ficha) return;
 
     const currentStatus = getBoardStatus(ficha);
-    clearDropHighlights();
+    const sourceStatus = VALID_STATUS.has(state.drag.sourceStatus) ? state.drag.sourceStatus : currentStatus;
+    const sourceListEl = getColumnListElement(sourceStatus);
+    const targetListEl = getColumnListElement(targetStatus);
+    const targetIndex = getDropIndexFromPointer(targetListEl, event.clientY, draggedId);
 
-    if (currentStatus === targetStatus) return;
-    if (state.pendingPersistById[String(draggedId)]) return;
+    const sourceVisibleIds = getVisibleColumnIds(sourceListEl, draggedId);
+    const targetVisibleIds = getVisibleColumnIds(targetListEl, draggedId);
+    const safeTargetIndex = clamp(targetIndex, 0, targetVisibleIds.length);
+    targetVisibleIds.splice(safeTargetIndex, 0, draggedId);
+
+    const sameColumn = sourceStatus === targetStatus;
+    const snapshot = captureKanbanSnapshot();
+
+    let sourceFinalOrder = [];
+    let targetFinalOrder = [];
+
+    clearDropHighlights();
+    clearDropPreview();
+    if (state.pendingPersistById[String(draggedId)] || state.pendingDeliverById[String(draggedId)]) return;
 
     state.pendingPersistById[String(draggedId)] = true;
-    setBoardStatus(draggedId, targetStatus);
-    state.lastMovedFichaId = draggedId;
-    renderKanban();
 
     try {
-      const response = await db.atualizarKanbanStatus(draggedId, targetStatus);
-      const persistedStatus = normalizeBoardStatus(response?.kanbanStatus || targetStatus);
-      setBoardStatus(draggedId, persistedStatus);
+      if (sameColumn) {
+        const beforeOrder = getColumnOrderFromState(sourceStatus);
+        sourceFinalOrder = composeColumnOrder(sourceStatus, targetVisibleIds);
 
-      if (typeof window.mostrarInfo === 'function') {
-        window.mostrarInfo(`Ficha #${draggedId} movida para ${getStatusLabel(persistedStatus)}`);
+        if (arraysEqual(beforeOrder, sourceFinalOrder)) return;
+
+        applyColumnOrder(sourceStatus, sourceFinalOrder);
+        state.lastMovedFichaId = draggedId;
+        renderKanban();
+
+        await db.atualizarKanbanOrdem(sourceStatus, sourceFinalOrder);
+      } else {
+        setBoardStatus(draggedId, targetStatus);
+
+        sourceFinalOrder = composeColumnOrder(sourceStatus, sourceVisibleIds);
+        targetFinalOrder = composeColumnOrder(targetStatus, targetVisibleIds);
+
+        applyColumnOrder(sourceStatus, sourceFinalOrder);
+        applyColumnOrder(targetStatus, targetFinalOrder);
+
+        state.lastMovedFichaId = draggedId;
+        renderKanban();
+
+        const response = await db.atualizarKanbanStatus(draggedId, targetStatus);
+        const persistedStatus = normalizeBoardStatus(response?.kanbanStatus || targetStatus);
+        setBoardStatus(draggedId, persistedStatus);
+        setBoardOrder(draggedId, response?.kanbanOrder);
+
+        const persistPromises = [];
+        if (sourceFinalOrder.length) {
+          persistPromises.push(db.atualizarKanbanOrdem(sourceStatus, sourceFinalOrder));
+        }
+        if (targetFinalOrder.length) {
+          persistPromises.push(db.atualizarKanbanOrdem(persistedStatus, targetFinalOrder));
+        }
+        if (persistPromises.length) {
+          await Promise.all(persistPromises);
+        }
+
       }
     } catch (error) {
       console.error('Erro ao persistir status do kanban:', error);
-      setBoardStatus(draggedId, currentStatus);
+      restoreKanbanSnapshot(snapshot);
       state.lastMovedFichaId = draggedId;
 
       if (typeof window.mostrarErro === 'function') {
-        window.mostrarErro(`Nao foi possivel mover a ficha #${draggedId}`);
+        window.mostrarErro(`Nao foi possivel atualizar a ordem da ficha #${draggedId}`);
       }
     } finally {
       delete state.pendingPersistById[String(draggedId)];
@@ -456,8 +758,161 @@
     ficha.kanban_status = status;
   }
 
+  function setBoardOrder(fichaId, order) {
+    const ficha = findFichaById(fichaId);
+    if (!ficha) return;
+    ficha.kanban_ordem = normalizeBoardOrder(order);
+  }
+
   function getBoardStatus(ficha) {
     return normalizeBoardStatus(ficha?.kanban_status);
+  }
+
+  function getColumnListElement(statusKey) {
+    return document.getElementById(`kanban-list-${statusKey}`);
+  }
+
+  function getVisibleColumnIds(listEl, excludeId = null) {
+    if (!listEl) return [];
+
+    return Array.from(listEl.querySelectorAll('.kanban-card[data-ficha-id]'))
+      .map(card => Number(card.dataset.fichaId))
+      .filter(id => Number.isInteger(id) && id > 0 && Number(id) !== Number(excludeId));
+  }
+
+  function ensureDropPreviewElement() {
+    if (state.drag.previewEl && state.drag.previewEl.nodeType === 1) {
+      return state.drag.previewEl;
+    }
+
+    const el = document.createElement('div');
+    el.className = 'kanban-drop-indicator';
+    el.setAttribute('aria-hidden', 'true');
+    state.drag.previewEl = el;
+    return el;
+  }
+
+  function updateDropPreview(column, pointerY) {
+    if (!column || !state.drag.fichaId) return;
+
+    const status = String(column.dataset.status || '');
+    const listEl = getColumnListElement(status);
+    if (!listEl) return;
+
+    const indicator = ensureDropPreviewElement();
+    const draggedId = Number(state.drag.fichaId);
+    const cards = Array.from(listEl.querySelectorAll('.kanban-card[data-ficha-id]'))
+      .filter(card => Number(card.dataset.fichaId) !== draggedId);
+
+    if (indicator.parentElement !== listEl) {
+      clearDropPreview();
+      listEl.appendChild(indicator);
+    }
+
+    let inserted = false;
+    for (let index = 0; index < cards.length; index++) {
+      const rect = cards[index].getBoundingClientRect();
+      if (pointerY < rect.top + rect.height / 2) {
+        listEl.insertBefore(indicator, cards[index]);
+        inserted = true;
+        break;
+      }
+    }
+
+    if (!inserted) {
+      listEl.appendChild(indicator);
+    }
+
+    state.drag.previewStatus = status;
+    column.classList.add('has-drop-preview');
+  }
+
+  function clearDropPreview() {
+    const indicator = state.drag.previewEl;
+    if (indicator && indicator.parentElement) {
+      indicator.parentElement.removeChild(indicator);
+    }
+    state.drag.previewStatus = null;
+    document.querySelectorAll('.kanban-column.has-drop-preview').forEach(col => {
+      col.classList.remove('has-drop-preview');
+    });
+  }
+
+  function getDropIndexFromPointer(listEl, pointerY, draggedId) {
+    if (!listEl) return 0;
+
+    const cards = Array.from(listEl.querySelectorAll('.kanban-card[data-ficha-id]'))
+      .filter(card => Number(card.dataset.fichaId) !== Number(draggedId));
+
+    for (let index = 0; index < cards.length; index++) {
+      const rect = cards[index].getBoundingClientRect();
+      if (pointerY < rect.top + rect.height / 2) {
+        return index;
+      }
+    }
+
+    return cards.length;
+  }
+
+  function getColumnOrderFromState(statusKey) {
+    return state.fichas
+      .filter(ficha => getBoardStatus(ficha) === statusKey && String(ficha.status || '').toLowerCase() !== 'entregue')
+      .sort(compareFichasWithinColumn)
+      .map(ficha => Number(ficha.id))
+      .filter(id => Number.isInteger(id) && id > 0);
+  }
+
+  function composeColumnOrder(statusKey, prioritizedIds = []) {
+    const currentIds = getColumnOrderFromState(statusKey);
+    if (!currentIds.length) return [];
+
+    const validSet = new Set(currentIds);
+    const used = new Set();
+    const finalOrder = [];
+
+    prioritizedIds.forEach(rawId => {
+      const id = Number(rawId);
+      if (!Number.isInteger(id) || id <= 0) return;
+      if (!validSet.has(id) || used.has(id)) return;
+      used.add(id);
+      finalOrder.push(id);
+    });
+
+    currentIds.forEach(id => {
+      if (used.has(id)) return;
+      used.add(id);
+      finalOrder.push(id);
+    });
+
+    return finalOrder;
+  }
+
+  function applyColumnOrder(statusKey, orderedIds) {
+    const validIds = composeColumnOrder(statusKey, orderedIds);
+    validIds.forEach((id, index) => {
+      setBoardOrder(id, index + 1);
+    });
+    return validIds;
+  }
+
+  function captureKanbanSnapshot() {
+    return state.fichas.map(ficha => ({
+      id: Number(ficha.id),
+      kanban_status: getBoardStatus(ficha),
+      kanban_ordem: normalizeBoardOrder(ficha.kanban_ordem)
+    }));
+  }
+
+  function restoreKanbanSnapshot(snapshot) {
+    if (!Array.isArray(snapshot) || !snapshot.length) return;
+
+    const byId = new Map(snapshot.map(item => [Number(item.id), item]));
+    state.fichas.forEach(ficha => {
+      const saved = byId.get(Number(ficha.id));
+      if (!saved) return;
+      ficha.kanban_status = normalizeBoardStatus(saved.kanban_status);
+      ficha.kanban_ordem = normalizeBoardOrder(saved.kanban_ordem);
+    });
   }
 
   function normalizeBoardStatus(status) {
@@ -465,9 +920,19 @@
     return VALID_STATUS.has(normalized) ? normalized : 'pendente';
   }
 
+  function normalizeBoardOrder(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    if (!Number.isInteger(parsed) || parsed <= 0) return null;
+    return parsed;
+  }
+
   function clearDropHighlights() {
     document.querySelectorAll('.kanban-column.is-drop-target').forEach(col => {
       col.classList.remove('is-drop-target');
+    });
+    document.querySelectorAll('.kanban-column.has-drop-preview').forEach(col => {
+      col.classList.remove('has-drop-preview');
     });
   }
 
@@ -487,19 +952,32 @@
     state.lastMovedFichaId = null;
   }
 
+  function arraysEqual(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b)) return false;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (Number(a[i]) !== Number(b[i])) return false;
+    }
+    return true;
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
   function loadFilters() {
     try {
       const raw = localStorage.getItem(STORAGE_FILTER_KEY);
-      if (!raw) return { cliente: '', pedido: '', sortDate: 'data_desc' };
+      if (!raw) return { cliente: '', pedido: '', sortDate: 'manual' };
 
       const parsed = JSON.parse(raw);
       return {
         cliente: typeof parsed.cliente === 'string' ? parsed.cliente : '',
         pedido: typeof parsed.pedido === 'string' ? parsed.pedido : '',
-        sortDate: parsed.sortDate === 'data_asc' ? 'data_asc' : 'data_desc'
+        sortDate: 'manual'
       };
     } catch (_) {
-      return { cliente: '', pedido: '', sortDate: 'data_desc' };
+      return { cliente: '', pedido: '', sortDate: 'manual' };
     }
   }
 
@@ -517,18 +995,63 @@
     if (sortData) sortData.value = state.filters.sortDate;
   }
 
-  function getStatusLabel(statusKey) {
-    const match = COLUMN_DEFINITIONS.find(col => col.key === statusKey);
-    return match ? match.label : 'Pendente';
-  }
-
-  function getCardStatusLabel(statusKey) {
-    return CARD_STATUS_LABELS[statusKey] || 'Pend.';
-  }
-
   function getDisplayDate(ficha) {
     const dateValue = ficha.data_entrega || ficha.data_inicio || '';
     return formatDate(dateValue);
+  }
+
+  function getEntregaInfo(ficha, statusKey) {
+    const rawDate = String(ficha?.data_entrega || '').trim();
+    if (!rawDate) {
+      return { texto: 'Entrega -', urgencia: 'default' };
+    }
+
+    const texto = `Entrega ${formatDateShort(rawDate)}`;
+    if (statusKey === 'na_costura') {
+      return { texto, urgencia: 'default' };
+    }
+
+    const diasRestantes = getRemainingDays(rawDate);
+    if (diasRestantes === null) {
+      return { texto, urgencia: 'default' };
+    }
+
+    if (diasRestantes <= 1) {
+      return { texto, urgencia: 'danger' };
+    }
+
+    if (diasRestantes <= 7) {
+      return { texto, urgencia: 'warning' };
+    }
+
+    return { texto, urgencia: 'default' };
+  }
+
+  function getRemainingDays(dateString) {
+    const parsed = parseIsoDate(dateString);
+    if (!parsed) return null;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffMs = parsed.getTime() - today.getTime();
+    return Math.ceil(diffMs / 86400000);
+  }
+
+  function parseIsoDate(value) {
+    const [yearStr, monthStr, dayStr] = String(value || '').split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    const day = Number(dayStr);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    return new Date(year, month - 1, day);
+  }
+
+  function formatDateShort(dateString) {
+    if (!dateString) return '-';
+    const [year, month, day] = String(dateString).split('-');
+    if (!year || !month || !day) return '-';
+    return `${day}/${month}/${year.slice(-2)}`;
   }
 
   function getSortTimestamp(ficha) {
@@ -588,6 +1111,41 @@
       .trim()
       .replace(/\s+/g, ' ')
       .toLowerCase();
+  }
+
+  function getPersonalizacaoLabel(value) {
+    const normalized = normalizeText(value)
+      .replace(/[\s/-]+/g, '_')
+      .replace(/_e_/g, '_');
+
+    if (!normalized) return '';
+    if (PERSONALIZACAO_LABELS[normalized]) return PERSONALIZACAO_LABELS[normalized];
+
+    return normalized
+      .split('_')
+      .filter(Boolean)
+      .map(part => (part === 'dtf' ? 'DTF' : formatDisplayName(part)))
+      .join(' ');
+  }
+
+  function normalizeSortMode(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'data_asc') return 'data_asc';
+    if (normalized === 'data_desc') return 'data_desc';
+    return 'manual';
+  }
+
+  function isEventoFicha(ficha) {
+    const value = ficha?.evento;
+    if (value === true || value === 1) return true;
+
+    const normalized = String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
+    return normalized === 'sim' || normalized === 'true' || normalized === '1';
   }
 
   function debounce(fn, delay) {

@@ -80,6 +80,7 @@
                             Ordenar por data
                         </label>
                         <select id="sortDataKanban" class="form-control">
+                            <option value="manual">Ordem manual</option>
                             <option value="data_desc">Mais recente</option>
                             <option value="data_asc">Mais antiga</option>
                         </select>
@@ -174,6 +175,10 @@
                 </button>
             </div>
             <div class="kanban-view-modal-body">
+                <div id="kanbanViewLoading" class="kanban-view-modal-loading" aria-live="polite">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Carregando preview...</span>
+                </div>
                 <iframe id="kanbanViewFrame" class="kanban-view-modal-iframe" title="Visualizacao da ficha"
                     loading="lazy"></iframe>
             </div>

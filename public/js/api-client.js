@@ -177,6 +177,24 @@ class APIClient {
     return response.json();
   }
 
+  async atualizarKanbanOrdem(status, orderedIds) {
+    const response = await fetch(`${this.baseURL}/kanban/order`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status,
+        orderedIds: Array.isArray(orderedIds) ? orderedIds : []
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Erro ao atualizar ordem do kanban');
+    }
+
+    return response.json();
+  }
+
   // Clientes
 
   async buscarClientes(termo = '') {

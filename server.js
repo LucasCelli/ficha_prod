@@ -130,6 +130,8 @@ async function initDatabase() {
         evento TEXT DEFAULT 'nao',
         status TEXT DEFAULT 'pendente',
         kanban_status TEXT DEFAULT 'pendente',
+        kanban_status_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        kanban_ordem INTEGER,
         material TEXT,
         composicao TEXT,
         cor_material TEXT,
@@ -201,7 +203,9 @@ async function initDatabase() {
       'filete_cor TEXT',
       'faixa_local TEXT',
       'faixa_cor TEXT',
-      "kanban_status TEXT DEFAULT 'pendente'"
+      "kanban_status TEXT DEFAULT 'pendente'",
+      'kanban_status_updated_at DATETIME',
+      'kanban_ordem INTEGER'
     ];
 
     for (const coluna of migrações) {
@@ -219,7 +223,15 @@ async function initDatabase() {
         SET kanban_status = 'pendente'
         WHERE kanban_status IS NULL OR trim(kanban_status) = ''
       `);
+      await db.execute(`
+        UPDATE fichas
+        SET kanban_status_updated_at = COALESCE(kanban_status_updated_at, data_atualizacao, data_criacao, CURRENT_TIMESTAMP)
+        WHERE kanban_status_updated_at IS NULL OR trim(kanban_status_updated_at) = ''
+      `);
+      await preencherKanbanOrdemInicial();
       await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_kanban_status ON fichas(kanban_status)`);
+      await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_kanban_status_updated_at ON fichas(kanban_status_updated_at)`);
+      await db.execute(`CREATE INDEX IF NOT EXISTS idx_fichas_kanban_ordem ON fichas(kanban_status, kanban_ordem)`);
     } catch (e) {
       // Ignora se a coluna ainda não existir por qualquer motivo.
     }
@@ -251,6 +263,66 @@ async function dbRun(sql, params = []) {
   };
 }
 
+async function getNextKanbanOrder(status, excludeId = null) {
+  const params = [status];
+  let query = 'SELECT COALESCE(MAX(kanban_ordem), 0) + 1 AS next_order FROM fichas WHERE kanban_status = ?';
+
+  if (excludeId !== null && excludeId !== undefined) {
+    query += ' AND id != ?';
+    params.push(Number(excludeId));
+  }
+
+  const row = await dbGet(query, params);
+  const parsed = Number(row?.next_order);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+async function preencherKanbanOrdemInicial() {
+  await db.execute(`
+    WITH ranked AS (
+      SELECT
+        id,
+        ROW_NUMBER() OVER (
+          PARTITION BY kanban_status
+          ORDER BY
+            replace(replace(COALESCE(kanban_status_updated_at, data_atualizacao, data_criacao, CURRENT_TIMESTAMP), 'T', ' '), 'Z', '') DESC,
+            id DESC
+        ) AS ordem
+      FROM fichas
+    )
+    UPDATE fichas
+    SET kanban_ordem = (
+      SELECT ranked.ordem
+      FROM ranked
+      WHERE ranked.id = fichas.id
+    )
+    WHERE kanban_ordem IS NULL OR kanban_ordem <= 0
+  `);
+}
+
+async function autoEntregarFichasNaCostura() {
+  const now = new Date().toISOString();
+  const result = await dbRun(
+    `
+      UPDATE fichas
+      SET
+        status = 'entregue',
+        data_entregue = COALESCE(data_entregue, ?),
+        data_atualizacao = ?
+      WHERE
+        status != 'entregue'
+        AND kanban_status = 'na_costura'
+        AND kanban_status_updated_at IS NOT NULL
+        AND julianday(replace(replace(kanban_status_updated_at, 'T', ' '), 'Z', '')) <= julianday(?, '-7 days')
+    `,
+    [now, now, now]
+  );
+
+  if ((result?.rowsAffected || 0) > 0) {
+    console.log(`✅ Auto-entrega do Kanban aplicada em ${result.rowsAffected} ficha(s)`);
+  }
+}
+
 // ==================== ROTAS DA API ====================
 
 // Health check
@@ -266,6 +338,8 @@ app.get('/api/health', async (req, res) => {
 // Listar todas as fichas
 app.get('/api/fichas', async (req, res) => {
   try {
+    await autoEntregarFichasNaCostura();
+
     const { status, cliente, vendedor, dataInicio, dataFim } = req.query;
 
     let query = 'SELECT * FROM fichas WHERE 1=1';
@@ -379,6 +453,9 @@ app.post('/api/fichas', async (req, res) => {
     const result = await dbRun(sql, params);
     const novoId = Number(result.lastInsertRowid);
 
+    const ordemKanban = await getNextKanbanOrder('pendente', novoId);
+    await dbRun('UPDATE fichas SET kanban_ordem = ? WHERE id = ?', [ordemKanban, novoId]);
+
     // Atualizar tabela de clientes
     if (dados.cliente) {
       await atualizarCliente(dados.cliente, dados.dataInicio);
@@ -455,7 +532,10 @@ app.patch('/api/fichas/:id/entregar', async (req, res) => {
     }
 
     const now = new Date().toISOString();
-    await dbRun(`UPDATE fichas SET status = 'entregue', data_entregue = ? WHERE id = ?`, [now, req.params.id]);
+    await dbRun(
+      `UPDATE fichas SET status = 'entregue', data_entregue = ?, data_atualizacao = ? WHERE id = ?`,
+      [now, now, req.params.id]
+    );
 
     console.log(`✅ Ficha #${req.params.id} marcada como entregue`);
     res.json({ message: 'Ficha marcada como entregue' });
@@ -505,20 +585,67 @@ app.patch('/api/fichas/:id/kanban-status', async (req, res) => {
     }
 
     const now = new Date().toISOString();
+    const kanbanOrder = await getNextKanbanOrder(kanbanStatus, req.params.id);
     await dbRun(
-      'UPDATE fichas SET kanban_status = ?, data_atualizacao = ? WHERE id = ?',
-      [kanbanStatus, now, req.params.id]
+      'UPDATE fichas SET kanban_status = ?, kanban_status_updated_at = ?, kanban_ordem = ?, data_atualizacao = ? WHERE id = ?',
+      [kanbanStatus, now, kanbanOrder, now, req.params.id]
     );
 
     console.log(`✅ Ficha #${req.params.id} atualizada no kanban: ${kanbanStatus}`);
     res.json({
       id: parseInt(req.params.id, 10),
       kanbanStatus,
+      kanbanOrder,
       message: 'Status do kanban atualizado com sucesso'
     });
   } catch (error) {
     console.error('Erro ao atualizar status do kanban:', error);
     res.status(500).json({ error: 'Erro ao atualizar status do kanban' });
+  }
+});
+
+// Atualizar ordem manual dentro de uma coluna do kanban
+app.patch('/api/kanban/order', async (req, res) => {
+  try {
+    const requestedStatus = req.body?.status;
+    const status = typeof requestedStatus === 'string'
+      ? requestedStatus.trim().toLowerCase()
+      : '';
+
+    if (!KANBAN_STATUS_VALUES.has(status)) {
+      return res.status(400).json({
+        error: 'Status de kanban inválido para ordenação.'
+      });
+    }
+
+    const orderedIdsRaw = Array.isArray(req.body?.orderedIds) ? req.body.orderedIds : [];
+    const orderedIds = [];
+    const seen = new Set();
+
+    for (const value of orderedIdsRaw) {
+      const id = Number(value);
+      if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue;
+      orderedIds.push(id);
+      seen.add(id);
+    }
+
+    const now = new Date().toISOString();
+
+    for (let index = 0; index < orderedIds.length; index++) {
+      await dbRun(
+        'UPDATE fichas SET kanban_ordem = ?, data_atualizacao = ? WHERE id = ? AND kanban_status = ?',
+        [index + 1, now, orderedIds[index], status]
+      );
+    }
+
+    res.json({
+      status,
+      updated: orderedIds.length,
+      message: 'Ordem do kanban atualizada com sucesso'
+    });
+  } catch (error) {
+    console.error('Erro ao atualizar ordem do kanban:', error);
+    res.status(500).json({ error: 'Erro ao atualizar ordem do kanban' });
   }
 });
 
