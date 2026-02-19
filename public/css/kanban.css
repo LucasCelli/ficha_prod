@@ -4,8 +4,8 @@
 }
 
 :root {
-  --kanban-cursor-grab: url("../img/cursor-grab.svg") 12 6, grab;
-  --kanban-cursor-grabbing: url("../img/cursor-grabbing.svg") 12 6, grabbing;
+  --kanban-cursor-grab: url("../img/cursor-grab.svg") 4 3, grab;
+  --kanban-cursor-grabbing: url("../img/cursor-grabbing.svg") 4 3, grabbing;
 }
 
 .kanban-layout {
@@ -236,10 +236,6 @@
 .kanban-card.is-dragging {
   opacity: 0.45;
   transform: scale(0.98);
-  cursor: var(--kanban-cursor-grabbing);
-}
-
-body.kanban-dragging .kanban-column {
   cursor: var(--kanban-cursor-grabbing);
 }
 
