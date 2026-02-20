@@ -12,6 +12,7 @@
     { key: 'na_costura', label: 'Na Costura/Em Revisão' }
   ];
   const PERSONALIZACAO_LABELS = Object.freeze({
+    sem_personalizacao: 'Sem Personalização',
     sublimacao: 'Sublimação',
     serigrafia: 'Serigrafia',
     bordado: 'Bordado',

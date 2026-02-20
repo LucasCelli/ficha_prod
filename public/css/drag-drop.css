@@ -2,10 +2,16 @@
 .drag-handle {
   cursor: grab;
   color: #adb5bd;
-  padding: 8px 10px 8px 0;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  padding: 0;
   transition: color 0.2s;
   flex-shrink: 0;
 }
@@ -20,15 +26,13 @@
 }
 
 #produtosTable tr td:first-child {
-  display: flex !important;
-  align-items: center !important;
-  gap: 0 !important;
-  padding-left: 4px !important;
+  position: relative !important;
+  padding-left: 6px !important;
 }
 
 #produtosTable tr td:first-child .tamanho {
-  flex: 1;
-  min-width: 70px;
+  width: 100%;
+  min-width: 0;
 }
 
 #produtosTable tr {
@@ -125,7 +129,7 @@
 
 @media (max-width: 768px) {
   .drag-handle {
-    padding: 6px 8px 6px 0;
+    left: -8px;
   }
 
   #ordenarProdutos span {
@@ -136,7 +140,7 @@
     padding: 8px 12px;
   }
 
-  #produtosTable tr td:first-child .tamanho {
-    min-width: 60px;
+  #produtosTable tr td:first-child {
+    padding-left: 6px !important;
   }
 }

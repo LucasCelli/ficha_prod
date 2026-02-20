@@ -57,9 +57,13 @@ function normalizeProdutos(produtos) {
 
   return produtos.map(produto => {
     if (!produto || typeof produto !== 'object') return produto;
+    const produtoPrincipal = normalizeNameCase(produto.produto || produto.descricao || '');
+    const detalhesProduto = normalizeNameCase(produto.detalhesProduto || produto.detalhes || '');
     return {
       ...produto,
-      descricao: normalizeNameCase(produto.descricao || '')
+      produto: produtoPrincipal,
+      descricao: produtoPrincipal,
+      detalhesProduto
     };
   });
 }
@@ -74,6 +78,20 @@ function normalizeFichaPayload(dados) {
     corBotao: normalizeNameCase(dados?.corBotao || ''),
     produtos: normalizeProdutos(dados?.produtos)
   };
+}
+
+function isValidISODate(value) {
+  const raw = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false;
+
+  const [yearStr, monthStr, dayStr] = raw.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && (date.getMonth() + 1) === month && date.getDate() === day;
 }
 
 const KANBAN_STATUS_VALUES = new Set([
@@ -422,6 +440,9 @@ app.get('/api/fichas/:id', async (req, res) => {
 app.post('/api/fichas', async (req, res) => {
   try {
     const dados = normalizeFichaPayload(req.body);
+    if (!isValidISODate(dados.dataEntrega)) {
+      return res.status(400).json({ error: 'Data de entrega obrigatória e inválida' });
+    }
     const produtosJson = JSON.stringify(dados.produtos || []);
     const now = new Date().toISOString();
 
@@ -479,6 +500,9 @@ app.put('/api/fichas/:id', async (req, res) => {
     }
 
     const dados = normalizeFichaPayload(req.body);
+    if (!isValidISODate(dados.dataEntrega)) {
+      return res.status(400).json({ error: 'Data de entrega obrigatória e inválida' });
+    }
     const produtosJson = JSON.stringify(dados.produtos || []);
     const now = new Date().toISOString();
 
@@ -1442,18 +1466,18 @@ app.get('/api/relatorio/produtos', async (req, res) => {
 
     const fichas = await dbAll(`SELECT produtos FROM fichas ${whereClause}`, params);
 
-    // Contar produtos por descrição
+    // Contar produtos pelo nome principal (com fallback retrocompatível)
     const produtosMap = {};
     fichas.forEach(ficha => {
       if (ficha.produtos) {
         try {
           const produtos = typeof ficha.produtos === 'string' ? JSON.parse(ficha.produtos) : ficha.produtos;
           produtos.forEach(p => {
-            const desc = (p.descricao || 'Sem descrição').trim();
-            if (!produtosMap[desc]) {
-              produtosMap[desc] = 0;
+            const produtoNome = String(p.produto || p.descricao || '').trim() || 'Sem produto';
+            if (!produtosMap[produtoNome]) {
+              produtosMap[produtoNome] = 0;
             }
-            produtosMap[desc] += parseInt(p.quantidade) || 0;
+            produtosMap[produtoNome] += parseInt(p.quantidade) || 0;
           });
         } catch (e) {}
       }

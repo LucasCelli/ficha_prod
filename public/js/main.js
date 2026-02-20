@@ -339,7 +339,6 @@
   function initDefaultDates() {
     const hoje = new Date();
     const dataInicio = document.getElementById('dataInicio');
-    const dataEntrega = document.getElementById('dataEntrega');
 
     const hojeStr = hoje.getFullYear() + '-' +
       String(hoje.getMonth() + 1).padStart(2, '0') + '-' +
@@ -347,17 +346,6 @@
 
     if (dataInicio && !dataInicio.value) {
       dataInicio.value = hojeStr;
-    }
-
-    if (dataEntrega && !dataEntrega.value) {
-      const umaSemanaDepois = new Date(hoje);
-      umaSemanaDepois.setDate(hoje.getDate() + 7);
-
-      const entregaStr = umaSemanaDepois.getFullYear() + '-' +
-        String(umaSemanaDepois.getMonth() + 1).padStart(2, '0') + '-' +
-        String(umaSemanaDepois.getDate()).padStart(2, '0');
-
-      dataEntrega.value = entregaStr;
     }
   }
 
@@ -367,7 +355,7 @@
     if (!eventoSelect || !alertDiv) return;
 
     function atualizar() {
-      alertDiv.style.display = eventoSelect.value === 'sim' ? 'flex' : 'none';
+      alertDiv.style.display = eventoSelect.value === 'sim' ? 'inline-flex' : 'none';
     }
 
     eventoSelect.addEventListener('change', atualizar);
@@ -399,19 +387,19 @@
       if (diffDays < 0) {
         prazoTexto.textContent = 'A data de entrega é anterior à data de início!';
         prazoInfo.className = 'prazo-info urgente';
-        prazoInfo.style.display = 'flex';
+        prazoInfo.style.display = 'inline-flex';
       } else if (diffDays === 0) {
         prazoTexto.textContent = 'Entrega no mesmo dia!';
         prazoInfo.className = 'prazo-info urgente';
-        prazoInfo.style.display = 'flex';
+        prazoInfo.style.display = 'inline-flex';
       } else if (diffDays <= 3) {
         prazoTexto.textContent = `Prazo curto: ${diffDays} dia${diffDays > 1 ? 's' : ''} para produção`;
         prazoInfo.className = 'prazo-info urgente';
-        prazoInfo.style.display = 'flex';
+        prazoInfo.style.display = 'inline-flex';
       } else {
         prazoTexto.textContent = `Prazo: ${diffDays} dia${diffDays > 1 ? 's' : ''} para produção`;
         prazoInfo.className = 'prazo-info';
-        prazoInfo.style.display = 'flex';
+        prazoInfo.style.display = 'inline-flex';
       }
     }
 
@@ -669,11 +657,15 @@
       }
 
       const inputQuantidade = row.querySelector('.quantidade');
-      const inputDescricao = row.querySelector('.descricao');
+      const inputProduto = row.querySelector('.produto');
+      const inputDetalhesProduto = row.querySelector('.detalhes-produto');
 
       if (produto) {
+        const produtoPrincipal = produto.produto || produto.descricao || '';
+        const detalhesProduto = produto.detalhesProduto || produto.detalhes || '';
         if (inputQuantidade) inputQuantidade.value = produto.quantidade || 1;
-        if (inputDescricao) inputDescricao.value = produto.descricao || '';
+        if (inputProduto) inputProduto.value = produtoPrincipal;
+        if (inputDetalhesProduto) inputDetalhesProduto.value = detalhesProduto;
       }
 
       tabelaBody.appendChild(row);
@@ -690,8 +682,9 @@
         const row = btnDuplicar.closest('tr');
         const tamanho = row.querySelector('.tamanho')?.value || '';
         const quantidade = row.querySelector('.quantidade')?.value || 1;
-        const descricao = row.querySelector('.descricao')?.value || '';
-        adicionarLinhaProduto({ tamanho, quantidade, descricao });
+        const produto = row.querySelector('.produto')?.value || row.querySelector('.descricao')?.value || '';
+        const detalhesProduto = row.querySelector('.detalhes-produto')?.value || '';
+        adicionarLinhaProduto({ tamanho, quantidade, produto, detalhesProduto });
       }
 
       if (btnRemover) {
@@ -1307,9 +1300,10 @@
     document.querySelectorAll('#produtosTable tr').forEach(row => {
       const tamanho = row.querySelector('.tamanho')?.value || '';
       const quantidade = row.querySelector('.quantidade')?.value || '';
-      const descricao = row.querySelector('.descricao')?.value || '';
-      if (!tamanho && !descricao) return;
-      produtos.push({ tamanho, quantidade, descricao });
+      const produto = row.querySelector('.produto')?.value || row.querySelector('.descricao')?.value || '';
+      const detalhesProduto = row.querySelector('.detalhes-produto')?.value || '';
+      if (!tamanho && !produto && !detalhesProduto) return;
+      produtos.push({ tamanho, quantidade, produto, detalhesProduto, descricao: produto });
     });
 
     const arteVal = document.getElementById('arte')?.value || '';
@@ -1789,14 +1783,17 @@
       document.querySelectorAll('#produtosTable tr').forEach(row => {
         const tamanho = row.querySelector('.tamanho')?.value;
         const quantidade = row.querySelector('.quantidade')?.value;
-        const descricao = row.querySelector('.descricao')?.value;
-        const descricaoFormatada = capitalizeFirstLetter(descricao);
-        if (!tamanho && !quantidade) return;
+        const produto = row.querySelector('.produto')?.value || row.querySelector('.descricao')?.value;
+        const detalhesProduto = row.querySelector('.detalhes-produto')?.value;
+        const produtoFormatado = capitalizeFirstLetter(produto);
+        const detalhesFormatado = capitalizeFirstLetter(detalhesProduto);
+        if (!tamanho && !quantidade && !produtoFormatado && !detalhesFormatado) return;
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${tamanho || '-'}</td>
           <td>${quantidade || '-'}</td>
-          <td>${descricaoFormatada || '-'}</td>
+          <td>${produtoFormatado || '-'}</td>
+          <td>${detalhesFormatado || '-'}</td>
         `;
         printBody.appendChild(tr);
       });
@@ -2104,9 +2101,9 @@
       if (!rows || rows.length === 0) return '';
 
       for (const row of rows) {
-        const descInput = row.querySelector('.descricao');
-        if (descInput) {
-          const val = (descInput.value || '').trim().toUpperCase();
+        const produtoInput = row.querySelector('.produto') || row.querySelector('.descricao');
+        if (produtoInput) {
+          const val = (produtoInput.value || '').trim().toUpperCase();
           if (val) return val;
         }
       }
@@ -2288,7 +2285,11 @@
       const arteRaw = getRaw('arte');
       const arteText = getVal('arte');
       if (arteRaw && arteText) {
-        partes.push(`PERSONALIZADO EM ${arteText}`);
+        if (arteRaw === 'sem_personalizacao') {
+          partes.push('SEM PERSONALIZAÇÃO');
+        } else {
+          partes.push(`PERSONALIZADO EM ${arteText}`);
+        }
       }
 
       const textoFinal = partes.length > 0
@@ -2394,7 +2395,7 @@
     const tabelaBody = document.getElementById('produtosTable');
     if (tabelaBody) {
       const observer = new MutationObserver(() => {
-        tabelaBody.querySelectorAll('.descricao').forEach(input => {
+        tabelaBody.querySelectorAll('.produto, .descricao').forEach(input => {
           if (!input.dataset.obsLinked) {
             input.dataset.obsLinked = 'true';
             input.addEventListener('input', atualizarObservacoes);
@@ -2406,7 +2407,7 @@
 
       observer.observe(tabelaBody, { childList: true, subtree: true });
 
-      tabelaBody.querySelectorAll('.descricao').forEach(input => {
+      tabelaBody.querySelectorAll('.produto, .descricao').forEach(input => {
         input.dataset.obsLinked = 'true';
         input.addEventListener('input', atualizarObservacoes);
         input.addEventListener('change', atualizarObservacoes);

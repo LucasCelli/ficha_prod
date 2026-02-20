@@ -155,27 +155,40 @@ textarea.form-control {
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: 12px;
-  display: flex;
+  display: inline-flex;
   gap: 8px;
   font-size: 0.85rem;
+  min-height: 42px;
+  align-items: center;
+  box-sizing: border-box;
+  vertical-align: top;
 }
 
 .event-warning {
   border: 1px solid #fbbf24;
   background: #fffbeb;
-  align-items: flex-start;
   color: #92400e;
 }
 
 .event-warning i {
-  margin-top: 2px;
+  margin-top: 0;
+}
+
+.event-warning-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .prazo-info {
   border: 1px solid #60a5fa;
   background: #eff6ff;
-  align-items: center;
   color: #1e40af;
+}
+
+.prazo-info span {
+  line-height: 1.2;
 }
 
 .prazo-info.urgente {
@@ -188,12 +201,58 @@ textarea.form-control {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
+  table-layout: auto;
 }
 
 .product-table th,
 .product-table td {
   padding: 6px;
   border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+
+.product-table th:nth-child(1),
+.product-table td:nth-child(1) {
+  width: 17.5%;
+}
+
+.product-table th:nth-child(2),
+.product-table td:nth-child(2) {
+  width: 12.5%;
+}
+
+.product-table th:nth-child(3),
+.product-table td:nth-child(3) {
+  width: 27.5%;
+}
+
+.product-table th:nth-child(4),
+.product-table td:nth-child(4) {
+  width: 32.5%;
+}
+
+.product-table th:nth-child(5),
+.product-table td:nth-child(5) {
+  width: auto;
+}
+
+.product-table th:last-child,
+.product-table td:last-child {
+  white-space: nowrap;
+}
+
+.product-table th:nth-child(5) {
+  text-align: center;
+}
+
+.product-table tbody td:nth-child(5) {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.product-table tbody td:nth-child(5) .btn {
+  vertical-align: middle;
+  margin: 0 3px;
 }
 
 .product-table th {
@@ -624,7 +683,7 @@ body.preview-impressao #print-dataEntrega {
 
 body.preview-impressao .print-two-cols {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 6fr 4fr;
   gap: 10px;
 }
 
@@ -795,7 +854,7 @@ body.preview-impressao .print-observacoes {
 
   .print-two-cols {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 6fr 4fr;
     column-gap: 3mm;
     flex: 0 0 auto;
     min-height: 0;

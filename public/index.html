@@ -49,7 +49,7 @@
                         <div class="form-group">
                             <label for="vendedor"><i class="fas fa-user-tie" aria-hidden="true"></i> Vendedor</label>
                             <input type="text" id="vendedor" list="vendedoresList" class="form-control"
-                                placeholder="Digite o vendedor">
+                                placeholder="Digite o vendedor" required>
                             <datalist id="vendedoresList">
                                 <option value="Fernanda">
                                 <option value="Kemilly">
@@ -70,7 +70,7 @@
 
                         <div class="form-group">
                             <label for="dataEntrega"><i class="fas fa-calendar-check" aria-hidden="true"></i> Data de Entrega</label>
-                            <input type="date" id="dataEntrega" class="form-control">
+                            <input type="date" id="dataEntrega" class="form-control" required>
                         </div>
 
                         <div class="form-group">
@@ -84,10 +84,7 @@
 
                     <div id="eventoAlert" class="event-warning" style="display: none;">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <div>
-                            <h3>ATENÇÃO: Pedido para Evento!</h3>
-                            <p>Este pedido tem prioridade máxima e prazo crítico.</p>
-                        </div>
+                        <span class="event-warning-title">Pedido para evento</span>
                     </div>
 
                     <div id="prazoInfo" class="prazo-info" style="display: none;">
@@ -109,7 +106,8 @@
                             <tr>
                                 <th>Tamanho</th>
                                 <th>Quantidade</th>
-                                <th>Descrição do Produto</th>
+                                <th>Produto</th>
+                                <th>Detalhes do Produto</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -127,8 +125,12 @@
                                     pattern="[0-9+\-*/\s]*" placeholder="">
                             </td>
                             <td>
-                                <input list="produtosList" class="form-control descricao"
+                                <input list="produtosList" class="form-control produto"
                                     placeholder="Digite ou selecione">
+                            </td>
+                            <td>
+                                <input type="text" class="form-control detalhes-produto"
+                                    placeholder="Opcional">
                             </td>
                             <td>
                                 <button type="button" class="btn btn-secondary btn-icon duplicar-produto"
@@ -171,7 +173,7 @@
                         <div class="form-group">
                             <label for="material"><i class="fas fa-rug" aria-hidden="true"></i> Tecido/Material</label>
                             <input type="text" id="material" list="materiaisList" class="form-control"
-                                placeholder="Digite ou selecione">
+                                placeholder="Digite ou selecione" required>
                             <datalist id="materiaisList"></datalist>
                         </div>
 
@@ -399,9 +401,10 @@
                         <hr class="form-divider" data-label="Arte / Personalização">
 
                         <div class="form-group">
-                            <label for="arte"><i class="fas fa-paint-brush" aria-hidden="true"></i> Tipo de Arte</label>
-                            <select id="arte" class="form-control">
+                            <label for="arte"><i class="fas fa-paint-brush" aria-hidden="true"></i> Tipo de Personalização</label>
+                            <select id="arte" class="form-control" required>
                                 <option value="">-</option>
+                                <option value="sem_personalizacao">Sem Personalização</option>
                                 <option value="sublimacao">Sublimação</option>
                                 <option value="serigrafia">Serigrafia</option>
                                 <option value="bordado">Bordado</option>
@@ -501,6 +504,7 @@
                             <th>TAM.</th>
                             <th>QTD.</th>
                             <th>PRODUTO</th>
+                            <th>DETALHES</th>
                         </tr>
                     </thead>
                     <tbody id="print-produtosTable"></tbody>

@@ -7,6 +7,13 @@
 
   let fichaAtualId = null;
   let modoVisualizacao = false;
+  const CAMPOS_OBRIGATORIOS = Object.freeze([
+    { key: 'cliente', id: 'cliente', label: 'o nome do cliente' },
+    { key: 'vendedor', id: 'vendedor', label: 'o vendedor' },
+    { key: 'dataEntrega', id: 'dataEntrega', label: 'a data de entrega' },
+    { key: 'material', id: 'material', label: 'o tecido/material' },
+    { key: 'arte', id: 'arte', label: 'o tipo de personalização' }
+  ]);
 
   const camposBancoParaForm = {
     'id': 'id',
@@ -268,9 +275,7 @@
     try {
       const dados = coletarDadosFormulario();
 
-      if (!dados.cliente || !dados.cliente.trim()) {
-        mostrarToast('Por favor, informe o nome do cliente', 'error');
-        document.getElementById('cliente').focus();
+      if (!validarCamposObrigatorios(dados)) {
         return;
       }
 
@@ -300,6 +305,20 @@
     } catch (error) {
       mostrarToast('Erro ao salvar ficha no banco de dados', 'error');
     }
+  }
+
+  function validarCamposObrigatorios(dados) {
+    for (const campo of CAMPOS_OBRIGATORIOS) {
+      const valor = String(dados?.[campo.key] || '').trim();
+      if (valor && !(campo.key === 'arte' && valor === '-')) continue;
+
+      mostrarToast(`Por favor, informe ${campo.label}`, 'error');
+      const input = document.getElementById(campo.id);
+      if (input) input.focus();
+      return false;
+    }
+
+    return true;
   }
 
   function coletarDadosFormulario() {
@@ -366,10 +385,11 @@
     rows.forEach(row => {
       const tamanho = row.querySelector('.tamanho')?.value || '';
       const quantidade = row.querySelector('.quantidade')?.value || '';
-      const descricao = row.querySelector('.descricao')?.value || '';
+      const produto = row.querySelector('.produto')?.value || row.querySelector('.descricao')?.value || '';
+      const detalhesProduto = row.querySelector('.detalhes-produto')?.value || '';
 
-      if (tamanho || quantidade || descricao) {
-        produtos.push({ tamanho, quantidade, descricao });
+      if (tamanho || quantidade || produto || detalhesProduto) {
+        produtos.push({ tamanho, quantidade, produto, detalhesProduto, descricao: produto });
       }
     });
 
@@ -608,11 +628,15 @@
               if (ultimaLinha) {
                 const selectTamanho = ultimaLinha.querySelector('.tamanho');
                 const inputQuantidade = ultimaLinha.querySelector('.quantidade');
-                const inputDescricao = ultimaLinha.querySelector('.descricao');
+                const inputProduto = ultimaLinha.querySelector('.produto') || ultimaLinha.querySelector('.descricao');
+                const inputDetalhesProduto = ultimaLinha.querySelector('.detalhes-produto');
+                const produtoPrincipal = produto.produto || produto.descricao || '';
+                const detalhesProduto = produto.detalhesProduto || produto.detalhes || '';
 
                 if (selectTamanho) selectTamanho.value = produto.tamanho || '';
                 if (inputQuantidade) inputQuantidade.value = produto.quantidade || '';
-                if (inputDescricao) inputDescricao.value = produto.descricao || '';
+                if (inputProduto) inputProduto.value = produtoPrincipal;
+                if (inputDetalhesProduto) inputDetalhesProduto.value = detalhesProduto;
               }
             }
           });
