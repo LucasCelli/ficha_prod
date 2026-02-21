@@ -6,7 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow, noarchive">
     <title>Dashboard - Fichas Técnicas</title>
-
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('site_theme_preference') === 'dark' ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (_) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/dashboard.css">
@@ -45,8 +54,8 @@
             <!-- ESTATÍSTICAS -->
             <section class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-icon" style="background: #dbeafe;">
-                        <i class="fas fa-file-alt" style="color: #2563eb;"></i>
+                    <div class="stat-icon stat-icon--blue">
+                        <i class="fas fa-file-alt"></i>
                     </div>
                     <div class="stat-content">
                         <div class="stat-value stat-value-skeleton" id="statTotalFichas" aria-busy="true"></div>
@@ -55,8 +64,8 @@
                 </div>
 
                 <div class="stat-card">
-                    <div class="stat-icon" style="background: #fef3c7;">
-                        <i class="fas fa-clock" style="color: #d97706;"></i>
+                    <div class="stat-icon stat-icon--amber">
+                        <i class="fas fa-clock"></i>
                     </div>
                     <div class="stat-content">
                         <div class="stat-value stat-value-skeleton" id="statPendentes" aria-busy="true"></div>
@@ -65,8 +74,8 @@
                 </div>
 
                 <div class="stat-card">
-                    <div class="stat-icon" style="background: #dcfce7;">
-                        <i class="fas fa-users" style="color: #16a34a;"></i>
+                    <div class="stat-icon stat-icon--green">
+                        <i class="fas fa-users"></i>
                     </div>
                     <div class="stat-content">
                         <div class="stat-value stat-value-skeleton" id="statClientes" aria-busy="true"></div>
@@ -75,8 +84,8 @@
                 </div>
 
                 <div class="stat-card">
-                    <div class="stat-icon" style="background: #fce7f3;">
-                        <i class="fas fa-calendar-week" style="color: #db2777;"></i>
+                    <div class="stat-icon stat-icon--pink">
+                        <i class="fas fa-calendar-week"></i>
                     </div>
                     <div class="stat-content">
                         <div class="stat-value stat-value-skeleton" id="statEsteMes" aria-busy="true"></div>
@@ -186,6 +195,7 @@
         </div>
     </div>
 
+    <script src="js/theme.js"></script>
     <script src="js/toast.js"></script>
     <script src="js/api-client.js"></script>
     <script src="js/dashboard.js"></script>

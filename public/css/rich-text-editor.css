@@ -381,3 +381,105 @@
 .format-applied {
   animation: highlight 0.3s ease;
 }
+
+html[data-theme='dark'] .rich-text-wrapper {
+  border-color: #334155;
+  background: #0f172a;
+}
+
+html[data-theme='dark'] .rich-text-toolbar {
+  background: #111827;
+  border-bottom-color: #334155;
+}
+
+html[data-theme='dark'] .rich-text-toolbar-group {
+  border-right-color: #334155;
+}
+
+html[data-theme='dark'] .toolbar-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .toolbar-btn:hover {
+  background: #273549;
+  border-color: #475569;
+}
+
+html[data-theme='dark'] .toolbar-btn.active {
+  background: #1e3a5f;
+  border-color: #2f4f79;
+  color: #dbeafe;
+}
+
+html[data-theme='dark'] .color-palette-dropdown {
+  background: #111827;
+  border-color: #334155;
+  box-shadow: 0 12px 26px rgba(2, 6, 23, 0.6);
+}
+
+html[data-theme='dark'] .color-palette-header {
+  border-bottom-color: #334155;
+}
+
+html[data-theme='dark'] .color-palette-header span,
+html[data-theme='dark'] .custom-color-label {
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .color-palette-close {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .color-palette-close:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+html[data-theme='dark'] .color-palette-divider {
+  background: #334155;
+}
+
+html[data-theme='dark'] .color-palette-custom {
+  background: #1e293b;
+}
+
+html[data-theme='dark'] .color-palette-custom:hover {
+  background: #273549;
+}
+
+html[data-theme='dark'] .color-picker-input {
+  border-color: #334155;
+  background: #111827;
+}
+
+html[data-theme='dark'] .rich-text-editor {
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+html[data-theme='dark'] .rich-text-editor:focus {
+  background: #111827;
+}
+
+html[data-theme='dark'] .rich-text-editor:empty:before {
+  color: #64748b;
+}
+
+html[data-theme='dark'] .rich-text-wrapper:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+html[data-theme='dark'] .rich-text-editor::-webkit-scrollbar-track {
+  background: #111827;
+}
+
+html[data-theme='dark'] .rich-text-editor::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+html[data-theme='dark'] .rich-text-editor::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}

@@ -322,6 +322,7 @@
   border-radius: var(--rel-radius-sm);
   font-size: 0.85rem;
   background: var(--rel-white);
+  color: var(--rel-text);
   cursor: pointer;
   min-width: 180px;
   transition: border-color 0.2s;
@@ -992,6 +993,54 @@
 }
 
 /* ==================== IMPRESSÃO ==================== */
+html[data-theme='dark'] {
+  --rel-primary: #e5e7eb;
+  --rel-secondary: #60a5fa;
+  --rel-text: #e5e7eb;
+  --rel-text-soft: #94a3b8;
+  --rel-border: #334155;
+  --rel-bg: #111827;
+  --rel-bg-hover: #1e293b;
+  --rel-white: #0f172a;
+  --rel-info-light: #1e3a8a;
+  --rel-success-light: #064e3b;
+  --rel-warning-light: #78350f;
+  --rel-danger-light: #7f1d1d;
+  --rel-purple-light: #312e81;
+}
+
+html[data-theme='dark'] .vendedores-report-row:nth-child(odd) {
+  background: #172033;
+}
+
+html[data-theme='dark'] .ranking-item.top-1 {
+  background: linear-gradient(135deg, #78350f 0%, #92400e 100%);
+}
+
+html[data-theme='dark'] .ranking-item.top-2 {
+  background: linear-gradient(135deg, #334155 0%, #475569 100%);
+}
+
+html[data-theme='dark'] .ranking-item.top-3 {
+  background: linear-gradient(135deg, #7c2d12 0%, #9a3412 100%);
+}
+
+html[data-theme='dark'] .top-vendedor {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
+}
+
+html[data-theme='dark'] .filter-select {
+  background: #0f172a;
+  color: #e5e7eb;
+  border-color: #334155;
+  color-scheme: dark;
+}
+
+html[data-theme='dark'] .filter-select option {
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
 @media print {
 
   .header-actions,

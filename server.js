@@ -376,6 +376,359 @@ async function autoEntregarFichasNaCostura() {
   }
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function formatTemperatureText(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '--°C';
+  return `${Math.round(number)}°C`;
+}
+
+function weatherIconFromCode(code) {
+  const numericCode = Number(code);
+  if (!Number.isFinite(numericCode)) return '🌤️';
+  if (numericCode === 0) return '☀️';
+  if (numericCode === 1 || numericCode === 2) return '🌤️';
+  if (numericCode === 3) return '☁️';
+  if (numericCode === 45 || numericCode === 48) return '🌫️';
+  if (numericCode >= 51 && numericCode <= 67) return '🌦️';
+  if (numericCode >= 71 && numericCode <= 77) return '❄️';
+  if (numericCode >= 80 && numericCode <= 82) return '🌧️';
+  if (numericCode >= 95) return '⛈️';
+  return '🌤️';
+}
+
+function extractClientIp(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '').trim();
+  if (forwarded) {
+    const first = forwarded.split(',')[0].trim();
+    if (first) return first;
+  }
+
+  const realIp = String(req.headers['x-real-ip'] || '').trim();
+  if (realIp) return realIp;
+
+  const remote = String(req.socket?.remoteAddress || '').trim();
+  if (!remote) return '';
+
+  return remote.startsWith('::ffff:') ? remote.slice(7) : remote;
+}
+
+function resolveGithubRepoSlug() {
+  const direct = String(process.env.GITHUB_REPO || process.env.GITHUB_REPOSITORY || '').trim();
+  if (/^[^/\s]+\/[^/\s]+$/.test(direct)) return direct;
+
+  const owner = String(process.env.VERCEL_GIT_REPO_OWNER || '').trim();
+  const repo = String(process.env.VERCEL_GIT_REPO_SLUG || '').trim();
+  if (owner && repo) return `${owner}/${repo}`;
+
+  return '';
+}
+
+function isCloudinaryConfigured() {
+  const cloudName = String(CLOUDINARY_CONFIG.cloudName || '').trim();
+  const apiKey = String(CLOUDINARY_CONFIG.apiKey || '').trim();
+  const apiSecret = String(CLOUDINARY_CONFIG.apiSecret || '').trim();
+
+  const invalidCloudName = !cloudName || /^SEU_/i.test(cloudName);
+  const invalidApiKey = !apiKey || /^SUA_/i.test(apiKey) || /^SEU_/i.test(apiKey);
+  const invalidApiSecret = !apiSecret || /^SEU_/i.test(apiSecret) || /^SUA_/i.test(apiSecret);
+
+  return !(invalidCloudName || invalidApiKey || invalidApiSecret);
+}
+
+async function getTursoConnectionStatus() {
+  try {
+    await db.execute('SELECT 1');
+    return {
+      status: 'ok',
+      message: 'Conectado'
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      message: `Falha: ${error.message}`
+    };
+  }
+}
+
+async function getCloudinaryConnectionStatus() {
+  if (!isCloudinaryConfigured()) {
+    return {
+      status: 'warning',
+      message: 'Não configurado'
+    };
+  }
+
+  try {
+    const credentials = Buffer.from(`${CLOUDINARY_CONFIG.apiKey}:${CLOUDINARY_CONFIG.apiSecret}`).toString('base64');
+    const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/resources/image?max_results=1`;
+    const response = await fetchWithTimeout(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Basic ${credentials}`
+      }
+    }, 6000);
+
+    if (!response.ok) {
+      return {
+        status: 'error',
+        message: `Falha HTTP ${response.status}`
+      };
+    }
+
+    return {
+      status: 'ok',
+      message: `Conectado (${CLOUDINARY_CONFIG.cloudName})`
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      message: `Sem resposta: ${error.message}`
+    };
+  }
+}
+
+async function getVercelAppStatus(req) {
+  const envVercelUrl = String(process.env.VERCEL_URL || '').trim();
+  const hostHeader = String(req.headers.host || '').trim();
+  const protocol = String(req.headers['x-forwarded-proto'] || req.protocol || 'https').trim();
+
+  const baseUrl = envVercelUrl
+    ? `https://${envVercelUrl}`
+    : (hostHeader.includes('vercel.app') ? `${protocol}://${hostHeader}` : '');
+
+  if (!baseUrl) {
+    return {
+      status: 'warning',
+      message: 'Ambiente Vercel não detectado',
+      url: null
+    };
+  }
+
+  const healthUrl = `${baseUrl.replace(/\/+$/, '')}/api/health`;
+  try {
+    const response = await fetchWithTimeout(healthUrl, { method: 'GET' }, 5000);
+    if (response.ok) {
+      return {
+        status: 'ok',
+        message: 'Aplicação acessível',
+        url: baseUrl
+      };
+    }
+
+    return {
+      status: 'error',
+      message: `Falha HTTP ${response.status}`,
+      url: baseUrl
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      message: `Sem resposta: ${error.message}`,
+      url: baseUrl
+    };
+  }
+}
+
+function formatGithubDate(value) {
+  const parsed = Date.parse(String(value || ''));
+  if (!Number.isFinite(parsed)) return '';
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(parsed));
+}
+
+async function getGithubCommitStatus() {
+  const repoSlug = resolveGithubRepoSlug();
+  const commitShaHint = String(process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || '').trim();
+  const githubToken = String(process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '').trim();
+
+  if (!repoSlug && !commitShaHint) {
+    return {
+      status: 'warning',
+      message: 'Repositório não configurado',
+      sha: null,
+      url: null
+    };
+  }
+
+  if (!repoSlug && commitShaHint) {
+    return {
+      status: 'warning',
+      message: `SHA local: ${commitShaHint.slice(0, 7)}`,
+      sha: commitShaHint,
+      url: null
+    };
+  }
+
+  const commitsUrl = `https://api.github.com/repos/${repoSlug}/commits?per_page=1`;
+  try {
+    const headers = {
+      'User-Agent': 'ficha-prod-status',
+      Accept: 'application/vnd.github+json'
+    };
+
+    if (githubToken) {
+      headers.Authorization = `Bearer ${githubToken}`;
+    }
+
+    const response = await fetchWithTimeout(commitsUrl, {
+      method: 'GET',
+      headers
+    }, 6000);
+
+    if (!response.ok) {
+      if (commitShaHint) {
+        return {
+          status: 'warning',
+          message: `GitHub indisponível (HTTP ${response.status})`,
+          sha: commitShaHint,
+          url: `https://github.com/${repoSlug}/commit/${commitShaHint}`
+        };
+      }
+
+      return {
+        status: 'error',
+        message: `Falha HTTP ${response.status}`,
+        sha: null,
+        url: `https://github.com/${repoSlug}`
+      };
+    }
+
+    const data = await response.json();
+    const latest = Array.isArray(data) ? data[0] : null;
+    const sha = String(latest?.sha || commitShaHint || '').trim();
+    const date = formatGithubDate(latest?.commit?.author?.date || '');
+    const commitUrl = sha ? `https://github.com/${repoSlug}/commit/${sha}` : `https://github.com/${repoSlug}`;
+
+    return {
+      status: 'ok',
+      message: date ? `Último commit em ${date}` : 'Último commit encontrado',
+      sha: sha || null,
+      url: commitUrl
+    };
+  } catch (error) {
+    if (commitShaHint) {
+      return {
+        status: 'warning',
+        message: `Usando SHA local (${commitShaHint.slice(0, 7)})`,
+        sha: commitShaHint,
+        url: `https://github.com/${repoSlug}/commit/${commitShaHint}`
+      };
+    }
+
+    return {
+      status: 'error',
+      message: `Sem resposta: ${error.message}`,
+      sha: null,
+      url: `https://github.com/${repoSlug}`
+    };
+  }
+}
+
+async function getLastFichaCreatedAt() {
+  try {
+    const row = await dbGet(
+      `
+        SELECT data_criacao, data_atualizacao
+        FROM fichas
+        ORDER BY replace(replace(COALESCE(data_criacao, data_atualizacao, CURRENT_TIMESTAMP), 'T', ' '), 'Z', '') DESC, id DESC
+        LIMIT 1
+      `
+    );
+
+    return row?.data_criacao || row?.data_atualizacao || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function getWeatherSnapshot(req) {
+  const fallback = {
+    city: 'sua região',
+    temperatureText: '--°C',
+    icon: '🌤️'
+  };
+
+  const clientIp = extractClientIp(req);
+  const localIps = new Set(['', '127.0.0.1', '::1', 'localhost']);
+  const ipSegment = localIps.has(clientIp) ? 'json' : `${encodeURIComponent(clientIp)}/json`;
+  const primaryGeoUrl = `https://ipapi.co/${ipSegment}/`;
+
+  let geoData = null;
+
+  try {
+    const response = await fetchWithTimeout(primaryGeoUrl, { method: 'GET' }, 5000);
+    if (response.ok) {
+      geoData = await response.json();
+    }
+  } catch (_) {
+    // continua para fallback
+  }
+
+  if (!geoData || !Number.isFinite(Number(geoData.latitude)) || !Number.isFinite(Number(geoData.longitude))) {
+    try {
+      const fallbackGeoResponse = await fetchWithTimeout('https://ipapi.co/json/', { method: 'GET' }, 5000);
+      if (fallbackGeoResponse.ok) {
+        geoData = await fallbackGeoResponse.json();
+      }
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  const latitude = Number(geoData?.latitude);
+  const longitude = Number(geoData?.longitude);
+  const city = String(geoData?.city || geoData?.region || geoData?.country_name || fallback.city).trim() || fallback.city;
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return {
+      city,
+      temperatureText: fallback.temperatureText,
+      icon: fallback.icon
+    };
+  }
+
+  try {
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&timezone=auto`;
+    const weatherResponse = await fetchWithTimeout(weatherUrl, { method: 'GET' }, 5000);
+    if (!weatherResponse.ok) {
+      return {
+        city,
+        temperatureText: fallback.temperatureText,
+        icon: fallback.icon
+      };
+    }
+
+    const weatherData = await weatherResponse.json();
+    const current = weatherData?.current || {};
+    return {
+      city,
+      temperatureText: formatTemperatureText(current.temperature_2m),
+      icon: weatherIconFromCode(current.weather_code)
+    };
+  } catch (_) {
+    return {
+      city,
+      temperatureText: fallback.temperatureText,
+      icon: fallback.icon
+    };
+  }
+}
+
 // ==================== ROTAS DA API ====================
 
 // Health check
@@ -621,6 +974,37 @@ app.patch('/api/fichas/:id/pendente', async (req, res) => {
     console.error('Erro ao marcar como pendente:', error);
     res.status(500).json({ error: 'Erro ao marcar como pendente' });
   }
+});
+
+app.get('/api/system-status', async (req, res) => {
+  const [
+    tursoStatus,
+    cloudinaryStatus,
+    vercelStatus,
+    githubStatus,
+    weather,
+    lastFichaCreatedAt
+  ] = await Promise.all([
+    getTursoConnectionStatus(),
+    getCloudinaryConnectionStatus(),
+    getVercelAppStatus(req),
+    getGithubCommitStatus(),
+    getWeatherSnapshot(req),
+    getLastFichaCreatedAt()
+  ]);
+
+  res.json({
+    status: 'ok',
+    generatedAt: new Date().toISOString(),
+    lastFichaCreatedAt,
+    weather,
+    systems: {
+      turso: tursoStatus,
+      cloudinary: cloudinaryStatus,
+      vercel: vercelStatus,
+      github: githubStatus
+    }
+  });
 });
 
 // Atualizar status do kanban
