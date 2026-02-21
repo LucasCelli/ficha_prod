@@ -249,7 +249,7 @@ async function initDatabase() {
     for (const coluna of migrações) {
       try {
         await db.execute(`ALTER TABLE fichas ADD COLUMN ${coluna}`);
-        console.log(`✅ Coluna ${coluna.split(' ')[0]} adicionada`);
+        console.log(`[db:migration] Coluna ${coluna.split(' ')[0]} adicionada`);
       } catch (e) {
         // Coluna já existe, ignorar
       }
@@ -289,9 +289,9 @@ async function initDatabase() {
       // Ignora se a coluna ainda não existir por qualquer motivo.
     }
 
-    console.log('✅ Banco de dados Turso inicializado com sucesso');
+    console.log('[db] Banco de dados Turso inicializado com sucesso');
   } catch (error) {
-    console.error('❌ Erro ao inicializar banco de dados:', error);
+    console.error('[db] Erro ao inicializar banco de dados:', error);
     throw error;
   }
 }
@@ -372,7 +372,7 @@ async function autoEntregarFichasNaCostura() {
   );
 
   if ((result?.rowsAffected || 0) > 0) {
-    console.log(`✅ Auto-entrega do Kanban aplicada em ${result.rowsAffected} ficha(s)`);
+    console.log(`[kanban] Auto-entrega aplicada em ${result.rowsAffected} ficha(s)`);
   }
 }
 
@@ -391,6 +391,23 @@ function formatTemperatureText(value) {
   if (!Number.isFinite(number)) return '--°C';
   return `${Math.round(number)}°C`;
 }
+
+const WEATHER_CACHE_TTL_MS = 30 * 60 * 1000;
+const WEATHER_CACHE_MAX_SIZE = 200;
+const WEATHER_PROVIDER_DISTANCE_LIMIT_KM = Number.isFinite(Number(process.env.WEATHER_PROVIDER_DISTANCE_LIMIT_KM))
+  ? Number(process.env.WEATHER_PROVIDER_DISTANCE_LIMIT_KM)
+  : 120;
+const WEATHER_PROVIDER_DISABLE_AFTER_INACCURATE = Number.isFinite(Number(process.env.WEATHER_PROVIDER_DISABLE_AFTER_INACCURATE))
+  ? Number(process.env.WEATHER_PROVIDER_DISABLE_AFTER_INACCURATE)
+  : 3;
+const WEATHER_PROVIDER_DISABLE_AFTER_FAILURES = Number.isFinite(Number(process.env.WEATHER_PROVIDER_DISABLE_AFTER_FAILURES))
+  ? Number(process.env.WEATHER_PROVIDER_DISABLE_AFTER_FAILURES)
+  : 5;
+const WEATHER_PROVIDER_DISABLE_TTL_MS = Number.isFinite(Number(process.env.WEATHER_PROVIDER_DISABLE_TTL_MS))
+  ? Number(process.env.WEATHER_PROVIDER_DISABLE_TTL_MS)
+  : 6 * 60 * 60 * 1000;
+const weatherSnapshotCache = new Map();
+const weatherGeoProviderStats = new Map();
 
 function weatherIconFromCode(code) {
   const numericCode = Number(code);
@@ -420,6 +437,360 @@ function extractClientIp(req) {
   if (!remote) return '';
 
   return remote.startsWith('::ffff:') ? remote.slice(7) : remote;
+}
+
+function isLocalHost(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return true;
+
+  const noBrackets = raw.replace(/^\[|\]$/g, '');
+  const hostOnly = noBrackets.replace(/:\d+$/, '');
+  return (
+    hostOnly === 'localhost' ||
+    hostOnly === '127.0.0.1' ||
+    hostOnly === '::1' ||
+    hostOnly === '0.0.0.0' ||
+    hostOnly === '::ffff:127.0.0.1'
+  );
+}
+
+function normalizeBaseUrlCandidate(value, fallbackProtocol = 'https') {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw.replace(/\/+$/, '');
+  return `${fallbackProtocol}://${raw}`.replace(/\/+$/, '');
+}
+
+function normalizeLocationText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getGeoDistanceKm(aLat, aLon, bLat, bLon) {
+  const lat1 = Number(aLat);
+  const lon1 = Number(aLon);
+  const lat2 = Number(bLat);
+  const lon2 = Number(bLon);
+  if (!Number.isFinite(lat1) || !Number.isFinite(lon1) || !Number.isFinite(lat2) || !Number.isFinite(lon2)) {
+    return null;
+  }
+
+  const toRad = (degrees) => degrees * (Math.PI / 180);
+  const earthRadiusKm = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2))
+    * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+}
+
+function buildGeoResult(latitude, longitude, city) {
+  const lat = Number(latitude);
+  const lon = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+  const safeCity = String(city || '').trim() || 'sua região';
+  return {
+    latitude: lat,
+    longitude: lon,
+    city: safeCity
+  };
+}
+
+function parseGeoFromIpApi(data) {
+  return buildGeoResult(
+    data?.latitude,
+    data?.longitude,
+    data?.city || data?.region || data?.country_name
+  );
+}
+
+function parseGeoFromIpWho(data) {
+  if (data && data.success === false) return null;
+  return buildGeoResult(
+    data?.latitude ?? data?.lat,
+    data?.longitude ?? data?.lon,
+    data?.city || data?.region || data?.country
+  );
+}
+
+function parseGeoFromIpInfo(data) {
+  const loc = String(data?.loc || '').trim();
+  const [lat, lon] = loc.split(',');
+  return buildGeoResult(
+    lat,
+    lon,
+    data?.city || data?.region || data?.country
+  );
+}
+
+function getWeatherProviderStats(providerName) {
+  const key = String(providerName || '').trim() || 'unknown';
+  if (!weatherGeoProviderStats.has(key)) {
+    weatherGeoProviderStats.set(key, {
+      success: 0,
+      failures: 0,
+      accurate: 0,
+      inaccurate: 0,
+      selected: 0,
+      disabledUntil: 0,
+      lastStatus: '',
+      lastError: ''
+    });
+  }
+
+  return weatherGeoProviderStats.get(key);
+}
+
+function isWeatherProviderEnabled(providerName) {
+  const stats = getWeatherProviderStats(providerName);
+  const disabledUntil = Number(stats.disabledUntil);
+  return !Number.isFinite(disabledUntil) || disabledUntil <= Date.now();
+}
+
+function disableWeatherProvider(providerName, reason) {
+  const stats = getWeatherProviderStats(providerName);
+  const now = Date.now();
+  const nextDisabledUntil = now + WEATHER_PROVIDER_DISABLE_TTL_MS;
+
+  if (Number(stats.disabledUntil) > now) return;
+
+  stats.disabledUntil = nextDisabledUntil;
+  stats.lastStatus = `disabled:${reason}`;
+  console.warn(`[weather] provider=${providerName} disabled reason=${reason} ttl_ms=${WEATHER_PROVIDER_DISABLE_TTL_MS}`);
+}
+
+function registerWeatherProviderFailure(providerName, reason = '') {
+  const stats = getWeatherProviderStats(providerName);
+  stats.failures += 1;
+  stats.lastStatus = 'failure';
+  stats.lastError = reason;
+
+  if (stats.failures >= WEATHER_PROVIDER_DISABLE_AFTER_FAILURES && stats.success === 0) {
+    disableWeatherProvider(providerName, 'failures');
+  }
+}
+
+function registerWeatherProviderSuccess(providerName, accuracy = 'unknown') {
+  const stats = getWeatherProviderStats(providerName);
+  stats.success += 1;
+  stats.lastStatus = `success:${accuracy}`;
+  stats.lastError = '';
+
+  if (accuracy === 'accurate') {
+    stats.accurate += 1;
+    return;
+  }
+
+  if (accuracy === 'inaccurate') {
+    stats.inaccurate += 1;
+    if (
+      stats.inaccurate >= WEATHER_PROVIDER_DISABLE_AFTER_INACCURATE
+      && stats.inaccurate > stats.accurate
+    ) {
+      disableWeatherProvider(providerName, 'inaccurate');
+    }
+  }
+}
+
+function getWeatherGeoProviders(clientIp) {
+  const ip = String(clientIp || '').trim();
+  const local = isLocalHost(ip);
+
+  return [
+    {
+      name: 'ipinfo',
+      parse: parseGeoFromIpInfo,
+      urls: !local && ip
+        ? [`https://ipinfo.io/${encodeURIComponent(ip)}/json`, 'https://ipinfo.io/json']
+        : ['https://ipinfo.io/json']
+    }
+  ];
+}
+
+function getReferenceGeoFromRequest(req) {
+  const latitude = Number(req.headers['x-vercel-ip-latitude']);
+  const longitude = Number(req.headers['x-vercel-ip-longitude']);
+  const city = String(req.headers['x-vercel-ip-city'] || '').trim();
+
+  if (!Number.isFinite(latitude) && !Number.isFinite(longitude) && !city) {
+    return null;
+  }
+
+  return {
+    latitude: Number.isFinite(latitude) ? latitude : null,
+    longitude: Number.isFinite(longitude) ? longitude : null,
+    city: city || null
+  };
+}
+
+function isGeoCandidateAccurate(candidate, referenceGeo) {
+  if (!referenceGeo) {
+    return {
+      accuracy: 'unknown',
+      distanceKm: null,
+      cityMatch: null
+    };
+  }
+
+  const hasReferenceCoords = Number.isFinite(referenceGeo.latitude) && Number.isFinite(referenceGeo.longitude);
+  const distanceKm = hasReferenceCoords
+    ? getGeoDistanceKm(candidate.latitude, candidate.longitude, referenceGeo.latitude, referenceGeo.longitude)
+    : null;
+
+  if (Number.isFinite(distanceKm)) {
+    return {
+      accuracy: distanceKm <= WEATHER_PROVIDER_DISTANCE_LIMIT_KM ? 'accurate' : 'inaccurate',
+      distanceKm,
+      cityMatch: null
+    };
+  }
+
+  const referenceCity = normalizeLocationText(referenceGeo.city);
+  const candidateCity = normalizeLocationText(candidate.city);
+  if (referenceCity && candidateCity) {
+    const cityMatch = referenceCity === candidateCity;
+    return {
+      accuracy: cityMatch ? 'accurate' : 'inaccurate',
+      distanceKm: null,
+      cityMatch
+    };
+  }
+
+  return {
+    accuracy: 'unknown',
+    distanceKm: null,
+    cityMatch: null
+  };
+}
+
+async function queryGeoProvider(provider) {
+  let lastFailure = 'sem_resposta';
+
+  for (const url of provider.urls) {
+    try {
+      const response = await fetchWithTimeout(url, { method: 'GET' }, 5000);
+      if (!response.ok) {
+        lastFailure = `http_${response.status}`;
+        continue;
+      }
+
+      const data = await response.json();
+      const parsed = provider.parse(data);
+      if (parsed) {
+        return {
+          ...parsed,
+          sourceUrl: url
+        };
+      }
+
+      lastFailure = 'payload_invalido';
+    } catch (error) {
+      lastFailure = error?.message ? String(error.message) : 'erro_desconhecido';
+    }
+  }
+
+  return {
+    error: lastFailure
+  };
+}
+
+function readWeatherCache(cacheKey) {
+  const key = String(cacheKey || 'global');
+  const entry = weatherSnapshotCache.get(key);
+  if (!entry) return null;
+
+  if ((Date.now() - entry.updatedAt) > WEATHER_CACHE_TTL_MS) {
+    weatherSnapshotCache.delete(key);
+    return null;
+  }
+
+  return entry.snapshot || null;
+}
+
+function writeWeatherCache(cacheKey, snapshot) {
+  const key = String(cacheKey || 'global');
+  weatherSnapshotCache.set(key, {
+    updatedAt: Date.now(),
+    snapshot
+  });
+
+  while (weatherSnapshotCache.size > WEATHER_CACHE_MAX_SIZE) {
+    const oldestKey = weatherSnapshotCache.keys().next().value;
+    if (!oldestKey) break;
+    weatherSnapshotCache.delete(oldestKey);
+  }
+}
+
+async function resolveGeoByIp(req, clientIp) {
+  const ip = String(clientIp || '').trim();
+  const referenceGeo = getReferenceGeoFromRequest(req);
+
+  const allProviders = getWeatherGeoProviders(ip);
+  let providers = allProviders.filter(provider => isWeatherProviderEnabled(provider.name));
+  if (providers.length === 0) {
+    providers = allProviders;
+  }
+
+  const candidates = [];
+  for (const provider of providers) {
+    const result = await queryGeoProvider(provider);
+    if (!result || result.error) {
+      registerWeatherProviderFailure(provider.name, result?.error || 'sem_resposta');
+      continue;
+    }
+
+    const evaluation = isGeoCandidateAccurate(result, referenceGeo);
+    registerWeatherProviderSuccess(provider.name, evaluation.accuracy);
+
+    candidates.push({
+      provider: provider.name,
+      latitude: result.latitude,
+      longitude: result.longitude,
+      city: result.city,
+      accuracy: evaluation.accuracy,
+      distanceKm: evaluation.distanceKm,
+      cityMatch: evaluation.cityMatch
+    });
+
+    if (!referenceGeo || evaluation.accuracy === 'accurate') {
+      break;
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  let selected = candidates[0];
+  if (referenceGeo) {
+    const accurateCandidates = candidates.filter(candidate => candidate.accuracy === 'accurate');
+    const pool = accurateCandidates.length > 0 ? accurateCandidates : candidates;
+
+    const poolWithDistance = pool.filter(candidate => Number.isFinite(candidate.distanceKm));
+    if (poolWithDistance.length > 0) {
+      selected = poolWithDistance.reduce((best, current) => (
+        current.distanceKm < best.distanceKm ? current : best
+      ));
+    } else {
+      const cityMatchCandidate = pool.find(candidate => candidate.cityMatch === true);
+      selected = cityMatchCandidate || pool[0];
+    }
+  }
+
+  const selectedStats = getWeatherProviderStats(selected.provider);
+  selectedStats.selected += 1;
+
+  return {
+    latitude: selected.latitude,
+    longitude: selected.longitude,
+    city: selected.city,
+    provider: selected.provider
+  };
 }
 
 function resolveGithubRepoSlug() {
@@ -499,14 +870,25 @@ async function getCloudinaryConnectionStatus() {
 
 async function getVercelAppStatus(req) {
   const envVercelUrl = String(process.env.VERCEL_URL || '').trim();
+  const envProductionUrl = String(process.env.VERCEL_PROJECT_PRODUCTION_URL || '').trim();
   const hostHeader = String(req.headers.host || '').trim();
-  const protocol = String(req.headers['x-forwarded-proto'] || req.protocol || 'https').trim();
+  const protocol = String(req.headers['x-forwarded-proto'] || req.protocol || 'https').trim() || 'https';
+  const hostOnly = hostHeader.replace(/:\d+$/, '').trim();
+  const candidates = [];
 
-  const baseUrl = envVercelUrl
-    ? `https://${envVercelUrl}`
-    : (hostHeader.includes('vercel.app') ? `${protocol}://${hostHeader}` : '');
+  if (hostHeader && !isLocalHost(hostOnly)) {
+    candidates.push(normalizeBaseUrlCandidate(`${protocol}://${hostHeader}`, protocol));
+  }
+  if (envProductionUrl) {
+    candidates.push(normalizeBaseUrlCandidate(envProductionUrl, 'https'));
+  }
+  if (envVercelUrl) {
+    candidates.push(normalizeBaseUrlCandidate(envVercelUrl, 'https'));
+  }
 
-  if (!baseUrl) {
+  const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
+
+  if (uniqueCandidates.length === 0) {
     return {
       status: 'warning',
       message: 'Ambiente Vercel não detectado',
@@ -514,29 +896,57 @@ async function getVercelAppStatus(req) {
     };
   }
 
-  const healthUrl = `${baseUrl.replace(/\/+$/, '')}/api/health`;
-  try {
-    const response = await fetchWithTimeout(healthUrl, { method: 'GET' }, 5000);
-    if (response.ok) {
-      return {
-        status: 'ok',
-        message: 'Aplicação acessível',
-        url: baseUrl
-      };
-    }
+  const attempts = [];
+  for (const baseUrl of uniqueCandidates) {
+    const healthUrl = `${baseUrl.replace(/\/+$/, '')}/api/health`;
+    try {
+      const response = await fetchWithTimeout(healthUrl, { method: 'GET' }, 5000);
+      if (response.ok) {
+        return {
+          status: 'ok',
+          message: 'Aplicação acessível',
+          url: baseUrl
+        };
+      }
 
+      attempts.push({ baseUrl, statusCode: response.status });
+    } catch (error) {
+      attempts.push({ baseUrl, errorMessage: error.message });
+    }
+  }
+
+  const unauthorizedAttempt = attempts.find(item => Number(item.statusCode) === 401);
+  if (unauthorizedAttempt) {
     return {
-      status: 'error',
-      message: `Falha HTTP ${response.status}`,
-      url: baseUrl
-    };
-  } catch (error) {
-    return {
-      status: 'error',
-      message: `Sem resposta: ${error.message}`,
-      url: baseUrl
+      status: 'warning',
+      message: 'Deployment protegido (HTTP 401)',
+      url: unauthorizedAttempt.baseUrl
     };
   }
+
+  const firstHttpAttempt = attempts.find(item => Number.isFinite(item.statusCode));
+  if (firstHttpAttempt) {
+    return {
+      status: 'error',
+      message: `Falha HTTP ${firstHttpAttempt.statusCode}`,
+      url: firstHttpAttempt.baseUrl
+    };
+  }
+
+  const firstNetworkAttempt = attempts.find(item => item.errorMessage);
+  if (firstNetworkAttempt) {
+    return {
+      status: 'error',
+      message: `Sem resposta: ${firstNetworkAttempt.errorMessage}`,
+      url: firstNetworkAttempt.baseUrl
+    };
+  }
+
+  return {
+    status: 'error',
+    message: 'Não foi possível verificar o status da aplicação',
+    url: uniqueCandidates[0]
+  };
 }
 
 function formatGithubDate(value) {
@@ -660,71 +1070,58 @@ async function getWeatherSnapshot(req) {
   const fallback = {
     city: 'sua região',
     temperatureText: '--°C',
-    icon: '🌤️'
+    icon: '🌤️',
+    provider: null
   };
 
   const clientIp = extractClientIp(req);
-  const localIps = new Set(['', '127.0.0.1', '::1', 'localhost']);
-  const ipSegment = localIps.has(clientIp) ? 'json' : `${encodeURIComponent(clientIp)}/json`;
-  const primaryGeoUrl = `https://ipapi.co/${ipSegment}/`;
+  const cacheKey = isLocalHost(clientIp) ? 'global' : clientIp;
+  const cached = readWeatherCache(cacheKey);
 
-  let geoData = null;
+  const geo = await resolveGeoByIp(req, clientIp);
+  if (!geo) return cached || fallback;
 
-  try {
-    const response = await fetchWithTimeout(primaryGeoUrl, { method: 'GET' }, 5000);
-    if (response.ok) {
-      geoData = await response.json();
-    }
-  } catch (_) {
-    // continua para fallback
-  }
+  const latitude = Number(geo.latitude);
+  const longitude = Number(geo.longitude);
+  const city = String(geo.city || fallback.city).trim() || fallback.city;
+  const provider = String(geo.provider || '').trim() || null;
+  const cityFallback = {
+    city,
+    temperatureText: fallback.temperatureText,
+    icon: fallback.icon,
+    provider
+  };
 
-  if (!geoData || !Number.isFinite(Number(geoData.latitude)) || !Number.isFinite(Number(geoData.longitude))) {
-    try {
-      const fallbackGeoResponse = await fetchWithTimeout('https://ipapi.co/json/', { method: 'GET' }, 5000);
-      if (fallbackGeoResponse.ok) {
-        geoData = await fallbackGeoResponse.json();
-      }
-    } catch (_) {
-      return fallback;
-    }
-  }
-
-  const latitude = Number(geoData?.latitude);
-  const longitude = Number(geoData?.longitude);
-  const city = String(geoData?.city || geoData?.region || geoData?.country_name || fallback.city).trim() || fallback.city;
-
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return {
-      city,
-      temperatureText: fallback.temperatureText,
-      icon: fallback.icon
-    };
-  }
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return cached || cityFallback;
 
   try {
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&timezone=auto`;
     const weatherResponse = await fetchWithTimeout(weatherUrl, { method: 'GET' }, 5000);
     if (!weatherResponse.ok) {
-      return {
+      return cached || {
         city,
         temperatureText: fallback.temperatureText,
-        icon: fallback.icon
+        icon: fallback.icon,
+        provider
       };
     }
 
     const weatherData = await weatherResponse.json();
     const current = weatherData?.current || {};
-    return {
+    const snapshot = {
       city,
       temperatureText: formatTemperatureText(current.temperature_2m),
-      icon: weatherIconFromCode(current.weather_code)
+      icon: weatherIconFromCode(current.weather_code),
+      provider
     };
+    writeWeatherCache(cacheKey, snapshot);
+    return snapshot;
   } catch (_) {
-    return {
+    return cached || {
       city,
       temperatureText: fallback.temperatureText,
-      icon: fallback.icon
+      icon: fallback.icon,
+      provider
     };
   }
 }
@@ -870,7 +1267,7 @@ app.post('/api/fichas', async (req, res) => {
       await atualizarCliente(dados.cliente, dados.dataInicio);
     }
 
-    console.log(`✅ Ficha #${novoId} criada`);
+    console.log(`[fichas] Ficha #${novoId} criada`);
     res.status(201).json({ id: novoId, message: 'Ficha criada com sucesso' });
   } catch (error) {
     console.error('Erro ao criar ficha:', error);
@@ -926,7 +1323,7 @@ app.put('/api/fichas/:id', async (req, res) => {
 
     await dbRun(sql, params);
 
-    console.log(`✅ Ficha #${req.params.id} atualizada`);
+    console.log(`[fichas] Ficha #${req.params.id} atualizada`);
     res.json({ id: parseInt(req.params.id), message: 'Ficha atualizada com sucesso' });
   } catch (error) {
     console.error('Erro ao atualizar ficha:', error);
@@ -949,7 +1346,7 @@ app.patch('/api/fichas/:id/entregar', async (req, res) => {
       [now, now, req.params.id]
     );
 
-    console.log(`✅ Ficha #${req.params.id} marcada como entregue`);
+    console.log(`[fichas] Ficha #${req.params.id} marcada como entregue`);
     res.json({ message: 'Ficha marcada como entregue' });
   } catch (error) {
     console.error('Erro ao marcar como entregue:', error);
@@ -968,7 +1365,7 @@ app.patch('/api/fichas/:id/pendente', async (req, res) => {
 
     await dbRun(`UPDATE fichas SET status = 'pendente', data_entregue = NULL WHERE id = ?`, [req.params.id]);
 
-    console.log(`✅ Ficha #${req.params.id} voltou para pendente`);
+    console.log(`[fichas] Ficha #${req.params.id} voltou para pendente`);
     res.json({ message: 'Ficha marcada como pendente' });
   } catch (error) {
     console.error('Erro ao marcar como pendente:', error);
@@ -1034,7 +1431,7 @@ app.patch('/api/fichas/:id/kanban-status', async (req, res) => {
       [kanbanStatus, now, kanbanOrder, now, req.params.id]
     );
 
-    console.log(`✅ Ficha #${req.params.id} atualizada no kanban: ${kanbanStatus}`);
+    console.log(`[kanban] Ficha #${req.params.id} atualizada: ${kanbanStatus}`);
     res.json({
       id: parseInt(req.params.id, 10),
       kanbanStatus,
@@ -1103,7 +1500,7 @@ app.delete('/api/fichas/:id', async (req, res) => {
 
     await dbRun('DELETE FROM fichas WHERE id = ?', [req.params.id]);
 
-    console.log(`✅ Ficha #${req.params.id} deletada`);
+    console.log(`[fichas] Ficha #${req.params.id} deletada`);
     res.json({ message: 'Ficha deletada com sucesso' });
   } catch (error) {
     console.error('Erro ao deletar ficha:', error);
@@ -1189,10 +1586,10 @@ app.put('/api/clientes/:id', async (req, res) => {
         `UPDATE fichas SET cliente = ? WHERE lower(cliente) = lower(?)`,
         [nomeFinal, clienteExiste.nome]
       );
-      console.log(`📝 Nome do cliente atualizado nas fichas: "${clienteExiste.nome}" -> "${nomeFinal}"`);
+      console.log(`[clientes] Nome atualizado nas fichas: "${clienteExiste.nome}" -> "${nomeFinal}"`);
     }
 
-    console.log(`✅ Cliente #${id} atualizado`);
+    console.log(`[clientes] Cliente #${id} atualizado`);
     res.json({ message: 'Cliente atualizado com sucesso' });
   } catch (error) {
     console.error('Erro ao atualizar cliente:', error);
@@ -1212,7 +1609,7 @@ app.delete('/api/clientes/:id', async (req, res) => {
 
     await dbRun('DELETE FROM clientes WHERE id = ?', [id]);
 
-    console.log(`✅ Cliente #${id} (${clienteExiste.nome}) deletado`);
+    console.log(`[clientes] Cliente #${id} (${clienteExiste.nome}) deletado`);
     res.json({ message: 'Cliente excluído com sucesso' });
   } catch (error) {
     console.error('Erro ao deletar cliente:', error);
@@ -1323,7 +1720,7 @@ app.post('/api/cloudinary/migrar', async (req, res) => {
          OR (imagens_data IS NOT NULL AND imagens_data LIKE '%data:%')
     `);
 
-    console.log(`📦 Encontradas ${fichas.length} fichas com imagens para migrar`);
+    console.log(`[cloudinary:migracao] Encontradas ${fichas.length} fichas com imagens para migrar`);
 
     const resultados = {
       total: fichas.length,
@@ -1389,16 +1786,16 @@ app.post('/api/cloudinary/migrar', async (req, res) => {
             fichaId: ficha.id,
             imagensMigradas: imagensAtualizadas.length
           });
-          console.log(`✅ Ficha #${ficha.id}: ${imagensAtualizadas.length} imagem(ns) migrada(s)`);
+          console.log(`[cloudinary:migracao] Ficha #${ficha.id}: ${imagensAtualizadas.length} imagem(ns) migrada(s)`);
         }
 
       } catch (err) {
-        console.error(`❌ Erro na ficha #${ficha.id}:`, err);
+        console.error(`[cloudinary:migracao] Erro na ficha #${ficha.id}:`, err);
         resultados.erros.push(`Ficha #${ficha.id}: ${err.message}`);
       }
     }
 
-    console.log(`🎉 Migração concluída: ${resultados.migradas}/${resultados.total} fichas`);
+    console.log(`[cloudinary:migracao] Concluída: ${resultados.migradas}/${resultados.total} fichas`);
     res.json(resultados);
 
   } catch (error) {
@@ -1519,7 +1916,7 @@ app.delete('/api/cloudinary/image/:publicId', async (req, res) => {
     const result = await response.json();
 
     if (result.result === 'ok') {
-      console.log(`🗑️ Imagem deletada do Cloudinary: ${realPublicId}`);
+      console.log(`[cloudinary] Imagem deletada: ${realPublicId}`);
       res.json({ success: true });
     } else if (result.result === 'not found') {
       res.json({
@@ -1692,7 +2089,7 @@ app.get('/api/relatorio', async (req, res) => {
     // Calcular totalFichas como soma segura
     const totalFichas = relatorio.fichasEntregues + relatorio.fichasPendentes;
 
-    console.log('📊 Relatório gerado:', relatorio);
+    console.log('[relatorio] Gerado:', relatorio);
     res.json({
       totalFichas,
       fichasEntregues: relatorio.fichasEntregues,
@@ -2264,13 +2661,13 @@ app.get('*', (req, res) => {
 // Iniciar servidor
 initDatabase().then(() => {
   app.listen(PORT, () => {
-    console.log('🚀 Servidor rodando em http://localhost:' + PORT);
-    console.log('📊 Banco de dados: Turso (LibSQL)');
-    console.log('☁️ Cloudinary: ' + CLOUDINARY_CONFIG.cloudName);
-    console.log('✅ Encoding UTF-8 configurado');
+    console.log('Servidor rodando em http://localhost:' + PORT);
+    console.log('Banco de dados: Turso (LibSQL)');
+    console.log('Cloudinary: ' + CLOUDINARY_CONFIG.cloudName);
+    console.log('Encoding UTF-8 configurado');
   });
 }).catch(error => {
-  console.error('❌ Falha ao iniciar servidor:', error);
+  console.error('Falha ao iniciar servidor:', error);
   process.exit(1);
 });
 

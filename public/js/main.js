@@ -28,10 +28,10 @@
       const response = await fetch('/api/cloudinary/config');
       if (response.ok) {
         cloudinaryConfig = await response.json();
-        console.log('✅ Cloudinary configurado:', cloudinaryConfig.cloudName);
+        console.log('[cloudinary] Configurado:', cloudinaryConfig.cloudName);
       }
     } catch (error) {
-      console.warn('⚠️ Cloudinary não disponível, usando base64');
+      console.warn('[cloudinary] Não disponível, usando base64');
     }
   }
 
@@ -58,7 +58,7 @@
       if (!response.ok) throw new Error('Upload falhou');
 
       const result = await response.json();
-      console.log('✅ Imagem enviada ao Cloudinary:', result.public_id);
+      console.log('[cloudinary] Imagem enviada:', result.public_id);
 
       return {
         success: true,
@@ -67,7 +67,7 @@
         isBase64: false
       };
     } catch (error) {
-      console.error('❌ Erro no upload Cloudinary:', error);
+      console.error('[cloudinary] Erro no upload:', error);
       return { success: true, url: base64Data, isBase64: true };
     }
   }
@@ -1324,7 +1324,7 @@
 
           const reader = new FileReader();
           reader.onload = async ev => {
-            console.log('📋 Imagem colada, fazendo upload...');
+            console.log('[imagens] Imagem colada, iniciando upload...');
             await adicionarImagem(ev.target.result);
           };
           reader.readAsDataURL(blob);
@@ -1475,7 +1475,7 @@
           const ficha = JSON.parse(ev.target.result);
           preencherFicha(ficha);
         } catch (err) {
-          alert('❌ Erro ao ler arquivo JSON.');
+          alert('Erro ao ler arquivo JSON.');
         }
       };
       reader.readAsText(file, 'UTF-8');

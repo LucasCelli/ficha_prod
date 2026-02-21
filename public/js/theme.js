@@ -238,40 +238,6 @@
     return !temp || temp === '--\u00B0C' || !city || city.toLowerCase() === 'sua regi\u00E3o';
   }
 
-  async function fetchGeoFromIpApi() {
-    const data = await fetchJsonWithTimeout('https://ipapi.co/json/', 5000);
-    const latitude = Number(data && data.latitude);
-    const longitude = Number(data && data.longitude);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      throw new Error('Sem coordenadas no ipapi');
-    }
-
-    return {
-      latitude,
-      longitude,
-      city: normalizeString(data && (data.city || data.region || data.country_name), 'sua regi\u00E3o')
-    };
-  }
-
-  async function fetchGeoFromIpWho() {
-    const data = await fetchJsonWithTimeout('https://ipwho.is/', 5000);
-    if (data && data.success === false) {
-      throw new Error('ipwho sem sucesso');
-    }
-
-    const latitude = Number(data && (data.latitude || data.lat));
-    const longitude = Number(data && (data.longitude || data.lon));
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      throw new Error('Sem coordenadas no ipwho');
-    }
-
-    return {
-      latitude,
-      longitude,
-      city: normalizeString(data && (data.city || data.region || data.country), 'sua regi\u00E3o')
-    };
-  }
-
   async function fetchGeoFromIpInfo() {
     const data = await fetchJsonWithTimeout('https://ipinfo.io/json', 5000);
     const loc = normalizeString(data && data.loc, '');
@@ -324,30 +290,11 @@
   }
 
   async function fetchBrowserWeather() {
-    let geo = null;
-
     try {
-      geo = await fetchGeoFromIpApi();
-    } catch (_) {
-      try {
-        geo = await fetchGeoFromIpWho();
-      } catch (_) {
-        try {
-          geo = await fetchGeoFromIpInfo();
-        } catch (_) {
-          return null;
-        }
-      }
-    }
-
-    try {
+      const geo = await fetchGeoFromIpInfo();
       return await fetchWeatherByCoordinates(geo.latitude, geo.longitude, geo.city);
     } catch (_) {
-      return {
-        city: geo.city,
-        temperatureText: '--\u00B0C',
-        icon: '\u{1F324}\uFE0F'
-      };
+      return null;
     }
   }
 
@@ -521,6 +468,8 @@
     renderTooltip(toolbar, snapshot);
 
     const refreshSnapshot = async (force) => {
+      const previousSnapshot = snapshot;
+
       try {
         snapshot = await fetchStatusSnapshotFromApi();
       } catch (_) {
@@ -530,6 +479,18 @@
       }
 
       snapshot = await enrichWeatherIfNeeded(snapshot);
+
+      if (
+        isWeatherFallback(snapshot.weather) &&
+        previousSnapshot &&
+        !isWeatherFallback(previousSnapshot.weather)
+      ) {
+        snapshot = normalizeSnapshot({
+          ...snapshot,
+          weather: previousSnapshot.weather
+        });
+      }
+
       writeStatusCache(snapshot);
 
       renderGreeting(toolbar, snapshot);
