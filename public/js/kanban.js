@@ -720,7 +720,6 @@
         const response = await db.atualizarKanbanStatus(draggedId, targetStatus);
         const persistedStatus = normalizeBoardStatus(response?.kanbanStatus || targetStatus);
         setBoardStatus(draggedId, persistedStatus);
-        setBoardOrder(draggedId, response?.kanbanOrder);
 
         const persistPromises = [];
         if (sourceFinalOrder.length) {

@@ -993,7 +993,21 @@ body.preview-impressao .print-observacoes {
     display: grid;
     gap: 8px;
     align-content: start;
-    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #print-imagesContainer.images-one {
+    grid-template-columns: 1fr;
+  }
+
+  #print-imagesContainer.images-three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #print-imagesContainer.images-three .print-image-item:nth-child(3) {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: calc(50% - 4px);
   }
 
   #print-imagesContainer.compact-four {

@@ -322,10 +322,6 @@
       const dados = coletarDadosFormulario();
       delete dados.id;
 
-      if (dados.numeroVenda) {
-        dados.numeroVenda = dados.numeroVenda + '-COPIA';
-      }
-
       const novoId = await db.salvarFicha(dados);
 
       mostrarToast('Ficha duplicada com sucesso!', 'success');

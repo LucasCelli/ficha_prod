@@ -850,10 +850,6 @@
       if (!dadosDuplicados) throw new Error('Dados da ficha indisponíveis');
 
       delete dadosDuplicados.id;
-      if (dadosDuplicados.numeroVenda) {
-        dadosDuplicados.numeroVenda = `${dadosDuplicados.numeroVenda}-COPIA`;
-      }
-
       const novoId = await db.salvarFicha(dadosDuplicados);
       await carregarFichas();
       aplicarFiltros();

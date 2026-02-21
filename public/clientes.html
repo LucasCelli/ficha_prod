@@ -14,13 +14,12 @@
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 </head>
 
-<body>
+<body class="page-clientes">
     <div class="container">
         <header>
             <div class="header-content">
                 <div>
                     <h1><i class="fas fa-users"></i> Gestão de Clientes</h1>
-                    <p>Visualize e gerencie todos os clientes cadastrados</p>
                 </div>
                 <div class="header-actions">
                     <a href="dashboard.html" class="btn btn-secondary">
@@ -43,7 +42,7 @@
                         <i class="fas fa-users" style="color: #2563eb;"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value" id="statTotalClientes">0</div>
+                        <div class="stat-value stat-value-skeleton" id="statTotalClientes"></div>
                         <div class="stat-label">Total de Clientes</div>
                     </div>
                 </div>
@@ -53,8 +52,8 @@
                         <i class="fas fa-shopping-bag" style="color: #16a34a;"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value" id="statTotalPedidos">0</div>
-                        <div class="stat-label">Total de Pedidos</div>
+                        <div class="stat-value stat-value-skeleton" id="statTotalFichas"></div>
+                        <div class="stat-label">Total de Fichas</div>
                     </div>
                 </div>
 
@@ -63,7 +62,7 @@
                         <i class="fas fa-user-plus" style="color: #d97706;"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value" id="statNovosClientes">0</div>
+                        <div class="stat-value stat-value-skeleton" id="statNovosClientes"></div>
                         <div class="stat-label">Novos este Mês</div>
                     </div>
                 </div>
@@ -73,8 +72,8 @@
                         <i class="fas fa-star" style="color: #db2777;"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value" id="statMediaPedidos">0</div>
-                        <div class="stat-label">Média por Cliente</div>
+                        <div class="stat-value stat-value-skeleton" id="statMediaFichas"></div>
+                        <div class="stat-label">Media de Fichas por Cliente</div>
                     </div>
                 </div>
             </section>
@@ -104,8 +103,8 @@
                             <select id="ordenarPor" class="form-control">
                                 <option value="nome_asc">Nome (A-Z)</option>
                                 <option value="nome_desc">Nome (Z-A)</option>
-                                <option value="pedidos_desc">Mais pedidos</option>
-                                <option value="pedidos_asc">Menos pedidos</option>
+                                <option value="fichas_desc">Mais fichas</option>
+                                <option value="fichas_asc">Menos fichas</option>
                                 <option value="recente">Mais recente</option>
                                 <option value="antigo">Mais antigo</option>
                             </select>
@@ -131,7 +130,7 @@
                     <span id="resultadosCount" class="badge">0 resultados</span>
                 </div>
                 <div class="card-body">
-                    <div id="clientesContainer" class="fichas-list">
+                    <div id="clientesContainer" class="fichas-list clientes-list">
                         <!-- Clientes serão inseridos aqui via JavaScript -->
                     </div>
 
@@ -174,11 +173,11 @@
                     <input type="text" id="editNome" class="form-control" required>
                 </div>
                 <div class="form-group">
-                    <label for="editPrimeiroPedido">Primeiro Pedido</label>
+                    <label for="editPrimeiroPedido">Primeira Ficha</label>
                     <input type="date" id="editPrimeiroPedido" class="form-control">
                 </div>
                 <div class="form-group">
-                    <label for="editUltimoPedido">Último Pedido</label>
+                    <label for="editUltimoPedido">Ultima Ficha</label>
                     <input type="date" id="editUltimoPedido" class="form-control">
                 </div>
                 <div class="modal-actions">

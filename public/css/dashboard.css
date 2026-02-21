@@ -299,6 +299,56 @@
   padding: 8px 12px;
 }
 
+/* Variacao compacta para pagina de clientes */
+body.page-clientes .clientes-list {
+  gap: 8px;
+}
+
+body.page-clientes .clientes-list .ficha-item {
+  padding: 10px 12px;
+  border-radius: 12px;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+}
+
+body.page-clientes .clientes-list .ficha-header {
+  margin-bottom: 4px;
+}
+
+body.page-clientes .clientes-list .ficha-cliente {
+  font-size: 0.98rem;
+  line-height: 1.2;
+}
+
+body.page-clientes .clientes-list .ficha-numero {
+  font-size: 0.78rem;
+  padding: 3px 8px;
+}
+
+body.page-clientes .clientes-list .ficha-details {
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+body.page-clientes .clientes-list .ficha-detail {
+  white-space: nowrap;
+}
+
+body.page-clientes .clientes-list .ficha-actions {
+  gap: 6px;
+  align-self: center;
+}
+
+body.page-clientes .clientes-list .ficha-item .btn {
+  padding: 7px 10px;
+  min-width: 34px;
+}
+
+body.page-clientes .clientes-list .ficha-item .btn i {
+  font-size: 0.85rem;
+}
+
 .badge {
   background: #e5edff;
   color: #1d4ed8;
@@ -744,6 +794,19 @@ body.image-preview-open {
   }
 
   .ficha-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  body.page-clientes .clientes-list .ficha-item {
+    align-items: stretch;
+  }
+
+  body.page-clientes .clientes-list .ficha-detail {
+    white-space: normal;
+  }
+
+  body.page-clientes .clientes-list .ficha-actions {
     width: 100%;
     justify-content: flex-end;
   }

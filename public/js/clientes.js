@@ -50,6 +50,9 @@
   }
 
   async function carregarClientes() {
+    renderizarLoadingEstatisticas();
+    renderizarLoadingClientes();
+
     try {
       const response = await fetch(db.baseURL + '/clientes/lista');
 
@@ -62,14 +65,68 @@
       aplicarFiltros();
 
     } catch (error) {
+      clientesCache = [];
+      atualizarEstatisticas();
+      aplicarFiltros();
       mostrarToast('Erro ao carregar clientes', 'error');
     }
   }
 
+  function renderizarLoadingEstatisticas() {
+    [
+      'statTotalClientes',
+      'statTotalFichas',
+      'statNovosClientes',
+      'statMediaFichas'
+    ].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = '';
+      el.classList.add('stat-value-skeleton');
+    });
+  }
+
+  function renderizarLoadingClientes() {
+    const container = document.getElementById('clientesContainer');
+    const emptyState = document.getElementById('emptyState');
+    const resultadosCount = document.getElementById('resultadosCount');
+    const paginacao = document.getElementById('paginacao');
+    if (!container) return;
+
+    if (emptyState) emptyState.style.display = 'none';
+    if (paginacao) paginacao.style.display = 'none';
+    if (resultadosCount) resultadosCount.textContent = 'Carregando...';
+
+    const quantidade = Math.max(4, Math.min(itensPorPagina, 6));
+    container.innerHTML = Array.from({ length: quantidade }, () => criarCardClienteSkeleton()).join('');
+  }
+
+  function criarCardClienteSkeleton() {
+    return `
+      <div class="ficha-item ficha-item-skeleton" aria-hidden="true">
+        <div class="ficha-main">
+          <div class="ficha-header">
+            <span class="dashboard-skeleton-line dashboard-skeleton-title"></span>
+            <span class="dashboard-skeleton-pill"></span>
+          </div>
+          <div class="ficha-details ficha-details-skeleton">
+            <span class="dashboard-skeleton-line dashboard-skeleton-short"></span>
+            <span class="dashboard-skeleton-line dashboard-skeleton-medium"></span>
+          </div>
+        </div>
+        <div class="ficha-actions ficha-actions-skeleton">
+          <span class="dashboard-skeleton-btn"></span>
+          <span class="dashboard-skeleton-btn"></span>
+          <span class="dashboard-skeleton-btn"></span>
+        </div>
+      </div>
+    `;
+  }
+
   function atualizarEstatisticas() {
     const totalClientes = clientesCache.length;
-    const totalPedidos = clientesCache.reduce((sum, c) => sum + (c.total_pedidos || 0), 0);
-    const mediaPedidos = totalClientes > 0 ? (totalPedidos / totalClientes).toFixed(1) : 0;
+    const totalFichas = clientesCache.reduce((sum, c) => sum + (c.total_pedidos || 0), 0);
+    const mediaFichas = totalClientes > 0 ? (totalFichas / totalClientes).toFixed(1) : 0;
 
     const now = new Date();
     const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -77,10 +134,17 @@
       c.primeiro_pedido && c.primeiro_pedido.startsWith(mesAtual)
     ).length;
 
-    document.getElementById('statTotalClientes').textContent = totalClientes;
-    document.getElementById('statTotalPedidos').textContent = totalPedidos;
-    document.getElementById('statNovosClientes').textContent = novosEsteMes;
-    document.getElementById('statMediaPedidos').textContent = mediaPedidos;
+    setStatValue('statTotalClientes', totalClientes);
+    setStatValue('statTotalFichas', totalFichas);
+    setStatValue('statNovosClientes', novosEsteMes);
+    setStatValue('statMediaFichas', mediaFichas);
+  }
+
+  function setStatValue(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('stat-value-skeleton');
+    el.textContent = value;
   }
 
   function aplicarFiltros() {
@@ -115,6 +179,7 @@
           valorB = (b.nome || '').toLowerCase();
           return multiplicador * valorA.localeCompare(valorB, 'pt-BR');
 
+        case 'fichas':
         case 'pedidos':
           valorA = a.total_pedidos || 0;
           valorB = b.total_pedidos || 0;
@@ -186,25 +251,25 @@
   function criarCardCliente(cliente) {
     const primeiroPedido = formatarData(cliente.primeiro_pedido);
     const ultimoPedido = formatarData(cliente.ultimo_pedido);
-    const totalPedidos = cliente.total_pedidos || 0;
+    const totalFichas = cliente.total_pedidos || 0;
 
     return `
       <div class="ficha-item">
         <div class="ficha-main">
           <div class="ficha-header">
             <span class="ficha-cliente">${escapeHtml(cliente.nome)}</span>
-            <span class="ficha-numero">${totalPedidos} ${totalPedidos === 1 ? 'pedido' : 'pedidos'}</span>
+            <span class="ficha-numero">${totalFichas} ${totalFichas === 1 ? 'ficha' : 'fichas'}</span>
           </div>
 
           <div class="ficha-details">
             <div class="ficha-detail">
               <i class="fas fa-calendar-plus"></i>
-              <span>Primeiro: ${primeiroPedido}</span>
+              <span>Primeira ficha: ${primeiroPedido}</span>
             </div>
 
             <div class="ficha-detail">
               <i class="fas fa-calendar-check"></i>
-              <span>Último: ${ultimoPedido}</span>
+              <span>Ultima ficha: ${ultimoPedido}</span>
             </div>
           </div>
         </div>
