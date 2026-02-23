@@ -9,6 +9,11 @@
   const STATUS_CACHE_TTL_MS = 5 * 60 * 1000;
   const STATUS_REFRESH_INTERVAL_MS = 60 * 1000;
   const GREETING_MESSAGE_ROTATION_INTERVAL_MS = 15 * 1000;
+  const FIXED_LOCATION = Object.freeze({
+    latitude: -20.9317,
+    longitude: -54.9614,
+    city: 'Sidrol\u00E2ndia'
+  });
   const DEFAULT_GREETING_STATUS_MESSAGES = [
     'Fichas atualizadas {{updatedText}}.'
   ];
@@ -165,7 +170,7 @@
       fetchedAt: now,
       lastFichaCreatedAt: now,
       weather: {
-        city: 'sua regi\u00E3o',
+        city: FIXED_LOCATION.city,
         temperatureText: '--\u00B0C',
         icon: '\u{1F324}\uFE0F'
       },
@@ -257,26 +262,8 @@
   }
 
   function isWeatherFallback(weather) {
-    const city = normalizeString(weather && weather.city, '');
     const temp = normalizeString(weather && weather.temperatureText, '');
-    return !temp || temp === '--\u00B0C' || !city || city.toLowerCase() === 'sua regi\u00E3o';
-  }
-
-  async function fetchGeoFromIpInfo() {
-    const data = await fetchJsonWithTimeout('https://ipinfo.io/json', 5000);
-    const loc = normalizeString(data && data.loc, '');
-    const parts = loc.split(',');
-    const latitude = Number(parts[0]);
-    const longitude = Number(parts[1]);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      throw new Error('Sem coordenadas no ipinfo');
-    }
-
-    return {
-      latitude,
-      longitude,
-      city: normalizeString(data && (data.city || data.region || data.country), 'sua regi\u00E3o')
-    };
+    return !temp || temp === '--\u00B0C';
   }
 
   function weatherIconFromCode(code) {
@@ -307,33 +294,46 @@
 
     const current = weather && weather.current ? weather.current : {};
     return {
-      city: normalizeString(city, 'sua regi\u00E3o'),
+      city: normalizeString(city, FIXED_LOCATION.city),
       temperatureText: toTemperatureText(current.temperature_2m),
       icon: weatherIconFromCode(current.weather_code)
     };
   }
 
-  async function fetchBrowserWeather() {
+  async function fetchFixedLocationWeather() {
     try {
-      const geo = await fetchGeoFromIpInfo();
-      return await fetchWeatherByCoordinates(geo.latitude, geo.longitude, geo.city);
+      return await fetchWeatherByCoordinates(
+        FIXED_LOCATION.latitude,
+        FIXED_LOCATION.longitude,
+        FIXED_LOCATION.city
+      );
     } catch (_) {
       return null;
     }
   }
 
-  async function enrichWeatherIfNeeded(snapshot) {
-    if (!snapshot || !isWeatherFallback(snapshot.weather)) return snapshot;
+  async function enrichWeatherWithFixedLocation(snapshot) {
+    if (!snapshot) return snapshot;
 
     try {
-      const browserWeather = await fetchBrowserWeather();
-      if (!browserWeather) return snapshot;
+      const fixedWeather = await fetchFixedLocationWeather();
+      if (!fixedWeather && !isWeatherFallback(snapshot.weather)) {
+        return normalizeSnapshot({
+          ...snapshot,
+          weather: {
+            ...snapshot.weather,
+            city: FIXED_LOCATION.city
+          }
+        });
+      }
+      if (!fixedWeather) return snapshot;
 
       return normalizeSnapshot({
         ...snapshot,
         weather: {
           ...snapshot.weather,
-          ...browserWeather
+          ...fixedWeather,
+          city: FIXED_LOCATION.city
         }
       });
     } catch (_) {
@@ -431,7 +431,7 @@
 
     const icon = normalizeString(weather.icon, '\u{1F324}\uFE0F');
     const temperatureText = normalizeString(weather.temperatureText, '--\u00B0C');
-    const city = normalizeString(weather.city, 'sua regi\u00E3o');
+    const city = normalizeString(weather.city, FIXED_LOCATION.city);
     const updatedText = formatMinutesAgo(snapshot && snapshot.lastFichaCreatedAt);
     const statusMessage = formatGreetingStatusMessage(
       getCurrentGreetingStatusTemplate(now),
@@ -444,7 +444,7 @@
   function formatGreetingStatusMessage(template, context) {
     const safeTemplate = normalizeString(template, 'Fichas atualizadas {{updatedText}}.');
     const updatedText = normalizeString(context && context.updatedText, 'h\u00E1 0 minutos');
-    const city = normalizeString(context && context.city, 'sua regi\u00E3o');
+    const city = normalizeString(context && context.city, FIXED_LOCATION.city);
     const temperatureText = normalizeString(context && context.temperatureText, '--\u00B0C');
 
     return safeTemplate
@@ -605,7 +605,7 @@
         }
       }
 
-      snapshot = await enrichWeatherIfNeeded(snapshot);
+      snapshot = await enrichWeatherWithFixedLocation(snapshot);
 
       if (
         isWeatherFallback(snapshot.weather) &&
