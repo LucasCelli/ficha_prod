@@ -1,25 +1,44 @@
-# Sistema de Fichas Tecnicas
+# Sistema de Fichas Técnicas
 
-Aplicacao web para cadastro, acompanhamento e impressao de fichas tecnicas de confeccao, com armazenamento em Turso (libSQL) e imagens no Cloudinary.
+Aplicação web para cadastro, acompanhamento e impressão de fichas técnicas de confecção, com persistência em Turso (libSQL) e suporte a imagens no Cloudinary.
 
-## Visao Geral
+## Visão Geral
 
-O sistema foi desenhado para operar o ciclo completo da ficha:
+O sistema cobre o fluxo operacional completo:
 
-- criar e editar ficha tecnica
-- anexar layouts/imagens (ate 4 por ficha)
-- controlar status (pendente/entregue)
-- visualizar e imprimir em modo pronto para producao
-- duplicar ficha para novo id
-- acompanhar indicadores e relatorios
-- exportar dados (PDF, Excel, JSON)
+- cadastro, edição, visualização e exclusão de fichas
+- controle de produção por Kanban com drag-and-drop
+- impressão em layout dedicado e preview em modal
+- gestão de clientes (autocomplete, edição e exclusão)
+- relatórios operacionais com comparativos por período
+- backup local em JSON (exportar/importar)
 
-## Stack Tecnica
+## Novidades Relevantes (últimos ciclos)
+
+- Quadro de Produção (`kanban.html`) com 5 etapas:
+  - `pendente`
+  - `exportando`
+  - `fila_impressao`
+  - `sublimando`
+  - `na_costura`
+- Reordenação manual no Kanban por coluna (`PATCH /api/kanban/order`).
+- Autoentrega no backend para fichas que ficam em `na_costura` por mais de 7 dias.
+- Filtro “Para Essa Semana” no Kanban e persistência de filtros em `localStorage`.
+- Carregamento de templates prontos no formulário (arquivos em `public/data/templates` + preview SVG).
+- Barra de tema/status global (`theme.js`) com:
+  - alternância light/dark
+  - resumo de conectividade (Turso, Cloudinary, Vercel, GitHub)
+  - snapshot de clima
+- Normalização de dados no backend (nomes, produtos, `comNomes`).
+- Migrações automáticas de colunas no startup (incluindo campos de Kanban e imagens múltiplas).
+- Design tokens centralizados em `public/css/design-tokens.css`.
+
+## Stack Técnica
 
 - Node.js 18+
 - Express 4
-- Turso (@libsql/client)
-- Cloudinary (upload e gestao de imagens)
+- Turso via `@libsql/client`
+- Cloudinary (upload assinado e remoção)
 - Frontend em HTML/CSS/JS vanilla
 
 ## Estrutura do Projeto
@@ -28,78 +47,85 @@ O sistema foi desenhado para operar o ciclo completo da ficha:
 .
 |-- server.js
 |-- package.json
+|-- src/
+|   |-- config/
+|   |-- controllers/
+|   |-- middlewares/
+|   |-- repositories/
+|   |-- routes/
+|   |-- services/
+|   `-- validators/
 `-- public/
     |-- index.html
     |-- dashboard.html
+    |-- kanban.html
     |-- clientes.html
     |-- relatorios.html
+    |-- data/
+    |   |-- catalogo.json
+    |   `-- templates/
     |-- css/
     `-- js/
 ```
 
-Arquivos principais:
+Arquivos-chave:
 
-- `server.js`: API, regras de negocio, integracao Turso/Cloudinary
-- `public/js/main.js`: formulario da ficha, impressao, preenchimento
-- `public/js/integration.js`: ligacao formulario <-> API
-- `public/js/dashboard.js`: listagem, modal de visualizacao, duplicacao
-- `public/js/image-handler-cloudinary.js`: UI de imagens no formulario
-- `public/js/cloudinary-upload.js`: upload/remocao no Cloudinary
-- `public/js/relatorios.js`: dashboards de relatorios + exportacoes
-- `public/js/rich-text-editor.js`: editor rico de observacoes
+- `server.js`: API principal, inicialização de banco, migrações e integrações externas.
+- `public/js/main.js`: formulário principal, imagens, impressão e regras de UI.
+- `public/js/integration.js`: integração formulário/API, templates e fluxo de duplicação.
+- `public/js/dashboard.js`: listagem de fichas, filtros, preview modal, backup.
+- `public/js/kanban.js`: quadro Kanban, drag-and-drop e persistência de ordem/status.
+- `public/js/relatorios.js`: dashboards analíticos e exportações.
+- `public/js/theme.js`: toolbar global (tema + status de sistemas + clima).
 
-## Funcionalidades Atuais
+## Funcionalidades
 
 ### Fichas
 
-- CRUD completo de fichas
-- campos tecnicos para modelagem e composicao
-- tabela de produtos por tamanho/quantidade/descricao
-- status pendente/entregue com data de entrega
-- destaque para fichas de evento
-- duplicacao de ficha com novo id
+- CRUD completo de fichas técnicas.
+- Campos técnicos de modelagem/material e tabela de produtos por tamanho.
+- Campo de evento com destaque visual em dashboard/kanban.
+- Duplicação de ficha com criação de novo ID.
+- Modos via query string no formulário:
+  - `?editar=<id>`
+  - `?visualizar=<id>`
+  - `?duplicar=1`
 
-### Visualizacao e Impressao
+### Imagens / Cloudinary
 
-- modal de pre-visualizacao de impressao no dashboard
-- loading do modal sincronizado com render final da pre-visualizacao
-- impressao com layout dedicado (`print-version`)
-- observacoes (editor rico) refletidas corretamente na impressao
+- Upload por clique, drag-and-drop e colar (Ctrl+V).
+- Limite de até 4 imagens por ficha.
+- Suporte a metadados por imagem (`src`, `publicId`, `descricao`).
+- Remoção com proteção para imagens compartilhadas entre fichas (`excludeFichaId`).
 
-### Duplicacao no Modal
+### Dashboard
 
-- botao `Duplicar ficha` no modal de visualizacao
-- ao duplicar, cria nova ficha (sem reaproveitar id)
-- redireciona direto para `index.html?editar=<novoId>`
+- Cards de estatísticas (total, pendentes, clientes, mês).
+- Busca por cliente/número da venda/vendedor.
+- Filtro por data e por status rápido (todos, pendentes, entregues, evento).
+- Preview de impressão em modal com sincronização por `postMessage`.
+- Exportação e importação de backup JSON.
 
-### Imagens e Cloudinary
+### Kanban
 
-- upload por clique, drag-and-drop e colar (Ctrl+V)
-- ate 4 imagens por ficha
-- suporte a URL/publicId/descricao por imagem
-- remocao segura para imagens compartilhadas:
-  - se a imagem estiver em outra ficha, remove apenas da ficha atual
-  - exibicao de aviso informando que a ficha original nao foi alterada
+- Colunas por etapa de produção com atualização de status em tempo real.
+- Reordenação por arraste dentro de coluna.
+- Dedupe por `numero_venda` para evitar cartões duplicados na visão.
+- Ação rápida de “marcar como entregue” na coluna `na_costura`.
 
 ### Clientes
 
-- autocomplete de clientes no formulario
-- listagem com historico e total de pedidos/fichas
-- edicao e exclusao de clientes
+- Autocomplete no formulário.
+- Página dedicada com filtros, ordenação, paginação e cards.
+- Edição e exclusão com modal de confirmação.
 
-### Relatorios
+### Relatórios
 
-- visao por periodo (mes, ano, customizado)
-- analise por vendedor e por material
-- top produtos, top clientes, distribuicao por tamanho
-- comparativo com periodo anterior
-- exportacao PDF/Excel e impressao
-- terminologia orientada a "fichas" na interface (evita confusao com "vendas")
-
-### Backup
-
-- exportar backup JSON
-- importar backup JSON
+- Períodos: mês, ano e customizado.
+- KPIs: fichas entregues/pendentes, itens, novos clientes.
+- Análises: vendedores, materiais, produtos, clientes top, tamanhos.
+- Comparativo com período anterior.
+- Indicadores de eficiência (tempo médio, atrasos, eventos, recorrência).
 
 ## Como Rodar Localmente
 
@@ -108,7 +134,7 @@ npm install
 npm start
 ```
 
-Acesse:
+Aplicação:
 
 - `http://localhost:3000`
 
@@ -118,29 +144,49 @@ Modo desenvolvimento:
 npm run dev
 ```
 
-## Variaveis de Ambiente
+## Variáveis de Ambiente
 
 Crie um `.env` na raiz:
 
 ```env
+# obrigatório
 TURSO_DATABASE_URL=libsql://seu-banco.turso.io
 TURSO_AUTH_TOKEN=seu_token
 
+# Cloudinary
 CLOUDINARY_CLOUD_NAME=seu_cloud_name
 CLOUDINARY_API_KEY=sua_api_key
 CLOUDINARY_API_SECRET=seu_api_secret
-# opcional (padrao: fichas_upload)
 CLOUDINARY_UPLOAD_PRESET=fichas_upload
 
-# opcional (padrao: 3000)
+# servidor
 PORT=3000
+
+# opcionais (status/conectividade)
+GITHUB_REPO=owner/repo
+GITHUB_TOKEN=seu_token_github
+GH_TOKEN=seu_token_github_alternativo
+VERCEL_URL=seu-deploy.vercel.app
+VERCEL_PROJECT_PRODUCTION_URL=seu-dominio.vercel.app
+VERCEL_GIT_REPO_OWNER=owner
+VERCEL_GIT_REPO_SLUG=repo
+VERCEL_GIT_COMMIT_SHA=sha
+GITHUB_SHA=sha
+
+# opcionais (weather/providers)
+GITHUB_COMMIT_TIMEZONE=Etc/GMT+4
+WEATHER_PROVIDER_DISTANCE_LIMIT_KM=120
+WEATHER_PROVIDER_DISABLE_AFTER_INACCURATE=3
+WEATHER_PROVIDER_DISABLE_AFTER_FAILURES=5
+WEATHER_PROVIDER_DISABLE_TTL_MS=21600000
 ```
 
 ## API (Resumo)
 
-### Health
+### Health e Sistema
 
 - `GET /api/health`
+- `GET /api/system-status`
 
 ### Fichas
 
@@ -150,15 +196,12 @@ PORT=3000
 - `PUT /api/fichas/:id`
 - `PATCH /api/fichas/:id/entregar`
 - `PATCH /api/fichas/:id/pendente`
+- `PATCH /api/fichas/:id/kanban-status`
 - `DELETE /api/fichas/:id`
 
-Filtros suportados em `GET /api/fichas`:
+### Kanban
 
-- `status`
-- `cliente`
-- `vendedor`
-- `dataInicio` (YYYY-MM-DD)
-- `dataFim` (YYYY-MM-DD)
+- `PATCH /api/kanban/order`
 
 ### Clientes
 
@@ -167,7 +210,7 @@ Filtros suportados em `GET /api/fichas`:
 - `PUT /api/clientes/:id`
 - `DELETE /api/clientes/:id`
 
-### Estatisticas e Relatorios
+### Estatísticas e Relatórios
 
 - `GET /api/estatisticas`
 - `GET /api/relatorio`
@@ -184,45 +227,27 @@ Filtros suportados em `GET /api/fichas`:
 - `GET /api/cloudinary/config`
 - `POST /api/cloudinary/signature`
 - `POST /api/cloudinary/migrar`
-- `DELETE /api/cloudinary/image/:publicId`
-  - query opcional: `excludeFichaId`
+- `DELETE /api/cloudinary/image/:publicId` (query opcional: `excludeFichaId`)
 
-## Banco de Dados (Principal)
+## Banco de Dados (Turso)
 
 ### Tabela `fichas`
 
-Campos relevantes:
+Campos principais:
 
-- identificacao e datas (`id`, `data_inicio`, `data_entrega`, `data_entregue`)
-- dados comerciais (`cliente`, `vendedor`, `numero_venda`, `status`, `evento`)
-- especificacoes tecnicas (material, manga, gola, bolso, filete, faixa etc.)
-- observacoes (`observacoes`)
+- identificação e datas (`id`, `data_inicio`, `data_entrega`, `data_entregue`)
+- comerciais (`cliente`, `vendedor`, `numero_venda`, `status`, `evento`)
+- Kanban (`kanban_status`, `kanban_status_updated_at`, `kanban_ordem`)
+- técnicos (material, manga, gola, bolso, filete, faixa, cores auxiliares etc.)
+- personalização (`com_nomes`, `observacoes`)
 - imagens (`imagem_data`, `imagens_data`)
-- produtos em JSON (`produtos`)
+- produtos serializados (`produtos`)
 
 ### Tabela `clientes`
 
 - `id`, `nome`, `primeiro_pedido`, `ultimo_pedido`, `total_pedidos`, `data_criacao`
 
-## Fluxos Importantes
-
-### 1) Duplicar ficha sem risco de sobrescrever id
-
-Duplicacao sempre remove `id` antes de salvar, garantindo nova ficha.
-
-### 2) Remover imagem em ficha duplicada
-
-Quando a imagem e compartilhada, o backend impede exclusao fisica no Cloudinary e retorna sucesso de remocao local.
-
-### 3) Preview no modal do dashboard
-
-O loading do modal so encerra quando o iframe sinaliza que a versao de impressao foi montada, evitando flash de pagina sem estilo final.
-
 ## Scripts
 
-- `npm start`: sobe o servidor
-- `npm run dev`: sobe com watch para desenvolvimento
-
-## Observacao
-
-Se voce alterar comportamento de relatorios, lembre que o sistema usa "fichas" como unidade de comparacao na interface para evitar vies por vendedor que apenas cadastrou mais fichas para o mesmo pedido.
+- `npm start`: inicia o servidor
+- `npm run dev`: inicia com watch
