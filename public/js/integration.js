@@ -694,8 +694,32 @@
       await initClienteAutocomplete();
 
     } catch (error) {
-      mostrarToast('Erro ao salvar ficha no banco de dados', 'error');
+      const mensagemErro = construirMensagemErroSalvar(error);
+      mostrarToast(mensagemErro, 'error');
     }
+  }
+
+  function construirMensagemErroSalvar(error) {
+    const mensagemBase = String(error?.message || '').trim();
+    const detalhes = Array.isArray(error?.details) ? error.details : [];
+
+    if (detalhes.length > 0) {
+      const resumo = detalhes
+        .slice(0, 3)
+        .map(item => {
+          const campo = String(item?.path || 'campo').trim();
+          const mensagem = String(item?.message || 'valor invalido').trim();
+          return `${campo}: ${mensagem}`;
+        })
+        .join(' | ');
+      return `Falha ao salvar ficha. ${resumo}`;
+    }
+
+    if (mensagemBase) {
+      return `Falha ao salvar ficha. ${mensagemBase}`;
+    }
+
+    return 'Erro ao salvar ficha no banco de dados';
   }
 
   function validarCamposObrigatorios(dados) {

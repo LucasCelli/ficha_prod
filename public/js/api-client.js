@@ -135,7 +135,10 @@ class APIClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(error.error || 'Erro ao salvar ficha');
+      const err = new Error(error.error || 'Erro ao salvar ficha');
+      err.details = Array.isArray(error.details) ? error.details : [];
+      err.status = response.status;
+      throw err;
     }
 
     const result = await response.json();
