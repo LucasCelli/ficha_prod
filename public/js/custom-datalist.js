@@ -144,6 +144,8 @@
     });
 
     input.addEventListener('input', () => {
+      // Evita abrir menus durante preenchimento programático (ex.: carregar template).
+      if (document.activeElement !== input) return;
       renderizarMenu(state);
     });
 
