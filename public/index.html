@@ -96,12 +96,23 @@
                                 <strong id="hubStatClientes" class="home-kpi-value">--</strong>
                             </article>
                             <article class="home-kpi">
-                                <span class="home-kpi-label">Itens Totais</span>
-                                <strong id="hubStatItens" class="home-kpi-value">--</strong>
+                                <span class="home-kpi-label">Fichas Entregues</span>
+                                <strong id="hubStatEntregues" class="home-kpi-value">--</strong>
                             </article>
                         </div>
-                        <div id="hubSystemStatus" class="home-status-chips">
-                            <span class="home-status-chip">Carregando status...</span>
+                        <div class="home-trend-card">
+                            <div class="home-trend-header">
+                                <strong>Fichas Criadas</strong>
+                                <div id="hubTrendFilters" class="home-trend-filters" role="group" aria-label="Filtro de período do gráfico">
+                                    <button type="button" class="home-trend-filter is-active" data-range="days">Últimos 7 dias</button>
+                                    <button type="button" class="home-trend-filter" data-range="weeks">Últimas semanas</button>
+                                    <button type="button" class="home-trend-filter" data-range="months">Últimos meses</button>
+                                </div>
+                            </div>
+                            <div id="hubTrendChart" class="home-trend-chart" aria-live="polite">
+                                <p class="home-empty">Carregando gráfico...</p>
+                            </div>
+                            <p id="hubTrendSummary" class="home-trend-summary">--</p>
                         </div>
                     </div>
                 </section>
@@ -138,6 +149,7 @@
     </div>
 
     <script src="js/theme.js"></script>
+    <script src="js/system-log.js"></script>
     <script src="js/home.js" defer></script>
 </body>
 

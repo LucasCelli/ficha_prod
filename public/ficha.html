@@ -216,7 +216,7 @@
                         <!-- ══════════════ MANGA ══════════════ -->
                         <hr class="form-divider" data-label="Manga">
 
-                        <div class="form-group">
+                        <div class="form-group" id="mangaContainer">
                             <label for="manga"><i class="fas fa-bread-slice" aria-hidden="true"></i> Tipo de
                                 Manga</label>
                             <select id="manga" class="form-control">
@@ -224,7 +224,7 @@
                             </select>
                         </div>
 
-                        <div class="form-group">
+                        <div class="form-group" id="acabamentoMangaContainer">
                             <label for="acabamentoManga"><i class="fas fa-sliders" aria-hidden="true"></i> Acabamento da
                                 Manga</label>
                             <select id="acabamentoManga" class="form-control">
@@ -235,9 +235,17 @@
                             </select>
                         </div>
 
+                        <div class="form-group" id="viesContainer" style="display: none;">
+                            <label for="vies"><i class="fas fa-bezier-curve" aria-hidden="true"></i> Viés</label>
+                            <select id="vies" class="form-control">
+                                <option value="">-</option>
+                                <option value="sim">Com Viés</option>
+                            </select>
+                        </div>
+
                         <!-- Campos condicionais da manga (viés ou punho) -->
                         <div class="form-group" id="larguraMangaContainer" style="display: none;">
-                            <label for="larguraManga"><i class="fas fa-ruler" aria-hidden="true"></i> Largura Acab.
+                            <label for="larguraManga" id="larguraMangaLabel"><i class="fas fa-ruler" aria-hidden="true"></i> Largura Acab.
                                 Manga</label>
                             <input type="text" id="larguraManga" list="largurasList" class="form-control"
                                 placeholder="Ex: 3,5">
@@ -245,7 +253,7 @@
                         </div>
 
                         <div class="form-group" id="corAcabamentoMangaContainer" style="display: none;">
-                            <label for="corAcabamentoManga"><i class="fas fa-palette" aria-hidden="true"></i> Cor Acab.
+                            <label for="corAcabamentoManga" id="corAcabamentoMangaLabel"><i class="fas fa-palette" aria-hidden="true"></i> Cor Acab.
                                 Manga</label>
                             <input type="text" id="corAcabamentoManga" class="form-control" list="coresList"
                                 placeholder="Ex: Branco, Preto, Azul Marinho">
@@ -592,12 +600,12 @@
 
                     <div><span class="label"><i class="fas fa-bread-slice" aria-hidden="true"></i> Tipo Manga:</span>
                         <span id="print-manga"></span></div>
-                    <div><span class="label"><i class="fas fa-sliders" aria-hidden="true"></i> Acab. Manga:</span> <span
+                    <div><span class="label" id="print-acabamentoMangaLabel"><i class="fas fa-sliders" aria-hidden="true"></i> Acab. Manga:</span> <span
                             id="print-acabamentoManga"></span></div>
-                    <div id="print-larguraMangaDiv" style="display: none;"><span class="label"><i class="fas fa-ruler"
+                    <div id="print-larguraMangaDiv" style="display: none;"><span class="label" id="print-larguraMangaLabel"><i class="fas fa-ruler"
                                 aria-hidden="true"></i> Largura Acab.
                             Manga:</span> <span id="print-larguraManga"></span></div>
-                    <div id="print-corAcabamentoMangaDiv" style="display: none;"><span class="label"><i
+                    <div id="print-corAcabamentoMangaDiv" style="display: none;"><span class="label" id="print-corAcabamentoMangaLabel"><i
                                 class="fas fa-palette" aria-hidden="true"></i> Cor Acab.
                             Manga:</span> <span id="print-corAcabamentoManga"></span></div>
 
@@ -685,7 +693,9 @@
     </div>
 
     <script src="js/theme.js"></script>
+    <script src="js/system-log.js"></script>
     <script src="js/toast.js"></script>
+    <script src="js/custom-datalist.js"></script>
     <script src="js/api-client.js"></script>
     <script src="js/image-handler-cloudinary.js"></script>
     <script src="js/cloudinary-upload.js"></script>

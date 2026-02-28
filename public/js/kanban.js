@@ -25,6 +25,7 @@
 
   const VALID_STATUS = new Set(COLUMN_DEFINITIONS.map(col => col.key));
   const NAME_EXCEPTIONS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+  const UPPERCASE_WORD_PATTERN = /^[A-ZÀ-Ý]{1,4}$/;
   const STORAGE_FILTER_KEY = 'kanban_filters_v1';
   const PREVIEW_READY_MESSAGE = 'ficha-preview-ready';
 
@@ -1207,11 +1208,19 @@
     if (typeof value !== 'string') return '';
     const text = value.trim().replace(/\s+/g, ' ');
     if (!text) return '';
+    const originalWords = text.split(' ');
+    const preserveUppercaseIndexes = new Set();
+    if (originalWords.length > 1) {
+      if (UPPERCASE_WORD_PATTERN.test(originalWords[0])) preserveUppercaseIndexes.add(0);
+      const lastIndex = originalWords.length - 1;
+      if (UPPERCASE_WORD_PATTERN.test(originalWords[lastIndex])) preserveUppercaseIndexes.add(lastIndex);
+    }
 
     return text
       .toLowerCase()
       .split(' ')
       .map((word, index) => {
+        if (preserveUppercaseIndexes.has(index)) return word.toUpperCase();
         return word
           .split(/([-/])/)
           .map(part => {

@@ -62,6 +62,36 @@ class APIClient {
     return response.json();
   }
 
+  async listarFichasPaginado(options = {}) {
+    const params = new URLSearchParams();
+    params.set('paged', '1');
+
+    const page = Number(options.page) > 0 ? Number(options.page) : 1;
+    const pageSize = Number(options.pageSize) > 0 ? Number(options.pageSize) : 10;
+    params.set('page', String(page));
+    params.set('pageSize', String(pageSize));
+    params.set('resumido', options.resumido === false ? '0' : '1');
+
+    if (options.status) params.set('status', String(options.status));
+    if (options.termo) params.set('termo', String(options.termo));
+    if (options.dataInicio) params.set('dataInicio', String(options.dataInicio));
+    if (options.dataFim) params.set('dataFim', String(options.dataFim));
+    if (options.evento) params.set('evento', String(options.evento));
+
+    const response = await fetch(`${this.baseURL}/fichas?${params.toString()}`);
+    if (!response.ok) throw new Error('Erro ao listar fichas');
+
+    const data = await response.json();
+    return {
+      items: Array.isArray(data?.items) ? data.items : [],
+      total: Number(data?.total) || 0,
+      page: Number(data?.page) || page,
+      pageSize: Number(data?.pageSize) || pageSize,
+      totalPages: Number(data?.totalPages) || 1,
+      hasNext: Boolean(data?.hasNext)
+    };
+  }
+
   async buscarFicha(id) {
     const response = await fetch(`${this.baseURL}/fichas/${id}`);
     if (!response.ok) {

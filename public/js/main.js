@@ -323,11 +323,19 @@
     if (typeof value !== 'string') return '';
     const texto = value.trim().replace(/\s+/g, ' ');
     if (!texto) return '';
+    const originalWords = texto.split(' ');
+    const preserveUppercaseIndexes = new Set();
+    if (originalWords.length > 1) {
+      if (/^[A-ZÀ-Ý]{1,4}$/.test(originalWords[0])) preserveUppercaseIndexes.add(0);
+      const lastIndex = originalWords.length - 1;
+      if (/^[A-ZÀ-Ý]{1,4}$/.test(originalWords[lastIndex])) preserveUppercaseIndexes.add(lastIndex);
+    }
 
     return texto
       .toLowerCase()
       .split(' ')
       .map((palavra, index) => {
+        if (preserveUppercaseIndexes.has(index)) return palavra.toUpperCase();
         return palavra
           .split(/([-/])/)
           .map(parte => {
@@ -339,6 +347,25 @@
       })
       .join(' ');
   }
+
+  function normalizarProdutoParaRegra(valor) {
+    return String(valor || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function produtoEhRegata(valor) {
+    return normalizarProdutoParaRegra(valor).includes('regata');
+  }
+
+  const PRODUTO_MATERIAL_HELANCA = normalizarProdutoParaRegra('Calça de Helanca');
+  const PRODUTOS_MATERIAL_BRIM = new Set([
+    'Calça de Brim',
+    'Jaleco de Brim'
+  ].map(normalizarProdutoParaRegra));
 
   const COM_NOMES_VALOR_NENHUM = '0';
   const COM_NOMES_MARCADORES = Object.freeze({
@@ -856,6 +883,89 @@
     initDragAndDrop(tabelaBody);
     adicionarBotaoOrdenar();
 
+    function getPrimeiroProdutoPreenchido() {
+      const rows = Array.from(tabelaBody.querySelectorAll('tr'));
+      for (const row of rows) {
+        const inputProduto = row.querySelector('.produto') || row.querySelector('.descricao');
+        const valor = String(inputProduto?.value || '').trim();
+        if (valor) return valor;
+      }
+      return '';
+    }
+
+    function aplicarRegrasAutomaticasDoPrimeiroProduto() {
+      const produtoNormalizado = normalizarProdutoParaRegra(getPrimeiroProdutoPreenchido());
+      const selectGola = document.getElementById('gola');
+      const inputMaterial = document.getElementById('material');
+      const inputComposicao = document.getElementById('composicao');
+
+      if (!produtoNormalizado) {
+        if (selectGola?.dataset.autoByPrimeiroProduto === '1') {
+          selectGola.value = '';
+          selectGola.dispatchEvent(new Event('change'));
+        }
+        if (inputMaterial?.dataset.autoByPrimeiroProduto === '1') {
+          inputMaterial.value = '';
+          if (inputComposicao) inputComposicao.value = '';
+          inputMaterial.dispatchEvent(new Event('input'));
+        }
+        if (typeof window.atualizarControlesMangaPorProduto === 'function') {
+          window.atualizarControlesMangaPorProduto();
+        }
+        return;
+      }
+
+      let golaAutomatica = '';
+      if (produtoNormalizado.includes('social')) {
+        golaAutomatica = 'social';
+      } else if (produtoNormalizado.includes('polo')) {
+        golaAutomatica = 'polo';
+      }
+
+      if (selectGola) {
+        const foiAuto = selectGola.dataset.autoByPrimeiroProduto === '1';
+        if (golaAutomatica) {
+          const podePreencher = !selectGola.value || foiAuto;
+          if (podePreencher && selectGola.value !== golaAutomatica) {
+            selectGola.value = golaAutomatica;
+            selectGola.dataset.autoByPrimeiroProduto = '1';
+            selectGola.dispatchEvent(new Event('change'));
+          }
+        } else if (foiAuto && selectGola.value) {
+          // Evita manter gola automática quando o produto deixa de ser social/polo.
+          selectGola.value = '';
+          selectGola.dispatchEvent(new Event('change'));
+        }
+      }
+
+      if (inputMaterial) {
+        let materialAutomatico = '';
+        if (produtoNormalizado === PRODUTO_MATERIAL_HELANCA) {
+          materialAutomatico = 'Helanca';
+        } else if (PRODUTOS_MATERIAL_BRIM.has(produtoNormalizado)) {
+          materialAutomatico = 'Brim';
+        }
+
+        if (materialAutomatico) {
+          const foiAuto = inputMaterial.dataset.autoByPrimeiroProduto === '1';
+          const podePreencher = !String(inputMaterial.value || '').trim() || foiAuto;
+          if (podePreencher && inputMaterial.value !== materialAutomatico) {
+            inputMaterial.value = materialAutomatico;
+            inputMaterial.dataset.autoByPrimeiroProduto = '1';
+            inputMaterial.dispatchEvent(new Event('input'));
+          }
+        } else if (inputMaterial.dataset.autoByPrimeiroProduto === '1' && String(inputMaterial.value || '').trim()) {
+          inputMaterial.value = '';
+          if (inputComposicao) inputComposicao.value = '';
+          inputMaterial.dispatchEvent(new Event('input'));
+        }
+      }
+
+      if (typeof window.atualizarControlesMangaPorProduto === 'function') {
+        window.atualizarControlesMangaPorProduto();
+      }
+    }
+
     function adicionarLinhaProduto(produto) {
       const row = template.content.firstElementChild.cloneNode(true);
       row.draggable = false;
@@ -908,6 +1018,7 @@
 
       tabelaBody.appendChild(row);
       atualizarTotalItens();
+      aplicarRegrasAutomaticasDoPrimeiroProduto();
     }
 
     btnAdicionar.addEventListener('click', () => adicionarLinhaProduto());
@@ -947,6 +1058,9 @@
         e.target.value = e.target.value.toUpperCase();
         e.target.setSelectionRange(start, end);
       }
+      if (e.target.classList.contains('produto') || e.target.classList.contains('descricao')) {
+        aplicarRegrasAutomaticasDoPrimeiroProduto();
+      }
     });
 
     tabelaBody.addEventListener('input', e => {
@@ -958,6 +1072,15 @@
         const start = e.target.selectionStart;
         e.target.value = e.target.value.toUpperCase();
         e.target.setSelectionRange(start, start);
+      }
+      if (e.target.classList.contains('produto') || e.target.classList.contains('descricao')) {
+        aplicarRegrasAutomaticasDoPrimeiroProduto();
+      }
+    });
+
+    tabelaBody.addEventListener('change', e => {
+      if (e.target.classList.contains('produto') || e.target.classList.contains('descricao')) {
+        aplicarRegrasAutomaticasDoPrimeiroProduto();
       }
     });
 
@@ -1086,21 +1209,78 @@
     inputMaterial.addEventListener('input', () => {
       const valorDigitado = inputMaterial.value;
       const options = datalist.querySelectorAll('option');
+      let encontrou = false;
       for (let opt of options) {
         if (opt.value === valorDigitado) {
           composicaoInput.value = opt.dataset.composicao || '';
+          encontrou = true;
           break;
         }
       }
+      if (!encontrou) composicaoInput.value = '';
     });
 
     const acabamentoManga = document.getElementById('acabamentoManga');
+    const vies = document.getElementById('vies');
+    const mangaContainer = document.getElementById('mangaContainer');
+    const acabamentoMangaContainer = document.getElementById('acabamentoMangaContainer');
+    const viesContainer = document.getElementById('viesContainer');
     const larguraMangaContainer = document.getElementById('larguraMangaContainer');
     const corAcabamentoMangaContainer = document.getElementById('corAcabamentoMangaContainer');
+    const larguraMangaLabel = document.getElementById('larguraMangaLabel');
+    const corAcabamentoMangaLabel = document.getElementById('corAcabamentoMangaLabel');
+
+    function modoRegataAtivo() {
+      const rows = document.querySelectorAll('#produtosTable tr');
+      const produtosPreenchidos = [];
+      rows.forEach(row => {
+        const valor = String(row.querySelector('.produto')?.value || row.querySelector('.descricao')?.value || '').trim();
+        if (valor) produtosPreenchidos.push(valor);
+      });
+
+      if (produtosPreenchidos.length === 0) return false;
+
+      const temRegata = produtosPreenchidos.some(produtoEhRegata);
+      const temNaoRegata = produtosPreenchidos.some(valor => !produtoEhRegata(valor));
+      return temRegata && !temNaoRegata;
+    }
+
+    function atualizarModoRegata() {
+      const isRegata = modoRegataAtivo();
+      if (mangaContainer) mangaContainer.style.display = isRegata ? 'none' : 'block';
+      if (acabamentoMangaContainer) acabamentoMangaContainer.style.display = isRegata ? 'none' : 'block';
+      if (viesContainer) viesContainer.style.display = isRegata ? 'block' : 'none';
+
+      if (larguraMangaLabel) {
+        larguraMangaLabel.innerHTML = isRegata
+          ? '<i class="fas fa-ruler" aria-hidden="true"></i> Largura do Viés'
+          : '<i class="fas fa-ruler" aria-hidden="true"></i> Largura Acab. Manga';
+      }
+
+      if (corAcabamentoMangaLabel) {
+        corAcabamentoMangaLabel.innerHTML = isRegata
+          ? '<i class="fas fa-palette" aria-hidden="true"></i> Cor do Viés'
+          : '<i class="fas fa-palette" aria-hidden="true"></i> Cor Acab. Manga';
+      }
+    }
 
     function atualizarCamposManga() {
+      const isRegata = modoRegataAtivo();
+      atualizarModoRegata();
+
+      if (isRegata && acabamentoManga) {
+        acabamentoManga.value = (vies?.value || '') === 'sim' ? 'vies' : '';
+        const manga = document.getElementById('manga');
+        if (manga) manga.value = '';
+      } else {
+        if (vies) vies.value = '';
+        if (acabamentoManga?.value === 'vies') acabamentoManga.value = '';
+      }
+
       const valor = acabamentoManga?.value || '';
-      const mostrarExtras = isAcabamentoMangaComExtras(valor);
+      const mostrarExtras = isRegata
+        ? ((vies?.value || '') === 'sim')
+        : isAcabamentoMangaComExtras(valor);
 
       if (larguraMangaContainer) {
         larguraMangaContainer.style.display = mostrarExtras ? 'block' : 'none';
@@ -1110,10 +1290,11 @@
       }
     }
 
-    if (acabamentoManga) {
-      acabamentoManga.addEventListener('change', atualizarCamposManga);
-      atualizarCamposManga();
-    }
+    if (acabamentoManga) acabamentoManga.addEventListener('change', atualizarCamposManga);
+    if (vies) vies.addEventListener('change', atualizarCamposManga);
+    window.atualizarControlesMangaPorProduto = atualizarCamposManga;
+    window.isModoRegataAtivo = modoRegataAtivo;
+    atualizarCamposManga();
   }
 
   // Controles da Gola
@@ -1561,8 +1742,14 @@
 
     const arteVal = document.getElementById('arte')?.value || '';
 
-    const acabamentoMangaVal = document.getElementById('acabamentoManga')?.value || '';
-    const temAcabamentoManga = isAcabamentoMangaComExtras(acabamentoMangaVal);
+    const isRegataAtivo = typeof window.isModoRegataAtivo === 'function' && window.isModoRegataAtivo();
+    const viesVal = document.getElementById('vies')?.value || '';
+    const acabamentoMangaVal = isRegataAtivo
+      ? (viesVal === 'sim' ? 'vies' : '')
+      : (document.getElementById('acabamentoManga')?.value || '');
+    const temAcabamentoManga = isRegataAtivo
+      ? (viesVal === 'sim')
+      : isAcabamentoMangaComExtras(acabamentoMangaVal);
     const larguraManga = temAcabamentoManga ? (document.getElementById('larguraManga')?.value || '') : '';
     const corAcabamentoManga = temAcabamentoManga ? (document.getElementById('corAcabamentoManga')?.value || '') : '';
 
@@ -1730,6 +1917,11 @@
     setVal('acabamentoManga', ficha.acabamentoManga);
     setVal('larguraManga', ficha.larguraManga);
     setVal('corAcabamentoManga', ficha.corAcabamentoManga);
+    const viesSelect = document.getElementById('vies');
+    if (viesSelect) {
+      viesSelect.value = String(ficha.acabamentoManga || '').includes('vies') ? 'sim' : '';
+      viesSelect.dispatchEvent(new Event('change'));
+    }
 
     setVal('gola', ficha.gola);
     document.getElementById('gola')?.dispatchEvent(new Event('change'));
@@ -2139,6 +2331,41 @@
 
     const corMaterialVal = getValorCampo('corMaterial');
     setText('print-corMaterial', corMaterialVal, '-');
+
+    const produtosPreenchidosImpressao = usarFichaDireta
+      ? produtosFonte
+        .map(item => String(item?.produto || item?.descricao || '').trim())
+        .filter(Boolean)
+      : (() => {
+        const lista = [];
+        const rows = document.querySelectorAll('#produtosTable tr');
+        rows.forEach(row => {
+          const valor = String(row.querySelector('.produto')?.value || row.querySelector('.descricao')?.value || '').trim();
+          if (valor) lista.push(valor);
+        });
+        return lista;
+      })();
+    const isRegataImpressao = produtosPreenchidosImpressao.length > 0
+      && produtosPreenchidosImpressao.every(produtoEhRegata);
+
+    const acabamentoMangaLabel = document.getElementById('print-acabamentoMangaLabel');
+    if (acabamentoMangaLabel) {
+      acabamentoMangaLabel.innerHTML = isRegataImpressao
+        ? '<i class="fas fa-sliders" aria-hidden="true"></i> Viés:'
+        : '<i class="fas fa-sliders" aria-hidden="true"></i> Acab. Manga:';
+    }
+    const larguraMangaLabel = document.getElementById('print-larguraMangaLabel');
+    if (larguraMangaLabel) {
+      larguraMangaLabel.innerHTML = isRegataImpressao
+        ? '<i class="fas fa-ruler" aria-hidden="true"></i> Largura do Viés:'
+        : '<i class="fas fa-ruler" aria-hidden="true"></i> Largura Acab. Manga:';
+    }
+    const corAcabMangaLabel = document.getElementById('print-corAcabamentoMangaLabel');
+    if (corAcabMangaLabel) {
+      corAcabMangaLabel.innerHTML = isRegataImpressao
+        ? '<i class="fas fa-palette" aria-hidden="true"></i> Cor do Viés:'
+        : '<i class="fas fa-palette" aria-hidden="true"></i> Cor Acab. Manga:';
+    }
 
     const mangaText = getSelectText('manga');
     setText('print-manga', mangaText, '-');
@@ -2773,7 +3000,7 @@
 
     const idsParaMonitorar = [
       'produto', 'material', 'corMaterial',
-      'manga', 'acabamentoManga', 'larguraManga', 'corAcabamentoManga',
+      'manga', 'acabamentoManga', 'vies', 'larguraManga', 'corAcabamentoManga',
       'gola', 'corGola', 'acabamentoGola', 'larguraGola',
       'reforcoGola', 'corReforco', 'corBotao',
       'corPeDeGolaInterno', 'corPeDeGolaExterno',

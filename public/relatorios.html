@@ -137,22 +137,30 @@
 
             <!-- DETALHES ADICIONAIS -->
             <div class="two-columns">
-                <!-- COBERTURA DA EQUIPE -->
+                <!-- ATIVIDADE DE CRIACAO DE FICHAS -->
                 <section class="card">
                     <div class="card-header">
-                        <i class="fas fa-users"></i>
-                        <span>Cobertura da Equipe</span>
+                        <i class="fas fa-chart-pie"></i>
+                        <span>Atividade de Criacao de Fichas</span>
                     </div>
                     <div class="card-body">
-                        <div class="equipe-resumo">
-                            <div class="equipe-resumo-item">
-                                <div class="equipe-resumo-label">Vendedores Ativos</div>
-                                <div class="equipe-resumo-value" id="equipeVendedoresAtivos">0</div>
+                        <div id="fichasHeatmap" class="fichas-heatmap">
+                            <div class="empty-placeholder">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <p>Carregando...</p>
                             </div>
-                            <div class="equipe-resumo-item">
-                                <div class="equipe-resumo-label">Fichas no Período</div>
-                                <div class="equipe-resumo-value" id="equipeFichasPeriodo">0</div>
-                            </div>
+                            <div id="heatmapTooltip" class="heatmap-tooltip" hidden></div>
+                        </div>
+                        <div class="insight-legend heatmap-legend">
+                            <span>Menos</span>
+                            <span class="legend-scale">
+                                <i class="legend-box level-0"></i>
+                                <i class="legend-box level-1"></i>
+                                <i class="legend-box level-2"></i>
+                                <i class="legend-box level-3"></i>
+                                <i class="legend-box level-4"></i>
+                            </span>
+                            <span>Mais</span>
                         </div>
                     </div>
                 </section>
@@ -212,9 +220,9 @@
                     <i class="fas fa-layer-group"></i>
                     <span>Análise por Material</span>
                     <div class="card-header-actions">
-                        <select id="filtroMaterial" class="filter-select">
-                            <option value="">Todos os materiais</option>
-                        </select>
+                        <input id="filtroMaterialInput" class="filter-input" list="materiaisCatalogoList"
+                            placeholder="Pesquisar material..." autocomplete="off">
+                        <datalist id="materiaisCatalogoList"></datalist>
                     </div>
                 </div>
                 <div class="card-body">
@@ -237,6 +245,11 @@
                     <div class="card-header">
                         <i class="fas fa-tshirt"></i>
                         <span>Top Produtos</span>
+                        <div class="card-header-actions">
+                            <input id="filtroProdutoInput" class="filter-input" list="produtosCatalogoList"
+                                placeholder="Pesquisar produto..." autocomplete="off">
+                            <datalist id="produtosCatalogoList"></datalist>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div id="produtosRanking" class="mini-ranking">
@@ -263,23 +276,38 @@
                     </div>
                 </section>
             </div>
-
-            <!-- DISTRIBUIÇÃO POR TAMANHO -->
-            <section class="card">
-                <div class="card-header">
-                    <i class="fas fa-ruler"></i>
-                    <span>Distribuição por Tamanho</span>
-                </div>
-                <div class="card-body">
-                    <div id="tamanhosContainer" class="tamanhos-chart">
-                        <div class="empty-placeholder">
-                            <i class="fas fa-spinner fa-spin"></i>
-                            <p>Carregando...</p>
+            <!-- DISTRIBUICAO POR TAMANHO -->
+            <div class="two-columns">
+                <section class="card">
+                    <div class="card-header">
+                        <i class="fas fa-ruler"></i>
+                        <span>Distribuicao por Tamanho</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="tamanhosContainer" class="tamanhos-chart">
+                            <div class="empty-placeholder">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <p>Carregando...</p>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
+                <section class="card">
+                    <div class="card-header">
+                        <i class="fas fa-paint-brush"></i>
+                        <span>Principais Personalizacoes</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="personalizacoesChart" class="personalizacoes-chart">
+                            <div class="loading-placeholder">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <p>Carregando...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
             <!-- COMPARATIVO COM PERÍODO ANTERIOR -->
             <section class="card">
                 <div class="card-header">
@@ -349,12 +377,20 @@
     </div>
 
     <script src="js/theme.js"></script>
+    <script src="js/system-log.js"></script>
     <script src="js/toast.js"></script>
+    <script src="js/custom-datalist.js"></script>
     <script src="js/api-client.js"></script>
     <script src="js/relatorios.js"></script>
 </body>
 
 </html>
+
+
+
+
+
+
 
 
 

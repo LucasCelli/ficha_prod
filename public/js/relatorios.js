@@ -8,8 +8,11 @@
   let relatorioAtual = null;
   let dadosVendedores = [];
   let dadosMateriais = [];
+  let dadosProdutos = [];
   let catalogoTamanhos = null;
   let catalogoRotulosTamanhos = null;
+  let catalogoMateriais = [];
+  let catalogoProdutos = [];
 
   function getCssVar(token, fallback = '') {
     const value = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
@@ -51,6 +54,7 @@
       await carregarCatalogoTamanhos();
 
       initEventListeners();
+      initEfeitosScroll();
       await carregarRelatorio();
     } catch (error) {
       mostrarErro('Erro ao conectar com o servidor');
@@ -88,13 +92,12 @@
       }
     });
 
-    document.getElementById('filtroMaterial')?.addEventListener('change', (e) => {
-      const material = e.target.value;
-      if (material) {
-        filtrarPorMaterial(material);
-      } else {
-        renderizarMateriais(dadosMateriais);
-      }
+    document.getElementById('filtroMaterialInput')?.addEventListener('input', (e) => {
+      filtrarPorMaterial(e.target.value);
+    });
+
+    document.getElementById('filtroProdutoInput')?.addEventListener('input', (e) => {
+      filtrarPorProduto(e.target.value);
     });
 
     document.getElementById('btnExportarPDF')?.addEventListener('click', exportarPDF);
@@ -120,6 +123,8 @@
 
       const catalogo = await response.json();
       const lista = Array.isArray(catalogo?.tamanhos) ? catalogo.tamanhos : [];
+      const listaMateriais = Array.isArray(catalogo?.materiais) ? catalogo.materiais : [];
+      const listaProdutos = Array.isArray(catalogo?.produtos) ? catalogo.produtos : [];
       const tamanhosPermitidos = new Set();
       const rotulosPorChaveCanonica = new Map();
       const rotulosCatalogoNormalizados = new Map();
@@ -148,9 +153,21 @@
 
       catalogoTamanhos = tamanhosPermitidos;
       catalogoRotulosTamanhos = rotulosPorChaveCanonica;
+      catalogoMateriais = listaMateriais
+        .map(m => String(m?.nome || '').trim())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      catalogoProdutos = listaProdutos
+        .map(p => String(p || '').trim())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      preencherDatalist('materiaisCatalogoList', catalogoMateriais);
+      preencherDatalist('produtosCatalogoList', catalogoProdutos);
     } catch (error) {
       catalogoTamanhos = null;
       catalogoRotulosTamanhos = null;
+      catalogoMateriais = [];
+      catalogoProdutos = [];
     }
   }
 
@@ -225,6 +242,7 @@
 
   async function carregarRelatorio() {
     try {
+      setRelatoriosLoadingState(true);
       if (periodoAtual === 'customizado') {
         const dataInicio = document.getElementById('relDataInicio')?.value;
         const dataFim = document.getElementById('relDataFim')?.value;
@@ -251,11 +269,14 @@
         carregarRankingProdutos(),
         carregarRankingClientes(),
         carregarDistribuicaoTamanhos(),
-        carregarComparativo()
+        carregarComparativo(),
+        carregarInsightsVisuais()
       ]);
 
     } catch (error) {
       mostrarErro('Erro ao carregar relatório');
+    } finally {
+      setRelatoriosLoadingState(false);
     }
   }
 
@@ -267,10 +288,10 @@
     const statItensConfeccionados = document.getElementById('statItensConfeccionados');
     const statNovosClientes = document.getElementById('statNovosClientes');
 
-    if (statPedidosEntregues) statPedidosEntregues.textContent = dados.fichasEntregues || 0;
-    if (statPedidosPendentes) statPedidosPendentes.textContent = dados.fichasPendentes || 0;
-    if (statItensConfeccionados) statItensConfeccionados.textContent = formatarNumero(dados.itensConfeccionados || 0);
-    if (statNovosClientes) statNovosClientes.textContent = dados.novosClientes || 0;
+    if (statPedidosEntregues) animateCounter(statPedidosEntregues, dados.fichasEntregues || 0);
+    if (statPedidosPendentes) animateCounter(statPedidosPendentes, dados.fichasPendentes || 0);
+    if (statItensConfeccionados) animateCounter(statItensConfeccionados, dados.itensConfeccionados || 0);
+    if (statNovosClientes) animateCounter(statNovosClientes, dados.novosClientes || 0);
   }
 
   function atualizarResumoEquipe(vendedores) {
@@ -283,8 +304,8 @@
       ? vendedores.reduce((soma, v) => soma + (v.totalPedidos || 0), 0)
       : 0;
 
-    vendedoresAtivosEl.textContent = formatarNumero(vendedoresAtivos);
-    fichasPeriodoEl.textContent = formatarNumero(fichasNoPeriodo);
+    animateCounter(vendedoresAtivosEl, vendedoresAtivos);
+    animateCounter(fichasPeriodoEl, fichasNoPeriodo);
   }
 
   function atualizarTaxaEntrega(dados) {
@@ -298,9 +319,9 @@
     const taxaTotal = document.getElementById('taxaTotal');
     const circle = document.getElementById('taxaProgress');
 
-    if (taxaValue) taxaValue.textContent = `${taxa}%`;
-    if (taxaEntregues) taxaEntregues.textContent = entregues;
-    if (taxaTotal) taxaTotal.textContent = total;
+    if (taxaValue) animateCounter(taxaValue, taxa, { suffix: '%' });
+    if (taxaEntregues) animateCounter(taxaEntregues, entregues);
+    if (taxaTotal) animateCounter(taxaTotal, total);
 
     if (circle) {
       const circumference = 283;
@@ -315,6 +336,7 @@
         circle.style.stroke = getCssVar('--color-danger', getCssVar('--color-danger', 'red'));
       }
     }
+
   }
 
   // Análise por Vendedor
@@ -419,7 +441,6 @@
     const container = document.getElementById('materiaisContainer');
     const loading = document.getElementById('materiaisLoading');
     const empty = document.getElementById('materiaisEmpty');
-    const select = document.getElementById('filtroMaterial');
 
     try {
       if (loading) loading.style.display = 'block';
@@ -439,13 +460,6 @@
         totalItens: m.total_itens || m.totalItens || 0
       }));
 
-      if (select) {
-        select.innerHTML = '<option value="">Todos os materiais</option>';
-        dadosMateriais.forEach(m => {
-          select.innerHTML += `<option value="${escapeHtml(m.material)}">${escapeHtml(m.material)}</option>`;
-        });
-      }
-
       if (loading) loading.style.display = 'none';
 
       if (dadosMateriais.length === 0) {
@@ -453,6 +467,7 @@
       } else {
         if (container) container.style.display = 'block';
         renderizarMateriais(dadosMateriais);
+        filtrarPorMaterial(document.getElementById('filtroMaterialInput')?.value || '');
       }
 
     } catch (error) {
@@ -490,17 +505,24 @@
               <span>${porcentagem.toFixed(1)}% do total</span>
             </div>
             <div class="material-horizontal-track">
-              <div class="material-horizontal-fill" style="width: ${Math.max(largura, 3)}%;"></div>
+              <div class="material-horizontal-fill" data-width="${Math.max(largura, 3)}" style="width: 0%;"></div>
             </div>
           </div>
         `;
     }).join('')}
       </div>
     `;
+    animarBarrasQuandoVisivel(container, '.material-horizontal-fill', 'width', '%');
   }
 
   function filtrarPorMaterial(material) {
-    const filtrado = dadosMateriais.filter(m => m.material === material);
+    const termo = normalizarTextoBusca(material);
+    if (!termo) {
+      renderizarMateriais(dadosMateriais);
+      return;
+    }
+
+    const filtrado = dadosMateriais.filter(m => normalizarTextoBusca(m.material).includes(termo));
     renderizarMateriais(filtrado);
   }
 
@@ -511,29 +533,59 @@
     if (!container) return;
 
     try {
+      container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-spinner fa-spin"></i><p>Carregando...</p></div>';
       const url = `${db.baseURL}/relatorio/produtos?${buildUrlParams()}`;
 
       const response = await fetch(url);
       if (!response.ok) throw new Error('Erro');
 
       const produtos = await response.json();
+      dadosProdutos = (Array.isArray(produtos) ? produtos : []).map(p => ({
+        produto: p.produto || 'Não especificado',
+        quantidade: p.quantidade || 0
+      }));
 
-      if (produtos.length === 0) {
+      if (dadosProdutos.length === 0) {
         container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-tshirt"></i><p>Nenhum produto</p></div>';
         return;
       }
 
-      container.innerHTML = produtos.slice(0, 5).map((p, i) => `
-        <div class="mini-ranking-item">
-          <span class="mini-pos">${i + 1}º</span>
-          <span class="mini-name">${escapeHtml(p.produto || 'Não especificado')}</span>
-          <span class="mini-value">${formatarNumero(p.quantidade || 0)}</span>
-        </div>
-      `).join('');
+      renderizarRankingProdutos(dadosProdutos.slice(0, 5));
+      filtrarPorProduto(document.getElementById('filtroProdutoInput')?.value || '');
 
     } catch (error) {
+      dadosProdutos = [];
       container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-exclamation-circle"></i><p>Erro ao carregar</p></div>';
     }
+  }
+
+  function renderizarRankingProdutos(produtos) {
+    const container = document.getElementById('produtosRanking');
+    if (!container) return;
+
+    if (!Array.isArray(produtos) || produtos.length === 0) {
+      container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-search"></i><p>Nenhum produto encontrado</p></div>';
+      return;
+    }
+
+    container.innerHTML = produtos.map((p, i) => `
+      <div class="mini-ranking-item">
+        <span class="mini-pos">${i + 1}º</span>
+        <span class="mini-name">${escapeHtml(p.produto || 'Não especificado')}</span>
+        <span class="mini-value">${formatarNumero(p.quantidade || 0)}</span>
+      </div>
+    `).join('');
+  }
+
+  function filtrarPorProduto(produto) {
+    const termo = normalizarTextoBusca(produto);
+    if (!termo) {
+      renderizarRankingProdutos(dadosProdutos.slice(0, 5));
+      return;
+    }
+
+    const filtrados = dadosProdutos.filter(p => normalizarTextoBusca(p.produto).includes(termo));
+    renderizarRankingProdutos(filtrados.slice(0, 10));
   }
 
   async function carregarRankingClientes() {
@@ -614,13 +666,14 @@
                   <span class="tamanho-horizontal-value">${formatarNumero(t.quantidade || 0)} (${percent}%)</span>
                 </div>
                 <div class="tamanho-horizontal-track">
-                  <div class="tamanho-horizontal-fill" style="width: ${Math.max(largura, 3)}%;"></div>
+                  <div class="tamanho-horizontal-fill" data-width="${Math.max(largura, 3)}" style="width: 0%;"></div>
                 </div>
               </div>
             `;
       }).join('')}
         </div>
       `;
+      animarBarrasQuandoVisivel(container, '.tamanho-horizontal-fill', 'width', '%');
 
     } catch (error) {
       container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-exclamation-circle"></i><p>Erro ao carregar</p></div>';
@@ -1487,6 +1540,363 @@
     if (typeof window.mostrarToast === 'function') {
       window.mostrarToast(mensagem, tipo);
     }
+  }
+
+  function preencherDatalist(listId, values) {
+    const datalist = document.getElementById(listId);
+    if (!datalist) return;
+
+    datalist.innerHTML = '';
+    (Array.isArray(values) ? values : []).forEach(value => {
+      const option = document.createElement('option');
+      option.value = value;
+      datalist.appendChild(option);
+    });
+  }
+
+  function normalizarTextoBusca(valor) {
+    return String(valor || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+
+  function prepararAnimacaoCards() {
+    const blocos = document.querySelectorAll('.stats-grid-large > *, .card');
+    blocos.forEach((bloco, index) => {
+      bloco.style.setProperty('--card-delay', `${Math.min(index * 40, 420)}ms`);
+      bloco.classList.add('report-card-enter');
+    });
+  }
+
+  function setRelatoriosLoadingState(isLoading) {
+    if (!isLoading) document.body.classList.add('relatorios-ready');
+  }
+
+  function animateCounter(element, toValue, options = {}) {
+    if (!element) return;
+    const duration = Number(options.duration) || 700;
+    const suffix = String(options.suffix || '');
+    const fromValue = Number(element.dataset.counterValue || 0);
+    const target = Number(toValue || 0);
+    element.dataset.counterValue = String(target);
+
+    const start = performance.now();
+    const delta = target - fromValue;
+
+    function step(now) {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = fromValue + (delta * eased);
+      const rounded = Math.round(current);
+      element.textContent = `${formatarNumero(rounded)}${suffix}`;
+      if (progress < 1) requestAnimationFrame(step);
+    }
+
+    requestAnimationFrame(step);
+  }
+
+  function animarBarrasQuandoVisivel(container, selector, prop, unit) {
+    if (!container) return;
+    const barras = Array.from(container.querySelectorAll(selector));
+    if (!barras.length) return;
+
+    const animar = () => {
+      barras.forEach((bar, index) => {
+        const target = Number(bar.dataset[prop] ?? bar.dataset.width ?? bar.dataset.height ?? 0);
+        bar.style.transition = `${prop} 700ms cubic-bezier(.2,.8,.2,1)`;
+        bar.style.transitionDelay = `${120 + (index * 90)}ms`;
+        requestAnimationFrame(() => {
+          bar.style[prop] = `${target}${unit}`;
+        });
+      });
+    };
+
+    if (!('IntersectionObserver' in window)) {
+      animar();
+      return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.55) {
+          animar();
+          observer.disconnect();
+        }
+      });
+    }, { threshold: [0.55], rootMargin: '0px 0px -8% 0px' });
+    observer.observe(container);
+  }
+
+  function bindHeatmapTooltip() {
+    const container = document.getElementById('fichasHeatmap');
+    const tooltip = document.getElementById('heatmapTooltip');
+    if (!container || !tooltip) return;
+
+    const show = (target, event) => {
+      const text = target?.dataset?.tooltip;
+      if (!text) return;
+      tooltip.textContent = text;
+      tooltip.hidden = false;
+      const rect = container.getBoundingClientRect();
+      const x = event.clientX - rect.left + 12;
+      const y = event.clientY - rect.top - 12;
+      tooltip.style.left = `${x}px`;
+      tooltip.style.top = `${y}px`;
+    };
+
+    const hide = () => {
+      tooltip.hidden = true;
+    };
+
+    container.onmousemove = (event) => {
+      const target = event.target.closest('.heatmap-cell');
+      if (!target || target.classList.contains('empty')) {
+        hide();
+        return;
+      }
+      show(target, event);
+    };
+
+    container.onmouseleave = hide;
+  }
+
+  async function carregarInsightsVisuais() {
+    const heatmapContainer = document.getElementById('fichasHeatmap');
+    const personalizacoesContainer = document.getElementById('personalizacoesChart');
+    if (!heatmapContainer || !personalizacoesContainer) return;
+
+    try {
+      const rangePersonalizacoes = obterRangePeriodoAtual();
+      if (!rangePersonalizacoes) {
+        throw new Error('Período inválido');
+      }
+
+      const rangeHeatmap = obterRangeUltimos365Dias();
+      const [resHeatmap, resPersonal] = await Promise.all([
+        fetch(`${db.baseURL}/fichas?${new URLSearchParams(rangeHeatmap).toString()}`),
+        fetch(`${db.baseURL}/fichas?${new URLSearchParams(rangePersonalizacoes).toString()}`)
+      ]);
+      if (!resHeatmap.ok || !resPersonal.ok) throw new Error('Erro ao carregar fichas');
+
+      const [fichasHeatmap, fichasPersonal] = await Promise.all([resHeatmap.json(), resPersonal.json()]);
+      renderizarHeatmapFichas(Array.isArray(fichasHeatmap) ? fichasHeatmap : [], rangeHeatmap);
+      renderizarGraficoPersonalizacoes(Array.isArray(fichasPersonal) ? fichasPersonal : []);
+    } catch (error) {
+      heatmapContainer.innerHTML = '<div class="empty-placeholder"><i class="fas fa-exclamation-circle"></i><p>Erro ao carregar heatmap</p></div>';
+      personalizacoesContainer.innerHTML = '<div class="empty-placeholder"><i class="fas fa-exclamation-circle"></i><p>Erro ao carregar personalizações</p></div>';
+    }
+  }
+
+  function obterRangePeriodoAtual() {
+    const hoje = new Date();
+    const hojeIso = toISODate(hoje);
+
+    if (periodoAtual === 'customizado') {
+      const dataInicio = document.getElementById('relDataInicio')?.value;
+      const dataFim = document.getElementById('relDataFim')?.value;
+      if (!dataInicio || !dataFim) return null;
+      return { dataInicio, dataFim };
+    }
+
+    if (periodoAtual === 'ano') {
+      return { dataInicio: `${hoje.getFullYear()}-01-01`, dataFim: hojeIso };
+    }
+
+    if (periodoAtual === 'mes') {
+      const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      return { dataInicio: toISODate(primeiroDiaMes), dataFim: hojeIso };
+    }
+
+    return { dataInicio: '2020-01-01', dataFim: hojeIso };
+  }
+
+  function obterRangeUltimos365Dias() {
+    const fim = new Date();
+    const inicio = new Date(fim);
+    inicio.setDate(inicio.getDate() - 364);
+    return { dataInicio: toISODate(inicio), dataFim: toISODate(fim) };
+  }
+
+  function renderizarHeatmapFichas(fichas, range) {
+    const container = document.getElementById('fichasHeatmap');
+    if (!container) return;
+
+    const dataFim = parseISODate(range.dataFim);
+    const dataInicioRange = parseISODate(range.dataInicio);
+    if (!dataFim || !dataInicioRange) {
+      container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-calendar-times"></i><p>Período inválido</p></div>';
+      return;
+    }
+
+    const dataInicio = dataInicioRange;
+    const contagemPorDia = new Map();
+
+    fichas.forEach(ficha => {
+      const data = obterDataCriacaoFicha(ficha);
+      if (!data) return;
+      const diaSemana = data.getDay();
+      if (diaSemana === 0 || diaSemana === 6) return;
+      const chave = toISODate(data);
+      contagemPorDia.set(chave, (contagemPorDia.get(chave) || 0) + 1);
+    });
+
+    const dias = [];
+    const cursor = new Date(dataInicio);
+    while (cursor <= dataFim) {
+      const diaSemana = cursor.getDay();
+      if (diaSemana !== 0 && diaSemana !== 6) {
+        const chave = toISODate(cursor);
+        dias.push({ data: new Date(cursor), quantidade: contagemPorDia.get(chave) || 0 });
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    const max = Math.max(...dias.map(d => d.quantidade), 0);
+    if (!dias.length) {
+      container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-calendar"></i><p>Sem dados para o período</p></div>';
+      return;
+    }
+
+    const primeiroDiaSemana = dias[0].data.getDay(); // 1..5 (seg..sex)
+    const blanks = Math.max(0, primeiroDiaSemana - 1); // alinhar em colunas seg-sex
+    const cells = [];
+    for (let i = 0; i < blanks; i++) {
+      cells.push({ empty: true, nivel: 0, tooltip: '', date: null });
+    }
+    dias.forEach(dia => {
+      const nivel = obterNivelHeatmap(dia.quantidade, max);
+      const tooltip = `${dia.data.toLocaleDateString('pt-BR')}: ${dia.quantidade} ficha(s) criada(s)`;
+      cells.push({ empty: false, nivel, tooltip, date: dia.data });
+    });
+    while (cells.length % 5 !== 0) {
+      cells.push({ empty: true, nivel: 0, tooltip: '', date: null });
+    }
+
+    const weeks = [];
+    for (let i = 0; i < cells.length; i += 5) {
+      weeks.push(cells.slice(i, i + 5));
+    }
+
+    const weeksHtml = weeks.map(week => {
+      const cellsHtml = week.map(cell => {
+        if (cell.empty) return '<span class="heatmap-cell empty"></span>';
+        return `<span class="heatmap-cell level-${cell.nivel}" data-tooltip="${escapeHtml(cell.tooltip)}"></span>`;
+      }).join('');
+      return `<div class="heatmap-week">${cellsHtml}</div>`;
+    }).join('');
+
+    container.innerHTML = `<div class="heatmap-lines"><div class="heatmap-line">${weeksHtml}</div></div><div id="heatmapTooltip" class="heatmap-tooltip" hidden></div>`;
+    bindHeatmapTooltip();
+  }
+
+  function obterNivelHeatmap(qtd, max) {
+    if (!qtd || max <= 0) return 0;
+    const ratio = qtd / max;
+    if (ratio < 0.25) return 1;
+    if (ratio < 0.5) return 2;
+    if (ratio < 0.75) return 3;
+    return 4;
+  }
+
+  function renderizarGraficoPersonalizacoes(fichas) {
+    const container = document.getElementById('personalizacoesChart');
+    if (!container) return;
+
+    const mapa = new Map();
+    fichas.forEach(ficha => {
+      const chave = normalizarChavePersonalizacao(ficha?.arte);
+      mapa.set(chave, (mapa.get(chave) || 0) + 1);
+    });
+
+    const dados = Array.from(mapa.entries())
+      .map(([chave, quantidade]) => ({ chave, quantidade, label: rotuloPersonalizacao(chave) }))
+      .sort((a, b) => b.quantidade - a.quantidade)
+      .slice(0, 7);
+
+    if (!dados.length) {
+      container.innerHTML = '<div class="empty-placeholder"><i class="fas fa-paint-brush"></i><p>Sem personalizações no período</p></div>';
+      return;
+    }
+
+    const max = Math.max(...dados.map(item => item.quantidade), 1);
+    container.innerHTML = `
+      <div class="personalizacoes-columns">
+        ${dados.map(item => {
+      const altura = Math.max(14, Math.round((item.quantidade / max) * 120));
+      return `
+            <div class="personalizacao-col" title="${escapeHtml(item.label)}: ${item.quantidade}">
+              <div class="personalizacao-bar-wrap">
+                <span class="personalizacao-value">${formatarNumero(item.quantidade)}</span>
+                <div class="personalizacao-bar" data-height="${altura}" style="height: 0px;"></div>
+              </div>
+              <span class="personalizacao-label">${escapeHtml(item.label)}</span>
+            </div>
+          `;
+    }).join('')}
+      </div>
+    `;
+    animarBarrasQuandoVisivel(container, '.personalizacao-bar', 'height', 'px');
+  }
+
+  function normalizarChavePersonalizacao(valor) {
+    const key = normalizarTextoBusca(valor).replace(/\s+/g, '_');
+    return key || 'sem_personalizacao';
+  }
+
+  function rotuloPersonalizacao(chave) {
+    const mapa = {
+      sem_personalizacao: 'Sem personalização',
+      sublimacao: 'Sublimação',
+      serigrafia: 'Serigrafia',
+      bordado: 'Bordado',
+      dtf: 'DTF Têxtil',
+      sublimacao_serigrafia: 'Sublimação + Serigrafia',
+      serigrafia_dtf: 'Serigrafia + DTF',
+      serigrafia_bordado: 'Serigrafia + Bordado'
+    };
+    if (mapa[chave]) return mapa[chave];
+    return chave.split('_').filter(Boolean).map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' ');
+  }
+
+  function obterDataCriacaoFicha(ficha) {
+    const raw = ficha?.data_criacao || ficha?.created_at || ficha?.data_inicio;
+    if (!raw) return null;
+    const data = new Date(raw);
+    return Number.isNaN(data.getTime()) ? null : data;
+  }
+
+  function parseISODate(iso) {
+    if (!iso) return null;
+    const data = new Date(`${iso}T00:00:00`);
+    return Number.isNaN(data.getTime()) ? null : data;
+  }
+
+  function toISODate(date) {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function initEfeitosScroll() {
+    if (!('IntersectionObserver' in window)) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -10% 0px' });
+
+    const elementos = document.querySelectorAll('.card, .stat-card-large');
+    elementos.forEach(el => {
+      el.classList.add('reveal-on-scroll');
+      observer.observe(el);
+    });
   }
 })();
 

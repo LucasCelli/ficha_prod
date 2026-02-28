@@ -657,6 +657,16 @@
         throw new Error('Falha ao preparar duplicação');
       }
 
+      const fichaOrigemId = Number.parseInt(String(fichaAtualId || ''), 10);
+      if (window.SystemLog && typeof window.SystemLog.track === 'function') {
+        window.SystemLog.track(
+          'ficha_duplicada',
+          'Ficha duplicada',
+          Number.isInteger(fichaOrigemId) && fichaOrigemId > 0 ? fichaOrigemId : null,
+          { origem: 'ficha.html' }
+        );
+      }
+
     } catch (error) {
       mostrarToast('Erro ao duplicar ficha', 'error');
     }
@@ -1232,6 +1242,7 @@
   };
 
 })();
+
 
 
 

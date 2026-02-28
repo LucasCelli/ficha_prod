@@ -42,6 +42,15 @@ function parsePositiveInt(value) {
   return parsed;
 }
 
+function parseBooleanOrUndefined(value) {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value === 'boolean') return value;
+  const text = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'sim'].includes(text)) return true;
+  if (['0', 'false', 'no', 'nao', 'não'].includes(text)) return false;
+  return undefined;
+}
+
 function zodIssueDetails(error) {
   return error.issues.map(issue => ({
     path: issue.path.join('.') || 'root',
@@ -102,7 +111,16 @@ export const fichaQuerySchema = z.object({
   cliente: optionalTextSchema,
   vendedor: optionalTextSchema,
   dataInicio: optionalIsoDateSchema,
-  dataFim: optionalIsoDateSchema
+  dataFim: optionalIsoDateSchema,
+  termo: optionalTextSchema,
+  evento: z.preprocess(
+    toTrimmedStringOrUndefined,
+    z.enum(['sim', 'nao']).optional()
+  ),
+  paged: z.preprocess(parseBooleanOrUndefined, z.boolean().optional()),
+  resumido: z.preprocess(parseBooleanOrUndefined, z.boolean().optional()),
+  page: z.preprocess(parsePositiveInt, z.number().int().positive().optional()),
+  pageSize: z.preprocess(parsePositiveInt, z.number().int().positive().optional())
 }).superRefine((data, ctx) => {
   if (data.dataInicio && data.dataFim && data.dataInicio > data.dataFim) {
     ctx.addIssue({

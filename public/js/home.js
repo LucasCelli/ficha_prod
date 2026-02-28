@@ -4,6 +4,9 @@
   const REFRESH_INTERVAL_MS = 2 * 60 * 1000;
   const PREVIEW_READY_MESSAGE = 'ficha-preview-ready';
   const PREVIEW_TIMEOUT_MS = 15000;
+  const TREND_RANGE_DAYS = 'days';
+  const TREND_RANGE_WEEKS = 'weeks';
+  const TREND_RANGE_MONTHS = 'months';
 
   let intervalId = null;
   let previewModal = null;
@@ -13,6 +16,10 @@
   let previewLoading = null;
   let previewTitle = null;
   let previewPrintBtn = null;
+  let trendRange = TREND_RANGE_DAYS;
+  let trendSource = [];
+  const numberFormatter = new Intl.NumberFormat('pt-BR');
+  const kpiAnimationFrames = new Map();
 
   function escapeHtml(value) {
     return String(value || '')
@@ -56,43 +63,385 @@
     el.textContent = text;
   }
 
+  function parseNumberLike(value) {
+    const digits = String(value ?? '').replace(/[^\d-]/g, '');
+    const parsed = Number(digits);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function animateKpiValue(id, targetValue) {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    const next = Math.max(0, Math.round(Number(targetValue) || 0));
+    const current = parseNumberLike(el.dataset.value ?? el.textContent);
+    if (current === next) {
+      el.textContent = numberFormatter.format(next);
+      el.dataset.value = String(next);
+      return;
+    }
+
+    const previousFrame = kpiAnimationFrames.get(id);
+    if (previousFrame) window.cancelAnimationFrame(previousFrame);
+
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      el.textContent = numberFormatter.format(next);
+      el.dataset.value = String(next);
+      return;
+    }
+
+    const duration = 650;
+    const startTime = performance.now();
+
+    const tick = (now) => {
+      const progress = Math.min(1, (now - startTime) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const value = Math.round(current + ((next - current) * eased));
+      el.textContent = numberFormatter.format(value);
+      el.dataset.value = String(value);
+
+      if (progress < 1) {
+        const raf = window.requestAnimationFrame(tick);
+        kpiAnimationFrames.set(id, raf);
+      } else {
+        kpiAnimationFrames.delete(id);
+        el.textContent = numberFormatter.format(next);
+        el.dataset.value = String(next);
+      }
+    };
+
+    const raf = window.requestAnimationFrame(tick);
+    kpiAnimationFrames.set(id, raf);
+  }
+
   function setStats(stats) {
-    setText('hubStatTotalFichas', String(stats?.totalFichas ?? 0));
-    setText('hubStatPendentes', String(stats?.pendentes ?? 0));
-    setText('hubStatClientes', String(stats?.totalClientes ?? 0));
-    setText('hubStatItens', String(stats?.totalItens ?? 0));
+    animateKpiValue('hubStatTotalFichas', stats?.totalFichas ?? 0);
+    animateKpiValue('hubStatPendentes', stats?.pendentes ?? 0);
+    animateKpiValue('hubStatClientes', stats?.totalClientes ?? 0);
+    animateKpiValue('hubStatEntregues', stats?.entregues ?? 0);
   }
 
-  function mapSystemLabel(key) {
-    if (key === 'turso') return 'Turso';
-    if (key === 'cloudinary') return 'Cloudinary';
-    if (key === 'vercel') return 'Vercel';
-    if (key === 'github') return 'GitHub';
-    return key;
+  function parseDateTime(value) {
+    if (!value) return null;
+    const raw = String(value).trim();
+    if (!raw) return null;
+
+    // Datas com timezone explícito (ex: Z, +00:00) devem respeitar o fuso original.
+    if (/([zZ]|[+\-]\d{2}:?\d{2})$/.test(raw)) {
+      const parsedWithTimezone = new Date(raw);
+      return Number.isNaN(parsedWithTimezone.getTime()) ? null : parsedWithTimezone;
+    }
+
+    const simpleDateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (simpleDateMatch) {
+      const year = Number(simpleDateMatch[1]);
+      const month = Number(simpleDateMatch[2]);
+      const day = Number(simpleDateMatch[3]);
+      return new Date(year, month - 1, day);
+    }
+
+    const dateTimeMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (dateTimeMatch) {
+      const year = Number(dateTimeMatch[1]);
+      const month = Number(dateTimeMatch[2]);
+      const day = Number(dateTimeMatch[3]);
+      const hour = Number(dateTimeMatch[4]);
+      const minute = Number(dateTimeMatch[5]);
+      const second = Number(dateTimeMatch[6] || 0);
+      return new Date(year, month - 1, day, hour, minute, second);
+    }
+
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  function mapSystemClass(status) {
-    if (status === 'ok') return 'is-ok';
-    if (status === 'error') return 'is-error';
-    return 'is-warning';
+  function startOfDay(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
   }
 
-  function renderSystemStatus(payload) {
-    const container = document.getElementById('hubSystemStatus');
-    if (!container) return;
+  function startOfWeek(date) {
+    const base = startOfDay(date);
+    const day = base.getDay();
+    const diff = (day + 6) % 7;
+    base.setDate(base.getDate() - diff);
+    return base;
+  }
 
-    const systems = payload?.systems && typeof payload.systems === 'object'
-      ? payload.systems
-      : {};
+  function startOfMonth(date) {
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+  }
 
-    const keys = ['turso', 'cloudinary', 'vercel', 'github'];
-    container.innerHTML = keys.map(key => {
-      const system = systems[key] || {};
-      const label = mapSystemLabel(key);
-      const status = mapSystemClass(system.status);
-      const message = escapeHtml(system.message || 'Sem informação');
-      return `<span class="home-status-chip ${status}" title="${message}">${label}: ${message}</span>`;
-    }).join('');
+  function addDays(date, days) {
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+    return next;
+  }
+
+  function addMonths(date, months) {
+    return new Date(date.getFullYear(), date.getMonth() + months, 1);
+  }
+
+  function dateKey(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function monthKey(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  }
+
+  function labelForDay(date) {
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  }
+
+  function labelForWeek(date) {
+    return `Sem ${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+  }
+
+  function labelForMonth(date) {
+    return date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+  }
+
+  function normalizeCreatedDate(ficha) {
+    return parseDateTime(ficha?.data_criacao || ficha?.data_inicio || ficha?.data_atualizacao);
+  }
+
+  function buildTrendSeries(fichas, range) {
+    const points = [];
+    const items = Array.isArray(fichas) ? fichas : [];
+    const now = new Date();
+    const today = startOfDay(now);
+
+    if (range === TREND_RANGE_WEEKS) {
+      const weekStarts = [];
+      const currentWeek = startOfWeek(today);
+      for (let i = 6; i >= 0; i -= 1) {
+        weekStarts.push(addDays(currentWeek, -7 * i));
+      }
+
+      const buckets = new Map();
+      weekStarts.forEach(start => buckets.set(dateKey(start), 0));
+
+      items.forEach(ficha => {
+        const rawDate = normalizeCreatedDate(ficha);
+        if (!rawDate) return;
+        const week = startOfWeek(rawDate);
+        const key = dateKey(week);
+        if (!buckets.has(key)) return;
+        buckets.set(key, (buckets.get(key) || 0) + 1);
+      });
+
+      weekStarts.forEach(start => {
+        const key = dateKey(start);
+        points.push({
+          label: labelForWeek(start),
+          value: buckets.get(key) || 0
+        });
+      });
+
+      return {
+        points,
+        summaryLabel: 'últimas semanas'
+      };
+    }
+
+    if (range === TREND_RANGE_MONTHS) {
+      const monthStarts = [];
+      const currentMonth = startOfMonth(today);
+      for (let i = 6; i >= 0; i -= 1) {
+        monthStarts.push(addMonths(currentMonth, -i));
+      }
+
+      const buckets = new Map();
+      monthStarts.forEach(start => buckets.set(monthKey(start), 0));
+
+      items.forEach(ficha => {
+        const rawDate = normalizeCreatedDate(ficha);
+        if (!rawDate) return;
+        const key = monthKey(startOfMonth(rawDate));
+        if (!buckets.has(key)) return;
+        buckets.set(key, (buckets.get(key) || 0) + 1);
+      });
+
+      monthStarts.forEach(start => {
+        const key = monthKey(start);
+        points.push({
+          label: labelForMonth(start),
+          value: buckets.get(key) || 0
+        });
+      });
+
+      return {
+        points,
+        summaryLabel: 'últimos meses'
+      };
+    }
+
+    const dayStarts = [];
+    for (let i = 6; i >= 0; i -= 1) {
+      dayStarts.push(addDays(today, -i));
+    }
+
+    const buckets = new Map();
+    dayStarts.forEach(start => buckets.set(dateKey(start), 0));
+
+    items.forEach(ficha => {
+      const rawDate = normalizeCreatedDate(ficha);
+      if (!rawDate) return;
+      const key = dateKey(startOfDay(rawDate));
+      if (!buckets.has(key)) return;
+      buckets.set(key, (buckets.get(key) || 0) + 1);
+    });
+
+    dayStarts.forEach(start => {
+      const key = dateKey(start);
+      points.push({
+        label: labelForDay(start),
+        value: buckets.get(key) || 0
+      });
+    });
+
+    return {
+      points,
+      summaryLabel: 'últimos 7 dias'
+    };
+  }
+
+  function renderTrendChart(range) {
+    const chartEl = document.getElementById('hubTrendChart');
+    const summaryEl = document.getElementById('hubTrendSummary');
+    if (!chartEl || !summaryEl) return;
+
+    const series = buildTrendSeries(trendSource, range);
+    const points = series.points;
+    if (points.length === 0) {
+      chartEl.innerHTML = '<p class="home-empty">Sem dados para o período.</p>';
+      summaryEl.textContent = '--';
+      return;
+    }
+
+    const width = 640;
+    const height = 190;
+    const top = 12;
+    const right = 12;
+    const bottom = 32;
+    const left = 28;
+    const plotWidth = width - left - right;
+    const plotHeight = height - top - bottom;
+    const maxValue = Math.max(1, ...points.map(point => point.value));
+    const stepX = points.length > 1 ? plotWidth / (points.length - 1) : plotWidth;
+
+    const toY = (value) => top + plotHeight - (value / maxValue) * plotHeight;
+    const toX = (index) => left + (index * stepX);
+
+    const path = points
+      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${toX(index).toFixed(2)} ${toY(point.value).toFixed(2)}`)
+      .join(' ');
+
+    const guides = [0, 0.33, 0.66, 1]
+      .map(ratio => {
+        const y = top + plotHeight - (ratio * plotHeight);
+        return `<line class="home-trend-grid" x1="${left}" y1="${y.toFixed(2)}" x2="${(width - right).toFixed(2)}" y2="${y.toFixed(2)}"></line>`;
+      })
+      .join('');
+
+    const pointsSvg = points
+      .map((point, index) => {
+        const x = toX(index).toFixed(2);
+        const y = toY(point.value).toFixed(2);
+        return `<circle class="home-trend-point" cx="${x}" cy="${y}" r="3.5" data-label="${escapeHtml(point.label)}" data-value="${point.value}"></circle>`;
+      })
+      .join('');
+
+    const labelsSvg = points
+      .map((point, index) => {
+        const x = toX(index).toFixed(2);
+        return `<text class="home-trend-label" x="${x}" y="${height - 10}" text-anchor="middle">${escapeHtml(point.label)}</text>`;
+      })
+      .join('');
+
+    chartEl.innerHTML = `
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Gráfico de fichas criadas">
+        ${guides}
+        <line class="home-trend-axis" x1="${left}" y1="${(top + plotHeight).toFixed(2)}" x2="${(width - right).toFixed(2)}" y2="${(top + plotHeight).toFixed(2)}"></line>
+        <path class="home-trend-line" d="${path}"></path>
+        ${pointsSvg}
+        ${labelsSvg}
+      </svg>
+      <div class="home-trend-tooltip" id="hubTrendTooltip"></div>
+    `;
+
+    bindTrendTooltip(chartEl);
+
+    const total = points.reduce((sum, point) => sum + point.value, 0);
+    const media = total / points.length;
+    summaryEl.textContent = `Total (${series.summaryLabel}): ${total} fichas • Média: ${media.toFixed(1).replace('.', ',')} por período`;
+  }
+
+  function bindTrendTooltip(chartEl) {
+    if (!chartEl) return;
+    const svg = chartEl.querySelector('svg');
+    const tooltip = chartEl.querySelector('#hubTrendTooltip');
+    if (!svg || !tooltip) return;
+
+    const hideTooltip = () => {
+      tooltip.classList.remove('is-visible');
+    };
+
+    const showTooltip = (event) => {
+      const target = event.target instanceof Element
+        ? event.target.closest('.home-trend-point')
+        : null;
+      if (!target) {
+        hideTooltip();
+        return;
+      }
+
+      const label = target.getAttribute('data-label') || '--';
+      const value = target.getAttribute('data-value') || '0';
+      tooltip.textContent = `${label}: ${value} ficha(s)`;
+      tooltip.classList.add('is-visible');
+
+      const chartRect = chartEl.getBoundingClientRect();
+      const pointRect = target.getBoundingClientRect();
+      const x = pointRect.left + (pointRect.width / 2) - chartRect.left;
+      const y = pointRect.top - chartRect.top;
+      tooltip.style.left = `${x}px`;
+      tooltip.style.top = `${y}px`;
+    };
+
+    svg.addEventListener('mousemove', showTooltip);
+    svg.addEventListener('mouseleave', hideTooltip);
+  }
+
+  function updateTrendRange(nextRange) {
+    trendRange = [TREND_RANGE_DAYS, TREND_RANGE_WEEKS, TREND_RANGE_MONTHS].includes(nextRange)
+      ? nextRange
+      : TREND_RANGE_DAYS;
+
+    const buttons = document.querySelectorAll('#hubTrendFilters .home-trend-filter');
+    buttons.forEach(button => {
+      const isActive = button.getAttribute('data-range') === trendRange;
+      button.classList.toggle('is-active', isActive);
+    });
+
+    renderTrendChart(trendRange);
+  }
+
+  function initTrendFilters() {
+    const filterWrap = document.getElementById('hubTrendFilters');
+    if (!filterWrap) return;
+    filterWrap.addEventListener('click', (event) => {
+      const target = event.target instanceof Element
+        ? event.target.closest('.home-trend-filter[data-range]')
+        : null;
+      if (!target) return;
+      updateTrendRange(target.getAttribute('data-range') || TREND_RANGE_DAYS);
+    });
   }
 
   function renderUpcoming(fichas) {
@@ -302,9 +651,9 @@
   async function loadHubData() {
     setText('hubLastUpdate', 'Atualizando...');
 
-    const [statsRes, systemsRes, pendentesRes] = await Promise.allSettled([
+    const [statsRes, fichasRes, pendentesRes] = await Promise.allSettled([
       fetchJson('/api/estatisticas'),
-      fetchJson('/api/system-status'),
+      fetchJson('/api/fichas'),
       fetchJson('/api/fichas?status=pendente')
     ]);
 
@@ -312,11 +661,10 @@
       setStats(statsRes.value);
     }
 
-    if (systemsRes.status === 'fulfilled') {
-      renderSystemStatus(systemsRes.value);
-    } else {
-      renderSystemStatus({});
-    }
+    trendSource = fichasRes.status === 'fulfilled' && Array.isArray(fichasRes.value)
+      ? fichasRes.value
+      : [];
+    renderTrendChart(trendRange);
 
     if (pendentesRes.status === 'fulfilled') {
       renderUpcoming(pendentesRes.value);
@@ -333,6 +681,8 @@
 
   function init() {
     initPreviewModal();
+    initTrendFilters();
+    updateTrendRange(TREND_RANGE_DAYS);
     window.addEventListener('message', onPreviewFrameMessage);
     document.addEventListener('keydown', onDocumentKeyDown);
 
@@ -352,7 +702,8 @@
 
     loadHubData().catch(() => {
       setText('hubLastUpdate', 'Falha ao carregar');
-      renderSystemStatus({});
+      trendSource = [];
+      renderTrendChart(trendRange);
       renderUpcoming([]);
     });
 

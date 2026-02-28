@@ -5,8 +5,8 @@
 (function () {
   'use strict';
 
-  let fichasCache = [];
-  let fichasFiltradas = [];
+  let fichasPaginaAtual = [];
+  let totalResultados = 0;
   let fichaParaDeletar = null;
   let modalVisualizacao = null;
   let iframeVisualizacao = null;
@@ -26,6 +26,7 @@
   const DUPLICACAO_DRAFT_STORAGE_KEY = 'ficha_duplicada_draft_v1';
   let paginaAtual = 1;
   const itensPorPagina = 10;
+  let ultimoRequestId = 0;
   let carregamentoEstatisticasAtivo = 0;
   const IDS_ESTATISTICAS = ['statTotalFichas', 'statPendentes', 'statClientes', 'statEsteMes'];
   const PERSONALIZACAO_LABELS = Object.freeze({
@@ -49,9 +50,9 @@
       await db.init();
       criarPaginacao();
       initEventListeners(); // CORREÇÃO: Inicializar listeners ANTES de carregar dados
-      await carregarFichas();
-      await atualizarEstatisticas();
       verificarParametrosURL();
+      await carregarFichas({ resetPage: true });
+      await atualizarEstatisticas();
     } catch (error) {
       console.error('Erro ao inicializar dashboard:', error);
       mostrarErro('Erro ao carregar dados do servidor');
@@ -130,7 +131,6 @@
       const searchInput = document.getElementById('searchInput');
       if (searchInput) {
         searchInput.value = clienteFiltro;
-        aplicarFiltros();
       }
     }
   }
@@ -164,18 +164,41 @@
     container.appendChild(btnNext);
   }
 
-  function mudarPagina(direcao) {
-    const totalPaginas = Math.ceil(fichasFiltradas.length / itensPorPagina);
-    const novaPagina = paginaAtual + direcao;
+  function obterStatusFiltroAtivo() {
+    const btnAtivo = document.querySelector('.status-filter .btn.active');
+    const filtroStatusAtivo = btnAtivo ? btnAtivo.id : 'btnFiltroTodos';
+    if (filtroStatusAtivo === 'btnFiltroPendentes') return { status: 'pendente' };
+    if (filtroStatusAtivo === 'btnFiltroEntregues') return { status: 'entregue' };
+    if (filtroStatusAtivo === 'btnFiltroEvento') return { evento: 'sim' };
+    return {};
+  }
 
+  function obterFiltrosDaTela() {
+    const searchInput = document.getElementById('searchInput');
+    const filterDataInicio = document.getElementById('filterDataInicio');
+    const filterDataFim = document.getElementById('filterDataFim');
+    const termo = String(searchInput?.value || '').trim();
+    const dataInicio = String(filterDataInicio?.value || '').trim();
+    const dataFim = String(filterDataFim?.value || '').trim();
+    return {
+      termo: termo || undefined,
+      dataInicio: dataInicio || undefined,
+      dataFim: dataFim || undefined,
+      ...obterStatusFiltroAtivo()
+    };
+  }
+
+  async function mudarPagina(direcao) {
+    const totalPaginas = Math.max(1, Math.ceil(totalResultados / itensPorPagina));
+    const novaPagina = paginaAtual + direcao;
     if (novaPagina >= 1 && novaPagina <= totalPaginas) {
       paginaAtual = novaPagina;
-      renderizarPagina();
+      await carregarFichas();
     }
   }
 
   function atualizarPaginacao() {
-    const totalPaginas = Math.ceil(fichasFiltradas.length / itensPorPagina) || 1;
+    const totalPaginas = Math.max(1, Math.ceil(totalResultados / itensPorPagina));
     const container = document.getElementById('pagination');
     const pageInfo = document.getElementById('pageInfo');
     const btnPrev = document.getElementById('btnPrevPage');
@@ -201,26 +224,37 @@
   }
 
   function renderizarPagina() {
-    const startIdx = (paginaAtual - 1) * itensPorPagina;
-    const endIdx = startIdx + itensPorPagina;
-    const fichasPagina = fichasFiltradas.slice(startIdx, endIdx);
-
-    renderizarFichas(fichasPagina);
+    renderizarFichas(fichasPaginaAtual);
     atualizarPaginacao();
   }
 
   // Fichas
 
-  async function carregarFichas() {
+  async function carregarFichas({ resetPage = false } = {}) {
+    if (resetPage) paginaAtual = 1;
+    const requestId = ++ultimoRequestId;
     renderizarLoadingFichas();
     try {
-      fichasCache = await db.listarFichas();
-      fichasFiltradas = [...fichasCache];
-      paginaAtual = 1;
+      const filtros = obterFiltrosDaTela();
+      const resultado = await db.listarFichasPaginado({
+        page: paginaAtual,
+        pageSize: itensPorPagina,
+        resumido: true,
+        ...filtros
+      });
+
+      if (requestId !== ultimoRequestId) return;
+
+      fichasPaginaAtual = Array.isArray(resultado.items) ? resultado.items : [];
+      totalResultados = Number(resultado.total) || 0;
+      paginaAtual = Number(resultado.page) || paginaAtual;
       renderizarPagina();
     } catch (error) {
+      if (requestId !== ultimoRequestId) return;
       console.error('Erro ao carregar fichas:', error);
       mostrarErro('Erro ao carregar fichas');
+      fichasPaginaAtual = [];
+      totalResultados = 0;
       const container = document.getElementById('fichasContainer');
       if (container) container.innerHTML = '';
     }
@@ -272,7 +306,7 @@
 
     if (!container) return;
 
-    const totalFiltrado = fichasFiltradas.length;
+    const totalFiltrado = totalResultados;
     if (resultadosCount) {
       resultadosCount.textContent = `${totalFiltrado} ${totalFiltrado === 1 ? 'resultado' : 'resultados'}`;
     }
@@ -437,60 +471,8 @@
 
   // Filtros
 
-  function aplicarFiltros() {
-    const searchInput = document.getElementById('searchInput');
-    const filterDataInicio = document.getElementById('filterDataInicio');
-    const filterDataFim = document.getElementById('filterDataFim');
-
-    const searchTerm = searchInput ? normalizarTextoBusca(searchInput.value) : '';
-    const dataInicio = filterDataInicio ? filterDataInicio.value : '';
-    const dataFim = filterDataFim ? filterDataFim.value : '';
-    
-    // CORREÇÃO: Verificar se o elemento existe antes de acessar .id
-    const btnAtivo = document.querySelector('.status-filter .btn.active');
-    const filtroStatusAtivo = btnAtivo ? btnAtivo.id : 'btnFiltroTodos';
-
-    fichasFiltradas = fichasCache.filter(ficha => {
-      // Filtro de busca por texto
-      if (searchTerm) {
-        const cliente = normalizarTextoBusca(ficha.cliente);
-        const numeroVenda = normalizarTextoBusca(ficha.numero_venda);
-        const vendedor = normalizarTextoBusca(ficha.vendedor);
-
-        if (!cliente.includes(searchTerm) &&
-          !numeroVenda.includes(searchTerm) &&
-          !vendedor.includes(searchTerm)) {
-          return false;
-        }
-      }
-
-      // Filtro de data inicial
-      if (dataInicio && ficha.data_inicio) {
-        if (ficha.data_inicio < dataInicio) return false;
-      }
-
-      // Filtro de data final
-      if (dataFim && ficha.data_inicio) {
-        if (ficha.data_inicio > dataFim) return false;
-      }
-
-      // Filtro de status
-      switch (filtroStatusAtivo) {
-        case 'btnFiltroTodos':
-          return true;
-        case 'btnFiltroPendentes':
-          return ficha.status === 'pendente';
-        case 'btnFiltroEntregues':
-          return ficha.status !== 'pendente';
-        case 'btnFiltroEvento':
-          return ficha.evento === 'sim';
-        default:
-          return true;
-      }
-    });
-
-    paginaAtual = 1;
-    renderizarPagina();
+  async function aplicarFiltros() {
+    await carregarFichas({ resetPage: true });
   }
 
   function limparFiltros() {
@@ -510,9 +492,8 @@
 
     window.history.replaceState({}, '', window.location.pathname);
 
-    fichasFiltradas = [...fichasCache];
     paginaAtual = 1;
-    renderizarPagina();
+    carregarFichas({ resetPage: true });
   }
 
   // Estatísticas
@@ -954,6 +935,10 @@
         throw new Error('Falha ao salvar rascunho da duplicacao');
       }
 
+      if (window.SystemLog && typeof window.SystemLog.track === 'function') {
+        window.SystemLog.track('ficha_duplicada', 'Ficha duplicada', Number(fichaVisualizadaId) || null, { origem: 'dashboard_modal' });
+      }
+
       window.location.href = 'ficha.html?duplicar=1';
     } catch (error) {
       console.error('Erro ao duplicar ficha pelo modal:', error);
@@ -978,7 +963,6 @@
     try {
       await db.marcarComoEntregue(id);
       await carregarFichas();
-      aplicarFiltros();
       await atualizarEstatisticas();
       mostrarSucesso('Pedido marcado como entregue!');
     } catch (error) {
@@ -1005,7 +989,6 @@
     try {
       await db.deletarFicha(fichaParaDeletar);
       await carregarFichas();
-      aplicarFiltros();
       await atualizarEstatisticas();
       fecharModalDelete();
       mostrarSucesso('Ficha excluída com sucesso!');
@@ -1022,7 +1005,6 @@
     try {
       await db.marcarComoPendente(id);
       await carregarFichas();
-      aplicarFiltros();
       await atualizarEstatisticas();
       mostrarSucesso('Pedido desmarcado como entregue!');
     } catch (error) {
@@ -1128,11 +1110,19 @@
     if (typeof value !== 'string') return '';
     const texto = value.trim().replace(/\s+/g, ' ');
     if (!texto) return '';
+    const originalWords = texto.split(' ');
+    const preserveUppercaseIndexes = new Set();
+    if (originalWords.length > 1) {
+      if (/^[A-ZÀ-Ý]{1,4}$/.test(originalWords[0])) preserveUppercaseIndexes.add(0);
+      const lastIndex = originalWords.length - 1;
+      if (/^[A-ZÀ-Ý]{1,4}$/.test(originalWords[lastIndex])) preserveUppercaseIndexes.add(lastIndex);
+    }
 
     return texto
       .toLowerCase()
       .split(' ')
       .map((palavra, index) => {
+        if (preserveUppercaseIndexes.has(index)) return palavra.toUpperCase();
         return palavra
           .split(/([-/])/)
           .map(parte => {
@@ -1226,10 +1216,4 @@
     return Number.isNaN(id) || id <= 0 ? null : botao;
   }
 })();
-
-
-
-
-
-
 
