@@ -2102,6 +2102,94 @@
     });
   }
 
+  function injetarEstilosToastImpressao() {
+    if (document.getElementById('toast-impressao-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'toast-impressao-styles';
+    style.textContent = `
+      .toast-impressao-preparo {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.95);
+        color: #fff;
+        font-size: 13px;
+        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.35);
+        opacity: 0;
+        transform: translateX(-50%) translateY(100%);
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        pointer-events: none;
+        max-width: 90vw;
+      }
+
+      .toast-impressao-preparo.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      .toast-impressao-preparo i {
+        font-size: 14px;
+      }
+
+      @media (max-width: 480px) {
+        .toast-impressao-preparo {
+          left: 16px;
+          right: 16px;
+          bottom: 16px;
+          transform: translateX(0) translateY(100%);
+          max-width: none;
+          justify-content: center;
+        }
+
+        .toast-impressao-preparo.show {
+          transform: translateX(0) translateY(0);
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  function mostrarToastPreparandoImpressao(texto = 'Preparando impressão...') {
+    injetarEstilosToastImpressao();
+
+    let toast = document.getElementById('toast-impressao-preparo');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'toast-impressao-preparo';
+      toast.className = 'toast-impressao-preparo';
+      toast.innerHTML = `
+        <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+        <span></span>
+      `;
+      document.body.appendChild(toast);
+    }
+
+    const textoEl = toast.querySelector('span');
+    if (textoEl) textoEl.textContent = texto;
+
+    requestAnimationFrame(() => toast.classList.add('show'));
+  }
+
+  function esconderToastPreparandoImpressao() {
+    const toast = document.getElementById('toast-impressao-preparo');
+    if (!toast) return;
+
+    toast.classList.remove('show');
+    setTimeout(() => {
+      if (!toast.classList.contains('show')) {
+        toast.remove();
+      }
+    }, 220);
+  }
+
   function initPrint() {
     const btn = document.getElementById('btnImprimir');
     btn?.addEventListener('click', () => {
@@ -2128,21 +2216,541 @@
     return (mm * 96) / 25.4;
   }
 
-  function aplicarModoCompactoSeNecessario() {
-    const printV = document.getElementById('print-version');
-    if (!printV) return;
+  const A4_WIDTH_MM = 210;
+  const A4_HEIGHT_MM = 297;
+  const PRINT_MARGIN_MM = 6;
+  const HTML2CANVAS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  const JSPDF_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  const HTML2CANVAS_LOCAL = 'js/html2canvas.min.js';
+  const JSPDF_LOCAL = 'js/jspdf.umd.min.js';
 
-    const alturaMaxA4Px = mmToPx(297 - (6 * 2)) - 1;
+  // Tunables for PDF-print generation (quality x speed x fit behavior).
+  const PRINT_API_CONFIG = {
+    expandImagesSectionToFillHeight: true,
+    canvasScale: {
+      base: 2.4,
+      smallAreaBoost: 2.8,
+      largeAreaBase: 2.1,
+      min: 1.6,
+      max: 3.1,
+      areaSmallPx: 900000,
+      areaLargePx: 1600000
+    }
+  };
 
-    printV.classList.remove('print-compact');
-    if (printV.scrollHeight <= alturaMaxA4Px) return;
+  let carregamentoHtml2Canvas = null;
+  let carregamentoJsPdf = null;
 
-    printV.classList.add('print-compact');
+  function carregarScriptUmaVez(src, testePronto) {
+    if (typeof testePronto === 'function' && testePronto()) {
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve, reject) => {
+      const scriptExistente = Array.from(document.scripts).find(script => script.src === src);
+      const validar = () => {
+        if (typeof testePronto !== 'function' || testePronto()) {
+          resolve();
+          return;
+        }
+        reject(new Error(`Script carregado sem expor API esperada: ${src}`));
+      };
+
+      if (scriptExistente) {
+        if (typeof testePronto === 'function' && testePronto()) {
+          resolve();
+          return;
+        }
+        scriptExistente.addEventListener('load', validar, { once: true });
+        scriptExistente.addEventListener('error', () => reject(new Error(`Falha ao carregar script: ${src}`)), { once: true });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.addEventListener('load', validar, { once: true });
+      script.addEventListener('error', () => reject(new Error(`Falha ao carregar script: ${src}`)), { once: true });
+      document.head.appendChild(script);
+    });
   }
 
-  function aplicarAjusteAlturaImagensPorObservacoes() {
-    const printV = document.getElementById('print-version');
-    const observacoesEl = document.getElementById('print-observacoes');
+  async function carregarScriptComFallback(cdnSrc, localSrc, testePronto, nomeLib) {
+    try {
+      await carregarScriptUmaVez(cdnSrc, testePronto);
+      return;
+    } catch (erroCdn) {
+      console.warn(`${nomeLib}: falha ao carregar via CDN, tentando fallback local.`, erroCdn);
+      try {
+        await carregarScriptUmaVez(localSrc, testePronto);
+      } catch (erroLocal) {
+        throw new Error(`${nomeLib}: falha no CDN e no fallback local.`);
+      }
+    }
+  }
+
+  async function garantirBibliotecasPdf() {
+    if (!carregamentoHtml2Canvas) {
+      carregamentoHtml2Canvas = carregarScriptComFallback(
+        HTML2CANVAS_CDN,
+        HTML2CANVAS_LOCAL,
+        () => typeof window.html2canvas === 'function',
+        'html2canvas'
+      );
+    }
+    await carregamentoHtml2Canvas;
+
+    if (!carregamentoJsPdf) {
+      carregamentoJsPdf = carregarScriptComFallback(
+        JSPDF_CDN,
+        JSPDF_LOCAL,
+        () => !!window.jspdf?.jsPDF,
+        'jsPDF'
+      );
+    }
+    await carregamentoJsPdf;
+  }
+
+  function obterAreaUtilA4Px() {
+    return {
+      largura: mmToPx(A4_WIDTH_MM - (PRINT_MARGIN_MM * 2)),
+      altura: mmToPx(A4_HEIGHT_MM - (PRINT_MARGIN_MM * 2))
+    };
+  }
+
+  function ajustarSecaoImagensParaPreencherAltura(printV, alturaAlvoPx) {
+    const imagesSection = printV.querySelector('#print-imagesSection');
+    if (!imagesSection) return () => {};
+    if (window.getComputedStyle(imagesSection).display === 'none') return () => {};
+    if (!PRINT_API_CONFIG.expandImagesSectionToFillHeight) return () => {};
+
+    const minHeightAnterior = imagesSection.style.minHeight;
+    imagesSection.style.minHeight = '';
+
+    const sobra = Math.floor(alturaAlvoPx - printV.scrollHeight);
+    if (sobra > 0) {
+      const alturaAtual = imagesSection.getBoundingClientRect().height;
+      imagesSection.style.minHeight = `${Math.max(alturaAtual + sobra, alturaAtual)}px`;
+    }
+
+    return () => {
+      if (minHeightAnterior) {
+        imagesSection.style.minHeight = minHeightAnterior;
+      } else {
+        imagesSection.style.removeProperty('min-height');
+      }
+    };
+  }
+
+  function slugNomeArquivo(valor) {
+    return String(valor || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase();
+  }
+
+  function montarNomeArquivoFichaPdf() {
+    const numeroVenda = slugNomeArquivo(document.getElementById('numeroVenda')?.value || '');
+    const cliente = slugNomeArquivo(document.getElementById('cliente')?.value || '');
+    const base = [numeroVenda, cliente].filter(Boolean).join('-') || 'ficha-tecnica';
+    const data = new Date().toISOString().slice(0, 10);
+    return `${base}-${data}.pdf`;
+  }
+
+  async function aguardarEstilosDocumento(doc, timeoutMs = 3500) {
+    if (!doc) return;
+
+    const links = Array.from(doc.querySelectorAll('link[rel="stylesheet"]'));
+    if (links.length === 0) return;
+
+    const promessas = links.map(link => {
+      if (link.sheet) return Promise.resolve();
+      return new Promise(resolve => {
+        const done = () => resolve();
+        link.addEventListener('load', done, { once: true });
+        link.addEventListener('error', done, { once: true });
+      });
+    });
+
+    await Promise.race([
+      Promise.all(promessas),
+      new Promise(resolve => setTimeout(resolve, timeoutMs))
+    ]);
+  }
+
+  function criarSandboxImpressaoIframe(printV) {
+    if (!printV) {
+      throw new Error('Elemento de impressão não encontrado para sandbox');
+    }
+
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.position = 'fixed';
+    iframe.style.left = '-10000px';
+    iframe.style.top = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument;
+    if (!doc) {
+      iframe.remove();
+      throw new Error('Não foi possível inicializar iframe de sandbox');
+    }
+
+    const baseHref = window.location.href.replace(/[^/]*$/, '');
+    doc.open();
+    doc.write(`<!doctype html><html><head><meta charset="utf-8"><base href="${baseHref}"></head><body class="pdf-export-impressao"></body></html>`);
+    doc.close();
+
+    const temaAtual = document.documentElement.getAttribute('data-theme');
+    if (temaAtual) {
+      doc.documentElement.setAttribute('data-theme', temaAtual);
+    }
+
+    const head = doc.head;
+    document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
+      const clone = doc.createElement('link');
+      clone.rel = 'stylesheet';
+      clone.href = link.href;
+      head.appendChild(clone);
+    });
+
+    document.querySelectorAll('style').forEach(styleEl => {
+      const clone = doc.createElement('style');
+      clone.textContent = styleEl.textContent || '';
+      head.appendChild(clone);
+    });
+
+    const regrasBase = doc.createElement('style');
+    regrasBase.textContent = `
+      html, body { margin: 0; padding: 0; background: #fff; }
+      #normal-version { display: none !important; }
+      #print-version { display: block !important; }
+    `;
+    head.appendChild(regrasBase);
+
+    const printClone = printV.cloneNode(true);
+    printClone.style.display = 'block';
+    doc.body.appendChild(printClone);
+
+    return {
+      iframe,
+      doc,
+      printClone,
+      cleanup: () => {
+        try {
+          iframe.remove();
+        } catch (_) { }
+      }
+    };
+  }
+
+  function abrirImpressaoPdfSemDownload(pdf, opcoes = {}) {
+    if (!pdf || typeof pdf.output !== 'function') {
+      return Promise.reject(new Error('Instância de PDF inválida para impressão'));
+    }
+
+    if (typeof pdf.autoPrint === 'function') {
+      pdf.autoPrint();
+    }
+
+    const blob = pdf.output('blob');
+    const blobUrl = URL.createObjectURL(blob);
+
+    return new Promise((resolve, reject) => {
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.style.opacity = '0';
+      iframe.style.pointerEvents = 'none';
+
+      let finalizado = false;
+      let frameWindow = null;
+      let timeoutCarregamentoId = null;
+      let timeoutFallbackFechamentoId = null;
+      let timeoutDisparoPrintId = null;
+      let printDisparadoEm = 0;
+      let houveBlurAposPrint = false;
+
+      const aoBlurJanela = () => {
+        if (!printDisparadoEm || finalizado) return;
+        houveBlurAposPrint = true;
+      };
+
+      const aoFocusJanela = () => {
+        if (!printDisparadoEm || !houveBlurAposPrint || finalizado) return;
+        setTimeout(() => finalizar(), 250);
+      };
+
+      const aoAfterPrint = () => {
+        if (finalizado) return;
+        if (!printDisparadoEm) return;
+        const tempoDesdeDisparo = Date.now() - printDisparadoEm;
+        // Alguns navegadores disparam afterprint cedo demais ao carregar PDF.
+        if (tempoDesdeDisparo < 800 && !houveBlurAposPrint) return;
+        finalizar();
+      };
+
+      const removerEscutas = () => {
+        window.removeEventListener('blur', aoBlurJanela, true);
+        window.removeEventListener('focus', aoFocusJanela, true);
+        if (!frameWindow) return;
+
+        try {
+          frameWindow.removeEventListener('afterprint', aoAfterPrint);
+        } catch (_) { }
+        try {
+          frameWindow.onafterprint = null;
+        } catch (_) { }
+      };
+
+      const finalizar = (erro = null) => {
+        if (finalizado) return;
+        finalizado = true;
+        if (timeoutCarregamentoId) clearTimeout(timeoutCarregamentoId);
+        if (timeoutFallbackFechamentoId) clearTimeout(timeoutFallbackFechamentoId);
+        if (timeoutDisparoPrintId) clearTimeout(timeoutDisparoPrintId);
+        removerEscutas();
+        try {
+          iframe.remove();
+        } catch (_) { }
+        try {
+          URL.revokeObjectURL(blobUrl);
+        } catch (_) { }
+
+        if (erro) {
+          reject(erro);
+          return;
+        }
+        resolve();
+      };
+
+      timeoutCarregamentoId = setTimeout(() => {
+        finalizar(new Error('Timeout ao carregar PDF para impressão em iframe'));
+      }, 7000);
+
+      iframe.addEventListener('load', () => {
+        if (timeoutCarregamentoId) {
+          clearTimeout(timeoutCarregamentoId);
+          timeoutCarregamentoId = null;
+        }
+
+        frameWindow = iframe.contentWindow;
+        if (!frameWindow) {
+          finalizar(new Error('Não foi possível acessar o iframe de impressão'));
+          return;
+        }
+
+        try {
+          frameWindow.addEventListener('afterprint', aoAfterPrint);
+        } catch (_) { }
+        try {
+          frameWindow.onafterprint = aoAfterPrint;
+        } catch (_) { }
+        window.addEventListener('blur', aoBlurJanela, true);
+        window.addEventListener('focus', aoFocusJanela, true);
+
+        timeoutDisparoPrintId = setTimeout(() => {
+          try {
+            frameWindow.focus();
+            printDisparadoEm = Date.now();
+            if (typeof opcoes.onPrintStart === 'function') {
+              try {
+                opcoes.onPrintStart();
+              } catch (_) { }
+            }
+            frameWindow.print();
+            timeoutFallbackFechamentoId = setTimeout(() => {
+              finalizar();
+            }, 120000);
+          } catch (erroPrint) {
+            const erro = erroPrint instanceof Error
+              ? erroPrint
+              : new Error('Falha ao acionar impressão do PDF no iframe');
+            finalizar(erro);
+          }
+        }, 120);
+      }, { once: true });
+
+      try {
+        document.body.appendChild(iframe);
+        iframe.src = blobUrl;
+      } catch (erroAppend) {
+        if (timeoutCarregamentoId) clearTimeout(timeoutCarregamentoId);
+        const erro = erroAppend instanceof Error
+          ? erroAppend
+          : new Error('Falha ao preparar iframe de impressão');
+        finalizar(erro);
+      }
+    });
+  }
+
+  async function gerarPdfImpressaoApi(printV, opcoes = {}) {
+    if (!printV) throw new Error('Elemento de impressão não encontrado');
+    await garantirBibliotecasPdf();
+
+    let sandbox = null;
+    let restaurarAlturaImagens = () => {};
+    let printRenderEl = null;
+
+    try {
+      sandbox = criarSandboxImpressaoIframe(printV);
+      printRenderEl = sandbox.printClone;
+      await aguardarEstilosDocumento(sandbox.doc);
+
+      const areaA4Px = obterAreaUtilA4Px();
+      const larguraA4Px = Math.max(1, Math.ceil(areaA4Px.largura));
+      const alturaA4Px = Math.max(1, Math.ceil(areaA4Px.altura));
+      sandbox.iframe.style.width = `${larguraA4Px}px`;
+      sandbox.iframe.style.height = `${alturaA4Px}px`;
+
+      const estilosAnteriores = {
+        width: printRenderEl.style.width,
+        margin: printRenderEl.style.margin,
+        padding: printRenderEl.style.padding,
+        height: printRenderEl.style.height,
+        minHeight: printRenderEl.style.minHeight,
+        maxHeight: printRenderEl.style.maxHeight,
+        overflow: printRenderEl.style.overflow
+      };
+
+      printRenderEl.style.margin = '0 auto';
+      printRenderEl.style.padding = '0';
+      printRenderEl.style.height = 'auto';
+      printRenderEl.style.minHeight = '0';
+      printRenderEl.style.maxHeight = 'none';
+      printRenderEl.style.overflow = 'visible';
+
+      aplicarAjusteAlturaImagensPorObservacoesNoContainer(printRenderEl);
+      await aguardarImagensDaImpressao(2000, printRenderEl);
+      const alturaAntesCapturaPx = Math.max(
+        1,
+        Math.ceil(printRenderEl.scrollHeight || printRenderEl.getBoundingClientRect().height || alturaA4Px)
+      );
+      if (alturaAntesCapturaPx > alturaA4Px) {
+        printRenderEl.style.width = '100%';
+      } else {
+        printRenderEl.style.removeProperty('width');
+      }
+      restaurarAlturaImagens = ajustarSecaoImagensParaPreencherAltura(printRenderEl, areaA4Px.altura);
+      const larguraCapturaPx = Math.max(
+        1,
+        Math.ceil(printRenderEl.scrollWidth || printRenderEl.getBoundingClientRect().width || larguraA4Px)
+      );
+      const alturaCapturaPx = Math.max(
+        1,
+        Math.ceil(printRenderEl.scrollHeight || printRenderEl.getBoundingClientRect().height || alturaA4Px)
+      );
+
+      const areaTotalPx = Math.max(1, Math.ceil(larguraCapturaPx * alturaCapturaPx));
+      const memoriaDispositivo = Number(window.navigator?.deviceMemory || 0);
+      let escalaBase = PRINT_API_CONFIG.canvasScale.base;
+      if (areaTotalPx < PRINT_API_CONFIG.canvasScale.areaSmallPx) {
+        escalaBase = PRINT_API_CONFIG.canvasScale.smallAreaBoost;
+      }
+      if (areaTotalPx > PRINT_API_CONFIG.canvasScale.areaLargePx) {
+        escalaBase = PRINT_API_CONFIG.canvasScale.largeAreaBase;
+      }
+      if (memoriaDispositivo >= 8) escalaBase += 0.2;
+      if (memoriaDispositivo > 0 && memoriaDispositivo <= 4) escalaBase -= 0.2;
+      escalaBase = Math.min(
+        PRINT_API_CONFIG.canvasScale.max,
+        Math.max(PRINT_API_CONFIG.canvasScale.min, escalaBase)
+      );
+
+      const escalasTentativa = Array.from(new Set([
+        escalaBase,
+        Math.max(1.8, escalaBase - 0.45),
+        1.6
+      ]));
+      let canvas = null;
+      let ultimoErroCanvas = null;
+
+      for (const escalaCanvas of escalasTentativa) {
+        try {
+          canvas = await window.html2canvas(printRenderEl, {
+            scale: escalaCanvas,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+            scrollX: 0,
+            scrollY: 0,
+            width: larguraCapturaPx,
+            height: alturaCapturaPx,
+            windowWidth: larguraCapturaPx,
+            windowHeight: alturaCapturaPx
+          });
+          break;
+        } catch (erroCanvas) {
+          ultimoErroCanvas = erroCanvas;
+        }
+      }
+
+      if (!canvas) {
+        throw (ultimoErroCanvas || new Error('Falha ao renderizar canvas para PDF'));
+      }
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const contentWidth = pageWidth - (PRINT_MARGIN_MM * 2);
+      const contentHeight = pageHeight - (PRINT_MARGIN_MM * 2);
+      const pxToMm = 25.4 / 96;
+      let renderWidth = larguraCapturaPx * pxToMm;
+      let renderHeight = alturaCapturaPx * pxToMm;
+      const fitScale = Math.min(contentWidth / renderWidth, contentHeight / renderHeight, 1);
+      renderWidth *= fitScale;
+      renderHeight *= fitScale;
+
+      const offsetX = (pageWidth - renderWidth) / 2;
+      const offsetY = PRINT_MARGIN_MM + ((contentHeight - renderHeight) / 2);
+
+      pdf.addImage(
+        canvas.toDataURL('image/jpeg', 0.9),
+        'JPEG',
+        offsetX,
+        offsetY,
+        renderWidth,
+        renderHeight,
+        undefined,
+        'FAST'
+      );
+      await abrirImpressaoPdfSemDownload(pdf, opcoes);
+
+      printRenderEl.style.width = estilosAnteriores.width;
+      printRenderEl.style.margin = estilosAnteriores.margin;
+      printRenderEl.style.padding = estilosAnteriores.padding;
+      printRenderEl.style.height = estilosAnteriores.height;
+      printRenderEl.style.minHeight = estilosAnteriores.minHeight;
+      printRenderEl.style.maxHeight = estilosAnteriores.maxHeight;
+      printRenderEl.style.overflow = estilosAnteriores.overflow;
+    } finally {
+      restaurarAlturaImagens();
+      if (sandbox) sandbox.cleanup();
+    }
+  }
+
+  function aplicarAjusteAlturaImagensPorObservacoesNoContainer(printV) {
+    const observacoesEl = printV?.querySelector('#print-observacoes');
     if (!printV || !observacoesEl) return;
 
     const textoVisivel = String(observacoesEl.textContent || '').trim();
@@ -2164,8 +2772,14 @@
     printV.style.setProperty('--obs-extra-lines', String(linhasExtras));
   }
 
-  async function aguardarImagensDaImpressao(timeoutMs = 1500) {
+  function aplicarAjusteAlturaImagensPorObservacoes() {
     const printV = document.getElementById('print-version');
+    if (!printV) return;
+    aplicarAjusteAlturaImagensPorObservacoesNoContainer(printV);
+  }
+
+  async function aguardarImagensDaImpressao(timeoutMs = 1500, raiz = null) {
+    const printV = raiz || document.getElementById('print-version');
     if (!printV) return;
 
     const imagensPrint = Array.from(printV.querySelectorAll('img'));
@@ -2601,25 +3215,18 @@
     const resumoProdutosPrintEl = document.getElementById('print-totalProdutosPorTipo');
     if (resumoProdutosPrintEl) {
       resumoProdutosPrintEl.innerHTML = '';
-      Array.from(totaisPorProdutoImpressao.values())
+      const itensResumoProdutos = Array.from(totaisPorProdutoImpressao.values())
         .filter(item => item.quantidade > 0)
-        .sort((a, b) => b.quantidade - a.quantidade)
-        .forEach(item => {
-          const itemEl = document.createElement('span');
-          itemEl.className = 'print-total-produto-item';
+        .sort((a, b) => b.quantidade - a.quantidade);
 
-          const nomeEl = document.createElement('span');
-          nomeEl.className = 'print-total-produto-nome';
-          nomeEl.textContent = item.nome;
-
-          const qtdEl = document.createElement('span');
-          qtdEl.className = 'print-total-produto-qtd';
-          qtdEl.textContent = `(${item.quantidade})`;
-
-          itemEl.appendChild(nomeEl);
-          itemEl.appendChild(qtdEl);
-          resumoProdutosPrintEl.appendChild(itemEl);
-        });
+      if (itensResumoProdutos.length <= 1) {
+        resumoProdutosPrintEl.style.display = 'none';
+      } else {
+        resumoProdutosPrintEl.style.display = 'block';
+        resumoProdutosPrintEl.textContent = itensResumoProdutos
+          .map(item => `${item.nome} (${item.quantidade})`)
+          .join(' / ');
+      }
     }
 
     const materialVal = getValorCampo('material');
@@ -2833,16 +3440,17 @@
     const printV = document.getElementById('print-version');
 
     if (normal && printV) {
-      normal.style.display = 'none';
-      printV.style.display = 'block';
-      aplicarAjusteAlturaImagensPorObservacoes();
-      await aguardarImagensDaImpressao();
-      aplicarModoCompactoSeNecessario();
+      const deveTrocarVisualizacaoNaTela = apenasPreview || manterVersaoImpressao;
+      if (deveTrocarVisualizacaoNaTela) {
+        normal.style.display = 'none';
+        printV.style.display = 'block';
+        aplicarAjusteAlturaImagensPorObservacoes();
+        await aguardarImagensDaImpressao();
+      }
 
       if (apenasPreview) {
         document.body.classList.add('preview-impressao');
         aplicarAjusteAlturaImagensPorObservacoes();
-        aplicarModoCompactoSeNecessario();
         if (window.parent && window.parent !== window) {
           const params = new URLSearchParams(window.location.search);
           const visualizarId = params.get('visualizar') || null;
@@ -2858,16 +3466,34 @@
         return;
       }
 
-      document.body.classList.remove('preview-impressao');
-      window.print();
+      mostrarToastPreparandoImpressao('Preparando impressão...');
+      try {
+        await gerarPdfImpressaoApi(printV, {
+          onPrintStart: () => esconderToastPreparandoImpressao()
+        });
+      } catch (erroPdf) {
+        console.error('Falha ao gerar PDF via API, usando impressão nativa.', erroPdf);
+        if (typeof window.mostrarErro === 'function') {
+          window.mostrarErro('Falha ao gerar PDF. Abrindo impressão do navegador.');
+        }
+        esconderToastPreparandoImpressao();
+        const tinhaClassePreview = document.body.classList.contains('preview-impressao');
+        if (tinhaClassePreview) {
+          document.body.classList.remove('preview-impressao');
+        }
+        window.print();
+        if (tinhaClassePreview) {
+          document.body.classList.add('preview-impressao');
+        }
+      }
+      esconderToastPreparandoImpressao();
       if (manterVersaoImpressao) {
         document.body.classList.add('preview-impressao');
       }
-      if (!manterVersaoImpressao) {
+      if (deveTrocarVisualizacaoNaTela && !manterVersaoImpressao) {
         setTimeout(() => {
           normal.style.display = 'block';
           printV.style.display = 'none';
-          printV.classList.remove('print-compact');
           document.body.classList.remove('preview-impressao');
         }, 100);
       }
