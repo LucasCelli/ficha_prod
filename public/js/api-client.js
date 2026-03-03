@@ -77,6 +77,7 @@ class APIClient {
     if (options.dataInicio) params.set('dataInicio', String(options.dataInicio));
     if (options.dataFim) params.set('dataFim', String(options.dataFim));
     if (options.evento) params.set('evento', String(options.evento));
+    if (options.atrasado === true) params.set('atrasado', '1');
 
     const response = await fetch(`${this.baseURL}/fichas?${params.toString()}`);
     if (!response.ok) throw new Error('Erro ao listar fichas');

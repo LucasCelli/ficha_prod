@@ -117,6 +117,7 @@ export const fichaQuerySchema = z.object({
     toTrimmedStringOrUndefined,
     z.enum(['sim', 'nao']).optional()
   ),
+  atrasado: z.preprocess(parseBooleanOrUndefined, z.boolean().optional()),
   paged: z.preprocess(parseBooleanOrUndefined, z.boolean().optional()),
   resumido: z.preprocess(parseBooleanOrUndefined, z.boolean().optional()),
   page: z.preprocess(parsePositiveInt, z.number().int().positive().optional()),

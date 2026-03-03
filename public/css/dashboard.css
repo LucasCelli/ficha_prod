@@ -299,6 +299,40 @@
   text-transform: uppercase;
 }
 
+.ficha-atraso-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ficha-atraso-action-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid #10B981;
+  background: #ECFDF5;
+  color: #047857;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ficha-atraso-action-chip:hover {
+  background: #D1FAE5;
+  border-color: #059669;
+  color: #065F46;
+}
+
 .ficha-details {
   display: flex;
   flex-wrap: wrap;
@@ -1168,6 +1202,11 @@ html[data-theme='dark'] .empty-state {
   color: #6B7280;
 }
 
+.status-filter .btn-atrasados {
+  border-color: #EF4444;
+  color: #EF4444;
+}
+
 .status-filter .btn.active {
   opacity: 1;
 }
@@ -1189,6 +1228,11 @@ html[data-theme='dark'] .empty-state {
 
 .status-filter .btn-evento.active {
   background-color: #6B7280;
+  color: #FFFFFF;
+}
+
+.status-filter .btn-atrasados.active {
+  background-color: #EF4444;
   color: #FFFFFF;
 }
 
@@ -1347,9 +1391,6 @@ html[data-theme='dark'] .empty-state {
     padding: 6px 8px;
   }
 }
-
-
-
 
 
 

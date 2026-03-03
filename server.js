@@ -1268,6 +1268,7 @@ app.get('/api/fichas', async (req, res) => {
       dataFim,
       termo,
       evento,
+      atrasado,
       paged,
       resumido,
       page,
@@ -1322,6 +1323,10 @@ app.get('/api/fichas', async (req, res) => {
     if (evento) {
       whereClause += ' AND evento = ?';
       params.push(evento);
+    }
+
+    if (atrasado) {
+      whereClause += " AND status = 'pendente' AND data_entrega IS NOT NULL AND trim(data_entrega) != '' AND date(data_entrega) < date('now', 'localtime')";
     }
 
     if (termo) {

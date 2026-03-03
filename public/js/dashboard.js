@@ -176,6 +176,7 @@
     if (filtroStatusAtivo === 'btnFiltroPendentes') return { status: 'pendente' };
     if (filtroStatusAtivo === 'btnFiltroEntregues') return { status: 'entregue' };
     if (filtroStatusAtivo === 'btnFiltroEvento') return { evento: 'sim' };
+    if (filtroStatusAtivo === 'btnFiltroAtrasados') return { atrasado: true };
     return {};
   }
 
@@ -397,6 +398,7 @@
     const totalItens = calcularTotalItens(ficha.produtos || []);
     const isEvento = ficha.evento === 'sim';
     const isPendente = ficha.status === 'pendente';
+    const diasAtraso = calcularDiasAtraso(ficha.data_entrega, ficha.status);
     const miniaturaSrc = obterMiniaturaFicha(ficha);
     const clienteFormatado = capitalizeFirstLetter(ficha.cliente);
     const vendedorFormatado = capitalizeFirstLetter(ficha.vendedor);
@@ -415,6 +417,12 @@
           <a class="ficha-cliente ficha-cliente-link" href="ficha.html?visualizar=${ficha.id}" data-id="${ficha.id}" title="Visualizar ficha">
             ${clienteFormatado || 'Cliente não informado'}
           </a>
+          ${diasAtraso > 0 ? `
+            <span class="ficha-atraso-chip">${diasAtraso} ${diasAtraso === 1 ? 'dia' : 'dias'} de atraso</span>
+            <button type="button" class="ficha-atraso-action-chip btn-entregar" data-id="${ficha.id}" title="Marcar como entregue">
+              Marcar como entregue
+            </button>
+          ` : ''}
           ${ficha.numero_venda ? `<span class="ficha-numero">#${ficha.numero_venda}</span>` : ''}
           ${isEvento ? '<span class="ficha-evento-badge"><i class="fas fa-star"></i> Evento</span>' : ''}
           ${!isPendente ? '<span class="ficha-status-badge entregue"><i class="fas fa-check"></i> Entregue</span>' : ''}
@@ -1135,6 +1143,36 @@
     } catch {
       return dataStr;
     }
+  }
+
+  function parseDataIsoLocal(dataStr) {
+    const texto = String(dataStr || '').trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return null;
+
+    const [anoRaw, mesRaw, diaRaw] = texto.split('-');
+    const ano = Number(anoRaw);
+    const mes = Number(mesRaw);
+    const dia = Number(diaRaw);
+    const data = new Date(ano, mes - 1, dia);
+    if (data.getFullYear() !== ano || data.getMonth() !== (mes - 1) || data.getDate() !== dia) return null;
+
+    data.setHours(0, 0, 0, 0);
+    return data;
+  }
+
+  function calcularDiasAtraso(dataEntregaStr, statusFicha) {
+    if (String(statusFicha || '').toLowerCase() !== 'pendente') return 0;
+
+    const dataEntrega = parseDataIsoLocal(dataEntregaStr);
+    if (!dataEntrega) return 0;
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const diffMs = hoje.getTime() - dataEntrega.getTime();
+    if (diffMs <= 0) return 0;
+
+    return Math.floor(diffMs / 86400000);
   }
 
   function normalizarTextoBusca(valor) {
