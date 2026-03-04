@@ -63,6 +63,12 @@
   flex-wrap: wrap;
 }
 
+.relatorio-cliente-cta {
+  margin-bottom: var(--rel-gap-lg);
+  display: flex;
+  justify-content: flex-end;
+}
+
 .btn-periodo {
   flex: 1;
   min-width: 160px;

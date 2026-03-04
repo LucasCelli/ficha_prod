@@ -106,14 +106,16 @@
   }
 
   function buildUrlParams() {
-    let params = `periodo=${periodoAtual}`;
+    const params = new URLSearchParams();
+    params.set('periodo', periodoAtual);
     if (periodoAtual === 'customizado') {
       const dataInicio = document.getElementById('relDataInicio')?.value;
       const dataFim = document.getElementById('relDataFim')?.value;
-      if (dataInicio) params += `&dataInicio=${dataInicio}`;
-      if (dataFim) params += `&dataFim=${dataFim}`;
+      if (dataInicio) params.set('dataInicio', dataInicio);
+      if (dataFim) params.set('dataFim', dataFim);
     }
-    return params;
+
+    return params.toString();
   }
 
   async function carregarCatalogoTamanhos() {
@@ -252,7 +254,6 @@
           return;
         }
       }
-
       const url = `${db.baseURL}/relatorio?${buildUrlParams()}`;
 
       const response = await fetch(url);
@@ -896,9 +897,7 @@
         throw new Error('Biblioteca jsPDF não carregada');
       }
 
-      const mesesPt = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-      const dataAtual = new Date();
-      const periodo = `${mesesPt[dataAtual.getMonth()]} de ${dataAtual.getFullYear()}`;
+      const periodo = getPeriodoNome();
 
       const doc = new window.jspdf.jsPDF({
         orientation: 'portrait',
@@ -1015,10 +1014,7 @@
 
     try {
       const workbook = new ExcelJS.Workbook();
-      const mesesPt = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-      const dataAtual = new Date();
-      const periodo = `${mesesPt[dataAtual.getMonth()]} de ${dataAtual.getFullYear()}`;
+      const periodo = getPeriodoNome();
       const dataGeracao = new Date().toLocaleString('pt-BR');
 
       // Calcular métricas principais
@@ -1504,6 +1500,7 @@
 
   function getPeriodoNome() {
     if (periodoAtual === 'mes') return 'Este Mês';
+    if (periodoAtual === 'ultimo_mes') return 'Último Mês';
     if (periodoAtual === 'ano') return 'Este Ano';
 
     const inicio = document.getElementById('relDataInicio')?.value;
@@ -1692,7 +1689,6 @@
   function obterRangePeriodoAtual() {
     const hoje = new Date();
     const hojeIso = toISODate(hoje);
-
     if (periodoAtual === 'customizado') {
       const dataInicio = document.getElementById('relDataInicio')?.value;
       const dataFim = document.getElementById('relDataFim')?.value;
@@ -1707,6 +1703,12 @@
     if (periodoAtual === 'mes') {
       const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
       return { dataInicio: toISODate(primeiroDiaMes), dataFim: hojeIso };
+    }
+
+    if (periodoAtual === 'ultimo_mes') {
+      const primeiroDiaUltimoMes = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+      const ultimoDiaUltimoMes = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+      return { dataInicio: toISODate(primeiroDiaUltimoMes), dataFim: toISODate(ultimoDiaUltimoMes) };
     }
 
     return { dataInicio: '2020-01-01', dataFim: hojeIso };

@@ -18,6 +18,8 @@ import {
   kanbanStatusBodySchema,
   parseWithZod,
   positiveIdParamSchema,
+  relatorioClienteDetalheQuerySchema,
+  relatorioClientesListQuerySchema,
   relatorioPeriodoQuerySchema
 } from './src/validators/serverSchemas.js';
 
@@ -48,6 +50,21 @@ function generateCloudinarySignature(paramsToSign) {
 
 const NAME_EXCEPTIONS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
 const UPPERCASE_WORD_PATTERN = /^[A-ZÀ-Ý]{1,4}$/;
+const AUTO_OBS_MARKERS = Object.freeze([
+  'TECIDO',
+  'MANGA',
+  'PERSONALIZADO EM',
+  'SEM PERSONALIZACAO',
+  'COM NOMES',
+  'SOMENTE NUMEROS',
+  'PEITILHO',
+  'PE DE GOLA',
+  'FILETE',
+  'FAIXA REFLETIVA',
+  'ABERTURA LATERAL',
+  'REFORCO',
+  'BOLSO'
+]);
 
 function normalizeNameCase(value) {
   if (typeof value !== 'string') return '';
@@ -122,6 +139,109 @@ function normalizeFichaPayload(dados) {
     produtos: normalizeProdutos(dados?.produtos),
     comNomes: normalizeComNomesValue(comNomesRaw)
   };
+}
+
+function normalizarTextoBusca(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function textoSemHtml(valor) {
+  const texto = String(valor || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&#160;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+  return texto
+    .replace(/\r/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+function observacaoPareceAutoDescricao(valor) {
+  const normalizado = normalizarTextoBusca(valor).toUpperCase();
+  if (!normalizado) return false;
+  const hits = AUTO_OBS_MARKERS.reduce((total, marker) => (
+    normalizado.includes(marker) ? total + 1 : total
+  ), 0);
+  const temSeparador = normalizado.includes(' / ');
+  return (temSeparador && hits >= 1) || hits >= 3;
+}
+
+function extrairObservacoesUsuario(valor) {
+  const texto = textoSemHtml(valor);
+  if (!texto) return '';
+  if (!observacaoPareceAutoDescricao(texto)) return texto;
+
+  const linhas = texto
+    .split(/\r?\n+/)
+    .map(linha => linha.trim())
+    .filter(Boolean);
+
+  const linhasMarcadas = linhas.filter(linha => (
+    /(^|\s)(obs|observacoes?|anotacoes?|nota)\s*[:\-]/i.test(linha)
+  ));
+  if (linhasMarcadas.length > 0) {
+    return linhasMarcadas.join(' ');
+  }
+
+  if (linhas.length > 1) {
+    return linhas.slice(1).join(' ').trim();
+  }
+
+  return '';
+}
+
+function extrairTextoProdutosBusca(produtosRaw) {
+  if (!produtosRaw) return '';
+  let produtos = produtosRaw;
+  if (typeof produtosRaw === 'string') {
+    try {
+      produtos = JSON.parse(produtosRaw);
+    } catch (_) {
+      return '';
+    }
+  }
+  if (!Array.isArray(produtos)) return '';
+  return produtos.map(item => (
+    [
+      item?.produto,
+      item?.descricao,
+      item?.detalhesProduto,
+      item?.detalhes,
+      item?.tamanho
+    ]
+      .filter(Boolean)
+      .join(' ')
+  )).join(' ');
+}
+
+function fichaCorrespondeTermoBusca(ficha, termo) {
+  const termoNormalizado = normalizarTextoBusca(termo);
+  if (!termoNormalizado) return true;
+
+  const camposBusca = [
+    ficha?.cliente,
+    ficha?.vendedor,
+    ficha?.numero_venda,
+    extrairTextoProdutosBusca(ficha?.produtos),
+    extrairObservacoesUsuario(ficha?.observacoes)
+  ];
+
+  return camposBusca.some(campo => normalizarTextoBusca(campo).includes(termoNormalizado));
 }
 
 // Middlewares
@@ -1291,6 +1411,22 @@ app.get('/api/fichas', async (req, res) => {
         'produtos'
       ].join(', ')
       : '*';
+    const resumoColumns = resumido
+      ? [
+        'id',
+        'cliente',
+        'vendedor',
+        'data_inicio',
+        'numero_venda',
+        'data_entrega',
+        'status',
+        'evento',
+        'arte',
+        'imagem_data',
+        'imagens_data',
+        'produtos'
+      ]
+      : [];
 
     let whereClause = ' WHERE 1=1';
     const params = [];
@@ -1329,12 +1465,6 @@ app.get('/api/fichas', async (req, res) => {
       whereClause += " AND status = 'pendente' AND data_entrega IS NOT NULL AND trim(data_entrega) != '' AND date(data_entrega) < date('now', 'localtime')";
     }
 
-    if (termo) {
-      whereClause += ' AND (cliente LIKE ? OR vendedor LIKE ? OR numero_venda LIKE ?)';
-      const like = `%${termo}%`;
-      params.push(like, like, like);
-    }
-
     const parseFichas = fichas => fichas.map(ficha => {
       const registro = { ...ficha };
       if (typeof registro.produtos === 'string') {
@@ -1346,18 +1476,47 @@ app.get('/api/fichas', async (req, res) => {
       }
       return registro;
     });
+    const resumirFicha = ficha => {
+      if (!resumido) return ficha;
+      return resumoColumns.reduce((acc, key) => {
+        acc[key] = ficha[key];
+        return acc;
+      }, {});
+    };
 
     if (paged) {
       const safePageSize = Math.min(Math.max(Number(pageSize) || 20, 1), 100);
+      const requestedPage = Math.max(Number(page) || 1, 1);
+
+      if (termo) {
+        const fichasBrutas = await dbAll(`SELECT * FROM fichas${whereClause} ORDER BY id DESC`, params);
+        const fichasFiltradas = parseFichas(fichasBrutas).filter(ficha => fichaCorrespondeTermoBusca(ficha, termo));
+        const total = fichasFiltradas.length;
+        const totalPages = Math.max(1, Math.ceil(total / safePageSize));
+        const currentPage = Math.min(requestedPage, totalPages);
+        const offset = (currentPage - 1) * safePageSize;
+        const items = fichasFiltradas
+          .slice(offset, offset + safePageSize)
+          .map(resumirFicha);
+
+        return res.json({
+          items,
+          page: currentPage,
+          pageSize: safePageSize,
+          total,
+          totalPages,
+          hasNext: currentPage < totalPages
+        });
+      }
+
       const totalResult = await dbGet(`SELECT COUNT(*) AS total FROM fichas${whereClause}`, params);
       const total = Number(totalResult?.total) || 0;
       const totalPages = Math.max(1, Math.ceil(total / safePageSize));
-      const requestedPage = Math.max(Number(page) || 1, 1);
       const currentPage = Math.min(requestedPage, totalPages);
       const offset = (currentPage - 1) * safePageSize;
       const query = `SELECT ${selectColumns} FROM fichas${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`;
       const fichas = await dbAll(query, [...params, safePageSize, offset]);
-      const items = parseFichas(fichas);
+      const items = parseFichas(fichas).map(resumirFicha);
       return res.json({
         items,
         page: currentPage,
@@ -1368,9 +1527,14 @@ app.get('/api/fichas', async (req, res) => {
       });
     }
 
-    const query = `SELECT ${selectColumns} FROM fichas${whereClause} ORDER BY id DESC`;
+    const query = `SELECT ${termo ? '*' : selectColumns} FROM fichas${whereClause} ORDER BY id DESC`;
     const fichas = await dbAll(query, params);
-    const fichasFormatadas = parseFichas(fichas);
+    let fichasFormatadas = parseFichas(fichas);
+    if (termo) {
+      fichasFormatadas = fichasFormatadas
+        .filter(ficha => fichaCorrespondeTermoBusca(ficha, termo))
+        .map(resumirFicha);
+    }
 
     res.json(fichasFormatadas);
   } catch (error) {
@@ -2027,6 +2191,250 @@ app.delete('/api/clientes/:id', async (req, res) => {
   }
 });
 
+app.get('/api/relatorio-clientes', async (req, res) => {
+  try {
+    const queryData = parseWithZod(res, relatorioClientesListQuerySchema, req.query, 'Parâmetros de relatório de clientes inválidos');
+    if (!queryData) return;
+
+    const limit = Number(queryData.limit) || 30;
+    const offset = Number(queryData.offset) || 0;
+    const termo = String(queryData.query || '').trim();
+
+    const where = [];
+    const params = [];
+    if (termo) {
+      where.push('lower(c.nome) LIKE lower(?)');
+      params.push(`%${termo}%`);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const totalRow = await dbGet(
+      `SELECT COUNT(*) as total FROM clientes c ${whereSql}`,
+      params
+    );
+    const total = Number(totalRow?.total || 0);
+
+    const rows = await dbAll(
+      `
+      SELECT
+        c.id,
+        c.nome,
+        c.primeiro_pedido,
+        c.ultimo_pedido,
+        c.total_pedidos
+      FROM clientes c
+      ${whereSql}
+      ORDER BY c.ultimo_pedido DESC, c.nome ASC
+      LIMIT ? OFFSET ?
+      `,
+      [...params, limit, offset]
+    );
+
+    res.json({
+      items: rows.map(item => ({
+        id: item.id,
+        nome: item.nome,
+        documento: null,
+        email: null,
+        primeiroPedido: item.primeiro_pedido || null,
+        ultimoPedido: item.ultimo_pedido || null,
+        totalPedidos: Number(item.total_pedidos || 0)
+      })),
+      limit,
+      offset,
+      total,
+      hasMore: offset + rows.length < total
+    });
+  } catch (error) {
+    console.error('Erro ao listar clientes para relatório:', error);
+    res.status(500).json({ error: 'Erro ao listar clientes para relatório' });
+  }
+});
+
+app.get('/api/relatorio-clientes/:id', async (req, res) => {
+  try {
+    const paramsData = parseWithZod(res, positiveIdParamSchema, req.params, 'ID do cliente inválido');
+    if (!paramsData) return;
+    const queryData = parseWithZod(res, relatorioClienteDetalheQuerySchema, req.query, 'Parâmetros de período inválidos');
+    if (!queryData) return;
+
+    const cliente = await dbGet(
+      'SELECT id, nome, primeiro_pedido, ultimo_pedido, total_pedidos FROM clientes WHERE id = ?',
+      [paramsData.id]
+    );
+    if (!cliente) {
+      return res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+
+    const fichasLimit = Number(queryData.fichasLimit) || 10;
+    const fichasOffset = Number(queryData.fichasOffset) || 0;
+    const where = ['lower(cliente) = lower(?)'];
+    const args = [cliente.nome];
+
+    if (queryData.dataInicio && queryData.dataFim) {
+      where.push('data_inicio BETWEEN ? AND ?');
+      args.push(queryData.dataInicio, queryData.dataFim);
+    }
+    const whereSql = where.join(' AND ');
+
+    const totalRow = await dbGet(
+      `SELECT COUNT(*) as total FROM fichas WHERE ${whereSql}`,
+      args
+    );
+    const totalFichas = Number(totalRow?.total || 0);
+
+    const fichasPeriodo = await dbAll(
+      `
+      SELECT id, numero_venda, status, data_inicio, data_entrega, produtos, observacoes
+      FROM fichas
+      WHERE ${whereSql}
+      ORDER BY data_inicio DESC, id DESC
+      `,
+      args
+    );
+
+    const topProdutosMap = new Map();
+    let totalItens = 0;
+    let primeiroPedidoPeriodo = null;
+    let ultimoPedidoPeriodo = null;
+    const historicoResumo = [];
+
+    fichasPeriodo.forEach(f => {
+      const data = String(f.data_inicio || '').trim();
+      if (data) {
+        if (!primeiroPedidoPeriodo || data < primeiroPedidoPeriodo) primeiroPedidoPeriodo = data;
+        if (!ultimoPedidoPeriodo || data > ultimoPedidoPeriodo) ultimoPedidoPeriodo = data;
+      }
+
+      let itensFicha = 0;
+      const produtosRaw = f.produtos;
+      if (produtosRaw) {
+        try {
+          const produtos = typeof produtosRaw === 'string' ? JSON.parse(produtosRaw) : produtosRaw;
+          if (Array.isArray(produtos)) {
+            produtos.forEach(p => {
+              const nome = String(p?.produto || p?.descricao || '').trim() || 'Sem produto';
+              const qtd = Number.parseInt(String(p?.quantidade || '0'), 10) || 0;
+              itensFicha += qtd;
+              totalItens += qtd;
+              if (!topProdutosMap.has(nome)) {
+                topProdutosMap.set(nome, { produto: nome, quantidade: 0, pedidosSet: new Set() });
+              }
+              const entry = topProdutosMap.get(nome);
+              entry.quantidade += qtd;
+              entry.pedidosSet.add(f.id);
+            });
+          }
+        } catch (_) {}
+      }
+
+      historicoResumo.push({
+        id: f.id,
+        numeroVenda: f.numero_venda || '',
+        status: f.status || '',
+        dataInicio: f.data_inicio || '',
+        dataEntrega: f.data_entrega || '',
+        resumo: `${itensFicha} item(ns)`,
+        itens: itensFicha
+      });
+    });
+
+    const topProdutos = Array.from(topProdutosMap.values())
+      .map(item => ({
+        produto: item.produto,
+        quantidade: item.quantidade,
+        pedidos: item.pedidosSet.size
+      }))
+      .sort((a, b) => b.quantidade - a.quantidade);
+
+    const datasOrdenadas = fichasPeriodo
+      .map(f => String(f.data_inicio || '').trim())
+      .filter(Boolean)
+      .sort();
+    let mediaDiasEntreCompras = null;
+    if (datasOrdenadas.length >= 2) {
+      let somaDias = 0;
+      for (let i = 1; i < datasOrdenadas.length; i += 1) {
+        const d1 = new Date(`${datasOrdenadas[i - 1]}T00:00:00`);
+        const d2 = new Date(`${datasOrdenadas[i]}T00:00:00`);
+        const diff = Math.round((d2.getTime() - d1.getTime()) / 86400000);
+        if (Number.isFinite(diff) && diff >= 0) somaDias += diff;
+      }
+      mediaDiasEntreCompras = Math.round(somaDias / Math.max(datasOrdenadas.length - 1, 1));
+    }
+
+    const periodoInicio = queryData.dataInicio || null;
+    const periodoFim = queryData.dataFim || null;
+    const pedidosNoPeriodo = totalFichas;
+    const mesesNoPeriodo = (() => {
+      if (!periodoInicio || !periodoFim) return null;
+      const inicio = new Date(`${periodoInicio}T00:00:00`);
+      const fim = new Date(`${periodoFim}T00:00:00`);
+      const diffMeses = ((fim.getFullYear() - inicio.getFullYear()) * 12) + (fim.getMonth() - inicio.getMonth()) + 1;
+      return Math.max(diffMeses, 1);
+    })();
+    const pedidosPorMes = mesesNoPeriodo ? Number((pedidosNoPeriodo / mesesNoPeriodo).toFixed(2)) : null;
+
+    const recorrentes = topProdutos
+      .filter(p => p.pedidos >= 2)
+      .slice(0, 5)
+      .map(p => ({ produto: p.produto, pedidos: p.pedidos, quantidade: p.quantidade }));
+
+    const alertas = [];
+    const ultimoGlobal = String(cliente.ultimo_pedido || '').trim();
+    if (ultimoGlobal) {
+      const diff = Math.floor((Date.now() - new Date(`${ultimoGlobal}T00:00:00`).getTime()) / 86400000);
+      if (Number.isFinite(diff) && diff > 90) {
+        alertas.push(`Cliente inativo há ${diff} dias`);
+      }
+    }
+
+    res.json({
+      cliente: {
+        id: cliente.id,
+        nome: cliente.nome,
+        primeiroPedido: cliente.primeiro_pedido || null,
+        ultimoPedido: cliente.ultimo_pedido || null,
+        totalPedidos: Number(cliente.total_pedidos || 0)
+      },
+      periodo: {
+        dataInicio: periodoInicio,
+        dataFim: periodoFim
+      },
+      kpis: {
+        quantidadePedidos: pedidosNoPeriodo,
+        primeiroPedido: primeiroPedidoPeriodo,
+        ultimoPedido: ultimoPedidoPeriodo,
+        totalItens
+      },
+      topProdutos,
+      totais: {
+        itens: totalItens,
+        pedidos: pedidosNoPeriodo
+      },
+      insights: {
+        categoriasPreferidas: topProdutos.slice(0, 3).map(p => p.produto),
+        frequenciaCompra: {
+          pedidosPorMes,
+          mediaDiasEntreCompras
+        },
+        produtosRecorrentes: recorrentes,
+        alertas
+      },
+      historico: {
+        items: historicoResumo.slice(fichasOffset, fichasOffset + fichasLimit),
+        total: totalFichas,
+        limit: fichasLimit,
+        offset: fichasOffset,
+        hasMore: fichasOffset + fichasLimit < totalFichas
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao carregar relatório detalhado do cliente:', error);
+    res.status(500).json({ error: 'Erro ao carregar relatório detalhado do cliente' });
+  }
+});
+
 // Estatísticas gerais
 app.get('/api/estatisticas', async (req, res) => {
   try {
@@ -2389,75 +2797,89 @@ async function atualizarCliente(nomeCliente, dataInicio) {
 
 // ==================== ROTAS DE RELATÓRIO DETALHADO ====================
 
+function obterReferenciaPeriodoRelatorio(now = new Date()) {
+  const anoAtual = String(now.getFullYear());
+  const mesAtual = `${anoAtual}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const dataMesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const anoMesAnterior = String(dataMesAnterior.getFullYear());
+  const mesAnterior = `${anoMesAnterior}-${String(dataMesAnterior.getMonth() + 1).padStart(2, '0')}`;
+  return {
+    anoAtual,
+    mesAtual,
+    mesAnterior
+  };
+}
+
+function adicionarFiltrosRelatorio(whereParts, params, queryData, campoDataExpr) {
+  const cliente = String(queryData?.cliente || '').trim();
+  const clienteDataInicio = queryData?.clienteDataInicio;
+  const clienteDataFim = queryData?.clienteDataFim;
+  const periodo = String(queryData?.periodo || '').toLowerCase();
+  const dataInicio = queryData?.dataInicio;
+  const dataFim = queryData?.dataFim;
+
+  if (cliente) {
+    whereParts.push('lower(cliente) = lower(?)');
+    params.push(cliente);
+  }
+
+  if (cliente && clienteDataInicio && clienteDataFim) {
+    whereParts.push(`${campoDataExpr} BETWEEN ? AND ?`);
+    params.push(clienteDataInicio, clienteDataFim);
+    return;
+  }
+
+  // Com cliente selecionado sem datas próprias, ignora o período padrão (ex.: "Este mês").
+  if (cliente) return;
+
+  const { anoAtual, mesAtual, mesAnterior } = obterReferenciaPeriodoRelatorio(new Date());
+  if (periodo === 'mes') {
+    whereParts.push(`substr(${campoDataExpr}, 1, 7) = ?`);
+    params.push(mesAtual);
+  } else if (periodo === 'ultimo_mes') {
+    whereParts.push(`substr(${campoDataExpr}, 1, 7) = ?`);
+    params.push(mesAnterior);
+  } else if (periodo === 'ano') {
+    whereParts.push(`substr(${campoDataExpr}, 1, 4) = ?`);
+    params.push(anoAtual);
+  } else if (periodo === 'customizado' && dataInicio && dataFim) {
+    whereParts.push(`${campoDataExpr} BETWEEN ? AND ?`);
+    params.push(dataInicio, dataFim);
+  }
+}
+
 // Relatório principal (ÚNICA definição - usa data_entregue para entregues, data_inicio para pendentes)
 app.get('/api/relatorio', async (req, res) => {
   try {
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
-    const { periodo, dataInicio, dataFim } = queryData;
-
-    const now = new Date();
-    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const anoAtual = `${now.getFullYear()}`;
+    const { periodo } = queryData;
 
     const relatorio = {};
 
     // ---- Fichas entregues (filtradas por data_entregue) ----
-    let sqlEntregues = '';
-    let paramsEntregues = [];
-
-    if (periodo === 'mes') {
-      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 7) = ?`;
-      paramsEntregues = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 4) = ?`;
-      paramsEntregues = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND date(data_entregue) BETWEEN ? AND ?`;
-      paramsEntregues = [dataInicio, dataFim];
-    } else {
-      sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue'`;
-    }
+    const whereEntregues = ["status = 'entregue'"];
+    const paramsEntregues = [];
+    adicionarFiltrosRelatorio(whereEntregues, paramsEntregues, queryData, 'date(data_entregue)');
+    const sqlEntregues = `SELECT COUNT(*) as total FROM fichas WHERE ${whereEntregues.join(' AND ')}`;
 
     const entreguesResult = await dbGet(sqlEntregues, paramsEntregues);
     relatorio.fichasEntregues = entreguesResult?.total || 0;
 
     // ---- Fichas pendentes (filtradas por data_inicio) ----
-    let sqlPendentes = '';
-    let paramsPendentes = [];
-
-    if (periodo === 'mes') {
-      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND substr(data_inicio, 1, 7) = ?`;
-      paramsPendentes = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND substr(data_inicio, 1, 4) = ?`;
-      paramsPendentes = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND data_inicio BETWEEN ? AND ?`;
-      paramsPendentes = [dataInicio, dataFim];
-    } else {
-      sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente'`;
-    }
+    const wherePendentes = ["status = 'pendente'"];
+    const paramsPendentes = [];
+    adicionarFiltrosRelatorio(wherePendentes, paramsPendentes, queryData, 'data_inicio');
+    const sqlPendentes = `SELECT COUNT(*) as total FROM fichas WHERE ${wherePendentes.join(' AND ')}`;
 
     const pendentesResult = await dbGet(sqlPendentes, paramsPendentes);
     relatorio.fichasPendentes = pendentesResult?.total || 0;
 
     // ---- Itens confeccionados (entregues, filtrados por data_entregue) ----
-    let sqlItens = '';
-    let paramsItens = [];
-
-    if (periodo === 'mes') {
-      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 7) = ?`;
-      paramsItens = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND substr(date(data_entregue), 1, 4) = ?`;
-      paramsItens = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue' AND date(data_entregue) BETWEEN ? AND ?`;
-      paramsItens = [dataInicio, dataFim];
-    } else {
-      sqlItens = `SELECT produtos FROM fichas WHERE status = 'entregue'`;
-    }
+    const whereItens = ["status = 'entregue'"];
+    const paramsItens = [];
+    adicionarFiltrosRelatorio(whereItens, paramsItens, queryData, 'date(data_entregue)');
+    const sqlItens = `SELECT produtos FROM fichas WHERE ${whereItens.join(' AND ')}`;
 
     const fichasParaItens = await dbAll(sqlItens, paramsItens);
 
@@ -2475,18 +2897,26 @@ app.get('/api/relatorio', async (req, res) => {
     relatorio.itensConfeccionados = itensConfeccionados;
 
     // ---- Novos clientes ----
+    // Para "novos clientes", quando há filtro por cliente específico o valor é forçado para 0.
     let sqlClientes = '';
     let paramsClientes = [];
-
-    if (periodo === 'mes') {
+    if (String(queryData?.cliente || '').trim()) {
+      sqlClientes = 'SELECT 0 as total';
+    } else if (periodo === 'mes') {
+      const { mesAtual } = obterReferenciaPeriodoRelatorio(new Date());
       sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE substr(primeiro_pedido, 1, 7) = ?`;
       paramsClientes = [mesAtual];
+    } else if (periodo === 'ultimo_mes') {
+      const { mesAnterior } = obterReferenciaPeriodoRelatorio(new Date());
+      sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE substr(primeiro_pedido, 1, 7) = ?`;
+      paramsClientes = [mesAnterior];
     } else if (periodo === 'ano') {
+      const { anoAtual } = obterReferenciaPeriodoRelatorio(new Date());
       sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE substr(primeiro_pedido, 1, 4) = ?`;
       paramsClientes = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
+    } else if (periodo === 'customizado' && queryData.dataInicio && queryData.dataFim) {
       sqlClientes = `SELECT COUNT(*) as total FROM clientes WHERE primeiro_pedido BETWEEN ? AND ?`;
-      paramsClientes = [dataInicio, dataFim];
+      paramsClientes = [queryData.dataInicio, queryData.dataFim];
     } else {
       sqlClientes = `SELECT COUNT(*) as total FROM clientes`;
     }
@@ -2495,21 +2925,10 @@ app.get('/api/relatorio', async (req, res) => {
     relatorio.novosClientes = clientesResult?.total || 0;
 
     // ---- Top vendedor ----
-    let sqlVendedor = '';
-    let paramsVendedor = [];
-
-    if (periodo === 'mes') {
-      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 7) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
-      paramsVendedor = [mesAtual];
-    } else if (periodo === 'ano') {
-      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND substr(data_inicio, 1, 4) = ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
-      paramsVendedor = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' AND data_inicio BETWEEN ? AND ? GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
-      paramsVendedor = [dataInicio, dataFim];
-    } else {
-      sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE vendedor IS NOT NULL AND vendedor != '' GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
-    }
+    const whereVendedor = ["vendedor IS NOT NULL", "vendedor != ''"];
+    const paramsVendedor = [];
+    adicionarFiltrosRelatorio(whereVendedor, paramsVendedor, queryData, 'data_inicio');
+    const sqlVendedor = `SELECT vendedor, COUNT(*) as total FROM fichas WHERE ${whereVendedor.join(' AND ')} GROUP BY vendedor ORDER BY total DESC LIMIT 1`;
 
     const topVendedor = await dbGet(sqlVendedor, paramsVendedor);
     relatorio.topVendedor = topVendedor ? topVendedor.vendedor : null;
@@ -2540,44 +2959,22 @@ app.get('/api/relatorio/vendedores', async (req, res) => {
   try {
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
-    const { periodo, dataInicio, dataFim } = queryData;
-
-    const now = new Date();
-    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const anoAtual = `${now.getFullYear()}`;
+    const { periodo } = queryData;
 
     // Filtro por data_inicio para pedidos totais
-    let whereClause = "WHERE vendedor IS NOT NULL AND vendedor != ''";
-    let params = [];
-
-    if (periodo === 'mes') {
-      whereClause += " AND substr(data_inicio, 1, 7) = ?";
-      params = [mesAtual];
-    } else if (periodo === 'ano') {
-      whereClause += " AND substr(data_inicio, 1, 4) = ?";
-      params = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      whereClause += " AND data_inicio BETWEEN ? AND ?";
-      params = [dataInicio, dataFim];
-    }
+    const whereParts = ["vendedor IS NOT NULL", "vendedor != ''"];
+    const params = [];
+    adicionarFiltrosRelatorio(whereParts, params, queryData, 'data_inicio');
+    const whereClause = `WHERE ${whereParts.join(' AND ')}`;
 
     // Buscar todas as fichas com vendedor (total de pedidos)
     const fichas = await dbAll(`SELECT vendedor, produtos, status, data_entregue FROM fichas ${whereClause}`, params);
 
     // Filtro por data_entregue para contar entregues no período
-    let whereEntregue = "WHERE vendedor IS NOT NULL AND vendedor != '' AND status = 'entregue' AND data_entregue IS NOT NULL";
-    let paramsEntregue = [];
-
-    if (periodo === 'mes') {
-      whereEntregue += " AND substr(date(data_entregue), 1, 7) = ?";
-      paramsEntregue = [mesAtual];
-    } else if (periodo === 'ano') {
-      whereEntregue += " AND substr(date(data_entregue), 1, 4) = ?";
-      paramsEntregue = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      whereEntregue += " AND date(data_entregue) BETWEEN ? AND ?";
-      paramsEntregue = [dataInicio, dataFim];
-    }
+    const whereEntregueParts = ["vendedor IS NOT NULL", "vendedor != ''", "status = 'entregue'", "data_entregue IS NOT NULL"];
+    const paramsEntregue = [];
+    adicionarFiltrosRelatorio(whereEntregueParts, paramsEntregue, queryData, 'date(data_entregue)');
+    const whereEntregue = `WHERE ${whereEntregueParts.join(' AND ')}`;
 
     // Buscar fichas entregues no período pela data de entrega
     const fichasEntregues = await dbAll(`SELECT vendedor FROM fichas ${whereEntregue}`, paramsEntregue);
@@ -2635,27 +3032,10 @@ app.get('/api/relatorio/materiais', async (req, res) => {
   try {
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
-    const { periodo, dataInicio, dataFim } = queryData;
-
-    const now = new Date();
-    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const anoAtual = `${now.getFullYear()}`;
-
-    let whereClause = "WHERE material IS NOT NULL AND material != ''";
-    let params = [];
-
-    if (periodo === 'mes') {
-      whereClause += " AND substr(data_inicio, 1, 7) = ?";
-      params = [mesAtual];
-    } else if (periodo === 'ano') {
-      whereClause += " AND substr(data_inicio, 1, 4) = ?";
-      params = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      whereClause += " AND data_inicio BETWEEN ? AND ?";
-      params = [dataInicio, dataFim];
-    }
-
-    const fichas = await dbAll(`SELECT material, produtos FROM fichas ${whereClause}`, params);
+    const whereParts = ["material IS NOT NULL", "material != ''"];
+    const params = [];
+    adicionarFiltrosRelatorio(whereParts, params, queryData, 'data_inicio');
+    const fichas = await dbAll(`SELECT material, produtos FROM fichas WHERE ${whereParts.join(' AND ')}`, params);
 
     // Agrupar por material
     const materiaisMap = {};
@@ -2695,26 +3075,10 @@ app.get('/api/relatorio/produtos', async (req, res) => {
   try {
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
-    const { periodo, dataInicio, dataFim } = queryData;
-
-    const now = new Date();
-    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const anoAtual = `${now.getFullYear()}`;
-
-    let whereClause = '';
-    let params = [];
-
-    if (periodo === 'mes') {
-      whereClause = "WHERE substr(data_inicio, 1, 7) = ?";
-      params = [mesAtual];
-    } else if (periodo === 'ano') {
-      whereClause = "WHERE substr(data_inicio, 1, 4) = ?";
-      params = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      whereClause = "WHERE data_inicio BETWEEN ? AND ?";
-      params = [dataInicio, dataFim];
-    }
-
+    const whereParts = [];
+    const params = [];
+    adicionarFiltrosRelatorio(whereParts, params, queryData, 'data_inicio');
+    const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
     const fichas = await dbAll(`SELECT produtos FROM fichas ${whereClause}`, params);
 
     // Contar produtos pelo nome principal (com fallback retrocompatível)
@@ -2751,27 +3115,10 @@ app.get('/api/relatorio/clientes-top', async (req, res) => {
   try {
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
-    const { periodo, dataInicio, dataFim } = queryData;
-
-    const now = new Date();
-    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const anoAtual = `${now.getFullYear()}`;
-
-    let whereClause = "WHERE cliente IS NOT NULL AND cliente != ''";
-    let params = [];
-
-    if (periodo === 'mes') {
-      whereClause += " AND substr(data_inicio, 1, 7) = ?";
-      params = [mesAtual];
-    } else if (periodo === 'ano') {
-      whereClause += " AND substr(data_inicio, 1, 4) = ?";
-      params = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      whereClause += " AND data_inicio BETWEEN ? AND ?";
-      params = [dataInicio, dataFim];
-    }
-
-    const fichas = await dbAll(`SELECT cliente, numero_venda, produtos FROM fichas ${whereClause}`, params);
+    const whereParts = ["cliente IS NOT NULL", "cliente != ''"];
+    const params = [];
+    adicionarFiltrosRelatorio(whereParts, params, queryData, 'data_inicio');
+    const fichas = await dbAll(`SELECT cliente, numero_venda, produtos FROM fichas WHERE ${whereParts.join(' AND ')}`, params);
 
     // Agrupar por cliente
     const clientesMap = {};
@@ -2826,26 +3173,10 @@ app.get('/api/relatorio/tamanhos', async (req, res) => {
   try {
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
-    const { periodo, dataInicio, dataFim } = queryData;
-
-    const now = new Date();
-    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const anoAtual = `${now.getFullYear()}`;
-
-    let whereClause = '';
-    let params = [];
-
-    if (periodo === 'mes') {
-      whereClause = "WHERE substr(data_inicio, 1, 7) = ?";
-      params = [mesAtual];
-    } else if (periodo === 'ano') {
-      whereClause = "WHERE substr(data_inicio, 1, 4) = ?";
-      params = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      whereClause = "WHERE data_inicio BETWEEN ? AND ?";
-      params = [dataInicio, dataFim];
-    }
-
+    const whereParts = [];
+    const params = [];
+    adicionarFiltrosRelatorio(whereParts, params, queryData, 'data_inicio');
+    const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
     const fichas = await dbAll(`SELECT produtos FROM fichas ${whereClause}`, params);
 
     // Contar por tamanho
@@ -2892,12 +3223,39 @@ app.get('/api/relatorio/comparativo', async (req, res) => {
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
     const { periodo, dataInicio, dataFim } = queryData;
-
+    const cliente = String(queryData?.cliente || '').trim();
+    const clienteDataInicio = queryData?.clienteDataInicio;
+    const clienteDataFim = queryData?.clienteDataFim;
     const now = new Date();
     let atual = { inicio: '', fim: '' };
     let anterior = { inicio: '', fim: '' };
 
-    if (periodo === 'mes') {
+    if (cliente && clienteDataInicio && clienteDataFim) {
+      const inicio = new Date(clienteDataInicio);
+      const fim = new Date(clienteDataFim);
+      const diff = fim - inicio;
+      atual.inicio = clienteDataInicio;
+      atual.fim = clienteDataFim;
+
+      const anteriorFim = new Date(inicio);
+      anteriorFim.setDate(anteriorFim.getDate() - 1);
+      const anteriorInicio = new Date(anteriorFim);
+      anteriorInicio.setTime(anteriorInicio.getTime() - diff);
+      anterior.inicio = anteriorInicio.toISOString().split('T')[0];
+      anterior.fim = anteriorFim.toISOString().split('T')[0];
+    } else if (cliente) {
+      // Com cliente sem datas próprias, ignora o "Este mês" e usa janela móvel de 30 dias.
+      const hoje = now.toISOString().split('T')[0];
+      const trintaDiasAtras = new Date(now);
+      trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
+      const sessentaDiasAtras = new Date(now);
+      sessentaDiasAtras.setDate(sessentaDiasAtras.getDate() - 60);
+
+      atual.inicio = trintaDiasAtras.toISOString().split('T')[0];
+      atual.fim = hoje;
+      anterior.inicio = sessentaDiasAtras.toISOString().split('T')[0];
+      anterior.fim = trintaDiasAtras.toISOString().split('T')[0];
+    } else if (periodo === 'mes') {
       const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       const mesAnterior = now.getMonth() === 0 
         ? `${now.getFullYear() - 1}-12`
@@ -2907,6 +3265,15 @@ app.get('/api/relatorio/comparativo', async (req, res) => {
       atual.fim = `${mesAtual}-31`;
       anterior.inicio = `${mesAnterior}-01`;
       anterior.fim = `${mesAnterior}-31`;
+    } else if (periodo === 'ultimo_mes') {
+      const dataMesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const dataMesRetrasado = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      const ultimoDiaMesAnterior = new Date(now.getFullYear(), now.getMonth(), 0);
+      const ultimoDiaMesRetrasado = new Date(now.getFullYear(), now.getMonth() - 1, 0);
+      atual.inicio = `${dataMesAnterior.getFullYear()}-${String(dataMesAnterior.getMonth() + 1).padStart(2, '0')}-01`;
+      atual.fim = ultimoDiaMesAnterior.toISOString().split('T')[0];
+      anterior.inicio = `${dataMesRetrasado.getFullYear()}-${String(dataMesRetrasado.getMonth() + 1).padStart(2, '0')}-01`;
+      anterior.fim = ultimoDiaMesRetrasado.toISOString().split('T')[0];
     } else if (periodo === 'ano') {
       atual.inicio = `${now.getFullYear()}-01-01`;
       atual.fim = `${now.getFullYear()}-12-31`;
@@ -2941,16 +3308,19 @@ app.get('/api/relatorio/comparativo', async (req, res) => {
       anterior.fim = trintaDiasAtras.toISOString().split('T')[0];
     }
 
+    const clienteWhere = cliente ? ' AND lower(cliente) = lower(?)' : '';
+    const clienteParams = cliente ? [cliente] : [];
+
     // Buscar dados do período atual
     const fichasAtual = await dbAll(
-      `SELECT produtos, status, cliente FROM fichas WHERE data_inicio BETWEEN ? AND ?`,
-      [atual.inicio, atual.fim]
+      `SELECT produtos, status, cliente FROM fichas WHERE data_inicio BETWEEN ? AND ?${clienteWhere}`,
+      [atual.inicio, atual.fim, ...clienteParams]
     );
 
     // Buscar dados do período anterior
     const fichasAnterior = await dbAll(
-      `SELECT produtos, status, cliente FROM fichas WHERE data_inicio BETWEEN ? AND ?`,
-      [anterior.inicio, anterior.fim]
+      `SELECT produtos, status, cliente FROM fichas WHERE data_inicio BETWEEN ? AND ?${clienteWhere}`,
+      [anterior.inicio, anterior.fim, ...clienteParams]
     );
 
     // Calcular métricas
@@ -3011,25 +3381,11 @@ app.get('/api/relatorio/eficiencia', async (req, res) => {
   try {
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
-    const { periodo, dataInicio, dataFim } = queryData;
-
     const now = new Date();
-    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const anoAtual = `${now.getFullYear()}`;
-
-    let whereClause = '';
-    let params = [];
-
-    if (periodo === 'mes') {
-      whereClause = "WHERE substr(data_inicio, 1, 7) = ?";
-      params = [mesAtual];
-    } else if (periodo === 'ano') {
-      whereClause = "WHERE substr(data_inicio, 1, 4) = ?";
-      params = [anoAtual];
-    } else if (periodo === 'customizado' && dataInicio && dataFim) {
-      whereClause = "WHERE data_inicio BETWEEN ? AND ?";
-      params = [dataInicio, dataFim];
-    }
+    const whereParts = [];
+    const params = [];
+    adicionarFiltrosRelatorio(whereParts, params, queryData, 'data_inicio');
+    const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
 
     // Buscar fichas entregues para calcular tempo médio
     const fichasEntregues = await dbAll(`

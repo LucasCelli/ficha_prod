@@ -253,13 +253,18 @@ export const relatorioPeriodoQuerySchema = z.object({
       const text = toTrimmedStringOrUndefined(value);
       return text ? text.toLowerCase() : undefined;
     },
-    z.enum(['mes', 'ano', 'customizado', 'geral']).optional()
+    z.enum(['mes', 'ultimo_mes', 'ano', 'customizado', 'geral']).optional()
   ),
   dataInicio: optionalIsoDateSchema,
-  dataFim: optionalIsoDateSchema
+  dataFim: optionalIsoDateSchema,
+  cliente: optionalTextSchema,
+  clienteDataInicio: optionalIsoDateSchema,
+  clienteDataFim: optionalIsoDateSchema
 }).superRefine((data, ctx) => {
   const hasInicio = Boolean(data.dataInicio);
   const hasFim = Boolean(data.dataFim);
+  const hasClienteInicio = Boolean(data.clienteDataInicio);
+  const hasClienteFim = Boolean(data.clienteDataFim);
 
   if ((hasInicio && !hasFim) || (!hasInicio && hasFim)) {
     ctx.addIssue({
@@ -277,6 +282,60 @@ export const relatorioPeriodoQuerySchema = z.object({
     });
   }
 
+  if (hasInicio && hasFim && data.dataInicio > data.dataFim) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['dataFim'],
+      message: 'dataFim deve ser maior ou igual a dataInicio'
+    });
+  }
+
+  if ((hasClienteInicio && !hasClienteFim) || (!hasClienteInicio && hasClienteFim)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['clienteDataFim'],
+      message: 'Informe clienteDataInicio e clienteDataFim juntos'
+    });
+  }
+
+  if (hasClienteInicio && hasClienteFim && data.clienteDataInicio > data.clienteDataFim) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['clienteDataFim'],
+      message: 'clienteDataFim deve ser maior ou igual a clienteDataInicio'
+    });
+  }
+});
+
+export const relatorioClientesListQuerySchema = z.object({
+  query: optionalTextSchema,
+  limit: z.preprocess(parsePositiveInt, z.number().int().positive().max(100).optional()),
+  offset: z.preprocess(value => {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 0) return undefined;
+    return parsed;
+  }, z.number().int().min(0).optional())
+});
+
+export const relatorioClienteDetalheQuerySchema = z.object({
+  dataInicio: optionalIsoDateSchema,
+  dataFim: optionalIsoDateSchema,
+  fichasLimit: z.preprocess(parsePositiveInt, z.number().int().positive().max(100).optional()),
+  fichasOffset: z.preprocess(value => {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 0) return undefined;
+    return parsed;
+  }, z.number().int().min(0).optional())
+}).superRefine((data, ctx) => {
+  const hasInicio = Boolean(data.dataInicio);
+  const hasFim = Boolean(data.dataFim);
+  if ((hasInicio && !hasFim) || (!hasInicio && hasFim)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['dataFim'],
+      message: 'Informe dataInicio e dataFim juntos'
+    });
+  }
   if (hasInicio && hasFim && data.dataInicio > data.dataFim) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,

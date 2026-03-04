@@ -9,6 +9,7 @@
   let modoVisualizacao = false;
   let fichaVisualizacaoAtual = null;
   let fallbackOrigemLocalId = null;
+  let salvamentoEmAndamento = false;
   const DUPLICACAO_DRAFT_STORAGE_KEY = 'ficha_duplicada_draft_v1';
   const FICHA_FALLBACK_STORAGE_KEY = 'fichas_nao_salvas_fallback_v1';
   const FICHA_FALLBACK_MAX_ITEMS = 20;
@@ -346,6 +347,10 @@
       const usarIds = container === containerPrincipal;
       botoes.forEach(botaoDef => {
         const btn = criarBotao(usarIds ? botaoDef.id : '', botaoDef.classe, botaoDef.icone, botaoDef.texto, botaoDef.onClick);
+        if (botaoDef.id === 'btnSalvarDB') {
+          btn.dataset.action = 'save-db';
+          btn.dataset.defaultHtml = btn.innerHTML;
+        }
         if (botaoDef.alinharDireita) btn.style.marginLeft = 'auto';
         container.appendChild(btn);
       });
@@ -353,6 +358,26 @@
       if (container === containerTopo && !modoVisualizacao) {
         const btnTemplate = criarBotaoCarregarTemplate();
         container.appendChild(btnTemplate);
+      }
+    });
+
+    if (salvamentoEmAndamento) {
+      atualizarEstadoBotoesSalvar(true);
+    }
+  }
+
+  function atualizarEstadoBotoesSalvar(emSalvamento) {
+    const botoesSalvar = document.querySelectorAll('button[data-action="save-db"]');
+    botoesSalvar.forEach(botao => {
+      if (!botao.dataset.defaultHtml) {
+        botao.dataset.defaultHtml = botao.innerHTML;
+      }
+      botao.disabled = emSalvamento;
+      botao.setAttribute('aria-busy', emSalvamento ? 'true' : 'false');
+      if (emSalvamento) {
+        botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Salvando...</span>';
+      } else {
+        botao.innerHTML = botao.dataset.defaultHtml;
       }
     });
   }
@@ -816,6 +841,10 @@
   }
 
   async function salvarNoBanco() {
+    if (salvamentoEmAndamento) return;
+    salvamentoEmAndamento = true;
+    atualizarEstadoBotoesSalvar(true);
+
     let dados = null;
     try {
       dados = coletarDadosFormulario();
@@ -863,6 +892,9 @@
       if (fallback.localOk) detalhes.push('Rascunho guardado localmente na Central.');
       const mensagemFinal = detalhes.length ? `${mensagemErro} ${detalhes.join(' ')}` : mensagemErro;
       mostrarToast(mensagemFinal, 'warning');
+    } finally {
+      salvamentoEmAndamento = false;
+      atualizarEstadoBotoesSalvar(false);
     }
   }
 
@@ -1324,8 +1356,9 @@
 
     // Mostrar campos condicionais
     setTimeout(() => {
-      const acabamentoMangaVal = ficha.acabamentoManga;
-      if (acabamentoMangaVal === 'vies' || acabamentoMangaVal === 'punho') {
+      const acabamentoMangaVal = String(ficha.acabamentoManga || '').trim().toLowerCase();
+      const temAcabamentoMangaExtra = acabamentoMangaVal.startsWith('punho') || acabamentoMangaVal.includes('vies');
+      if (temAcabamentoMangaExtra) {
         const larguraMangaContainer = document.getElementById('larguraMangaContainer');
         const corAcabamentoMangaContainer = document.getElementById('corAcabamentoMangaContainer');
         if (larguraMangaContainer) larguraMangaContainer.style.display = 'block';

@@ -312,7 +312,7 @@
       punho_ribana: 'PUNHO DE RIBANA',
       punho_vies_sublimado: 'PUNHO SUBLIMADO',
       vies_sublimado: 'VIÉS SUBLIMADO',
-      punho: 'PUNHO',
+      punho: 'PUNHO DE RIBANA',
       vies: 'VIÉS'
     };
     if (map[valor]) return map[valor];
