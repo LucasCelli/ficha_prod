@@ -983,6 +983,13 @@
   function prepararDadosParaDuplicacao(dados) {
     if (!dados || typeof dados !== 'object') return null;
 
+    const hoje = new Date();
+    const dataAtualIso = [
+      hoje.getFullYear(),
+      String(hoje.getMonth() + 1).padStart(2, '0'),
+      String(hoje.getDate()).padStart(2, '0')
+    ].join('-');
+
     const payload = { ...dados };
     delete payload.id;
     delete payload.status;
@@ -990,6 +997,10 @@
     delete payload.dataAtualizacao;
     delete payload.data_criacao;
     delete payload.data_atualizacao;
+    payload.dataInicio = dataAtualIso;
+    payload.data_inicio = dataAtualIso;
+    payload.dataEntrega = '';
+    payload.data_entrega = '';
 
     return normalizarObservacoesDuplicacao(payload);
   }

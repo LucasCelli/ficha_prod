@@ -3124,8 +3124,8 @@
       return String(item?.produto || '').trim();
     };
     const catalogoCoresImpressao = [
-      { nome: 'Preto', hex: '#1F1F1F', chaves: ['preto', 'preta'] },
-      { nome: 'Branco', hex: '#C4C8CE', chaves: ['branco', 'branca', 'white'] },
+      { nome: 'Preto', hex: '#000000', chaves: ['preto', 'preta'] },
+      { nome: 'Branco', hex: '#999999', chaves: ['branco', 'branca', 'white'] },
       { nome: 'Azul Royal', hex: '#2F5DA8', chaves: ['azul royal', 'royal'] },
       { nome: 'Azul Marinho', hex: '#1F3A63', chaves: ['azul marinho', 'marinho'] },
       { nome: 'Azul Turquesa', hex: '#2D8C94', chaves: ['azul turquesa', 'turquesa'] },
