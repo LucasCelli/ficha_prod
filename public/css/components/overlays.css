@@ -1,0 +1,68 @@
+.modal,
+.drawer,
+.popover,
+.dropdown-menu {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--modal-bg);
+  color: var(--color-text);
+  box-shadow: var(--shadow-lg);
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal.is-open {
+  display: flex;
+}
+
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--modal-overlay);
+}
+
+.modal-content {
+  position: relative;
+  z-index: 1;
+  width: min(560px, calc(100vw - var(--space-24)));
+  padding: var(--space-20);
+  border-radius: var(--radius-xl);
+  background: var(--modal-bg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 100vw);
+  z-index: var(--z-overlay);
+  border-radius: 0;
+  border-right: 0;
+  border-top: 0;
+  border-bottom: 0;
+  padding: var(--space-16);
+}
+
+.popover {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  min-width: 180px;
+  padding: var(--space-8);
+}
+
+.dropdown-menu {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  min-width: 200px;
+  padding: var(--space-6);
+}

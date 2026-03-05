@@ -18,28 +18,18 @@
     style.textContent = `
       .system-log-modal{
         position:fixed;inset:0;z-index:9999;display:none;
-        --sl-bg:var(--bg-body,#f5f5f7);
-        --sl-surface:var(--surface-soft,#f9fafb);
-        --sl-card:var(--color-white,#ffffff);
-        --sl-border:var(--color-light-1,#e2e8f0);
-        --sl-text:var(--color-dark-1,#111827);
-        --sl-muted:var(--text-soft,#6b7280);
+        --sl-bg:var(--color-bg);
+        --sl-surface:var(--color-surface-soft);
+        --sl-card:var(--color-surface);
+        --sl-border:var(--color-border);
+        --sl-text:var(--color-text);
+        --sl-muted:var(--color-muted);
         --sl-btn-bg:var(--sl-card);
         --sl-btn-hover:var(--sl-surface);
       }
-      html[data-theme='dark'] .system-log-modal{
-        --sl-bg:var(--bg-body,#0b1220);
-        --sl-surface:var(--surface-soft,#0f172a);
-        --sl-card:var(--color-dark-1,#111827);
-        --sl-border:var(--color-dark-2,#1f2937);
-        --sl-text:var(--color-light-1,#e2e8f0);
-        --sl-muted:var(--color-dark-4,#94a3b8);
-        --sl-btn-bg:var(--color-dark-2,#1f2937);
-        --sl-btn-hover:#273449;
-      }
       .system-log-modal.open{display:block}
-      .system-log-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.6)}
-      .system-log-card{position:relative;max-width:920px;margin:4vh auto;background:var(--sl-card);border:1px solid var(--sl-border);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);height:92vh;display:flex;flex-direction:column}
+      .system-log-backdrop{position:absolute;inset:0;background:color-mix(in srgb, var(--color-neutral-900) 60%, transparent)}
+      .system-log-card{position:relative;max-width:920px;margin:4vh auto;background:var(--sl-card);border:1px solid var(--sl-border);border-radius:14px;box-shadow:var(--shadow-xl);height:92vh;display:flex;flex-direction:column}
       .system-log-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--sl-border);background:var(--sl-surface)}
       .system-log-title{font-weight:700;color:var(--sl-text);font-size:14px}
       .system-log-actions{display:flex;gap:8px}
@@ -133,6 +123,9 @@
   }
 
   function escapeHtml(value) {
+    if (window.appUtils && typeof window.appUtils.escapeHtml === 'function') {
+      return window.appUtils.escapeHtml(value);
+    }
     return String(value || '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')

@@ -2094,7 +2094,7 @@
 
   // Impressão
   function ocultarTodosToasts() {
-    const seletores = ['.toast-global', '.toast-custom', '#toast-limite-produtos', '#toast-produtos-mesmo-tamanho'];
+    const seletores = ['.toast-global', '#toast-limite-produtos', '#toast-produtos-mesmo-tamanho'];
     seletores.forEach(seletor => {
       document.querySelectorAll(seletor).forEach(el => {
         el.style.display = 'none';
@@ -2962,7 +2962,7 @@
     const eventoEl = document.getElementById('print-evento');
     if (eventoEl) {
       if (isEvento) {
-        eventoEl.innerHTML = '<span style="color: var(--color-danger-dark); font-weight: 700;">EVENTO</span>';
+        eventoEl.innerHTML = '<span style="color: var(--color-danger-strong); font-weight: 700;">EVENTO</span>';
       } else {
         eventoEl.textContent = 'Não';
       }

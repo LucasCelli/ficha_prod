@@ -261,8 +261,8 @@
       const placeholder = document.createElement('div');
       placeholder.className = 'image-card loading-placeholder';
       placeholder.innerHTML = `
-        <div class="image-wrapper" style="display: flex; align-items: center; justify-content: center; background: var(--color-light-3);">
-          <div style="text-align: center; color: var(--color-dark-3);">
+        <div class="image-wrapper" style="display: flex; align-items: center; justify-content: center; background: var(--color-neutral-100);">
+          <div style="text-align: center; color: var(--color-neutral-600);">
             <i class="fas fa-rotate fa-2x fa-spin"></i>
             <div style="margin-top: 8px; font-size: 12px;">Enviando Layout...</div>
           </div>
@@ -278,6 +278,10 @@
   }
 
   function toast(mensagem, tipo = 'info') {
+    if (window.toast && typeof window.toast.show === 'function') {
+      window.toast.show({ message: mensagem, type: tipo });
+      return;
+    }
     if (typeof window.mostrarToast === 'function') {
       window.mostrarToast(mensagem, tipo);
     }

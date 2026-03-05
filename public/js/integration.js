@@ -10,6 +10,7 @@
   let fichaVisualizacaoAtual = null;
   let fallbackOrigemLocalId = null;
   let salvamentoEmAndamento = false;
+  let chaveIdempotenciaCriacao = null;
   const DUPLICACAO_DRAFT_STORAGE_KEY = 'ficha_duplicada_draft_v1';
   const FICHA_FALLBACK_STORAGE_KEY = 'fichas_nao_salvas_fallback_v1';
   const FICHA_FALLBACK_MAX_ITEMS = 20;
@@ -94,6 +95,17 @@
     v_polo: 'Gola V Polo'
   });
   let templateLoaderState = null;
+
+  function obterChaveIdempotenciaCriacao() {
+    if (chaveIdempotenciaCriacao) return chaveIdempotenciaCriacao;
+
+    const randomPart = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2, 12);
+
+    chaveIdempotenciaCriacao = `ficha-create-${Date.now()}-${randomPart}`;
+    return chaveIdempotenciaCriacao;
+  }
 
   function normalizarComNomesValor(valor) {
     if (valor === true) return '1';
@@ -240,8 +252,8 @@
     };
 
     if (modoVisualizacao) {
-      botoes.push({ id: 'btnImprimir', classe: 'btn-primary', icone: 'fa-print', texto: 'Imprimir', onClick: acaoImprimir });
-      botoes.push({ id: 'btnDuplicar', classe: 'btn-success', icone: 'fa-copy', texto: 'Duplicar Ficha', onClick: duplicarFicha });
+      botoes.push({ id: 'btnImprimir', classe: 'btn-secondary', extraClasse: 'btn-action-print', icone: 'fa-print', texto: 'Imprimir', onClick: acaoImprimir });
+      botoes.push({ id: 'btnDuplicar', classe: 'btn-primary', icone: 'fa-copy', texto: 'Duplicar Ficha', onClick: duplicarFicha });
       botoes.push({
         id: 'btnEditar',
         classe: 'btn-warning',
@@ -266,11 +278,12 @@
       botoes.push({
         id: 'btnSalvarDB',
         classe: 'btn-success',
+        extraClasse: 'btn-action-save',
         icone: 'fa-save',
         texto: `Atualizar Ficha #${fichaAtualId}`,
         onClick: salvarNoBanco
       });
-      botoes.push({ id: 'btnImprimir', classe: 'btn-warning', icone: 'fa-print', texto: 'Imprimir', onClick: acaoImprimir });
+      botoes.push({ id: 'btnImprimir', classe: 'btn-secondary', extraClasse: 'btn-action-print', icone: 'fa-print', texto: 'Imprimir', onClick: acaoImprimir });
       botoes.push({
         id: 'btnBaixar',
         classe: 'btn-secondary',
@@ -282,7 +295,7 @@
       });
       botoes.push({
         id: 'btnCarregar',
-        classe: 'btn-secondary',
+        classe: 'btn-warning',
         icone: 'fa-upload',
         texto: 'Carregar Ficha',
         onClick: () => {
@@ -291,7 +304,7 @@
       });
       botoes.push({
         id: 'btnDashboard',
-        classe: 'btn-primary',
+        classe: 'btn-secondary',
         icone: 'fa-chart-line',
         texto: 'Painel de Controle',
         onClick: () => {
@@ -302,7 +315,7 @@
       botoes.push(botaoHomeHub);
       botoes.push({
         id: 'btnNovaFicha',
-        classe: 'btn-success',
+        classe: 'btn-primary',
         icone: 'fa-plus',
         texto: 'Nova Ficha',
         onClick: () => {
@@ -310,8 +323,8 @@
         }
       });
     } else {
-      botoes.push({ id: 'btnSalvarDB', classe: 'btn-success', icone: 'fa-save', texto: 'Salvar Ficha', onClick: salvarNoBanco });
-      botoes.push({ id: 'btnImprimir', classe: 'btn-warning', icone: 'fa-print', texto: 'Imprimir', onClick: acaoImprimir });
+      botoes.push({ id: 'btnSalvarDB', classe: 'btn-success', extraClasse: 'btn-action-save', icone: 'fa-save', texto: 'Salvar Ficha', onClick: salvarNoBanco });
+      botoes.push({ id: 'btnImprimir', classe: 'btn-secondary', extraClasse: 'btn-action-print', icone: 'fa-print', texto: 'Imprimir', onClick: acaoImprimir });
       botoes.push({
         id: 'btnBaixar',
         classe: 'btn-secondary',
@@ -323,7 +336,7 @@
       });
       botoes.push({
         id: 'btnCarregar',
-        classe: 'btn-secondary',
+        classe: 'btn-warning',
         icone: 'fa-upload',
         texto: 'Carregar Ficha',
         onClick: () => {
@@ -332,7 +345,7 @@
       });
       botoes.push({
         id: 'btnDashboard',
-        classe: 'btn-primary',
+        classe: 'btn-secondary',
         icone: 'fa-chart-line',
         texto: 'Painel de Controle',
         onClick: () => {
@@ -346,7 +359,7 @@
     containers.forEach(container => {
       const usarIds = container === containerPrincipal;
       botoes.forEach(botaoDef => {
-        const btn = criarBotao(usarIds ? botaoDef.id : '', botaoDef.classe, botaoDef.icone, botaoDef.texto, botaoDef.onClick);
+        const btn = criarBotao(usarIds ? botaoDef.id : '', botaoDef.classe, botaoDef.icone, botaoDef.texto, botaoDef.onClick, botaoDef.extraClasse);
         if (botaoDef.id === 'btnSalvarDB') {
           btn.dataset.action = 'save-db';
           btn.dataset.defaultHtml = btn.innerHTML;
@@ -382,11 +395,11 @@
     });
   }
 
-  function criarBotao(id, classe, icone, texto, onClick) {
+  function criarBotao(id, classe, icone, texto, onClick, extraClasse = '') {
     const btn = document.createElement('button');
     if (id) btn.id = id;
     btn.type = 'button';
-    btn.className = `btn ${classe}`;
+    btn.className = `btn ${classe}${extraClasse ? ` ${extraClasse}` : ''}`;
     btn.innerHTML = `<i class="fas ${icone}"></i><span>${texto}</span>`;
     btn.addEventListener('click', onClick);
     return btn;
@@ -857,10 +870,16 @@
         dados.id = fichaAtualId;
       }
 
+      const criandoNovaFicha = !fichaAtualId;
+      if (criandoNovaFicha) {
+        dados.__idempotencyKey = obterChaveIdempotenciaCriacao();
+      }
+
       const id = await db.salvarFicha(dados);
 
       if (!fichaAtualId) {
         fichaAtualId = id;
+        chaveIdempotenciaCriacao = null;
 
         const novaUrl = new URL(window.location.href);
         novaUrl.searchParams.set('editar', id);
@@ -1166,6 +1185,7 @@
       }
 
       fichaAtualId = id;
+      chaveIdempotenciaCriacao = null;
 
       const ficha = converterBancoParaForm(fichaBanco);
 
@@ -1192,6 +1212,7 @@
       }
 
       fichaAtualId = id;
+      chaveIdempotenciaCriacao = null;
 
       const ficha = converterBancoParaForm(fichaBanco);
 
@@ -1442,67 +1463,14 @@
   // Toast
 
   function mostrarToast(mensagem, tipo = 'success') {
-    const existente = document.querySelector('.toast-custom');
-    if (existente) existente.remove();
-
-    const icons = {
-      success: 'fa-check-circle',
-      error: 'fa-exclamation-circle',
-      warning: 'fa-exclamation-triangle'
-    };
-
-    const cores = {
-      success: 'var(--toast-bg-success)',
-      error: 'var(--toast-bg-error)',
-      warning: 'var(--toast-bg-warning)'
-    };
-
-    const toast = document.createElement('div');
-    toast.className = 'toast-custom';
-    toast.innerHTML = `<i class="fas ${icons[tipo]}"></i><span>${mensagem}</span>`;
-    toast.style.cssText = `
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 16px 24px;
-      border-radius: var(--radius-xl);
-      color: var(--toast-text-color);
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      z-index: 10001;
-      box-shadow: var(--shadow-lg);
-      background: ${cores[tipo]};
-      animation: toastIn 0.4s ease;
-    `;
-
-    if (!document.getElementById('toastStyles')) {
-      const style = document.createElement('style');
-      style.id = 'toastStyles';
-      style.textContent = `
-        @keyframes toastIn {
-          from { transform: translateX(-50%) translateY(100%); opacity: 0; }
-          to { transform: translateX(-50%) translateY(0); opacity: 1; }
-        }
-        @keyframes toastOut {
-          from { transform: translateX(-50%) translateY(0); opacity: 1; }
-          to { transform: translateX(-50%) translateY(100%); opacity: 0; }
-        }
-      `;
-      document.head.appendChild(style);
+    if (window.toast && typeof window.toast.show === 'function') {
+      window.toast.show({ message: mensagem, type: tipo });
+      return;
     }
-
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-      toast.style.animation = 'toastOut 0.4s ease forwards';
-      setTimeout(() => toast.remove(), 400);
-    }, 3000);
+    if (typeof window.mostrarToast === 'function' && window.mostrarToast !== mostrarToast) {
+      window.mostrarToast(mensagem, tipo);
+    }
   }
-
-  window.mostrarToast = mostrarToast;
 
   window.dbIntegration = {
     salvarNoBanco,

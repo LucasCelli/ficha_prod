@@ -1,0 +1,9 @@
+html[data-theme='dark'] body {
+  background: var(--color-bg) !important;
+}
+
+html[data-theme='dark'] *,
+html[data-theme='dark'] *::before,
+html[data-theme='dark'] *::after {
+  box-shadow: none !important;
+}

@@ -1,0 +1,9 @@
+:root {
+  --shadow-xs: 0 1px 2px var(--shadow-color-xs);
+  --shadow-sm: 0 2px 6px var(--shadow-color-sm);
+  --shadow-md: 0 6px 16px var(--shadow-color-md);
+  --shadow-lg: 0 12px 24px var(--shadow-color-lg);
+  --shadow-xl: var(--shadow-lg);
+  --shadow-focus-neutral: 0 0 0 2px var(--shadow-focus-color);
+  --shadow-text-soft: 0 1px 1px var(--shadow-text-color);
+}

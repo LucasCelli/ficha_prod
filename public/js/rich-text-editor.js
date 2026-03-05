@@ -7,18 +7,18 @@
   let lastSafeAutoFillHtml = null;
   let pendingSafeUndo = false;
   const RTE_SWATCHES = [
-    { token: '--color-dark-1', title: 'Preto' },
+    { token: '--color-neutral-900', title: 'Preto' },
     { token: '--color-danger', title: 'Vermelho' },
     { token: '--color-warning', title: 'Laranja' },
     { token: '--color-warning', title: 'Amarelo Escuro' },
     { token: '--color-success', title: 'Verde' },
-    { token: '--color-primary-main', title: 'Ciano' },
-    { token: '--color-primary-main', title: 'Azul' },
-    { token: '--color-primary-darker', title: 'Roxo' },
+    { token: '--color-primary', title: 'Ciano' },
+    { token: '--color-primary', title: 'Azul' },
+    { token: '--color-primary-strong', title: 'Roxo' },
     { token: '--color-danger', title: 'Magenta' },
     { token: '--color-danger', title: 'Rosa' },
-    { token: '--color-dark-3', title: 'Cinza' },
-    { token: '--color-white', title: 'Branco', borderToken: '--color-light-1' }
+    { token: '--color-neutral-600', title: 'Cinza' },
+    { token: '--color-neutral-0', title: 'Branco', borderToken: '--color-neutral-200' }
   ];
 
   function getCssVar(token, fallback = '') {
@@ -37,7 +37,7 @@
     const oldContent = oldTextarea.value;
 
     // Criar estrutura do editor
-    currentColor = getCssVar('--color-dark-1', getCssVar('--color-dark-1', 'black'));
+    currentColor = getCssVar('--color-neutral-900', getCssVar('--color-neutral-900', 'black'));
     const wrapper = document.createElement('div');
     wrapper.className = 'rich-text-wrapper';
     wrapper.innerHTML = `
@@ -134,7 +134,7 @@
         swatch.className = 'color-swatch';
         swatch.title = swatchDef.title;
         swatch.dataset.token = swatchDef.token;
-        const resolvedColor = getCssVar(swatchDef.token, getCssVar('--color-dark-1', 'black'));
+        const resolvedColor = getCssVar(swatchDef.token, getCssVar('--color-neutral-900', 'black'));
         swatch.dataset.color = resolvedColor;
         swatch.style.background = `var(${swatchDef.token})`;
         if (swatchDef.borderToken) {
@@ -199,7 +199,7 @@
         e.preventDefault();
         e.stopPropagation();
         const token = swatch.dataset.token;
-        const color = token ? getCssVar(token, swatch.dataset.color || getCssVar('--color-dark-1', 'black')) : swatch.dataset.color;
+        const color = token ? getCssVar(token, swatch.dataset.color || getCssVar('--color-neutral-900', 'black')) : swatch.dataset.color;
         currentColor = color;
         colorIndicator.style.backgroundColor = color;
         colorPicker.value = color;

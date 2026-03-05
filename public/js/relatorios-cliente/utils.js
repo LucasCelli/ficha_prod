@@ -1,4 +1,7 @@
 export function debounce(fn, wait = 300) {
+  if (window.appUtils && typeof window.appUtils.debounce === 'function') {
+    return window.appUtils.debounce(fn, wait);
+  }
   let timeoutId = null;
   return (...args) => {
     clearTimeout(timeoutId);
@@ -7,6 +10,9 @@ export function debounce(fn, wait = 300) {
 }
 
 export function normalizeText(value) {
+  if (window.appUtils && typeof window.appUtils.normalizeText === 'function') {
+    return window.appUtils.normalizeText(value);
+  }
   return String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -15,6 +21,9 @@ export function normalizeText(value) {
 }
 
 export function formatDatePtBr(value) {
+  if (window.appUtils && typeof window.appUtils.formatDateBrIso === 'function') {
+    return window.appUtils.formatDateBrIso(value, '—');
+  }
   const text = String(value || '').trim();
   if (!text) return '—';
   if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
@@ -29,9 +38,15 @@ export function formatNumber(value) {
 }
 
 export function escapeHtml(value) {
-  const div = document.createElement('div');
-  div.textContent = String(value || '');
-  return div.innerHTML;
+  if (window.appUtils && typeof window.appUtils.escapeHtml === 'function') {
+    return window.appUtils.escapeHtml(value);
+  }
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 export function toIsoDate(date) {

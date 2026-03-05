@@ -108,6 +108,9 @@ class APIClient {
       : `${this.baseURL}/fichas`;
 
     const method = dados.id ? 'PUT' : 'POST';
+    const idempotencyKey = method === 'POST'
+      ? String(dados.__idempotencyKey || '').trim()
+      : '';
 
     const comNomesNumero = (() => {
       if (dados.comNomes === true) return 1;
@@ -158,9 +161,14 @@ class APIClient {
       imagensData: dados.imagensData || '[]'
     };
 
+    const headers = { 'Content-Type': 'application/json' };
+    if (idempotencyKey) {
+      headers['Idempotency-Key'] = idempotencyKey;
+    }
+
     const response = await fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(dadosEnvio)
     });
 

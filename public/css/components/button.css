@@ -1,0 +1,91 @@
+.btn,
+button.btn,
+input[type="button"].btn,
+input[type="submit"].btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  min-height: 36px;
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--button-border);
+  border-radius: var(--radius-md);
+  background: var(--button-bg);
+  color: var(--button-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.btn:hover {
+  background: var(--button-hover);
+}
+
+.btn:active {
+  background: var(--button-active);
+  transform: translateY(1px);
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--input-focus);
+}
+
+.btn[disabled],
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  transform: none;
+}
+
+.btn-primary {
+  background: var(--button-brand-bg);
+  color: var(--button-brand-text);
+  border-color: var(--button-brand-border);
+}
+
+.btn-primary:hover {
+  background: var(--button-brand-hover);
+}
+
+.btn-success {
+  background: var(--button-success-bg);
+  color: var(--button-success-text);
+  border-color: var(--button-success-border);
+}
+
+.btn-success:hover {
+  background: var(--button-success-hover);
+}
+
+.btn-warning {
+  background: var(--button-warning-bg);
+  color: var(--button-warning-text);
+  border-color: var(--button-warning-border);
+}
+
+.btn-warning:hover {
+  background: var(--button-warning-hover);
+}
+
+.btn-danger {
+  background: var(--button-danger-bg);
+  color: var(--button-danger-text);
+  border-color: var(--button-danger-border);
+}
+
+.btn-danger:hover {
+  background: var(--button-danger-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+}
+
+.btn-outline {
+  background: transparent;
+  border-color: var(--button-brand-border);
+  color: var(--button-brand-text);
+}

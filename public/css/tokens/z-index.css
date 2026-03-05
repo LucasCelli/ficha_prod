@@ -1,0 +1,10 @@
+:root {
+  --z-base: 1;
+  --z-dropdown: 1200;
+  --z-sticky: 1300;
+  --z-overlay: 2000;
+  --z-tooltip: 2400;
+  --z-modal: 2600;
+  --z-toast: 2800;
+  --z-elevated: var(--z-sticky);
+}

@@ -23,12 +23,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/design-tokens.css">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/components/index.css">
     <link rel="stylesheet" href="css/dashboard.css">
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 </head>
 
-<body>
+<body class="page-dashboard">
     <div class="container">
         <header>
             <div class="header-content">
@@ -52,7 +53,7 @@
                         <i class="fas fa-chart-bar"></i>
                         <span>Relatórios</span>
                     </a>
-                    <a href="ficha.html" class="btn btn-primary">
+                    <a href="ficha.html" class="btn btn-primary btn-new-ficha-highlight">
                         <i class="fas fa-plus"></i>
                         <span>Nova Ficha</span>
                     </a>
@@ -210,9 +211,11 @@
 
     <script src="js/theme.js"></script>
     <script src="js/system-log.js"></script>
-    <script src="js/toast.js"></script>
+    <script src="js/utils/common.js"></script>
+    <script src="js/utils/toast.js"></script>
     <script src="js/api-client.js"></script>
-    <script src="js/dashboard.js"></script>
+    <script type="module" src="js/dashboard/main.js"></script>
+    <script nomodule src="js/dashboard.js"></script>
 </body>
 
 </html>

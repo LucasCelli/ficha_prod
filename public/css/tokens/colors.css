@@ -1,0 +1,321 @@
+:root {
+  --primitive-neutral-0: #FFFFFF;
+  --primitive-neutral-50: #F8FAFC;
+  --primitive-neutral-100: #F1F5F9;
+  --primitive-neutral-200: #E2E8F0;
+  --primitive-neutral-300: #CBD5E1;
+  --primitive-neutral-400: #94A3B8;
+  --primitive-neutral-500: #64748B;
+  --primitive-neutral-600: #475569;
+  --primitive-neutral-700: #334155;
+  --primitive-neutral-800: #1E293B;
+  --primitive-neutral-900: #0F172A;
+  --primitive-neutral-950: #020617;
+
+  --primitive-brand-50: #EFF6FF;
+  --primitive-brand-100: #DBEAFE;
+  --primitive-brand-200: #BFDBFE;
+  --primitive-brand-300: #93C5FD;
+  --primitive-brand-400: #60A5FA;
+  --primitive-brand-500: #3B82F6;
+  --primitive-brand-600: #2563EB;
+  --primitive-brand-700: #1D4ED8;
+  --primitive-brand-800: #1E40AF;
+  --primitive-brand-900: #1E3A8A;
+
+  --primitive-blue-50: #EFF6FF;
+  --primitive-blue-100: #DBEAFE;
+  --primitive-blue-200: #BFDBFE;
+  --primitive-blue-300: #93C5FD;
+  --primitive-blue-400: #60A5FA;
+  --primitive-blue-500: #3B82F6;
+  --primitive-blue-600: #2563EB;
+  --primitive-blue-700: #1D4ED8;
+  --primitive-blue-800: #1E40AF;
+  --primitive-blue-900: #1E3A8A;
+
+  --primitive-green-50: #F0FDF4;
+  --primitive-green-100: #DCFCE7;
+  --primitive-green-200: #BBF7D0;
+  --primitive-green-300: #86EFAC;
+  --primitive-green-400: #4ADE80;
+  --primitive-green-500: #22C55E;
+  --primitive-green-600: #16A34A;
+  --primitive-green-700: #15803D;
+  --primitive-green-800: #166534;
+  --primitive-green-900: #14532D;
+
+  --primitive-yellow-50: #FFFBEB;
+  --primitive-yellow-100: #FEF3C7;
+  --primitive-yellow-200: #FDE68A;
+  --primitive-yellow-300: #FCD34D;
+  --primitive-yellow-400: #FBBF24;
+  --primitive-yellow-500: #F59E0B;
+  --primitive-yellow-600: #D97706;
+  --primitive-yellow-700: #B45309;
+  --primitive-yellow-800: #92400E;
+  --primitive-yellow-900: #78350F;
+
+  --primitive-red-50: #FEF2F2;
+  --primitive-red-100: #FEE2E2;
+  --primitive-red-200: #FECACA;
+  --primitive-red-300: #FCA5A5;
+  --primitive-red-400: #F87171;
+  --primitive-red-500: #EF4444;
+  --primitive-red-600: #DC2626;
+  --primitive-red-700: #B91C1C;
+  --primitive-red-800: #991B1B;
+  --primitive-red-900: #7F1D1D;
+
+  --color-bg: var(--primitive-neutral-50);
+  --color-surface: var(--primitive-neutral-0);
+  --color-surface-2: var(--primitive-neutral-100);
+  --color-surface-3: var(--primitive-neutral-200);
+  --color-text: var(--primitive-neutral-900);
+  --color-text-secondary: var(--primitive-neutral-700);
+  --color-text-muted: var(--primitive-neutral-500);
+  --color-border: var(--primitive-neutral-300);
+  --color-border-soft: var(--primitive-neutral-200);
+  --color-brand: var(--primitive-brand-600);
+  --color-primary: var(--color-brand);
+  --color-success: var(--primitive-green-700);
+  --color-warning: var(--primitive-yellow-700);
+  --color-danger: var(--primitive-red-700);
+  --color-info: var(--primitive-blue-700);
+
+  --color-muted: var(--color-text-muted);
+  --color-surface-soft: var(--color-surface-2);
+  --color-text-inverse: var(--primitive-neutral-0);
+  --color-primary-soft: var(--primitive-brand-100);
+  --color-primary-strong: var(--primitive-brand-700);
+  --color-primary-contrast: var(--primitive-neutral-0);
+  --color-success-soft: var(--primitive-green-100);
+  --color-success-strong: var(--primitive-green-800);
+  --color-warning-soft: var(--primitive-yellow-100);
+  --color-warning-strong: var(--primitive-yellow-800);
+  --color-danger-soft: var(--primitive-red-100);
+  --color-danger-strong: var(--primitive-red-800);
+  --color-info-soft: var(--primitive-blue-100);
+  --color-info-strong: var(--primitive-blue-800);
+
+  --color-neutral-0: var(--primitive-neutral-0);
+  --color-neutral-50: var(--primitive-neutral-50);
+  --color-neutral-100: var(--primitive-neutral-100);
+  --color-neutral-200: var(--primitive-neutral-200);
+  --color-neutral-300: var(--primitive-neutral-300);
+  --color-neutral-400: var(--primitive-neutral-400);
+  --color-neutral-500: var(--primitive-neutral-500);
+  --color-neutral-600: var(--primitive-neutral-600);
+  --color-neutral-700: var(--primitive-neutral-700);
+  --color-neutral-800: var(--primitive-neutral-800);
+  --color-neutral-900: var(--primitive-neutral-900);
+  --color-neutral-950: var(--primitive-neutral-950);
+
+  --color-overlay-soft: rgba(15, 23, 42, 0.08);
+  --color-overlay-medium: rgba(15, 23, 42, 0.16);
+  --color-overlay-strong: rgba(15, 23, 42, 0.32);
+  --color-overlay-heavy: rgba(2, 6, 23, 0.62);
+
+  --shadow-color-xs: rgba(15, 23, 42, 0.06);
+  --shadow-color-sm: rgba(15, 23, 42, 0.08);
+  --shadow-color-md: rgba(15, 23, 42, 0.12);
+  --shadow-color-lg: rgba(15, 23, 42, 0.16);
+  --shadow-focus-color: rgba(37, 99, 235, 0.22);
+  --shadow-text-color: rgba(15, 23, 42, 0.2);
+
+  --button-bg: var(--color-surface-2);
+  --button-text: var(--color-text-secondary);
+  --button-border: var(--color-border);
+  --button-hover: var(--color-surface-3);
+  --button-active: var(--color-surface-3);
+  --button-brand-bg: var(--color-primary-soft);
+  --button-brand-text: var(--color-primary-strong);
+  --button-brand-border: var(--color-brand);
+  --button-brand-hover: color-mix(in srgb, var(--color-primary-soft) 70%, var(--color-brand));
+  --button-success-bg: var(--color-success-soft);
+  --button-success-text: var(--color-success-strong);
+  --button-success-border: var(--color-success);
+  --button-success-hover: color-mix(in srgb, var(--color-success-soft) 70%, var(--color-success));
+  --button-warning-bg: var(--color-warning-soft);
+  --button-warning-text: var(--color-warning-strong);
+  --button-warning-border: var(--color-warning);
+  --button-warning-hover: color-mix(in srgb, var(--color-warning-soft) 70%, var(--color-warning));
+  --button-danger-bg: var(--color-danger-soft);
+  --button-danger-text: var(--color-danger-strong);
+  --button-danger-border: var(--color-danger);
+  --button-danger-hover: color-mix(in srgb, var(--color-danger-soft) 70%, var(--color-danger));
+
+  --input-bg: var(--color-surface);
+  --input-border: var(--color-border);
+  --input-text: var(--color-text);
+  --input-placeholder: var(--color-text-muted);
+  --input-focus: var(--color-brand);
+
+  --card-bg: var(--color-surface);
+  --card-border: var(--color-border);
+  --card-shadow: var(--shadow-sm);
+
+  --modal-bg: var(--color-surface);
+  --modal-overlay: var(--color-overlay-heavy);
+
+  --toast-bg: var(--color-surface);
+  --toast-text: var(--color-text);
+  --toast-border: var(--color-border);
+  --toast-text-color: var(--color-primary-contrast);
+  --toast-bg-success: linear-gradient(135deg, var(--primitive-green-500) 0%, var(--primitive-green-600) 45%, var(--primitive-green-700) 100%);
+  --toast-bg-error: linear-gradient(135deg, var(--primitive-red-400) 0%, var(--primitive-red-500) 45%, var(--primitive-red-700) 100%);
+  --toast-bg-warning: linear-gradient(135deg, var(--primitive-yellow-500) 0%, var(--primitive-yellow-600) 48%, var(--primitive-yellow-700) 100%);
+  --toast-bg-info: linear-gradient(135deg, var(--primitive-blue-400) 0%, var(--primitive-blue-500) 45%, var(--primitive-blue-700) 100%);
+
+  --table-bg: var(--color-surface);
+  --table-border: var(--color-border);
+  --table-row-hover: var(--color-surface-2);
+
+  --chip-bg: var(--color-surface-2);
+  --chip-text: var(--color-text-secondary);
+  --badge-bg: var(--color-primary-soft);
+  --badge-text: var(--color-primary-strong);
+
+  --alert-success-bg: var(--color-success-soft);
+  --alert-success-text: var(--color-success-strong);
+  --alert-warning-bg: var(--color-warning-soft);
+  --alert-warning-text: var(--color-warning-strong);
+  --alert-danger-bg: var(--color-danger-soft);
+  --alert-danger-text: var(--color-danger-strong);
+  --alert-info-bg: var(--color-info-soft);
+  --alert-info-text: var(--color-info-strong);
+
+  --sidebar-bg: var(--color-surface);
+  --sidebar-border: var(--color-border);
+  --sidebar-item-hover: var(--color-surface-2);
+  --sidebar-item-active: var(--color-primary-soft);
+  --navbar-bg: var(--color-surface);
+  --navbar-border: var(--color-border);
+  --color-header-bg-start: color-mix(in srgb, var(--primitive-neutral-900) 90%, var(--primitive-neutral-950));
+  --color-header-bg-end: var(--primitive-neutral-800);
+
+  --metric-positive: var(--color-success);
+  --metric-negative: var(--color-danger);
+  --metric-neutral: var(--color-text-muted);
+  --kpi-bg: var(--color-surface);
+  --kpi-border: var(--color-border);
+  --kpi-title: var(--color-text-secondary);
+  --kpi-value: var(--color-text);
+  --chart-1: var(--primitive-blue-500);
+  --chart-2: var(--primitive-green-500);
+  --chart-3: var(--primitive-yellow-500);
+  --chart-4: var(--primitive-red-500);
+  --chart-5: var(--primitive-brand-700);
+}
+
+html[data-theme='dark'] {
+  --color-bg: color-mix(in srgb, var(--color-surface) 90%, var(--primitive-neutral-950));
+  --color-surface: var(--primitive-neutral-900);
+  --color-surface-2: var(--primitive-neutral-800);
+  --color-surface-3: var(--primitive-neutral-700);
+  --color-text: var(--primitive-neutral-100);
+  --color-text-secondary: var(--primitive-neutral-300);
+  --color-text-muted: var(--primitive-neutral-400);
+  --color-border: var(--primitive-neutral-800);
+  --color-border-soft: var(--primitive-neutral-800);
+  --color-brand: var(--primitive-brand-500);
+  --color-primary: var(--color-brand);
+  --color-success: var(--primitive-green-500);
+  --color-warning: var(--primitive-yellow-500);
+  --color-danger: var(--primitive-red-500);
+  --color-info: var(--primitive-blue-500);
+
+  --color-muted: var(--color-text-muted);
+  --color-surface-soft: var(--color-surface-2);
+  --color-text-inverse: var(--primitive-neutral-0);
+  --color-primary-soft: color-mix(in srgb, var(--primitive-brand-500) 16%, var(--primitive-neutral-900));
+  --color-primary-strong: var(--primitive-brand-200);
+  --color-primary-contrast: var(--primitive-neutral-950);
+  --color-success-soft: color-mix(in srgb, var(--primitive-green-500) 16%, var(--primitive-neutral-900));
+  --color-success-strong: var(--primitive-green-200);
+  --color-warning-soft: color-mix(in srgb, var(--primitive-yellow-500) 16%, var(--primitive-neutral-900));
+  --color-warning-strong: var(--primitive-yellow-200);
+  --color-danger-soft: color-mix(in srgb, var(--primitive-red-500) 16%, var(--primitive-neutral-900));
+  --color-danger-strong: var(--primitive-red-200);
+  --color-info-soft: color-mix(in srgb, var(--primitive-blue-500) 14%, var(--primitive-neutral-900));
+  --color-info-strong: color-mix(in srgb, var(--primitive-blue-500) 22%, var(--primitive-neutral-900));
+
+  --color-overlay-soft: rgba(2, 6, 23, 0.36);
+  --color-overlay-medium: rgba(2, 6, 23, 0.48);
+  --color-overlay-strong: rgba(0, 0, 0, 0.62);
+  --color-overlay-heavy: rgba(0, 0, 0, 0.82);
+
+  --shadow-color-xs: rgba(0, 0, 0, 0.34);
+  --shadow-color-sm: rgba(0, 0, 0, 0.42);
+  --shadow-color-md: rgba(0, 0, 0, 0.52);
+  --shadow-color-lg: rgba(0, 0, 0, 0.62);
+  --shadow-focus-color: rgba(96, 165, 250, 0.42);
+  --shadow-text-color: rgba(2, 6, 23, 0.62);
+
+  --button-bg: color-mix(in srgb, var(--color-surface-3) 56%, var(--color-surface));
+  --button-text: var(--color-text);
+  --button-border: var(--color-border);
+  --button-hover: var(--color-surface-3);
+  --button-active: var(--color-surface-3);
+  --button-brand-bg: color-mix(in srgb, var(--color-brand) 24%, var(--color-surface));
+  --button-brand-text: var(--primitive-brand-100);
+  --button-brand-border: color-mix(in srgb, var(--color-brand) 56%, var(--color-border));
+  --button-brand-hover: color-mix(in srgb, var(--color-brand) 34%, var(--color-surface));
+  --button-success-bg: color-mix(in srgb, var(--color-success) 26%, var(--color-surface));
+  --button-success-text: var(--primitive-green-100);
+  --button-success-border: color-mix(in srgb, var(--color-success) 56%, var(--color-border));
+  --button-success-hover: color-mix(in srgb, var(--color-success) 34%, var(--color-surface));
+  --button-warning-bg: color-mix(in srgb, var(--color-warning) 26%, var(--color-surface));
+  --button-warning-text: var(--primitive-yellow-100);
+  --button-warning-border: color-mix(in srgb, var(--color-warning) 56%, var(--color-border));
+  --button-warning-hover: color-mix(in srgb, var(--color-warning) 34%, var(--color-surface));
+  --button-danger-bg: color-mix(in srgb, var(--color-danger) 24%, var(--color-surface));
+  --button-danger-text: var(--primitive-red-100);
+  --button-danger-border: color-mix(in srgb, var(--color-danger) 56%, var(--color-border));
+  --button-danger-hover: color-mix(in srgb, var(--color-danger) 32%, var(--color-surface));
+
+  --input-bg: var(--color-surface-2);
+  --input-border: var(--color-border);
+  --input-text: var(--color-text);
+  --input-placeholder: var(--color-text-muted);
+  --input-focus: var(--color-brand);
+
+  --card-bg: var(--color-surface);
+  --card-border: var(--color-border);
+  --card-shadow: var(--shadow-md);
+
+  --modal-bg: var(--color-surface);
+  --modal-overlay: var(--color-overlay-heavy);
+  --toast-bg: var(--color-surface);
+  --toast-text: var(--color-text);
+  --toast-border: var(--color-border);
+  --table-bg: var(--color-surface);
+  --table-border: var(--color-border);
+  --table-row-hover: var(--color-surface-2);
+  --chip-bg: var(--color-surface-2);
+  --chip-text: var(--color-text-secondary);
+  --badge-bg: var(--color-primary-soft);
+  --badge-text: var(--color-primary-strong);
+
+  --sidebar-bg: var(--color-surface);
+  --sidebar-border: var(--color-border);
+  --sidebar-item-hover: var(--color-surface-2);
+  --sidebar-item-active: var(--color-primary-soft);
+  --navbar-bg: var(--color-surface);
+  --navbar-border: var(--color-border);
+  --color-header-bg-start: color-mix(in srgb, var(--primitive-neutral-900) 90%, var(--primitive-neutral-950));
+  --color-header-bg-end: var(--primitive-neutral-800);
+
+  --metric-positive: var(--color-success);
+  --metric-negative: var(--color-danger);
+  --metric-neutral: var(--color-text-muted);
+  --kpi-bg: var(--color-surface);
+  --kpi-border: var(--color-border);
+  --kpi-title: var(--color-text-secondary);
+  --kpi-value: var(--color-text);
+  --chart-1: var(--primitive-blue-300);
+  --chart-2: var(--primitive-green-300);
+  --chart-3: var(--primitive-yellow-300);
+  --chart-4: var(--primitive-red-300);
+  --chart-5: var(--primitive-brand-300);
+}

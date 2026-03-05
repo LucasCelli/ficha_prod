@@ -5,3 +5,5 @@ data/*.db-shm
 .env
 *.log
 .DS_Store
+agents.md
+refactor-plan.md

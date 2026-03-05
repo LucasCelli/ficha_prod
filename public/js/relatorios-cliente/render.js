@@ -60,9 +60,16 @@ export function renderDetailEmpty() {
   const el = document.getElementById('clienteDetailContent');
   if (!el) return;
   el.innerHTML = `
-    <div class="empty-placeholder">
-      <i class="fas fa-hand-pointer"></i>
-      <p>Selecione um cliente para ver o relatório.</p>
+    <div class="empty-placeholder empty-placeholder--report">
+      <div class="empty-placeholder-icon">
+        <i class="fas fa-file-lines"></i>
+      </div>
+      <h3>Nenhuma ficha selecionada</h3>
+      <p>Selecione um cliente na lista para visualizar o resumo de fichas, produtos e histórico.</p>
+      <div class="empty-placeholder-hint">
+        <i class="fas fa-arrow-left"></i>
+        <span>Use a busca para encontrar o cliente mais rápido.</span>
+      </div>
     </div>
   `;
 }
@@ -125,9 +132,9 @@ export function renderDetailReport({
           ${escapeHtml(cliente.nome || 'Cliente')}
         </h2>
         <div class="cliente-kpis">
-          ${chip('fas fa-hashtag', 'chip-tone-info', 'Pedidos', formatNumber(kpis.quantidadePedidos || 0))}
-          ${chip('fas fa-calendar-plus', 'chip-tone-success', 'Primeiro pedido', formatDatePtBr(kpis.primeiroPedido))}
-          ${chip('fas fa-calendar-check', 'chip-tone-accent', 'Último pedido', formatDatePtBr(kpis.ultimoPedido))}
+          ${chip('fas fa-hashtag', 'chip-tone-info', 'Fichas', formatNumber(kpis.quantidadePedidos || 0))}
+          ${chip('fas fa-calendar-plus', 'chip-tone-success', 'Primeira ficha', formatDatePtBr(kpis.primeiroPedido))}
+          ${chip('fas fa-calendar-check', 'chip-tone-accent', 'Última ficha', formatDatePtBr(kpis.ultimoPedido))}
         </div>
       </div>
       <div class="cliente-export-actions">
@@ -172,7 +179,7 @@ export function renderDetailReport({
           <div class="cliente-produto-item">
             <span>${escapeHtml(item.produto)}</span>
             <span class="tag-metric tag-metric--blue">${formatNumber(item.quantidade)} itens</span>
-            <span class="tag-metric tag-metric--teal">${formatNumber(item.pedidos)} pedidos</span>
+            <span class="tag-metric tag-metric--teal">${formatNumber(item.pedidos)} fichas</span>
           </div>
         `).join('') : '<p>Sem produtos no período.</p>'}
       </div>
@@ -193,7 +200,7 @@ export function renderDetailReport({
           <div class="value">${formatNumber(totais.itens || 0)}</div>
         </div>
         <div class="cliente-total-card">
-          <div class="label"><i class="fas fa-receipt"></i> Total de pedidos</div>
+          <div class="label"><i class="fas fa-receipt"></i> Total de fichas</div>
           <div class="value">${formatNumber(totais.pedidos || 0)}</div>
         </div>
         <div class="cliente-total-card">
@@ -256,7 +263,7 @@ export function renderDetailReport({
         </div>
         <div class="cliente-insight-item">
           <span><i class="fas fa-gauge-high"></i> Frequência de compra</span>
-          <span>${escapeHtml(insights.frequenciaCompra?.pedidosPorMes != null ? `${insights.frequenciaCompra.pedidosPorMes} pedidos/mês` : '—')}</span>
+          <span>${escapeHtml(insights.frequenciaCompra?.pedidosPorMes != null ? `${insights.frequenciaCompra.pedidosPorMes} fichas/mês` : '—')}</span>
           <span>${escapeHtml(insights.frequenciaCompra?.mediaDiasEntreCompras != null ? `${insights.frequenciaCompra.mediaDiasEntreCompras} dias entre compras` : '')}</span>
         </div>
         <div class="cliente-insight-item">

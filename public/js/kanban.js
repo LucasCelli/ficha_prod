@@ -1280,6 +1280,9 @@
   }
 
   function escapeHtml(value) {
+    if (window.appUtils && typeof window.appUtils.escapeHtml === 'function') {
+      return window.appUtils.escapeHtml(value);
+    }
     return String(value || '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -1289,6 +1292,9 @@
   }
 
   function normalizeText(value) {
+    if (window.appUtils && typeof window.appUtils.normalizeText === 'function') {
+      return window.appUtils.normalizeText(value);
+    }
     return String(value || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -1383,6 +1389,9 @@
   }
 
   function debounce(fn, delay) {
+    if (window.appUtils && typeof window.appUtils.debounce === 'function') {
+      return window.appUtils.debounce(fn, delay);
+    }
     let timeout = null;
     return (...args) => {
       clearTimeout(timeout);

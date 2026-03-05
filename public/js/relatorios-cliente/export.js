@@ -64,14 +64,14 @@ function fallbackCsvExport(detail, periodoLabel) {
     ['Periodo', periodoLabel],
     [],
     ['Indicador', 'Valor'],
-    ['Quantidade de pedidos', String(kpis.quantidadePedidos || 0)],
-    ['Primeiro pedido', String(formatDatePtBr(kpis.primeiroPedido))],
-    ['Ultimo pedido', String(formatDatePtBr(kpis.ultimoPedido))],
+    ['Quantidade de fichas', String(kpis.quantidadePedidos || 0)],
+    ['Primeira ficha', String(formatDatePtBr(kpis.primeiroPedido))],
+    ['Última ficha', String(formatDatePtBr(kpis.ultimoPedido))],
     ['Total de itens', String(totais.itens || 0)],
-    ['Total de pedidos no periodo', String(totais.pedidos || 0)],
+    ['Total de fichas no período', String(totais.pedidos || 0)],
     [],
     ['Top produtos'],
-    ['Produto', 'Itens', 'Pedidos'],
+    ['Produto', 'Itens', 'Fichas'],
     ...produtos.map(p => [String(p.produto || ''), String(p.quantidade || 0), String(p.pedidos || 0)]),
     [],
     ['Historico'],
@@ -120,16 +120,16 @@ export async function exportPdf(detail, periodoLabel) {
     startY: 38,
     head: [['Indicador', 'Valor']],
     body: [
-      ['Quantidade de pedidos', String(kpis.quantidadePedidos || 0)],
-      ['Primeiro pedido', String(formatDatePtBr(kpis.primeiroPedido))],
-      ['Ultimo pedido', String(formatDatePtBr(kpis.ultimoPedido))],
+      ['Quantidade de fichas', String(kpis.quantidadePedidos || 0)],
+      ['Primeira ficha', String(formatDatePtBr(kpis.primeiroPedido))],
+      ['Última ficha', String(formatDatePtBr(kpis.ultimoPedido))],
       ['Total de itens', String(totais.itens || 0)],
-      ['Total de pedidos no periodo', String(totais.pedidos || 0)]
+      ['Total de fichas no período', String(totais.pedidos || 0)]
     ]
   });
 
   doc.autoTable({
-    head: [['Produto', 'Itens', 'Pedidos']],
+    head: [['Produto', 'Itens', 'Fichas']],
     body: produtos.slice(0, 20).map(p => [String(p.produto || ''), String(p.quantidade || 0), String(p.pedidos || 0)])
   });
 
@@ -164,15 +164,15 @@ export async function exportExcel(detail, periodoLabel) {
   const wsResumo = workbook.addWorksheet('Resumo');
   wsResumo.addRow(['Cliente', cliente]);
   wsResumo.addRow(['Periodo', periodoLabel]);
-  wsResumo.addRow(['Quantidade de pedidos', Number(kpis.quantidadePedidos || 0)]);
-  wsResumo.addRow(['Primeiro pedido', formatDatePtBr(kpis.primeiroPedido)]);
-  wsResumo.addRow(['Ultimo pedido', formatDatePtBr(kpis.ultimoPedido)]);
+  wsResumo.addRow(['Quantidade de fichas', Number(kpis.quantidadePedidos || 0)]);
+  wsResumo.addRow(['Primeira ficha', formatDatePtBr(kpis.primeiroPedido)]);
+  wsResumo.addRow(['Última ficha', formatDatePtBr(kpis.ultimoPedido)]);
   wsResumo.addRow(['Total de itens', Number(totais.itens || 0)]);
-  wsResumo.addRow(['Total pedidos periodo', Number(totais.pedidos || 0)]);
+  wsResumo.addRow(['Total fichas período', Number(totais.pedidos || 0)]);
   wsResumo.columns = [{ width: 28 }, { width: 46 }];
 
   const wsProdutos = workbook.addWorksheet('Produtos');
-  wsProdutos.addRow(['Produto', 'Itens', 'Pedidos']);
+  wsProdutos.addRow(['Produto', 'Itens', 'Fichas']);
   produtos.forEach(p => wsProdutos.addRow([p.produto || '', Number(p.quantidade || 0), Number(p.pedidos || 0)]));
   wsProdutos.columns = [{ width: 40 }, { width: 14 }, { width: 14 }];
 

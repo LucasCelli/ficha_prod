@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/design-tokens.css">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/components/index.css">
     <link rel="stylesheet" href="css/drag-drop.css">
     <link rel="stylesheet" href="css/images.css">
     <link rel="stylesheet" href="css/cloudinary-styles.css">
@@ -197,7 +198,7 @@
                 <div class="card-body">
                     <div class="form-grid">
 
-                        <!-- ══════════════ MATERIAL ══════════════ -->
+                        <!-- -------------- MATERIAL -------------- -->
                         <div class="form-group">
                             <label for="material"><i class="fas fa-rug" aria-hidden="true"></i> Tecido/Material</label>
                             <input type="text" id="material" list="materiaisList" class="form-control"
@@ -213,7 +214,7 @@
                             <datalist id="coresList"></datalist>
                         </div>
 
-                        <!-- ══════════════ MANGA ══════════════ -->
+                        <!-- -------------- MANGA -------------- -->
                         <hr class="form-divider" data-label="Manga">
 
                         <div class="form-group" id="mangaContainer">
@@ -261,7 +262,7 @@
                             <datalist id="coresList"></datalist>
                         </div>
 
-                        <!-- ══════════════ GOLA ══════════════ -->
+                        <!-- -------------- GOLA -------------- -->
                         <hr class="form-divider" data-label="Gola">
 
                         <div class="form-group">
@@ -327,7 +328,7 @@
                             <datalist id="coresList"></datalist>
                         </div>
 
-                        <!-- ══════════════ CAMPOS ESPECÍFICOS POLO ══════════════ -->
+                        <!-- -------------- CAMPOS ESPECÍFICOS POLO -------------- -->
                         <div class="form-group" id="corPeitilhoInternoContainer" style="display: none;">
                             <label for="corPeitilhoInterno"><i class="fas fa-palette" aria-hidden="true"></i> Cor do
                                 Peitilho Interno</label>
@@ -369,7 +370,7 @@
                             <datalist id="coresList"></datalist>
                         </div>
 
-                        <!-- ══════════════ CAMPOS ESPECÍFICOS GOLA SOCIAL ══════════════ -->
+                        <!-- -------------- CAMPOS ESPECÍFICOS GOLA SOCIAL -------------- -->
                         <div class="form-group" id="corPeDeGolaInternoContainer" style="display: none;">
                             <label for="corPeDeGolaInterno"><i class="fas fa-palette" aria-hidden="true"></i> Cor do Pé
                                 de Gola Interno</label>
@@ -386,7 +387,7 @@
                             <datalist id="coresList"></datalist>
                         </div>
 
-                        <!-- ══════════════ DETALHES ══════════════ -->
+                        <!-- -------------- DETALHES -------------- -->
                         <hr class="form-divider" data-label="Detalhes">
 
                         <div class="form-group">
@@ -452,7 +453,7 @@
                             <datalist id="faixaCorList"></datalist>
                         </div>
 
-                        <!-- ══════════════ ARTE ══════════════ -->
+                        <!-- -------------- ARTE -------------- -->
                         <hr class="form-divider" data-label="Arte / Personalização">
 
                         <div class="form-group">
@@ -696,14 +697,16 @@
 
     <script src="js/theme.js"></script>
     <script src="js/system-log.js"></script>
-    <script src="js/toast.js"></script>
+    <script src="js/utils/common.js"></script>
+    <script src="js/utils/toast.js"></script>
     <script src="js/custom-datalist.js"></script>
     <script src="js/api-client.js"></script>
     <script src="js/image-handler-cloudinary.js"></script>
     <script src="js/cloudinary-upload.js"></script>
-    <script src="js/main.js" defer></script>
-    <script src="js/integration.js"></script>
-    <script src="js/rich-text-editor.js"></script>
+    <script type="module" src="js/ficha/main.js"></script>
+    <script nomodule src="js/main.js" defer></script>
+    <script nomodule src="js/integration.js"></script>
+    <script nomodule src="js/rich-text-editor.js"></script>
 
 </body>
 

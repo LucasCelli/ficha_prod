@@ -369,6 +369,20 @@ async function initDatabase() {
       )
     `);
 
+    await executeDb(`
+      CREATE TABLE IF NOT EXISTS idempotency_keys (
+        route TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'processing',
+        status_code INTEGER,
+        response_body TEXT,
+        resource_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (route, idempotency_key)
+      )
+    `);
+
     // Criar índices
     await executeDb(`CREATE INDEX IF NOT EXISTS idx_fichas_cliente ON fichas(cliente)`);
     await executeDb(`CREATE INDEX IF NOT EXISTS idx_fichas_status ON fichas(status)`);
@@ -377,6 +391,7 @@ async function initDatabase() {
     await executeDb(`CREATE INDEX IF NOT EXISTS idx_fichas_vendedor ON fichas(vendedor)`);
     await executeDb(`CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs(created_at DESC)`);
     await executeDb(`CREATE INDEX IF NOT EXISTS idx_system_logs_ficha_id ON system_logs(ficha_id)`);
+    await executeDb(`CREATE INDEX IF NOT EXISTS idx_idempotency_keys_created_at ON idempotency_keys(created_at DESC)`);
 
     // ==================== MIGRAÇÕES ====================
     const migrações = [
@@ -470,6 +485,97 @@ async function dbRun(sql, params = []) {
     lastInsertRowid: result.lastInsertRowid,
     rowsAffected: result.rowsAffected
   };
+}
+
+const IDEMPOTENCY_ROUTE_CREATE_FICHA = 'POST:/api/fichas';
+const IDEMPOTENCY_STATUS_PROCESSING = 'processing';
+const IDEMPOTENCY_STATUS_COMPLETED = 'completed';
+
+function normalizeIdempotencyKey(value) {
+  if (typeof value !== 'string') return '';
+  const normalized = value.trim();
+  if (!normalized) return '';
+  if (normalized.length > 128) return '';
+  if (!/^[a-zA-Z0-9:_-]+$/.test(normalized)) return '';
+  return normalized;
+}
+
+function isUniqueConstraintError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('unique constraint') || message.includes('constraint failed');
+}
+
+function parseStoredIdempotentResponse(rawValue, fallbackId = null) {
+  if (typeof rawValue === 'string' && rawValue.trim()) {
+    try {
+      const parsed = JSON.parse(rawValue);
+      if (parsed && typeof parsed === 'object') {
+        return parsed;
+      }
+    } catch (_) {
+      // ignore parse error and use fallback payload
+    }
+  }
+
+  return {
+    id: fallbackId,
+    message: 'Ficha criada com sucesso'
+  };
+}
+
+async function getIdempotencyRecord(route, idempotencyKey) {
+  return dbGet(
+    `
+      SELECT route, idempotency_key, status, status_code, response_body, resource_id
+      FROM idempotency_keys
+      WHERE route = ? AND idempotency_key = ?
+      LIMIT 1
+    `,
+    [route, idempotencyKey]
+  );
+}
+
+async function reserveIdempotencyKey(route, idempotencyKey) {
+  const now = new Date().toISOString();
+  await dbRun(
+    `
+      INSERT INTO idempotency_keys (route, idempotency_key, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+    [route, idempotencyKey, IDEMPOTENCY_STATUS_PROCESSING, now, now]
+  );
+}
+
+async function completeIdempotencyKey(route, idempotencyKey, statusCode, responseBody, resourceId = null) {
+  const now = new Date().toISOString();
+  await dbRun(
+    `
+      UPDATE idempotency_keys
+      SET
+        status = ?,
+        status_code = ?,
+        response_body = ?,
+        resource_id = ?,
+        updated_at = ?
+      WHERE route = ? AND idempotency_key = ?
+    `,
+    [
+      IDEMPOTENCY_STATUS_COMPLETED,
+      Number(statusCode) || 201,
+      JSON.stringify(responseBody || {}),
+      resourceId,
+      now,
+      route,
+      idempotencyKey
+    ]
+  );
+}
+
+async function releaseIdempotencyReservation(route, idempotencyKey) {
+  await dbRun(
+    'DELETE FROM idempotency_keys WHERE route = ? AND idempotency_key = ? AND status = ?',
+    [route, idempotencyKey, IDEMPOTENCY_STATUS_PROCESSING]
+  );
 }
 
 function isDbConnectionNotOpenedError(error) {
@@ -1362,6 +1468,16 @@ async function getWeatherSnapshot(req) {
 
 // ==================== ROTAS DA API ====================
 
+app.use('/api', async (req, res, next) => {
+  try {
+    await ensureDatabaseInitialized();
+    next();
+  } catch (error) {
+    console.error('[db] Falha ao inicializar banco para requisição:', error);
+    res.status(503).json({ error: 'Serviço temporariamente indisponível' });
+  }
+});
+
 // Health check
 app.get('/api/health', async (req, res) => {
   try {
@@ -1572,9 +1688,45 @@ app.get('/api/fichas/:id', async (req, res) => {
 
 // Criar nova ficha
 app.post('/api/fichas', async (req, res) => {
+  const idempotencyRoute = IDEMPOTENCY_ROUTE_CREATE_FICHA;
+  const idempotencyKey = normalizeIdempotencyKey(req.get('Idempotency-Key'));
+  let idempotencyReservationActive = false;
+
   try {
     const bodyData = parseWithZod(res, fichaBodySchema, req.body, 'Dados da ficha inválidos');
     if (!bodyData) return;
+
+    if (idempotencyKey) {
+      const existente = await getIdempotencyRecord(idempotencyRoute, idempotencyKey);
+      if (existente) {
+        if (existente.status === IDEMPOTENCY_STATUS_COMPLETED) {
+          const statusCode = Number(existente.status_code) || 201;
+          const payload = parseStoredIdempotentResponse(existente.response_body, existente.resource_id);
+          return res.status(statusCode).json(payload);
+        }
+        return res.status(409).json({
+          error: 'Uma solicitação de salvamento já está em processamento. Aguarde alguns segundos e tente novamente.'
+        });
+      }
+
+      try {
+        await reserveIdempotencyKey(idempotencyRoute, idempotencyKey);
+        idempotencyReservationActive = true;
+      } catch (reserveError) {
+        if (isUniqueConstraintError(reserveError)) {
+          const registro = await getIdempotencyRecord(idempotencyRoute, idempotencyKey);
+          if (registro?.status === IDEMPOTENCY_STATUS_COMPLETED) {
+            const statusCode = Number(registro.status_code) || 201;
+            const payload = parseStoredIdempotentResponse(registro.response_body, registro.resource_id);
+            return res.status(statusCode).json(payload);
+          }
+          return res.status(409).json({
+            error: 'Uma solicitação de salvamento já está em processamento. Aguarde alguns segundos e tente novamente.'
+          });
+        }
+        throw reserveError;
+      }
+    }
 
     const dados = normalizeFichaPayload(bodyData);
     const produtosJson = JSON.stringify(dados.produtos || []);
@@ -1610,6 +1762,12 @@ app.post('/api/fichas', async (req, res) => {
 
     const ordemKanban = await getNextKanbanOrder('pendente', novoId);
     await dbRun('UPDATE fichas SET kanban_ordem = ? WHERE id = ?', [ordemKanban, novoId]);
+    const payload = { id: novoId, message: 'Ficha criada com sucesso' };
+
+    if (idempotencyKey) {
+      await completeIdempotencyKey(idempotencyRoute, idempotencyKey, 201, payload, novoId);
+      idempotencyReservationActive = false;
+    }
 
     // Atualizar tabela de clientes
     if (dados.cliente) {
@@ -1629,8 +1787,16 @@ app.post('/api/fichas', async (req, res) => {
     });
 
     console.log(`[fichas] Ficha #${novoId} criada`);
-    res.status(201).json({ id: novoId, message: 'Ficha criada com sucesso' });
+    res.status(201).json(payload);
   } catch (error) {
+    if (idempotencyKey && idempotencyReservationActive) {
+      try {
+        await releaseIdempotencyReservation(idempotencyRoute, idempotencyKey);
+      } catch (cleanupError) {
+        console.error('[idempotency] Falha ao limpar reserva pendente:', cleanupError);
+      }
+    }
+
     console.error('Erro ao criar ficha:', error);
     res.status(500).json({
       error: 'Erro ao criar ficha',
@@ -3466,9 +3632,10 @@ app.get('/api/relatorio/eficiencia', async (req, res) => {
 
 // Rota catch-all
 app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'Rota de API não encontrada' });
   }
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Bootstrap da aplicação (suporta ambiente serverless e execução local)
@@ -3476,7 +3643,10 @@ let databaseInitPromise = null;
 
 function ensureDatabaseInitialized() {
   if (!databaseInitPromise) {
-    databaseInitPromise = initDatabase();
+    databaseInitPromise = initDatabase().catch((error) => {
+      databaseInitPromise = null;
+      throw error;
+    });
   }
   return databaseInitPromise;
 }
@@ -3484,7 +3654,11 @@ function ensureDatabaseInitialized() {
 export default app;
 
 if (process.env.VERCEL) {
-  await ensureDatabaseInitialized();
+  try {
+    await ensureDatabaseInitialized();
+  } catch (error) {
+    console.error('[bootstrap] Falha inicial de banco no ambiente Vercel. Nova tentativa ocorrerá na próxima requisição:', error);
+  }
 } else {
   ensureDatabaseInitialized().then(() => {
     const server = app.listen(PORT, () => {

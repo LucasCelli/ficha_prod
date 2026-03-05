@@ -14,6 +14,10 @@ let loadingModalVisualizacao = null;
 let timeoutLoadingModal = null;
 
 function toast(message, type = 'info') {
+  if (window.toast && typeof window.toast.show === 'function') {
+    window.toast.show({ message, type });
+    return;
+  }
   if (typeof window.mostrarToast === 'function') {
     window.mostrarToast(message, type);
   }

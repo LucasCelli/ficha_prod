@@ -1,0 +1,104 @@
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-12);
+}
+
+.analytics-card,
+.kpi-widget,
+.chart-card,
+.activity-feed,
+.kanban-card {
+  background: var(--kpi-bg);
+  border: 1px solid var(--kpi-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.analytics-card,
+.kpi-widget,
+.chart-card,
+.activity-feed {
+  padding: var(--space-14);
+}
+
+.kpi-title {
+  font-size: var(--font-size-xs);
+  color: var(--kpi-title);
+}
+
+.kpi-value {
+  margin-top: var(--space-6);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-tight);
+  color: var(--kpi-value);
+  font-weight: var(--font-weight-bold);
+}
+
+.metric-positive {
+  color: var(--metric-positive);
+}
+
+.metric-negative {
+  color: var(--metric-negative);
+}
+
+.metric-neutral {
+  color: var(--metric-neutral);
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.chart-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  display: inline-block;
+}
+
+.chart-dot-1 {
+  background: var(--chart-1);
+}
+
+.chart-dot-2 {
+  background: var(--chart-2);
+}
+
+.chart-dot-3 {
+  background: var(--chart-3);
+}
+
+.chart-dot-4 {
+  background: var(--chart-4);
+}
+
+.chart-dot-5 {
+  background: var(--chart-5);
+}
+
+.activity-feed {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.activity-item {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  padding: var(--space-10);
+}
+
+.kanban-column {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.kanban-card {
+  padding: var(--space-10);
+}

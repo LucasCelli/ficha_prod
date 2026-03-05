@@ -11,6 +11,7 @@
   const itensPorPagina = 15;
   let ordenacaoAtual = 'nome_asc';
   let clienteParaDeletar = null;
+  let exclusaoClienteEmAndamento = false;
   let captchaDeleteCliente = '';
   let ultimoToastCaptchaInvalidoCliente = 0;
 
@@ -375,6 +376,7 @@
 
   function abrirModalDelete(id, nome) {
     clienteParaDeletar = id;
+    exclusaoClienteEmAndamento = false;
     captchaDeleteCliente = gerarCaptchaExclusao();
     document.getElementById('deleteClienteNome').textContent = nome;
     const captchaLabel = document.getElementById('deleteCaptchaValueCliente');
@@ -389,6 +391,7 @@
   }
 
   function fecharModalDelete() {
+    if (exclusaoClienteEmAndamento) return;
     document.getElementById('deleteModal').style.display = 'none';
     clienteParaDeletar = null;
     captchaDeleteCliente = '';
@@ -401,6 +404,8 @@
 
   async function confirmarDelete() {
     if (!clienteParaDeletar) return;
+    if (exclusaoClienteEmAndamento) return;
+
     const captchaInput = document.getElementById('deleteCaptchaInputCliente');
     const captchaDigitado = String(captchaInput?.value || '').trim();
     if (!captchaDeleteCliente || captchaDigitado !== captchaDeleteCliente) {
@@ -409,6 +414,9 @@
     }
 
     try {
+      exclusaoClienteEmAndamento = true;
+      atualizarEstadoConfirmarDeleteCliente();
+
       const response = await fetch(`${db.baseURL}/clientes/${clienteParaDeletar}`, {
         method: 'DELETE'
       });
@@ -427,10 +435,13 @@
       }
 
       mostrarToast('Cliente excluído com sucesso!', 'success');
+      exclusaoClienteEmAndamento = false;
       fecharModalDelete();
       await carregarClientes();
 
     } catch (error) {
+      exclusaoClienteEmAndamento = false;
+      atualizarEstadoConfirmarDeleteCliente();
       const msg = error.message || 'Erro ao excluir cliente';
       const msgLimpa = msg.includes('Unexpected token') ? 'Erro ao excluir cliente' : msg;
       mostrarToast(msgLimpa, 'error');
@@ -443,15 +454,37 @@
 
   function atualizarEstadoConfirmarDeleteCliente() {
     const btnConfirmarDelete = document.getElementById('btnConfirmarDelete');
+    const btnCancelarDelete = document.getElementById('btnCancelarDelete');
+    const captchaInput = document.getElementById('deleteCaptchaInputCliente');
+    const modal = document.getElementById('deleteModal');
     if (!btnConfirmarDelete) return;
 
-    const captchaInput = document.getElementById('deleteCaptchaInputCliente');
+    if (!btnConfirmarDelete.dataset.defaultHtml) {
+      btnConfirmarDelete.dataset.defaultHtml = btnConfirmarDelete.innerHTML;
+    }
+
     const captchaDigitado = String(captchaInput?.value || '').trim();
     const captchaCompleto = captchaDeleteCliente && captchaDigitado.length === String(captchaDeleteCliente).length;
     const captchaValido = Boolean(captchaDeleteCliente) && captchaDigitado === captchaDeleteCliente;
-    btnConfirmarDelete.disabled = !captchaValido;
+    btnConfirmarDelete.disabled = exclusaoClienteEmAndamento || !captchaValido;
+    btnConfirmarDelete.setAttribute('aria-busy', exclusaoClienteEmAndamento ? 'true' : 'false');
+    btnConfirmarDelete.innerHTML = exclusaoClienteEmAndamento
+      ? '<i class="fas fa-spinner fa-spin"></i> Excluindo cliente...'
+      : btnConfirmarDelete.dataset.defaultHtml;
 
-    if (captchaCompleto && !captchaValido) {
+    if (btnCancelarDelete) {
+      btnCancelarDelete.disabled = exclusaoClienteEmAndamento;
+    }
+
+    if (captchaInput) {
+      captchaInput.disabled = exclusaoClienteEmAndamento;
+    }
+
+    if (modal) {
+      modal.classList.toggle('is-busy', exclusaoClienteEmAndamento);
+    }
+
+    if (!exclusaoClienteEmAndamento && captchaCompleto && !captchaValido) {
       notificarCaptchaInvalidoCliente();
     }
   }
@@ -472,19 +505,30 @@
   // Utilitários
 
   function formatarData(dataISO) {
+    if (window.appUtils && typeof window.appUtils.formatDateBrIso === 'function') {
+      return window.appUtils.formatDateBrIso(dataISO, '-');
+    }
     if (!dataISO) return '-';
     const [ano, mes, dia] = dataISO.split('-');
     return `${dia}/${mes}/${ano}`;
   }
 
   function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    if (window.appUtils && typeof window.appUtils.escapeHtml === 'function') {
+      return window.appUtils.escapeHtml(text);
+    }
+    return String(text || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   function debounce(func, wait) {
+    if (window.appUtils && typeof window.appUtils.debounce === 'function') {
+      return window.appUtils.debounce(func, wait);
+    }
     let timeout;
     return function executedFunction(...args) {
       const later = () => {

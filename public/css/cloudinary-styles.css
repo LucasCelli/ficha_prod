@@ -1,137 +1,128 @@
 /* Cloudinary Image Styles */
 .image-card .cloud-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: #2563EB;
-  color: white;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 10px;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--color-primary);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 10px;
 }
 
 .image-card.loading-placeholder {
-  background: linear-gradient(135deg, var(--color-light-4), var(--color-light-2));
-  display: grid;
-  place-items: center;
-  min-height: 150px;
+    background: linear-gradient(135deg, var(--color-surface-soft), var(--color-neutral-200));
+    display: grid;
+    place-items: center;
+    min-height: 150px;
 }
 
 .loading-spinner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-8);
-  color: var(--color-dark-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-8);
+    color: var(--color-neutral-600);
 }
 
 .loading-spinner {
-  & i {
-    font-size: 24px;
-    color: var(--color-primary-main);
-  }
-  
-  & span {
-    font-size: 12px;
-  }
+    & i {
+        font-size: 24px;
+        color: var(--color-primary);
+    }
+
+    & span {
+        font-size: 12px;
+    }
 }
 
 .image-upload.drag-over {
-  border-color: var(--color-primary-main);
-  background: rgba(37, 99, 235, 0.10);
+    border-color: var(--color-primary);
+    background: var(--color-info-soft);
 }
 
 .image-card {
-  &.dragging {
-    opacity: 0.5;
-    transform: scale(0.95);
-  }
+    &.dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
+    }
 
-  &.drag-target {
-    border: 2px dashed var(--color-primary-main);
-  }
+    &.drag-target {
+        border: 2px dashed var(--color-primary);
+    }
 
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-  }
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
 }
 
 .image-modal {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  display: grid;
-  place-items: center;
-
-  &-backdrop {
-    position: absolute;
+    position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.90);
-  }
-
-  &-content {
-    position: relative;
-    max-width: 90vw;
-    max-height: 90vh;
-
-    & img {
-      max-width: 100%;
-      max-height: 90vh;
-      object-fit: contain;
-      border-radius: var(--radius-md);
-    }
-  }
-
-  &-close {
-    position: absolute;
-    top: -40px;
-    right: 0;
-    background: var(--color-white);
-    border: none;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    cursor: pointer;
+    z-index: var(--z-modal);
     display: grid;
     place-items: center;
 
-    &:hover {
-      background: var(--color-light-3);
+    &-backdrop {
+        position: absolute;
+        inset: 0;
+        background: var(--color-neutral-900);
     }
-  }
+
+    &-content {
+        position: relative;
+        max-width: 90vw;
+        max-height: 90vh;
+
+        & img {
+            max-width: 100%;
+            max-height: 90vh;
+            object-fit: contain;
+            border-radius: var(--radius-md);
+        }
+    }
+
+    &-close {
+        position: absolute;
+        top: -40px;
+        right: 0;
+        background: var(--color-neutral-0);
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+
+        &:hover {
+            background: var(--color-neutral-100);
+        }
+    }
 }
 
 .btn-view-image {
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-text);
-  border: 1px solid var(--btn-primary-border);
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
+    background: var(--button-brand-bg);
+    color: var(--button-brand-text);
+    border: 1px solid var(--button-brand-border);
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
 
-  &:hover {
-    background: var(--btn-primary-bg-hover);
-    border-color: var(--btn-primary-border);
-  }
+    &:hover {
+        background: var(--button-brand-hover);
+        border-color: var(--button-brand-border);
+    }
 }
 
 .image-actions {
-  display: flex;
-  gap: var(--space-8);
-  padding: var(--space-8);
-  justify-content: center;
+    display: flex;
+    gap: var(--space-8);
+    padding: var(--space-8);
+    justify-content: center;
 }
-
-
-
-
-
-
-
-
-

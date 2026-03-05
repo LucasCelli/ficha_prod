@@ -8,6 +8,7 @@
   let fichasPaginaAtual = [];
   let totalResultados = 0;
   let fichaParaDeletar = null;
+  let exclusaoFichaEmAndamento = false;
   let captchaDeleteFicha = '';
   let ultimoToastCaptchaInvalidoFicha = 0;
   let modalVisualizacao = null;
@@ -19,6 +20,7 @@
   let timeoutLoadingModal = null;
   let fichaVisualizadaId = null;
   let duplicandoFichaModal = false;
+  let impressaoPendenteNoPreview = false;
   let modalImagem = null;
   let imagemModalPreview = null;
   let tituloModalImagem = null;
@@ -51,8 +53,7 @@
     try {
       await db.init();
       criarPaginacao();
-      initEventListeners(); // CORREÇÃO: Inicializar listeners ANTES de carregar dados
-      verificarParametrosURL();
+      initEventListeners(); // CORREÇÃO: Inicializar listeners ANTES de carregar dados`r`n      verificarParametrosURL();
       await carregarFichas({ resetPage: true });
       await atualizarEstatisticas();
     } catch (error) {
@@ -127,6 +128,11 @@
     if (modalOverlay) {
       modalOverlay.addEventListener('click', fecharModalDelete);
     }
+
+    document.addEventListener('click', event => {
+      if (event.target.closest('.ficha-actions-menu')) return;
+      fecharMenusAcoesFicha();
+    });
   }
 
   function verificarParametrosURL() {
@@ -345,6 +351,21 @@
     });
 
     container.querySelectorAll('.ficha-thumb.has-image').forEach(thumb => {
+      const img = thumb.querySelector('img');
+      if (img) {
+        const finalizarCarregamentoThumb = () => {
+          thumb.classList.remove('is-loading');
+        };
+
+        if (img.complete) {
+          finalizarCarregamentoThumb();
+        } else {
+          thumb.classList.add('is-loading');
+          img.addEventListener('load', finalizarCarregamentoThumb, { once: true });
+          img.addEventListener('error', finalizarCarregamentoThumb, { once: true });
+        }
+      }
+
       thumb.setAttribute('role', 'button');
       thumb.setAttribute('tabindex', '0');
       thumb.addEventListener('click', () => {
@@ -384,10 +405,23 @@
       });
     });
 
-    container.querySelectorAll('.btn-deletar').forEach(btn => {
-      btn.addEventListener('click', () => {
+    container.querySelectorAll('.btn-menu-ficha').forEach(btn => {
+      btn.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        alternarMenuAcoesFicha(btn);
+      });
+    });
+
+    container.querySelectorAll('.ficha-menu-item').forEach(btn => {
+      btn.addEventListener('click', async event => {
+        event.preventDefault();
+        event.stopPropagation();
         const id = parseInt(btn.dataset.id);
-        abrirModalDelete(id);
+        const action = String(btn.dataset.action || '').trim();
+        if (Number.isNaN(id) || !action) return;
+        fecharMenusAcoesFicha();
+        await executarAcaoMenuFicha(action, id);
       });
     });
   }
@@ -406,10 +440,10 @@
 
     return `
     <div class="ficha-item ${isPendente ? '' : 'ficha-entregue'}">
-      <div class="ficha-thumb ${miniaturaSrc ? 'has-image' : 'no-image'}"
+      <div class="ficha-thumb ${miniaturaSrc ? 'has-image is-loading' : 'no-image'}"
         ${miniaturaSrc ? `data-id="${ficha.id}" data-cliente="${escapeHtmlAttr(clienteFormatado || 'Cliente')}"` : ''}>
         ${miniaturaSrc
-        ? `<img src="${miniaturaSrc}" alt="Miniatura da ficha de ${clienteFormatado || 'cliente'}" loading="lazy">`
+        ? `<span class="ficha-thumb-spinner" aria-hidden="true"><i class="fas fa-spinner fa-spin"></i></span><img src="${miniaturaSrc}" alt="Miniatura da ficha de ${clienteFormatado || 'cliente'}" loading="lazy">`
         : '<i class="fas fa-image" aria-hidden="true"></i>'}
       </div>
       <div class="ficha-main">
@@ -460,6 +494,12 @@
       </div>
 
       <div class="ficha-actions">
+        <button class="btn btn-primary btn-visualizar" data-id="${ficha.id}" title="Visualizar">
+          <i class="fas fa-eye"></i>
+        </button>
+        <button class="btn btn-secondary btn-editar" data-id="${ficha.id}" title="Editar">
+          <i class="fas fa-edit"></i>
+        </button>
         ${isPendente ? `
           <button class="btn btn-success btn-entregar" data-id="${ficha.id}" title="Marcar como Entregue">
             <i class="fas fa-check-circle"></i>
@@ -469,15 +509,25 @@
             <i class="fas fa-undo"></i>
           </button>
         `}
-        <button class="btn btn-primary btn-visualizar" data-id="${ficha.id}" title="Visualizar">
-          <i class="fas fa-eye"></i>
-        </button>
-        <button class="btn btn-secondary btn-editar" data-id="${ficha.id}" title="Editar">
-          <i class="fas fa-edit"></i>
-        </button>
-        <button class="btn btn-danger btn-deletar" data-id="${ficha.id}" title="Excluir">
-          <i class="fas fa-trash"></i>
-        </button>
+        <div class="ficha-actions-menu">
+          <button type="button" class="btn btn-secondary btn-menu-ficha" data-id="${ficha.id}" title="Mais ações" aria-haspopup="true" aria-expanded="false">
+            <i class="fas fa-ellipsis-v"></i>
+          </button>
+          <div class="ficha-actions-menu-list" role="menu">
+            <button type="button" class="ficha-menu-item" role="menuitem" data-action="print" data-id="${ficha.id}">
+              Imprimir Ficha
+            </button>
+            <button type="button" class="ficha-menu-item" role="menuitem" data-action="edit" data-id="${ficha.id}">
+              Editar Ficha
+            </button>
+            <button type="button" class="ficha-menu-item" role="menuitem" data-action="deliver" data-id="${ficha.id}" ${isPendente ? '' : 'disabled'} title="${isPendente ? 'Marcar ficha como entregue' : 'Ficha já está entregue'}">
+              Marcar Ficha Como Entregue
+            </button>
+            <button type="button" class="ficha-menu-item ficha-menu-item-danger" role="menuitem" data-action="delete" data-id="${ficha.id}">
+              Excluir Ficha
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -557,7 +607,52 @@
   // Ações
 
   function visualizarFicha(id) {
+    impressaoPendenteNoPreview = false;
     abrirModalVisualizacao(id);
+  }
+
+  function imprimirFicha(id) {
+    impressaoPendenteNoPreview = true;
+    abrirModalVisualizacao(id);
+  }
+
+  function fecharMenusAcoesFicha() {
+    document.querySelectorAll('.ficha-actions-menu.is-open').forEach(menu => {
+      menu.classList.remove('is-open');
+      const trigger = menu.querySelector('.btn-menu-ficha');
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  function alternarMenuAcoesFicha(botao) {
+    const menu = botao?.closest('.ficha-actions-menu');
+    if (!menu) return;
+    const estavaAberto = menu.classList.contains('is-open');
+    fecharMenusAcoesFicha();
+    if (estavaAberto) return;
+    menu.classList.add('is-open');
+    botao.setAttribute('aria-expanded', 'true');
+  }
+
+  async function executarAcaoMenuFicha(action, id) {
+    if (action === 'print') {
+      imprimirFicha(id);
+      return;
+    }
+
+    if (action === 'edit') {
+      editarFicha(id);
+      return;
+    }
+
+    if (action === 'deliver') {
+      await marcarComoEntregue(id);
+      return;
+    }
+
+    if (action === 'delete') {
+      abrirModalDelete(id);
+    }
   }
 
   function initModalVisualizacao() {
@@ -620,6 +715,11 @@
 
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return;
+
+      if (document.querySelector('.ficha-actions-menu.is-open')) {
+        fecharMenusAcoesFicha();
+        return;
+      }
 
       if (modalImagem && modalImagem.style.display !== 'none') {
         fecharModalImagem();
@@ -715,6 +815,7 @@
     modalVisualizacao.style.display = 'none';
     iframeVisualizacao.src = 'about:blank';
     fichaVisualizadaId = null;
+    impressaoPendenteNoPreview = false;
     duplicandoFichaModal = false;
     setLoadingPreview(false);
     document.body.classList.remove('preview-modal-open');
@@ -728,6 +829,11 @@
 
     if (!modalVisualizacao || modalVisualizacao.style.display === 'none') return;
     setLoadingPreview(false);
+
+    if (impressaoPendenteNoPreview) {
+      impressaoPendenteNoPreview = false;
+      imprimirFichaModal();
+    }
   }
 
   function setLoadingPreview(loading) {
@@ -739,6 +845,7 @@
 
     const isError = loading === 'error';
     const isLoading = loading === true || isError;
+    if (isError) impressaoPendenteNoPreview = false;
 
     modalVisualizacao.classList.toggle('is-loading', isLoading);
     modalVisualizacao.classList.toggle('has-error', isError);
@@ -987,6 +1094,7 @@
 
   function abrirModalDelete(id) {
     fichaParaDeletar = id;
+    exclusaoFichaEmAndamento = false;
     captchaDeleteFicha = gerarCaptchaExclusao();
     const modal = document.getElementById('deleteModal');
     const captchaLabel = document.getElementById('deleteCaptchaValueFicha');
@@ -1002,6 +1110,7 @@
   }
 
   function fecharModalDelete() {
+    if (exclusaoFichaEmAndamento) return;
     fichaParaDeletar = null;
     captchaDeleteFicha = '';
     const modal = document.getElementById('deleteModal');
@@ -1015,6 +1124,8 @@
 
   async function confirmarDelete() {
     if (!fichaParaDeletar) return;
+    if (exclusaoFichaEmAndamento) return;
+
     const captchaInput = document.getElementById('deleteCaptchaInputFicha');
     const captchaDigitado = String(captchaInput?.value || '').trim();
     if (!captchaDeleteFicha || captchaDigitado !== captchaDeleteFicha) {
@@ -1023,12 +1134,18 @@
     }
 
     try {
+      exclusaoFichaEmAndamento = true;
+      atualizarEstadoConfirmarDeleteFicha();
+
       await db.deletarFicha(fichaParaDeletar);
       await carregarFichas();
       await atualizarEstatisticas();
+      exclusaoFichaEmAndamento = false;
       fecharModalDelete();
       mostrarSucesso('Ficha excluída com sucesso!');
     } catch (error) {
+      exclusaoFichaEmAndamento = false;
+      atualizarEstadoConfirmarDeleteFicha();
       console.error('Erro ao deletar ficha:', error);
       mostrarErro('Erro ao excluir ficha');
     }
@@ -1040,15 +1157,33 @@
 
   function atualizarEstadoConfirmarDeleteFicha() {
     const btnConfirmarDelete = document.getElementById('btnConfirmarDelete');
+    const btnCancelarDelete = document.getElementById('btnCancelarDelete');
+    const captchaInput = document.getElementById('deleteCaptchaInputFicha');
+    const modal = document.getElementById('deleteModal');
     if (!btnConfirmarDelete) return;
 
-    const captchaInput = document.getElementById('deleteCaptchaInputFicha');
     const captchaDigitado = String(captchaInput?.value || '').trim();
     const captchaCompleto = captchaDeleteFicha && captchaDigitado.length === String(captchaDeleteFicha).length;
     const captchaValido = Boolean(captchaDeleteFicha) && captchaDigitado === captchaDeleteFicha;
-    btnConfirmarDelete.disabled = !captchaValido;
+    btnConfirmarDelete.disabled = exclusaoFichaEmAndamento || !captchaValido;
+    btnConfirmarDelete.setAttribute('aria-busy', exclusaoFichaEmAndamento ? 'true' : 'false');
+    btnConfirmarDelete.innerHTML = exclusaoFichaEmAndamento
+      ? '<i class="fas fa-spinner fa-spin"></i> Excluindo ficha...'
+      : 'Excluir';
 
-    if (captchaCompleto && !captchaValido) {
+    if (btnCancelarDelete) {
+      btnCancelarDelete.disabled = exclusaoFichaEmAndamento;
+    }
+
+    if (captchaInput) {
+      captchaInput.disabled = exclusaoFichaEmAndamento;
+    }
+
+    if (modal) {
+      modal.classList.toggle('is-busy', exclusaoFichaEmAndamento);
+    }
+
+    if (!exclusaoFichaEmAndamento && captchaCompleto && !captchaValido) {
       notificarCaptchaInvalidoFicha();
     }
   }
@@ -1135,6 +1270,9 @@
   // Utilitários
 
   function formatarData(dataStr) {
+    if (window.appUtils && typeof window.appUtils.formatDateBrIso === 'function') {
+      return window.appUtils.formatDateBrIso(dataStr, '-');
+    }
     if (!dataStr) return '-';
 
     try {
@@ -1176,6 +1314,9 @@
   }
 
   function normalizarTextoBusca(valor) {
+    if (window.appUtils && typeof window.appUtils.normalizeText === 'function') {
+      return window.appUtils.normalizeText(valor);
+    }
     return String(valor || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -1205,9 +1346,9 @@
     const originalWords = texto.split(' ');
     const preserveUppercaseIndexes = new Set();
     if (originalWords.length > 1) {
-      if (/^[A-ZÀ-Ý]{1,4}$/.test(originalWords[0])) preserveUppercaseIndexes.add(0);
+      if (/^[A-Z\u00C0-\u00DD]{1,4}$/.test(originalWords[0])) preserveUppercaseIndexes.add(0);
       const lastIndex = originalWords.length - 1;
-      if (/^[A-ZÀ-Ý]{1,4}$/.test(originalWords[lastIndex])) preserveUppercaseIndexes.add(lastIndex);
+      if (/^[A-Z\u00C0-\u00DD]{1,4}$/.test(originalWords[lastIndex])) preserveUppercaseIndexes.add(lastIndex);
     }
 
     return texto
@@ -1272,6 +1413,9 @@
     return [];
   }
   function debounce(func, wait) {
+    if (window.appUtils && typeof window.appUtils.debounce === 'function') {
+      return window.appUtils.debounce(func, wait);
+    }
     let timeout;
     return function executedFunction(...args) {
       const later = () => {

@@ -24,6 +24,9 @@
   const kpiAnimationFrames = new Map();
 
   function escapeHtml(value) {
+    if (window.appUtils && typeof window.appUtils.escapeHtml === 'function') {
+      return window.appUtils.escapeHtml(value);
+    }
     return String(value || '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')

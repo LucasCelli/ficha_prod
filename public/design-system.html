@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design System Showcase</title>
+  <link rel="stylesheet" href="css/design-tokens.css">
+  <link rel="stylesheet" href="css/components/index.css">
+  <style>
+    body {
+      margin: 0;
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-family: var(--font-family-base);
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: var(--space-24);
+      display: grid;
+      gap: var(--space-24);
+    }
+
+    .section {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-16);
+      display: grid;
+      gap: var(--space-12);
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-10);
+      align-items: center;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: var(--space-16);
+    }
+
+    .kanban {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--space-10);
+    }
+
+    .chart-demo {
+      min-height: 120px;
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-2);
+      padding: var(--space-10);
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="navbar">
+      <strong>Design System Demo</strong>
+      <div class="row">
+        <button id="themeToggle" class="btn btn-primary" type="button">Toggle Theme</button>
+      </div>
+    </div>
+
+    <section class="section">
+      <h2>Form Elements</h2>
+      <div class="row">
+        <button class="btn" type="button">Default</button>
+        <button class="btn btn-primary" type="button">Primary</button>
+        <button class="btn btn-success" type="button">Success</button>
+        <button class="btn btn-warning" type="button">Warning</button>
+        <button class="btn btn-danger" type="button">Danger</button>
+      </div>
+      <div class="row">
+        <input class="form-control" type="text" placeholder="Input">
+        <select class="form-control">
+          <option>Option</option>
+        </select>
+      </div>
+      <div class="row">
+        <textarea class="form-control" placeholder="Textarea"></textarea>
+      </div>
+      <div class="row">
+        <label><input type="checkbox"> Checkbox</label>
+        <label><input type="radio" name="r" checked> Radio</label>
+        <label class="switch">
+          <input type="checkbox" checked>
+          <span class="switch-track"></span>
+          Switch
+        </label>
+      </div>
+      <div class="row">
+        <input type="range" value="60">
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Data Display</h2>
+      <div class="row">
+        <span class="chip">Chip</span>
+        <span class="badge">Badge</span>
+        <span class="avatar">LP</span>
+      </div>
+      <div class="card">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Status</th><th>Value</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Revenue</td><td><span class="chip">Live</span></td><td>$42k</td></tr>
+            <tr><td>Pipeline</td><td><span class="chip">Updated</span></td><td>$128k</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Feedback</h2>
+      <div class="alert alert-success">Success alert</div>
+      <div class="alert alert-warning">Warning alert</div>
+      <div class="alert alert-danger">Danger alert</div>
+      <div class="alert alert-info">Info alert</div>
+      <div class="row">
+        <div class="toast toast--success">Saved successfully</div>
+        <div class="toast toast--error">Failed to save</div>
+      </div>
+      <div class="tooltip">Tooltip</div>
+      <div class="progress"><div class="progress-bar" style="--progress-value: 72%;"></div></div>
+      <div class="skeleton" style="height: 18px;"></div>
+    </section>
+
+    <section class="section">
+      <h2>Overlays</h2>
+      <div class="row">
+        <div class="popover">Popover content</div>
+        <div class="dropdown-menu">Dropdown content</div>
+      </div>
+      <div class="modal is-open" style="position: static; inset: auto; padding: 0;">
+        <div class="modal-overlay" style="display: none;"></div>
+        <div class="modal-content">
+          <h3>Modal</h3>
+          <p>Tokenized modal surface and border.</p>
+        </div>
+      </div>
+      <div class="drawer" style="position: static; width: 100%;">Drawer content</div>
+    </section>
+
+    <section class="section">
+      <h2>Navigation</h2>
+      <div class="layout">
+        <aside class="sidebar">
+          <a class="sidebar-item is-active" href="#">Overview</a>
+          <a class="sidebar-item" href="#">Analytics</a>
+          <a class="sidebar-item" href="#">Billing</a>
+        </aside>
+        <div>
+          <div class="breadcrumbs">
+            <a href="#">Home</a> / <a href="#">Dashboard</a> / <span>Analytics</span>
+          </div>
+          <div class="tabs" style="margin-top: var(--space-10);">
+            <button class="tab is-active" type="button">Weekly</button>
+            <button class="tab" type="button">Monthly</button>
+          </div>
+          <div class="pagination" style="margin-top: var(--space-10);">
+            <button class="btn" type="button">Prev</button>
+            <span class="page-info">Page 1 of 4</span>
+            <button class="btn" type="button">Next</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Dashboard Tokens</h2>
+      <div class="analytics-grid">
+        <article class="kpi-widget">
+          <div class="kpi-title">MRR</div>
+          <div class="kpi-value">$84,200</div>
+          <small class="metric-positive">+12.8%</small>
+        </article>
+        <article class="kpi-widget">
+          <div class="kpi-title">Churn</div>
+          <div class="kpi-value">2.1%</div>
+          <small class="metric-negative">-0.3%</small>
+        </article>
+      </div>
+      <article class="chart-card">
+        <h3>Chart Palette</h3>
+        <div class="chart-demo">
+          <div class="chart-legend">
+            <span><i class="chart-dot chart-dot-1"></i> Series 1</span>
+            <span><i class="chart-dot chart-dot-2"></i> Series 2</span>
+            <span><i class="chart-dot chart-dot-3"></i> Series 3</span>
+            <span><i class="chart-dot chart-dot-4"></i> Series 4</span>
+            <span><i class="chart-dot chart-dot-5"></i> Series 5</span>
+          </div>
+        </div>
+      </article>
+      <div class="kanban">
+        <div class="kanban-column">
+          <article class="kanban-card">Kanban card A</article>
+          <article class="kanban-card">Kanban card B</article>
+        </div>
+        <div class="kanban-column">
+          <article class="kanban-card">Kanban card C</article>
+        </div>
+        <div class="kanban-column">
+          <article class="kanban-card">Kanban card D</article>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      const html = document.documentElement;
+      const key = "site_theme_preference";
+      const saved = localStorage.getItem(key);
+      if (saved === "dark" || saved === "light") html.setAttribute("data-theme", saved);
+      const btn = document.getElementById("themeToggle");
+      btn.addEventListener("click", function () {
+        const next = html.getAttribute("data-theme") === "dark" ? "light" : "dark";
+        html.setAttribute("data-theme", next);
+        localStorage.setItem(key, next);
+      });
+    })();
+  </script>
+</body>
+</html>

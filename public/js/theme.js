@@ -141,6 +141,9 @@
   }
 
   function escapeHtml(text) {
+    if (window.appUtils && typeof window.appUtils.escapeHtml === 'function') {
+      return window.appUtils.escapeHtml(text);
+    }
     return String(text || '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')

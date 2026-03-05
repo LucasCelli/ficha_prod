@@ -796,13 +796,13 @@
     const pendentes = relatorioAtual.fichasPendentes || 0;
     const total = entregues + pendentes;
     const taxa = total > 0 ? Math.min(100, Math.round((entregues / total) * 100)) : 0;
-    const printBodyColor = getCssVar('--color-report-body', getCssVar('--color-dark-1', 'black'));
-    const printHeadingColor = getCssVar('--color-report-heading', getCssVar('--color-dark-1', 'black'));
-    const printMutedColor = getCssVar('--color-report-muted', getCssVar('--color-dark-2', 'gray'));
-    const printBorderColor = getCssVar('--color-light-1', getCssVar('--color-light-1', 'lightgray'));
-    const printInfoBg = getCssVar('--color-neutral-50', getCssVar('--color-light-4', 'whitesmoke'));
-    const printPrimary = getCssVar('--color-primary-main', getCssVar('--color-primary-main', 'steelblue'));
-    const printPrimaryDark = getCssVar('--color-primary-darker', getCssVar('--color-primary-darker', 'slateblue'));
+    const printBodyColor = getCssVar('--color-text', getCssVar('--color-neutral-900', 'black'));
+    const printHeadingColor = getCssVar('--color-text', getCssVar('--color-neutral-900', 'black'));
+    const printMutedColor = getCssVar('--color-muted', getCssVar('--color-neutral-800', 'gray'));
+    const printBorderColor = getCssVar('--color-neutral-200', getCssVar('--color-neutral-200', 'lightgray'));
+    const printInfoBg = getCssVar('--color-surface-soft', getCssVar('--color-surface-soft', 'whitesmoke'));
+    const printPrimary = getCssVar('--color-primary', getCssVar('--color-primary', 'steelblue'));
+    const printPrimaryDark = getCssVar('--color-primary-strong', getCssVar('--color-primary-strong', 'slateblue'));
     const printSuccess = getCssVar('--color-success', getCssVar('--color-success', 'green'));
     const printWarning = getCssVar('--color-warning', getCssVar('--color-warning', 'orange'));
     const printDanger = getCssVar('--color-danger', getCssVar('--color-danger', 'red'));
@@ -1513,16 +1513,18 @@
   }
 
   function formatarData(dataStr) {
-    if (!dataStr) return '-';
-    try {
-      const data = new Date(dataStr + 'T00:00:00');
-      return data.toLocaleDateString('pt-BR');
-    } catch {
-      return dataStr;
+    if (window.appUtils && typeof window.appUtils.formatDateBrIso === 'function') {
+      return window.appUtils.formatDateBrIso(dataStr, '-');
     }
+    if (!dataStr) return '-';
+    const data = new Date(`${dataStr}T00:00:00`);
+    return Number.isNaN(data.getTime()) ? dataStr : data.toLocaleDateString('pt-BR');
   }
 
   function escapeHtml(text) {
+    if (window.appUtils && typeof window.appUtils.escapeHtml === 'function') {
+      return window.appUtils.escapeHtml(text);
+    }
     if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
@@ -1534,6 +1536,10 @@
   }
 
   function mostrarToast(mensagem, tipo = 'info') {
+    if (window.toast && typeof window.toast.show === 'function') {
+      window.toast.show({ message: mensagem, type: tipo });
+      return;
+    }
     if (typeof window.mostrarToast === 'function') {
       window.mostrarToast(mensagem, tipo);
     }
@@ -1552,6 +1558,9 @@
   }
 
   function normalizarTextoBusca(valor) {
+    if (window.appUtils && typeof window.appUtils.normalizeText === 'function') {
+      return window.appUtils.normalizeText(valor);
+    }
     return String(valor || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -1901,6 +1910,5 @@
     });
   }
 })();
-
 
 

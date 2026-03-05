@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/design-tokens.css">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/components/index.css">
     <link rel="stylesheet" href="css/dashboard.css">
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
@@ -41,11 +42,15 @@
                         <i class="fas fa-house"></i>
                         <span>In&iacute;cio</span>
                     </a>
-                    <a href="dashboard.html" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i>
-                        <span>Voltar</span>
+                    <a href="kanban.html" class="btn btn-primary">
+                        <i class="fas fa-table-columns"></i>
+                        <span>Quadro de Produção</span>
                     </a>
-                    <a href="ficha.html" class="btn btn-primary">
+                    <a href="relatorios.html" class="btn btn-warning">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Relatórios</span>
+                    </a>
+                    <a href="ficha.html" class="btn btn-primary btn-new-ficha-highlight">
                         <i class="fas fa-plus"></i>
                         <span>Nova Ficha</span>
                     </a>
@@ -216,7 +221,7 @@
         <div class="modal-content">
             <h3><i class="fas fa-exclamation-triangle"></i> Confirmar Exclusão</h3>
             <p>Tem certeza que deseja excluir o cliente <strong id="deleteClienteNome"></strong>? <strong>Esta ação não pode ser desfeita.</strong></p>
-            <p style="font-size: 0.85rem; color: var(--text-soft);">
+            <p style="font-size: 0.85rem; color: var(--color-muted);">
                 <i class="fas fa-info-circle"></i>
                 As fichas técnicas associadas não serão excluídas.
             </p>
@@ -234,9 +239,11 @@
 
     <script src="js/theme.js"></script>
     <script src="js/system-log.js"></script>
-    <script src="js/toast.js"></script>
+    <script src="js/utils/common.js"></script>
+    <script src="js/utils/toast.js"></script>
     <script src="js/api-client.js"></script>
-    <script src="js/clientes.js"></script>
+    <script type="module" src="js/clientes/main.js"></script>
+    <script nomodule src="js/clientes.js"></script>
 </body>
 
 </html>
