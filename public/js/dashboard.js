@@ -53,7 +53,8 @@
     try {
       await db.init();
       criarPaginacao();
-      initEventListeners(); // CORREÇÃO: Inicializar listeners ANTES de carregar dados`r`n      verificarParametrosURL();
+      initEventListeners(); // CORREÇÃO: Inicializar listeners ANTES de carregar dados
+      verificarParametrosURL();
       await carregarFichas({ resetPage: true });
       await atualizarEstatisticas();
     } catch (error) {
@@ -345,8 +346,11 @@
     container.querySelectorAll('.ficha-cliente-link').forEach(link => {
       link.addEventListener('click', e => {
         e.preventDefault();
-        const id = parseInt(link.dataset.id);
-        if (!Number.isNaN(id)) visualizarFicha(id);
+        const card = link.closest('.ficha-item');
+        const btnVisualizar = card?.querySelector('.btn-visualizar');
+        if (btnVisualizar instanceof HTMLButtonElement) {
+          btnVisualizar.click();
+        }
       });
     });
 
