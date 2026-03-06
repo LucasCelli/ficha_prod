@@ -12,6 +12,8 @@ input[type="submit"].btn {
   border-radius: var(--radius-md);
   background: var(--button-bg);
   color: var(--button-text);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
@@ -21,6 +23,8 @@ input[type="submit"].btn {
 
 .btn:hover {
   background: var(--button-hover);
+  box-shadow: var(--shadow-sm);
+  transform: scale(1.025);
 }
 
 .btn:active {
@@ -31,6 +35,10 @@ input[type="submit"].btn {
 .btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--input-focus);
+}
+
+.btn i {
+  font-size: 0.85rem;
 }
 
 .btn[disabled],
@@ -80,6 +88,16 @@ input[type="submit"].btn {
   background: var(--button-danger-hover);
 }
 
+.btn-secondary {
+  background: var(--button-bg);
+  border-color: var(--button-border);
+  color: var(--button-text);
+}
+
+.btn-secondary:hover {
+  background: var(--button-hover);
+}
+
 .btn-ghost {
   background: transparent;
 }
@@ -88,4 +106,27 @@ input[type="submit"].btn {
   background: transparent;
   border-color: var(--button-brand-border);
   color: var(--button-brand-text);
+}
+
+.btn-icon {
+  padding-inline: var(--space-10);
+}
+
+.btn-sm {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 1024px) {
+  .btn {
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    line-height: 1.15;
+    justify-content: center;
+  }
+
+  .btn i {
+    font-size: 0.8rem;
+  }
 }

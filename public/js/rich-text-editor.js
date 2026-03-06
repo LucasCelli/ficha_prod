@@ -422,7 +422,7 @@
           }
           
           // Chamar função original
-          originalGerarVersaoImpressao.apply(this, args);
+          return originalGerarVersaoImpressao.apply(this, args);
         };
       }
     }, 100);

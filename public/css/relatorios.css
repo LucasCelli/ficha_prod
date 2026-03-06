@@ -1190,7 +1190,7 @@
     margin-top: var(--space-10);
   }
 
-  .card-header {
+  body.page-relatorios .card-header {
     flex-wrap: wrap;
   }
 
@@ -1225,38 +1225,6 @@
 }
 
 /* ==================== IMPRESSÃO ==================== */
-html[data-theme='dark'] .vendedores-report-row:nth-child(odd) {
-  background: var(--color-neutral-800);
-}
-
-html[data-theme='dark'] .ranking-item.top-1 {
-  background: linear-gradient(135deg, var(--color-neutral-800) 0%, var(--color-warning-strong) 100%);
-}
-
-html[data-theme='dark'] .ranking-item.top-2 {
-  background: linear-gradient(135deg, var(--color-neutral-800) 0%, var(--color-neutral-800) 100%);
-}
-
-html[data-theme='dark'] .ranking-item.top-3 {
-  background: linear-gradient(135deg, var(--color-neutral-800) 0%, var(--color-warning-strong) 100%);
-}
-
-html[data-theme='dark'] .top-vendedor {
-  background: linear-gradient(135deg, var(--color-neutral-600) 0%, var(--color-info-strong) 100%);
-}
-
-html[data-theme='dark'] .filter-select {
-  background: var(--color-neutral-900);
-  color: var(--color-neutral-200);
-  border-color: var(--color-neutral-800);
-  color-scheme: dark;
-}
-
-html[data-theme='dark'] .filter-select option {
-  background: var(--color-neutral-900);
-  color: var(--color-neutral-200);
-}
-
 @media print {
 
   .header-actions,
@@ -1271,7 +1239,7 @@ html[data-theme='dark'] .filter-select option {
   }
 
   .stat-card-large,
-  .card,
+  body.page-relatorios .card,
   .ranking-item,
   .comparativo-item {
     break-inside: avoid;
@@ -1422,16 +1390,4 @@ html[data-theme='dark'] .filter-select option {
 .tamanho-horizontal-track,
 .material-horizontal-track {
   background: var(--color-border);
-}
-
-html[data-theme='dark'] .top-vendedor {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-info) 100%);
-}
-
-html[data-theme='dark'] .filter-select,
-html[data-theme='dark'] .filter-input,
-html[data-theme='dark'] .heatmap-tooltip {
-  background: var(--color-surface);
-  color: var(--color-text);
-  border-color: var(--color-border);
 }

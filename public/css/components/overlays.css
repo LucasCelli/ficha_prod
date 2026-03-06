@@ -3,7 +3,7 @@
 .dropdown-menu {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background: var(--modal-bg);
+  background: var(--color-surface);
   color: var(--color-text);
   box-shadow: var(--shadow-lg);
 }

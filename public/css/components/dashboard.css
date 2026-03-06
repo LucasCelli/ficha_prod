@@ -8,7 +8,7 @@
 .kpi-widget,
 .chart-card,
 .activity-feed,
-.kanban-card {
+.ds-kanban-card {
   background: var(--kpi-bg);
   border: 1px solid var(--kpi-border);
   border-radius: var(--radius-xl);
@@ -94,11 +94,11 @@
   padding: var(--space-10);
 }
 
-.kanban-column {
+.ds-kanban-column {
   display: grid;
   gap: var(--space-8);
 }
 
-.kanban-card {
+.ds-kanban-card {
   padding: var(--space-10);
 }

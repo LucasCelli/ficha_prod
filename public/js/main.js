@@ -2391,6 +2391,181 @@
     await carregamentoJsPdf;
   }
 
+  function clamp01(valor) {
+    if (!Number.isFinite(valor)) return 0;
+    if (valor < 0) return 0;
+    if (valor > 1) return 1;
+    return valor;
+  }
+
+  function parseComponenteColorFunction(valorRaw) {
+    const valor = String(valorRaw || '').trim();
+    if (!valor) return null;
+    const ehPercentual = valor.endsWith('%');
+    const numero = Number.parseFloat(valor);
+    if (!Number.isFinite(numero)) return null;
+
+    if (ehPercentual) {
+      return clamp01(numero / 100);
+    }
+
+    if (numero > 1) {
+      // Alguns navegadores podem serializar fora de 0..1.
+      return clamp01(numero / 255);
+    }
+    return clamp01(numero);
+  }
+
+  function parseAlphaColorFunction(valorRaw) {
+    const valor = String(valorRaw || '').trim();
+    if (!valor) return 1;
+    const ehPercentual = valor.endsWith('%');
+    const numero = Number.parseFloat(valor);
+    if (!Number.isFinite(numero)) return 1;
+
+    if (ehPercentual) return clamp01(numero / 100);
+    if (numero > 1 && numero <= 100) return clamp01(numero / 100);
+    return clamp01(numero);
+  }
+
+  function converterColorFunctionParaRgba(funcaoColor) {
+    const texto = String(funcaoColor || '').trim();
+    const match = texto.match(/^color\(\s*([a-z0-9-]+)\s+(.+)\)$/i);
+    if (!match) return 'rgba(0, 0, 0, 1)';
+
+    const args = match[2].trim();
+    if (!args) return 'rgba(0, 0, 0, 1)';
+
+    const barraIdx = args.lastIndexOf('/');
+    const canaisBrutos = (barraIdx >= 0 ? args.slice(0, barraIdx) : args).trim();
+    const alphaBruto = barraIdx >= 0 ? args.slice(barraIdx + 1).trim() : '';
+    const canais = canaisBrutos.split(/\s+/).filter(Boolean).slice(0, 3);
+    if (canais.length < 3) return 'rgba(0, 0, 0, 1)';
+
+    const r = parseComponenteColorFunction(canais[0]);
+    const g = parseComponenteColorFunction(canais[1]);
+    const b = parseComponenteColorFunction(canais[2]);
+    if (r === null || g === null || b === null) return 'rgba(0, 0, 0, 1)';
+
+    const alpha = parseAlphaColorFunction(alphaBruto);
+    const r255 = Math.round(r * 255);
+    const g255 = Math.round(g * 255);
+    const b255 = Math.round(b * 255);
+    const alphaFmt = String(Number(alpha.toFixed(3)));
+    return `rgba(${r255}, ${g255}, ${b255}, ${alphaFmt})`;
+  }
+
+  function substituirColorFunctionsPorRgba(valorCss) {
+    const texto = String(valorCss || '');
+    if (!texto.includes('color(')) return texto;
+
+    let resultado = '';
+    let cursor = 0;
+    while (cursor < texto.length) {
+      const inicio = texto.indexOf('color(', cursor);
+      if (inicio < 0) {
+        resultado += texto.slice(cursor);
+        break;
+      }
+
+      resultado += texto.slice(cursor, inicio);
+      let fim = inicio;
+      let nivel = 0;
+      for (; fim < texto.length; fim += 1) {
+        const ch = texto[fim];
+        if (ch === '(') {
+          nivel += 1;
+        } else if (ch === ')') {
+          nivel -= 1;
+          if (nivel === 0) {
+            fim += 1;
+            break;
+          }
+        }
+      }
+
+      if (nivel !== 0) {
+        resultado += texto.slice(inicio);
+        break;
+      }
+
+      const trechoColor = texto.slice(inicio, fim);
+      resultado += converterColorFunctionParaRgba(trechoColor);
+      cursor = fim;
+    }
+
+    if (resultado.includes('color(')) {
+      resultado = resultado.replace(/color\([^)]+\)/g, 'rgba(0, 0, 0, 1)');
+    }
+
+    return resultado;
+  }
+
+  function normalizarColorFunctionsParaHtml2Canvas(raiz, viewRef) {
+    if (!raiz) return;
+    const view = viewRef || window;
+    if (!view || typeof view.getComputedStyle !== 'function') return;
+
+    const elementosSet = new Set();
+    const adicionar = el => {
+      if (el && el.nodeType === 1) {
+        elementosSet.add(el);
+      }
+    };
+
+    adicionar(raiz);
+    raiz.querySelectorAll('*').forEach(adicionar);
+
+    let ancestral = raiz.parentElement;
+    while (ancestral) {
+      adicionar(ancestral);
+      ancestral = ancestral.parentElement;
+    }
+
+    const docRef = raiz.ownerDocument;
+    if (docRef) {
+      adicionar(docRef.body);
+      adicionar(docRef.documentElement);
+    }
+
+    const elementos = Array.from(elementosSet);
+    elementos.forEach(el => {
+      const estilo = view.getComputedStyle(el);
+      if (!estilo) return;
+
+      Array.from(estilo).forEach(prop => {
+        const valorAtual = String(estilo.getPropertyValue(prop) || '').trim();
+        if (!valorAtual || !valorAtual.includes('color(')) return;
+        const valorNormalizado = substituirColorFunctionsPorRgba(valorAtual);
+        if (!valorNormalizado || valorNormalizado === valorAtual) return;
+        try {
+          el.style.setProperty(prop, valorNormalizado);
+        } catch (_) { }
+      });
+    });
+
+    const doc = raiz.ownerDocument;
+    if (!doc) return;
+    let styleNeutralizador = doc.getElementById('print-color-fallback-style');
+    if (!styleNeutralizador) {
+      styleNeutralizador = doc.createElement('style');
+      styleNeutralizador.id = 'print-color-fallback-style';
+      styleNeutralizador.textContent = `
+        #print-version *::before,
+        #print-version *::after {
+          background: none !important;
+          background-image: none !important;
+          box-shadow: none !important;
+          text-shadow: none !important;
+          border-color: var(--color-print-canvas-border) !important;
+          outline-color: var(--color-print-canvas-border) !important;
+          color: var(--color-print-canvas-text) !important;
+        }
+      `;
+      doc.head.appendChild(styleNeutralizador);
+    }
+  }
+
   function obterAreaUtilA4Px() {
     return {
       largura: mmToPx(A4_WIDTH_MM - (PRINT_MARGIN_MM * 2)),
@@ -2489,10 +2664,7 @@
     doc.write(`<!doctype html><html><head><meta charset="utf-8"><base href="${baseHref}"></head><body class="pdf-export-impressao"></body></html>`);
     doc.close();
 
-    const temaAtual = document.documentElement.getAttribute('data-theme');
-    if (temaAtual) {
-      doc.documentElement.setAttribute('data-theme', temaAtual);
-    }
+    doc.documentElement.removeAttribute('data-theme');
 
     const head = doc.head;
     document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
@@ -2515,6 +2687,11 @@
       #print-version { display: block !important; }
     `;
     head.appendChild(regrasBase);
+
+    const overrideSandbox = doc.createElement('link');
+    overrideSandbox.rel = 'stylesheet';
+    overrideSandbox.href = new URL('css/print-canvas-override.css', baseHref).href;
+    head.appendChild(overrideSandbox);
 
     const printClone = printV.cloneNode(true);
     printClone.style.display = 'block';
@@ -2548,10 +2725,10 @@
       const iframe = document.createElement('iframe');
       iframe.setAttribute('aria-hidden', 'true');
       iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
+      iframe.style.left = '-10000px';
+      iframe.style.top = '0';
+      iframe.style.width = '1px';
+      iframe.style.height = '1px';
       iframe.style.border = '0';
       iframe.style.opacity = '0';
       iframe.style.pointerEvents = 'none';
@@ -2563,6 +2740,7 @@
       let timeoutDisparoPrintId = null;
       let printDisparadoEm = 0;
       let houveBlurAposPrint = false;
+      let manterBlobUrlParaFallback = false;
 
       const aoBlurJanela = () => {
         if (!printDisparadoEm || finalizado) return;
@@ -2606,11 +2784,33 @@
         try {
           iframe.remove();
         } catch (_) { }
-        try {
-          URL.revokeObjectURL(blobUrl);
-        } catch (_) { }
+        if (!manterBlobUrlParaFallback) {
+          try {
+            URL.revokeObjectURL(blobUrl);
+          } catch (_) { }
+        }
 
         if (erro) {
+          try {
+            const abaPdf = window.open(blobUrl, '_blank');
+            if (abaPdf) {
+              manterBlobUrlParaFallback = true;
+              if (typeof opcoes.onPrintStart === 'function') {
+                try {
+                  opcoes.onPrintStart();
+                } catch (_) { }
+              }
+              try { abaPdf.focus(); } catch (_) { }
+              setTimeout(() => {
+                try {
+                  URL.revokeObjectURL(blobUrl);
+                } catch (_) { }
+              }, 120000);
+              resolve();
+              return;
+            }
+          } catch (_) { }
+
           reject(erro);
           return;
         }
@@ -2653,6 +2853,7 @@
             }
             frameWindow.print();
             timeoutFallbackFechamentoId = setTimeout(() => {
+              // Fallback para evitar Promise pendente em navegadores sem afterprint/focus confiáveis.
               finalizar();
             }, 120000);
           } catch (erroPrint) {
@@ -2724,6 +2925,7 @@
       } else {
         printRenderEl.style.removeProperty('width');
       }
+      normalizarColorFunctionsParaHtml2Canvas(printRenderEl, sandbox.doc?.defaultView || window);
       restaurarAlturaImagens = ajustarSecaoImagensParaPreencherAltura(printRenderEl, areaA4Px.altura);
       const larguraCapturaPx = Math.max(
         1,
@@ -2889,7 +3091,12 @@
     linhas.forEach(linha => {
       if (linha.classList.contains('print-group-separator')) return;
 
-      const valorEl = linha.querySelector('[id^="print-"]');
+      const candidatosValor = Array.from(linha.querySelectorAll('[id^="print-"]'));
+      const valorEl = candidatosValor.find(el => (
+        el !== linha
+        && !el.classList.contains('label')
+        && !/label$/i.test(el.id)
+      ));
       if (!valorEl) return;
 
       const textoValor = (valorEl.textContent || '').trim().toLowerCase();

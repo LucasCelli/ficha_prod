@@ -328,33 +328,6 @@
     }
 }
 
-html[data-theme='dark'] .image-card {
-    background: var(--color-neutral-900);
-    border-color: var(--color-neutral-800);
-}
-
-html[data-theme='dark'] .image-card:hover {
-    border-color: var(--color-primary-soft);
-}
-
-html[data-theme='dark'] .image-wrapper {
-    background: var(--color-neutral-900);
-}
-
-html[data-theme='dark'] .image-description {
-    border-top-color: var(--color-neutral-800);
-}
-
-html[data-theme='dark'] .image-description input {
-    background: var(--color-neutral-900);
-    border-color: var(--color-neutral-800);
-    color: var(--color-neutral-200);
-}
-
-html[data-theme='dark'] .hint-text {
-    background: var(--color-neutral-900);
-}
-
 /* Normalizacao mobile */
 @media (max-width: 1024px) {
     .images-grid {

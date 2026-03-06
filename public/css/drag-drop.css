@@ -168,37 +168,6 @@
     }
 }
 
-html[data-theme='dark'] .drag-handle {
-    color: var(--color-neutral-600);
-}
-
-html[data-theme='dark'] .drag-handle:hover {
-    color: var(--color-neutral-400);
-}
-
-html[data-theme='dark'] #produtosTable tr {
-    background: var(--color-neutral-900);
-}
-
-html[data-theme='dark'] #produtosTable tr.dragging {
-    background: var(--color-primary-strong) !important;
-    box-shadow: var(--shadow-lg);
-}
-
-html[data-theme='dark'] #produtosTable tr.drag-over-top,
-html[data-theme='dark'] #produtosTable tr.drag-over-bottom {
-    background: var(--color-primary-strong) !important;
-}
-
-html[data-theme='dark'] #produtosTable tr.is-selected {
-    background: var(--color-neutral-900);
-    box-shadow: inset 3px 0 0 var(--color-primary);
-}
-
-html[data-theme='dark'] #produtosTable.sorted-flash tr {
-    animation: sortFlashDark 0.5s ease;
-}
-
 @keyframes sortFlashDark {
     0% {
         background: var(--color-neutral-800);
@@ -207,10 +176,6 @@ html[data-theme='dark'] #produtosTable.sorted-flash tr {
     100% {
         background: var(--color-neutral-900);
     }
-}
-
-html[data-theme='dark'] #produtosTable tr.just-dropped {
-    animation: dropBounceDark 0.3s ease;
 }
 
 @keyframes dropBounceDark {

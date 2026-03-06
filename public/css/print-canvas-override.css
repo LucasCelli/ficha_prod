@@ -1,0 +1,30 @@
+/* Overrides exclusivos do sandbox de impressão (html2canvas/PDF). */
+body.pdf-export-impressao {
+  --color-bg: var(--color-print-canvas-bg);
+  --color-surface: var(--color-print-canvas-bg);
+  --color-surface-2: var(--color-print-canvas-bg);
+  --color-surface-3: var(--color-print-canvas-bg);
+  --color-text: var(--color-print-canvas-text);
+  --color-text-secondary: var(--color-print-canvas-text);
+  --color-text-muted: var(--color-print-canvas-muted);
+  --color-muted: var(--color-print-canvas-muted);
+  --color-border: var(--color-print-canvas-border);
+  --color-border-soft: var(--color-print-canvas-border);
+  --color-neutral-0: var(--color-print-canvas-bg);
+  --color-neutral-400: var(--color-print-canvas-muted);
+  --color-neutral-900: var(--color-print-canvas-text);
+  --color-danger-strong: var(--color-print-canvas-danger);
+  color: var(--color-print-canvas-text);
+  background: var(--color-print-canvas-bg) !important;
+}
+
+body.pdf-export-impressao #print-version *::before,
+body.pdf-export-impressao #print-version *::after {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  border-color: var(--color-print-canvas-border) !important;
+  outline-color: var(--color-print-canvas-border) !important;
+  color: var(--color-print-canvas-text) !important;
+}

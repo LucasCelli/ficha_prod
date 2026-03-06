@@ -7,3 +7,5 @@ data/*.db-shm
 .DS_Store
 agents.md
 refactor-plan.md
+playwright.config.js
+tests/

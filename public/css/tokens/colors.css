@@ -149,6 +149,8 @@
   --input-border: var(--color-border);
   --input-text: var(--color-text);
   --input-placeholder: var(--color-text-muted);
+  --input-hover-bg: color-mix(in srgb, var(--color-primary-soft) 38%, var(--color-surface));
+  --input-hover-border: color-mix(in srgb, var(--color-brand) 42%, var(--input-border));
   --input-focus: var(--color-brand);
 
   --card-bg: var(--color-surface);
@@ -206,6 +208,12 @@
   --chart-3: var(--primitive-yellow-500);
   --chart-4: var(--primitive-red-500);
   --chart-5: var(--primitive-brand-700);
+
+  --color-print-canvas-bg: #FFFFFF;
+  --color-print-canvas-text: #0F172A;
+  --color-print-canvas-muted: #64748B;
+  --color-print-canvas-border: #0F172A;
+  --color-print-canvas-danger: #B91C1C;
 }
 
 html[data-theme='dark'] {
@@ -274,11 +282,13 @@ html[data-theme='dark'] {
   --button-danger-border: color-mix(in srgb, var(--color-danger) 56%, var(--color-border));
   --button-danger-hover: color-mix(in srgb, var(--color-danger) 32%, var(--color-surface));
 
-  --input-bg: var(--color-surface-2);
-  --input-border: var(--color-border);
+  --input-bg: color-mix(in srgb, var(--primitive-neutral-800) 86%, var(--primitive-neutral-900));
+  --input-border: color-mix(in srgb, var(--primitive-neutral-600) 42%, var(--primitive-neutral-800));
   --input-text: var(--color-text);
   --input-placeholder: var(--color-text-muted);
-  --input-focus: var(--color-brand);
+  --input-hover-bg: color-mix(in srgb, var(--color-brand) 16%, var(--input-bg));
+  --input-hover-border: color-mix(in srgb, var(--color-brand) 62%, var(--input-border));
+  --input-focus: var(--primitive-brand-400);
 
   --card-bg: var(--color-surface);
   --card-border: var(--color-border);
@@ -289,6 +299,15 @@ html[data-theme='dark'] {
   --toast-bg: var(--color-surface);
   --toast-text: var(--color-text);
   --toast-border: var(--color-border);
+  --toast-text-color: var(--primitive-neutral-0);
+  --alert-success-bg: color-mix(in srgb, var(--color-success) 26%, var(--color-surface));
+  --alert-success-text: var(--primitive-green-100);
+  --alert-warning-bg: color-mix(in srgb, var(--color-warning) 26%, var(--color-surface));
+  --alert-warning-text: var(--primitive-yellow-100);
+  --alert-danger-bg: color-mix(in srgb, var(--color-danger) 24%, var(--color-surface));
+  --alert-danger-text: var(--primitive-red-100);
+  --alert-info-bg: color-mix(in srgb, var(--color-info) 24%, var(--color-surface));
+  --alert-info-text: var(--primitive-blue-100);
   --table-bg: var(--color-surface);
   --table-border: var(--color-border);
   --table-row-hover: var(--color-surface-2);
@@ -318,4 +337,10 @@ html[data-theme='dark'] {
   --chart-3: var(--primitive-yellow-300);
   --chart-4: var(--primitive-red-300);
   --chart-5: var(--primitive-brand-300);
+
+  --color-print-canvas-bg: #FFFFFF;
+  --color-print-canvas-text: #0F172A;
+  --color-print-canvas-muted: #64748B;
+  --color-print-canvas-border: #0F172A;
+  --color-print-canvas-danger: #B91C1C;
 }

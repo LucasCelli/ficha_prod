@@ -166,6 +166,27 @@
     justify-content: center;
 }
 
+.kanban-board-header-actions .btn.btn-secondary.btn-icon.kanban-create-btn {
+    min-height: 30px;
+    height: 30px;
+    padding: 0 11px;
+    border-radius: var(--radius-pill);
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: var(--color-neutral-100);
+    border-color: var(--color-neutral-200);
+    color: var(--color-neutral-800);
+}
+
+.kanban-board-header-actions .btn.btn-secondary.btn-icon.kanban-create-btn:hover {
+    background: var(--color-neutral-200);
+    border-color: var(--color-neutral-400);
+}
+
+.kanban-board-header-actions .btn.btn-secondary.btn-icon.kanban-create-btn i {
+    color: var(--color-primary);
+}
+
 .kanban-filter-badge {
     appearance: none;
     font: inherit;
@@ -360,7 +381,7 @@
     padding: 3px 7px 2px;
     font-size: 0.64rem;
     font-weight: 700;
-    color: var(--color-neutral-600);
+    color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
@@ -1141,329 +1162,6 @@ body.kanban-modal-open {
     }
 }
 
-html[data-theme='dark'] .kanban-column {
-    background: var(--color-surface-soft);
-    border-color: var(--color-border);
-}
-
-html[data-theme='dark'] .kanban-filters-card.is-expanded .kanban-filters-header {
-    border-bottom-color: var(--color-neutral-800);
-}
-
-html[data-theme='dark'] .kanban-column-header {
-    background: var(--color-neutral-900);
-    border-bottom-color: var(--color-border);
-    box-shadow: 0 1px 2px var(--color-info);
-}
-
-html[data-theme='dark'] .kanban-column-header.pendente {
-    --kanban-header-accent-start: color-mix(in srgb, var(--color-warning) 78%, var(--color-surface));
-    --kanban-header-accent-end: color-mix(in srgb, var(--color-primary) 70%, var(--color-surface));
-}
-
-html[data-theme='dark'] .kanban-column-header.exportando {
-    --kanban-header-accent-start: color-mix(in srgb, var(--color-primary) 84%, var(--color-surface));
-    --kanban-header-accent-end: color-mix(in srgb, var(--color-info) 80%, var(--color-surface));
-}
-
-html[data-theme='dark'] .kanban-column-header.fila_impressao {
-    --kanban-header-accent-start: color-mix(in srgb, var(--color-info) 82%, var(--color-surface));
-    --kanban-header-accent-end: color-mix(in srgb, var(--color-primary) 72%, var(--color-surface));
-}
-
-html[data-theme='dark'] .kanban-column-header.sublimando {
-    --kanban-header-accent-start: color-mix(in srgb, var(--color-warning) 78%, var(--color-surface));
-    --kanban-header-accent-end: color-mix(in srgb, var(--color-danger) 62%, var(--color-surface));
-}
-
-html[data-theme='dark'] .kanban-column-header.na_costura {
-    --kanban-header-accent-start: color-mix(in srgb, var(--color-success) 82%, var(--color-surface));
-    --kanban-header-accent-end: color-mix(in srgb, var(--color-info) 68%, var(--color-surface));
-}
-
-html[data-theme='dark'] .kanban-column-count {
-    background: var(--color-primary-strong);
-    color: var(--color-primary-soft);
-}
-
-html[data-theme='dark'] .kanban-board-header-actions #kanbanTotalCount.badge {
-    background: var(--color-surface-2);
-    border: 1px solid var(--color-border);
-    color: var(--color-neutral-0) !important;
-}
-
-html[data-theme='dark'] .kanban-sort-date-btn {
-    border-color: var(--color-neutral-800);
-    background: var(--color-neutral-800);
-    color: var(--color-neutral-400);
-}
-
-html[data-theme='dark'] .kanban-sort-date-btn:hover {
-    border-color: var(--color-neutral-600);
-    background: var(--color-info-strong);
-}
-
-html[data-theme='dark'] .kanban-sort-menu {
-    background: var(--color-neutral-900);
-    border-color: var(--color-neutral-700);
-    box-shadow: 0 4px 16px var(--color-info);
-}
-
-html[data-theme='dark'] .kanban-sort-menu-divider {
-    background: var(--color-neutral-700);
-}
-
-html[data-theme='dark'] .kanban-sort-menu-group-title,
-html[data-theme='dark'] .kanban-sort-menu-note {
-    color: var(--color-neutral-500);
-}
-
-html[data-theme='dark'] .kanban-sort-menu-item {
-    color: var(--color-neutral-200);
-}
-
-html[data-theme='dark'] .kanban-sort-menu-item i {
-    color: var(--color-neutral-500);
-}
-
-html[data-theme='dark'] .kanban-sort-menu-item:hover {
-    background: var(--color-neutral-800);
-    border-color: var(--color-neutral-700);
-}
-
-html[data-theme='dark'] .kanban-sort-menu-item.kanban-sort-menu-item-filter.is-selected {
-    background: var(--color-primary-strong);
-    border-color: var(--color-primary);
-    color: var(--color-neutral-0);
-}
-
-html[data-theme='dark'] .kanban-sort-menu-item.kanban-sort-menu-item-filter.is-selected i {
-    color: var(--color-neutral-0);
-}
-
-html[data-theme='dark'] .kanban-empty {
-    background: var(--color-neutral-900);
-    border-color: var(--color-neutral-800);
-    color: var(--color-neutral-400);
-}
-
-html[data-theme='dark'] .kanban-card {
-    background: var(--color-neutral-900);
-    border-color: var(--color-neutral-600);
-    box-shadow: none;
-}
-
-html[data-theme='dark'] .kanban-card-skeleton:hover {
-    border-color: var(--color-neutral-800);
-    box-shadow: 0 1px 3px var(--color-info);
-}
-
-html[data-theme='dark'] .skeleton-line,
-html[data-theme='dark'] .skeleton-pill {
-    background: linear-gradient(90deg, var(--color-neutral-800) 0%, var(--color-neutral-800) 45%, var(--color-neutral-800) 100%);
-    background-size: 220% 100%;
-}
-
-html[data-theme='dark'] .kanban-card:hover {
-    border-color: var(--color-primary);
-    transform: translateY(-2px);
-}
-
-html[data-theme='dark'] .kanban-card-cliente {
-    background: var(--color-surface);
-    border-bottom-color: var(--color-border);
-}
-
-html[data-theme='dark'] .kanban-card-pedido,
-html[data-theme='dark'] .kanban-card-meta {
-    color: var(--color-neutral-400);
-}
-
-html[data-theme='dark'] .kanban-card-pedido i,
-html[data-theme='dark'] .kanban-card-meta i {
-    color: var(--color-neutral-600);
-}
-
-html[data-theme='dark'] .kanban-card-personalizacao {
-    background: var(--color-neutral-700);
-    border-color: var(--color-neutral-500);
-    color: var(--color-neutral-0);
-}
-
-html[data-theme='dark'] .kanban-card-tecido {
-    background: var(--color-neutral-700);
-    border-color: var(--color-neutral-500);
-    color: var(--color-neutral-0);
-}
-
-html[data-theme='dark'] .kanban-card-supply-status {
-    border-color: var(--color-success);
-    background: color-mix(in srgb, var(--color-success) 62%, var(--color-neutral-900));
-    color: var(--color-neutral-0);
-}
-
-html[data-theme='dark'] .kanban-card-supply-status.is-sem_tecido {
-    border-color: var(--color-warning);
-    background: color-mix(in srgb, var(--color-warning) 62%, var(--color-neutral-900));
-    color: var(--color-neutral-0);
-}
-
-html[data-theme='dark'] .kanban-card-supply-status.is-sem_tinta {
-    border-color: var(--color-danger);
-    background: color-mix(in srgb, var(--color-danger) 62%, var(--color-neutral-900));
-    color: var(--color-neutral-0);
-}
-
-html[data-theme='dark'] .kanban-card-supply-status.is-sem_papel {
-    border-color: var(--color-info);
-    background: color-mix(in srgb, var(--color-info) 62%, var(--color-neutral-900));
-    color: var(--color-neutral-0);
-}
-
-html[data-theme='dark'] .kanban-card-supply-status.is-pendencias {
-    border-color: var(--color-warning);
-    background: color-mix(in srgb, var(--color-warning) 52%, var(--color-neutral-900));
-    color: var(--color-neutral-0);
-}
-
-html[data-theme='dark'] .kanban-btn-view-icon {
-    background: var(--button-bg);
-    border-color: var(--button-border);
-    color: var(--button-text);
-}
-
-html[data-theme='dark'] .kanban-btn-view-icon:hover {
-    background: var(--button-hover);
-    border-color: var(--button-border);
-    color: var(--button-text);
-}
-
-html[data-theme='dark'] .kanban-filter-badge {
-    border-color: var(--color-neutral-800);
-    background: var(--color-neutral-800);
-    color: var(--color-neutral-400);
-}
-
-html[data-theme='dark'] .kanban-board-title input.kanban-title-search-input[type='text'] {
-    border: none;
-    background: var(--color-neutral-800);
-    color: var(--color-neutral-400);
-    box-shadow: none;
-}
-
-html[data-theme='dark'] .kanban-board-title input.kanban-title-search-input[type='text']::placeholder {
-    color: var(--color-neutral-600);
-}
-
-html[data-theme='dark'] .kanban-board-title input.kanban-title-search-input[type='text']:hover {
-    background: var(--color-info-strong);
-}
-
-html[data-theme='dark'] .kanban-board-title input.kanban-title-search-input[type='text']:focus {
-    border: none;
-    background: var(--color-neutral-800);
-    box-shadow: none;
-}
-
-html[data-theme='dark'] .kanban-filter-badge:hover {
-    border-color: var(--color-neutral-600);
-    background: var(--color-info-strong);
-}
-
-html[data-theme='dark'] .kanban-filter-badge.is-active {
-    background: var(--button-hover);
-    border-color: var(--button-border);
-    color: var(--button-text);
-}
-
-html[data-theme='dark'] .kanban-image-tooltip {
-    border-color: var(--color-neutral-800);
-    background: var(--color-neutral-900);
-    box-shadow: 0 4px 16px var(--color-info);
-}
-
-html[data-theme='dark'] .kanban-btn-deliver-icon {
-    background: var(--color-success-strong);
-    border-color: var(--color-success-strong);
-    color: var(--color-success-soft);
-}
-
-html[data-theme='dark'] .kanban-btn-deliver-icon:hover {
-    background: var(--color-success-strong);
-    border-color: var(--color-success-strong);
-    color: var(--color-success-soft);
-}
-
-html[data-theme='dark'] .kanban-column.is-drop-target {
-    background: color-mix(in srgb, var(--color-surface) 82%, var(--color-primary));
-    border-color: var(--color-primary);
-}
-
-html[data-theme='dark'] .kanban-column.is-drop-target .kanban-column-header {
-    background: color-mix(in srgb, var(--color-surface) 84%, var(--color-primary));
-}
-
-html[data-theme='dark'] .kanban-view-modal-content {
-    background: var(--color-neutral-900);
-    border-color: var(--color-neutral-800);
-}
-
-html[data-theme='dark'] .kanban-view-modal-header {
-    background: linear-gradient(180deg, var(--color-neutral-900), var(--color-neutral-800));
-    border-bottom-color: var(--color-neutral-800);
-}
-
-html[data-theme='dark'] .kanban-view-modal-title {
-    color: var(--color-neutral-200);
-}
-
-html[data-theme='dark'] .kanban-view-modal-subtitle {
-    color: var(--color-neutral-400);
-}
-
-html[data-theme='dark'] .kanban-view-modal-close {
-    background: var(--color-neutral-800);
-    border-color: var(--color-neutral-800);
-    color: var(--color-neutral-200);
-}
-
-html[data-theme='dark'] .kanban-view-modal-close:hover {
-    background: var(--color-neutral-800);
-    border-color: var(--color-neutral-800);
-}
-
-html[data-theme='dark'] .kanban-view-modal-body {
-    background: var(--color-neutral-800);
-}
-
-html[data-theme='dark'] .kanban-view-modal-iframe {
-    background: var(--color-neutral-900);
-    border-color: var(--color-neutral-800);
-}
-
-html[data-theme='dark'] .kanban-create-modal-content {
-    background: var(--color-neutral-900);
-    border-color: var(--color-neutral-800);
-}
-
-html[data-theme='dark'] .kanban-create-modal-title {
-    color: var(--color-neutral-200);
-}
-
-html[data-theme='dark'] .kanban-create-modal-close {
-    background: var(--color-neutral-800);
-    border-color: var(--color-neutral-800);
-    color: var(--color-neutral-200);
-}
-
-html[data-theme='dark'] .kanban-create-modal-close:hover {
-    background: var(--color-neutral-800);
-}
-
-html[data-theme='dark'] .kanban-create-modal-field span {
-    color: var(--color-neutral-400);
-}
-
 /* Normalizacao mobile */
 @media (max-width: 1024px) {
     .kanban-page-container {
@@ -1493,7 +1191,8 @@ html[data-theme='dark'] .kanban-create-modal-field span {
     }
 
     .kanban-board-header-actions .badge,
-    .kanban-filter-badge {
+    .kanban-filter-badge,
+    .kanban-create-btn {
         min-height: 30px;
         padding: 0 10px;
     }
