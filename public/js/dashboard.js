@@ -345,6 +345,12 @@
     container.querySelectorAll('.ficha-cliente-link').forEach(link => {
       link.addEventListener('click', e => {
         e.preventDefault();
+        const card = link.closest('.ficha-item');
+        const botaoVisualizar = card?.querySelector('.btn-visualizar');
+        if (botaoVisualizar) {
+          botaoVisualizar.click();
+          return;
+        }
         const id = parseInt(link.dataset.id);
         if (!Number.isNaN(id)) visualizarFicha(id);
       });
