@@ -11,27 +11,22 @@
   const NOTIFICATION_FEED_KEY = 'site_notifications_feed_v1';
   const NOTIFICATION_SENT_KEY = 'site_notifications_sent_v1';
   const NOTIFICATION_UNREAD_KEY = 'site_notifications_unread_v1';
-  const FIXED_LOCATION = Object.freeze({
-    latitude: -20.9317,
-    longitude: -54.9614,
-    city: 'Sidrol\u00E2ndia'
-  });
   const DEFAULT_GREETING_STATUS_MESSAGES = [
-    'Fichas atualizadas {{updatedText}}.'
+    'Foco no que importa.'
   ];
   const DEFAULT_GREETING_STATUS_MESSAGES_BY_PERIOD = Object.freeze({
     morning: [
-      'Fichas atualizadas {{updatedText}}.',
+      'Foco no que importa.',
       'Bora tomar um café e tentar acordar!',
       'Que hoje nosso dia seja abeçoado.'
     ],
     afternoon: [
-      'Fichas atualizadas {{updatedText}}.',
+      'Foco no que importa.',
       'Pelo menos já tá de tarde.',
-      'Por que o tempo passa mais devagar em {{city}}?'
+      'Segue firme que ja andou bastante.'
     ],
     night: [
-      'Fichas atualizadas {{updatedText}}.',
+      'Foco no que importa.',
       'Tá trabalhando ainda? Vá descansar!',
       'Boa noite, espero que essa horas extras valham a pena!'
     ]
@@ -84,42 +79,6 @@
     return Number.isFinite(parsed) ? parsed : NaN;
   }
 
-  function formatMinutesAgo(value) {
-    const ts = parseTimestamp(value);
-    if (!Number.isFinite(ts)) return 'h\u00E1 0 minutos';
-
-    const minutes = Math.max(0, Math.floor((Date.now() - ts) / 60000));
-    if (minutes < 60) {
-      return minutes === 1 ? 'h\u00E1 1 minuto' : `h\u00E1 ${minutes} minutos`;
-    }
-
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) {
-      const remainingMinutes = minutes % 60;
-      const hoursText = hours === 1 ? '1 hora' : `${hours} horas`;
-      const minutesText = remainingMinutes === 1 ? '1 minuto' : `${remainingMinutes} minutos`;
-      return `h\u00E1 ${hoursText} e ${minutesText}`;
-    }
-
-    const days = Math.floor(hours / 24);
-    if (days < 7) {
-      return days === 1 ? 'h\u00E1 1 dia' : `h\u00E1 ${days} dias`;
-    }
-
-    const weeks = Math.floor(days / 7);
-    if (weeks < 5) {
-      return weeks === 1 ? 'h\u00E1 1 semana' : `h\u00E1 ${weeks} semanas`;
-    }
-
-    const months = Math.floor(days / 30);
-    if (months < 12) {
-      return months === 1 ? 'h\u00E1 1 m\u00EAs' : `h\u00E1 ${months} meses`;
-    }
-
-    const years = Math.floor(days / 365);
-    return years === 1 ? 'h\u00E1 1 ano' : `h\u00E1 ${years} anos`;
-  }
-
   function escapeHtml(text) {
     if (window.appUtils && typeof window.appUtils.escapeHtml === 'function') {
       return window.appUtils.escapeHtml(text);
@@ -141,11 +100,7 @@
     return {
       fetchedAt: Date.now(),
       lastFichaCreatedAt: Date.now(),
-      weather: {
-        city: FIXED_LOCATION.city,
-        temperatureText: '--\u00B0C',
-        icon: '\u{1F324}\uFE0F'
-      },
+      weather: {},
       systems: {}
     };
   }
@@ -192,7 +147,7 @@
 
     return normalizedUnique.length > 0
       ? normalizedUnique
-      : ['Fichas atualizadas {{updatedText}}.'];
+      : ['Foco no que importa.'];
   }
 
   let greetingStatusMessages = getConfiguredGreetingMessages(getGreetingPeriod(new Date()));
@@ -203,7 +158,7 @@
     greetingStatusMessages = getConfiguredGreetingMessages(period);
 
     if (!Array.isArray(greetingStatusMessages) || greetingStatusMessages.length === 0) {
-      greetingStatusMessages = ['Fichas atualizadas {{updatedText}}.'];
+      greetingStatusMessages = ['Foco no que importa.'];
     }
 
     if (greetingStatusMessages.length === 1) {
@@ -236,30 +191,16 @@
 
   function formatGreetingLine(snapshot) {
     const now = new Date();
-    const weather = snapshot && snapshot.weather ? snapshot.weather : {};
-
-    const icon = normalizeString(weather.icon, '\u{1F324}\uFE0F');
-    const temperatureText = normalizeString(weather.temperatureText, '--\u00B0C');
-    const city = normalizeString(weather.city, FIXED_LOCATION.city);
-    const updatedText = formatMinutesAgo(snapshot && snapshot.lastFichaCreatedAt);
     const statusMessage = formatGreetingStatusMessage(
       getCurrentGreetingStatusTemplate(now),
-      { updatedText, city, temperatureText }
+      {}
     );
 
-    return `${getGreeting(now)} ${formatGreetingDate(now)} ${icon} ${temperatureText} em ${city} | ${statusMessage}`;
+    return `${getGreeting(now)} ${formatGreetingDate(now)} | ${statusMessage}`;
   }
 
   function formatGreetingStatusMessage(template, context) {
-    const safeTemplate = normalizeString(template, 'Fichas atualizadas {{updatedText}}.');
-    const updatedText = normalizeString(context && context.updatedText, 'h\u00E1 0 minutos');
-    const city = normalizeString(context && context.city, FIXED_LOCATION.city);
-    const temperatureText = normalizeString(context && context.temperatureText, '--\u00B0C');
-
-    return safeTemplate
-      .replace(/\{\{\s*updatedText\s*\}\}/g, updatedText)
-      .replace(/\{\{\s*city\s*\}\}/g, city)
-      .replace(/\{\{\s*temperatureText\s*\}\}/g, temperatureText);
+    return normalizeString(template, 'Foco no que importa.');
   }
 
   function toIsoDate(value) {

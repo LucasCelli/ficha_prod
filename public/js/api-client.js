@@ -27,6 +27,14 @@ class APIClient {
   async init() {
     if (this.initialized) return true;
 
+    if (
+      window.location.hostname !== 'localhost' &&
+      window.location.hostname !== '127.0.0.1'
+    ) {
+      this.initialized = true;
+      return true;
+    }
+
     try {
       const response = await fetch(`${this.baseURL}/health`, {
         method: 'GET',

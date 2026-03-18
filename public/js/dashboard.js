@@ -1073,10 +1073,6 @@
         throw new Error('Falha ao salvar rascunho da duplicacao');
       }
 
-      if (window.SystemLog && typeof window.SystemLog.track === 'function') {
-        window.SystemLog.track('ficha_duplicada', 'Ficha duplicada', Number(fichaVisualizadaId) || null, { origem: 'dashboard_modal' });
-      }
-
       window.location.href = '/ficha?duplicar=1';
     } catch (error) {
       console.error('Erro ao duplicar ficha pelo modal:', error);

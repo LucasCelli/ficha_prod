@@ -311,7 +311,10 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 function setShortCdnCache(res, seconds = 30) {
   const safeSeconds = Math.max(1, Number(seconds) || 30);
   const staleSeconds = Math.max(safeSeconds * 4, safeSeconds + 30);
-  res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${safeSeconds}, stale-while-revalidate=${staleSeconds}`);
+  const cdnValue = `public, max-age=${safeSeconds}, stale-while-revalidate=${staleSeconds}`;
+  res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+  res.setHeader('CDN-Cache-Control', cdnValue);
+  res.setHeader('Vercel-CDN-Cache-Control', cdnValue);
 }
 
 
@@ -424,17 +427,6 @@ async function initDatabase() {
     `);
 
     await executeDb(`
-      CREATE TABLE IF NOT EXISTS system_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        event_type TEXT NOT NULL,
-        action TEXT NOT NULL,
-        ficha_id INTEGER,
-        details TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await executeDb(`
       CREATE TABLE IF NOT EXISTS idempotency_keys (
         route TEXT NOT NULL,
         idempotency_key TEXT NOT NULL,
@@ -454,8 +446,6 @@ async function initDatabase() {
     await executeDb(`CREATE INDEX IF NOT EXISTS idx_fichas_data_inicio ON fichas(data_inicio)`);
     await executeDb(`CREATE INDEX IF NOT EXISTS idx_fichas_data_entrega ON fichas(data_entrega)`);
     await executeDb(`CREATE INDEX IF NOT EXISTS idx_fichas_vendedor ON fichas(vendedor)`);
-    await executeDb(`CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs(created_at DESC)`);
-    await executeDb(`CREATE INDEX IF NOT EXISTS idx_system_logs_ficha_id ON system_logs(ficha_id)`);
     await executeDb(`CREATE INDEX IF NOT EXISTS idx_idempotency_keys_created_at ON idempotency_keys(created_at DESC)`);
 
     // ==================== MIGRAÇÕES ====================
@@ -743,17 +733,6 @@ async function autoEntregarFichasNaCostura() {
   );
 
   if ((result?.rowsAffected || 0) > 0) {
-    for (const ficha of fichasParaAutoEntrega) {
-      await addSystemLog({
-        eventType: 'pedido_auto_marcado',
-        action: 'Pedido auto-marcado como entregue',
-        fichaId: ficha?.id,
-        details: {
-          estado: 'entregue',
-          origem: 'regra_kanban_na_costura_7_dias'
-        }
-      });
-    }
     console.log(`[kanban] Auto-entrega aplicada em ${result.rowsAffected} ficha(s)`);
   }
 }
@@ -769,29 +748,6 @@ function parseImagensDataCount(rawValue) {
     return Array.isArray(parsed) ? parsed.length : 0;
   } catch (_) {
     return 0;
-  }
-}
-
-async function addSystemLog({ eventType, action, fichaId = null, details = null }) {
-  const normalizedType = String(eventType || '').trim().toLowerCase();
-  const normalizedAction = String(action || '').trim();
-  if (!normalizedType || !normalizedAction) return;
-
-  const normalizedFichaId = Number.isInteger(Number(fichaId)) && Number(fichaId) > 0
-    ? Number(fichaId)
-    : null;
-
-  const detailsValue = details && typeof details === 'object'
-    ? JSON.stringify(details)
-    : (typeof details === 'string' && details.trim() ? details : null);
-
-  try {
-    await dbRun(
-      'INSERT INTO system_logs (event_type, action, ficha_id, details, created_at) VALUES (?, ?, ?, ?, ?)',
-      [normalizedType, normalizedAction, normalizedFichaId, detailsValue, new Date().toISOString()]
-    );
-  } catch (error) {
-    console.error('[system-log] Falha ao registrar evento:', error?.message || error);
   }
 }
 
@@ -1823,18 +1779,6 @@ app.post('/api/fichas', async (req, res) => {
       await atualizarCliente(dados.cliente, dados.dataInicio);
     }
 
-    await addSystemLog({
-      eventType: 'ficha_adicionada',
-      action: 'Ficha adicionada',
-      fichaId: novoId,
-      details: {
-        cliente: dados.cliente || '',
-        vendedor: dados.vendedor || '',
-        numeroVenda: dados.numeroVenda || '',
-        status: 'pendente'
-      }
-    });
-
     console.log(`[fichas] Ficha #${novoId} criada`);
     res.status(201).json(payload);
   } catch (error) {
@@ -1908,50 +1852,8 @@ app.put('/api/fichas/:id', async (req, res) => {
 
     await dbRun(sql, params);
 
-    await addSystemLog({
-      eventType: 'ficha_editada',
-      action: 'Ficha editada',
-      fichaId: paramsData.id,
-      details: {
-        cliente: dados.cliente || '',
-        vendedor: dados.vendedor || '',
-        numeroVenda: dados.numeroVenda || ''
-      }
-    });
-
     const imagensAntes = parseImagensDataCount(fichaExiste.imagens_data);
     const imagensDepois = parseImagensDataCount(dados.imagensData);
-    if (imagensDepois > imagensAntes) {
-      await addSystemLog({
-        eventType: 'imagem_adicionada',
-        action: 'Imagem adicionada',
-        fichaId: paramsData.id,
-        details: {
-          quantidade: imagensDepois - imagensAntes
-        }
-      });
-    } else if (imagensDepois < imagensAntes) {
-      await addSystemLog({
-        eventType: 'imagem_deletada',
-        action: 'Imagem deletada',
-        fichaId: paramsData.id,
-        details: {
-          quantidade: imagensAntes - imagensDepois
-        }
-      });
-    }
-
-    if (String(fichaExiste.status || '') !== String(dados.status || 'pendente')) {
-      await addSystemLog({
-        eventType: 'status_pedido_alterado',
-        action: 'Status do pedido alterado',
-        fichaId: paramsData.id,
-        details: {
-          de: String(fichaExiste.status || ''),
-          para: String(dados.status || 'pendente')
-        }
-      });
-    }
 
     console.log(`[fichas] Ficha #${paramsData.id} atualizada`);
     res.json({ id: paramsData.id, message: 'Ficha atualizada com sucesso' });
@@ -1982,13 +1884,6 @@ app.patch('/api/fichas/:id/entregar', async (req, res) => {
       [now, now, paramsData.id]
     );
 
-    await addSystemLog({
-      eventType: 'pedido_entregue',
-      action: 'Pedido entregue',
-      fichaId: paramsData.id,
-      details: { origem: 'manual' }
-    });
-
     console.log(`[fichas] Ficha #${paramsData.id} marcada como entregue`);
     res.json({ message: 'Ficha marcada como entregue' });
   } catch (error) {
@@ -2014,12 +1909,6 @@ app.patch('/api/fichas/:id/pendente', async (req, res) => {
       `UPDATE fichas SET status = 'pendente', data_entregue = NULL, auto_entregue_em = NULL, data_atualizacao = ? WHERE id = ?`,
       [now, paramsData.id]
     );
-
-    await addSystemLog({
-      eventType: 'pedido_reaberto',
-      action: 'Pedido voltou para pendente',
-      fichaId: paramsData.id
-    });
 
     console.log(`[fichas] Ficha #${paramsData.id} voltou para pendente`);
     res.json({ message: 'Ficha marcada como pendente' });
@@ -2094,16 +1983,6 @@ app.patch('/api/fichas/:id/kanban-status', async (req, res) => {
       [kanbanStatus, now, kanbanOrder, now, paramsData.id]
     );
 
-    await addSystemLog({
-      eventType: 'status_kanban',
-      action: 'Status no kanban alterado',
-      fichaId: paramsData.id,
-      details: {
-        de: String(fichaExiste.kanban_status || ''),
-        para: kanbanStatus
-      }
-    });
-
     console.log(`[kanban] Ficha #${paramsData.id} atualizada: ${kanbanStatus}`);
     res.json({
       id: paramsData.id,
@@ -2169,100 +2048,11 @@ app.delete('/api/fichas/:id', async (req, res) => {
 
     await dbRun('DELETE FROM fichas WHERE id = ?', [paramsData.id]);
 
-    await addSystemLog({
-      eventType: 'ficha_deletada',
-      action: 'Ficha deletada',
-      fichaId: paramsData.id,
-      details: {
-        cliente: String(fichaExiste.cliente || '')
-      }
-    });
-
     console.log(`[fichas] Ficha #${paramsData.id} deletada`);
     res.json({ message: 'Ficha deletada com sucesso' });
   } catch (error) {
     console.error('Erro ao deletar ficha:', error);
     res.status(500).json({ error: 'Erro ao deletar ficha' });
-  }
-});
-
-// Buscar clientes (autocomplete)
-app.get('/api/system-log', async (req, res) => {
-  try {
-    const rawLimit = Number.parseInt(String(req.query.limit || '200'), 10);
-    const limit = Number.isInteger(rawLimit) && rawLimit > 0
-      ? Math.min(rawLimit, 500)
-      : 200;
-
-    const logs = await dbAll(
-      `
-        SELECT
-          sl.id,
-          sl.event_type,
-          sl.action,
-          sl.ficha_id,
-          sl.details,
-          sl.created_at,
-          f.cliente AS ficha_cliente
-        FROM system_logs sl
-        LEFT JOIN fichas f ON f.id = sl.ficha_id
-        ORDER BY replace(replace(sl.created_at, 'T', ' '), 'Z', '') DESC, sl.id DESC
-        LIMIT ?
-      `,
-      [limit]
-    );
-
-    const normalized = logs.map(item => {
-      let parsedDetails = item.details;
-      if (typeof item.details === 'string' && item.details.trim()) {
-        try {
-          parsedDetails = JSON.parse(item.details);
-        } catch (_) {
-          parsedDetails = item.details;
-        }
-      }
-
-      return {
-        id: item.id,
-        eventType: item.event_type,
-        action: item.action,
-        fichaId: item.ficha_id ?? null,
-        cliente: (parsedDetails && typeof parsedDetails === 'object' && typeof parsedDetails.cliente === 'string' && parsedDetails.cliente.trim())
-          ? parsedDetails.cliente.trim()
-          : (item.ficha_cliente ? String(item.ficha_cliente) : ''),
-        details: parsedDetails,
-        createdAt: item.created_at
-      };
-    });
-
-    res.json(normalized);
-  } catch (error) {
-    console.error('Erro ao listar log do sistema:', error);
-    res.status(500).json({ error: 'Erro ao listar log do sistema' });
-  }
-});
-
-app.post('/api/system-log', async (req, res) => {
-  try {
-    const eventType = String(req.body?.eventType || '').trim().toLowerCase();
-    const action = String(req.body?.action || '').trim();
-    const rawFichaId = req.body?.fichaId;
-    const fichaId = Number.isInteger(Number(rawFichaId)) && Number(rawFichaId) > 0
-      ? Number(rawFichaId)
-      : null;
-    const details = req.body?.details && typeof req.body.details === 'object'
-      ? req.body.details
-      : null;
-
-    if (!eventType || !action) {
-      return res.status(400).json({ error: 'eventType e action são obrigatórios' });
-    }
-
-    await addSystemLog({ eventType, action, fichaId, details });
-    res.status(201).json({ message: 'Evento registrado' });
-  } catch (error) {
-    console.error('Erro ao registrar log do sistema:', error);
-    res.status(500).json({ error: 'Erro ao registrar log do sistema' });
   }
 });
 
@@ -2357,18 +2147,6 @@ app.put('/api/clientes/:id', async (req, res) => {
       console.log(`[clientes] Nome atualizado nas fichas: "${clienteExiste.nome}" -> "${nomeFinal}"`);
     }
 
-    await addSystemLog({
-      eventType: 'cliente_editado',
-      action: 'Cliente editado',
-      details: {
-        cliente: nomeFinal,
-        de: clienteExiste.nome,
-        para: nomeFinal,
-        primeiroPedido: primeiro_pedido || clienteExiste.primeiro_pedido || '',
-        ultimoPedido: ultimo_pedido || clienteExiste.ultimo_pedido || ''
-      }
-    });
-
     console.log(`[clientes] Cliente #${id} atualizado`);
     res.json({ message: 'Cliente atualizado com sucesso' });
   } catch (error) {
@@ -2391,15 +2169,6 @@ app.delete('/api/clientes/:id', async (req, res) => {
     }
 
     await dbRun('DELETE FROM clientes WHERE id = ?', [id]);
-
-    await addSystemLog({
-      eventType: 'cliente_deletado',
-      action: 'Cliente deletado',
-      details: {
-        cliente: clienteExiste.nome || '',
-        clienteId: id
-      }
-    });
 
     console.log(`[clientes] Cliente #${id} (${clienteExiste.nome}) deletado`);
     res.json({ message: 'Cliente excluído com sucesso' });
@@ -3017,14 +2786,6 @@ async function atualizarCliente(nomeCliente, dataInicio) {
         [nomeNormalizado, data, data]
       );
 
-      await addSystemLog({
-        eventType: 'cliente_adicionado',
-        action: 'Cliente adicionado',
-        details: {
-          cliente: nomeNormalizado,
-          primeiroPedido: data
-        }
-      });
     }
   } catch (error) {
     console.error('Erro ao atualizar cliente:', error);
@@ -3087,6 +2848,7 @@ function adicionarFiltrosRelatorio(whereParts, params, queryData, campoDataExpr)
 // Relatório principal (ÚNICA definição - usa data_entregue para entregues, data_inicio para pendentes)
 app.get('/api/relatorio', async (req, res) => {
   try {
+    setShortCdnCache(res, 60);
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
     const { periodo } = queryData;
@@ -3193,6 +2955,7 @@ app.get('/api/relatorio', async (req, res) => {
 // Análise por vendedor (usa data_inicio para total de pedidos, data_entregue para entregues)
 app.get('/api/relatorio/vendedores', async (req, res) => {
   try {
+    setShortCdnCache(res, 60);
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
     const { periodo } = queryData;
@@ -3266,6 +3029,7 @@ app.get('/api/relatorio/vendedores', async (req, res) => {
 // Análise por material
 app.get('/api/relatorio/materiais', async (req, res) => {
   try {
+    setShortCdnCache(res, 60);
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
     const whereParts = ["material IS NOT NULL", "material != ''"];
@@ -3309,6 +3073,7 @@ app.get('/api/relatorio/materiais', async (req, res) => {
 // Top produtos (descrições)
 app.get('/api/relatorio/produtos', async (req, res) => {
   try {
+    setShortCdnCache(res, 60);
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
     const whereParts = [];
@@ -3349,6 +3114,7 @@ app.get('/api/relatorio/produtos', async (req, res) => {
 // Top clientes
 app.get('/api/relatorio/clientes-top', async (req, res) => {
   try {
+    setShortCdnCache(res, 60);
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
     const whereParts = ["cliente IS NOT NULL", "cliente != ''"];
@@ -3407,6 +3173,7 @@ app.get('/api/relatorio/clientes-top', async (req, res) => {
 // Distribuição por tamanho
 app.get('/api/relatorio/tamanhos', async (req, res) => {
   try {
+    setShortCdnCache(res, 60);
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
     const whereParts = [];
@@ -3456,6 +3223,7 @@ app.get('/api/relatorio/tamanhos', async (req, res) => {
 // Comparativo com período anterior
 app.get('/api/relatorio/comparativo', async (req, res) => {
   try {
+    setShortCdnCache(res, 60);
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
     const { periodo, dataInicio, dataFim } = queryData;
@@ -3615,6 +3383,7 @@ app.get('/api/relatorio/comparativo', async (req, res) => {
 // Indicadores de eficiência
 app.get('/api/relatorio/eficiencia', async (req, res) => {
   try {
+    setShortCdnCache(res, 60);
     const queryData = parseWithZod(res, relatorioPeriodoQuerySchema, req.query, 'Parâmetros de relatório inválidos');
     if (!queryData) return;
     const now = new Date();
