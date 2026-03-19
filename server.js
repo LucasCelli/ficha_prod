@@ -554,28 +554,53 @@ function setShortCdnCache(res, seconds = 30) {
   res.setHeader('Vercel-CDN-Cache-Control', cdnValue);
 }
 
+function setStaticCacheHeaders(res, {
+  browser = 'public, max-age=0, must-revalidate',
+  edgeSeconds = 0,
+  staleSeconds = null
+} = {}) {
+  const browserValue = String(browser || 'public, max-age=0, must-revalidate');
+  res.setHeader('Cache-Control', browserValue);
+
+  if (Number(edgeSeconds) > 0) {
+    const safeEdge = Math.max(1, Number(edgeSeconds) || 0);
+    const parsedStale = Number(staleSeconds);
+    const safeStale = Number.isFinite(parsedStale)
+      ? Math.max(safeEdge, parsedStale)
+      : Math.max(safeEdge * 7, safeEdge + 300);
+    const cdnValue = `public, max-age=${safeEdge}, stale-while-revalidate=${safeStale}`;
+    res.setHeader('CDN-Cache-Control', cdnValue);
+    res.setHeader('Vercel-CDN-Cache-Control', cdnValue);
+    return;
+  }
+
+  res.setHeader('CDN-Cache-Control', browserValue);
+  res.setHeader('Vercel-CDN-Cache-Control', browserValue);
+}
+
 
 // Servir arquivos estáticos
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      // Evita servir HTML antigo, que pode carregar bundle incompatível.
-      res.setHeader('Cache-Control', 'no-store');
+      setStaticCacheHeaders(res, { edgeSeconds: 300, staleSeconds: 86400 });
     } else if (filePath.endsWith('.webmanifest')) {
       res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache');
+      setStaticCacheHeaders(res, { edgeSeconds: 3600, staleSeconds: 86400 });
     } else if (filePath.endsWith('sw.js')) {
-      res.setHeader('Cache-Control', 'no-store');
+      setStaticCacheHeaders(res);
     } else if (filePath.endsWith('.css')) {
       res.setHeader('Content-Type', 'text/css; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      setStaticCacheHeaders(res, { edgeSeconds: 86400, staleSeconds: 604800 });
     } else if (filePath.endsWith('.js')) {
       res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      setStaticCacheHeaders(res, { edgeSeconds: 86400, staleSeconds: 604800 });
     } else if (filePath.endsWith('.json')) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      setStaticCacheHeaders(res, { edgeSeconds: 3600, staleSeconds: 86400 });
+    } else if (/\.(png|jpe?g|gif|svg|webp|ico)$/i.test(filePath)) {
+      setStaticCacheHeaders(res, { edgeSeconds: 604800, staleSeconds: 2592000 });
     }
   }
 }));
