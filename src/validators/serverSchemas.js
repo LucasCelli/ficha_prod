@@ -7,8 +7,16 @@ const KANBAN_STATUS_LIST = [
   'sublimando',
   'na_costura'
 ];
+const SUPPLY_STATUS_LIST = [
+  'tudo_ok',
+  'sem_tecido',
+  'sem_tinta',
+  'sem_papel',
+  'pendencias'
+];
 
 export const KANBAN_STATUS_VALUES = new Set(KANBAN_STATUS_LIST);
+export const SUPPLY_STATUS_VALUES = new Set(SUPPLY_STATUS_LIST);
 const FICHA_STATUS_LIST = ['pendente', 'entregue'];
 
 function isValidISODate(value) {
@@ -202,6 +210,55 @@ export const kanbanOrderBodySchema = z.object({
   ),
   orderedIds: z.array(z.preprocess(parsePositiveInt, z.number().int().positive())).default([])
 });
+
+export const supplyStatusBodySchema = z.object({
+  supplyStatus: z.preprocess(
+    value => {
+      const text = toTrimmedStringOrUndefined(value);
+      return text ? text.toLowerCase() : undefined;
+    },
+    z.enum(SUPPLY_STATUS_LIST)
+  )
+});
+
+export const kanbanCardsQuerySchema = z.object({
+  cliente: optionalTextSchema,
+  onlyCurrentWeek: z.preprocess(parseBooleanOrUndefined, z.boolean().optional()),
+  tecido: optionalTextSchema,
+  personalizacao: optionalTextSchema,
+  supplyStatus: z.preprocess(
+    value => {
+      const text = toTrimmedStringOrUndefined(value);
+      return text ? text.toLowerCase() : undefined;
+    },
+    z.enum(SUPPLY_STATUS_LIST).optional()
+  )
+});
+
+export const kanbanManualCardBodySchema = z.object({
+  cliente: requiredTextSchema,
+  dataEntrega: requiredIsoDateSchema,
+  evento: z.preprocess(
+    toTrimmedStringOrUndefined,
+    z.enum(['sim', 'nao']).optional()
+  ),
+  arte: optionalTextSchema,
+  material: optionalTextSchema,
+  kanbanStatus: z.preprocess(
+    value => {
+      const text = toTrimmedStringOrUndefined(value);
+      return text ? text.toLowerCase() : undefined;
+    },
+    z.enum(KANBAN_STATUS_LIST).optional()
+  ),
+  supplyStatus: z.preprocess(
+    value => {
+      const text = toTrimmedStringOrUndefined(value);
+      return text ? text.toLowerCase() : undefined;
+    },
+    z.enum(SUPPLY_STATUS_LIST).optional()
+  )
+}).passthrough();
 
 export const clientesQuerySchema = z.object({
   termo: optionalTextSchema

@@ -435,7 +435,9 @@
   function criarCardFicha(ficha) {
     const dataInicio = ficha.data_inicio ? formatarData(ficha.data_inicio) : '-';
     const dataEntrega = ficha.data_entrega ? formatarData(ficha.data_entrega) : '-';
-    const totalItens = calcularTotalItens(ficha.produtos || []);
+    const totalItens = Number.isFinite(Number(ficha.totalItens))
+      ? Number(ficha.totalItens)
+      : calcularTotalItens(ficha.produtos || []);
     const isEvento = ficha.evento === 'sim';
     const isPendente = ficha.status === 'pendente';
     const diasAtraso = calcularDiasAtraso(ficha.data_entrega, ficha.status);
@@ -1393,6 +1395,10 @@
   function obterMiniaturaFicha(ficha) {
     const thumbSrc = String(ficha.thumbSrc || ficha.thumb_src || '').trim();
     if (thumbSrc) return thumbSrc;
+
+    if (!('imagens_data' in (ficha || {})) && !('imagensData' in (ficha || {}))) {
+      return '';
+    }
 
     const imagens = extrairImagensFicha(ficha);
     if (!Array.isArray(imagens) || imagens.length === 0) return '';

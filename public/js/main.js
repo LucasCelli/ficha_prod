@@ -214,8 +214,7 @@
 
   async function uploadToCloudinary(base64Data) {
     if (!cloudinaryConfig) {
-      console.warn('Cloudinary não configurado, mantendo base64');
-      return { success: true, url: base64Data, isBase64: true };
+      throw new Error('Cloudinary não configurado. O upload de imagens está indisponível.');
     }
 
     try {
@@ -245,7 +244,7 @@
       };
     } catch (error) {
       console.error('[cloudinary] Erro no upload:', error);
-      return { success: true, url: base64Data, isBase64: true };
+      throw new Error('Falha ao enviar imagem para o Cloudinary.');
     }
   }
 
@@ -1769,9 +1768,20 @@
         return false;
       }
 
-      // UPLOAD PARA CLOUDINARY
-      console.log('📤 Fazendo upload para Cloudinary...');
-      const uploadResult = await uploadToCloudinary(src);
+      // Upload obrigatório para evitar persistir imagens inline em base64.
+      console.log('Fazendo upload para Cloudinary...');
+      let uploadResult;
+      try {
+        uploadResult = await uploadToCloudinary(src);
+      } catch (error) {
+        const message = error?.message || 'Falha ao enviar imagem para o Cloudinary.';
+        if (typeof mostrarToast === 'function') {
+          mostrarToast(message, 'error');
+        } else {
+          alert(message);
+        }
+        return false;
+      }
 
       imagens.push({
         src: uploadResult.url,

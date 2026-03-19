@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import {
   KANBAN_STATUS_VALUES,
+  SUPPLY_STATUS_VALUES,
   clienteUpdateBodySchema,
   clientesQuerySchema,
   cloudinaryDeleteParamsSchema,
@@ -14,13 +15,16 @@ import {
   cloudinarySignatureBodySchema,
   fichaBodySchema,
   fichaQuerySchema,
+  kanbanCardsQuerySchema,
+  kanbanManualCardBodySchema,
   kanbanOrderBodySchema,
   kanbanStatusBodySchema,
   parseWithZod,
   positiveIdParamSchema,
   relatorioClienteDetalheQuerySchema,
   relatorioClientesListQuerySchema,
-  relatorioPeriodoQuerySchema
+  relatorioPeriodoQuerySchema,
+  supplyStatusBodySchema
 } from './src/validators/serverSchemas.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -65,6 +69,15 @@ const AUTO_OBS_MARKERS = Object.freeze([
   'REFORCO',
   'BOLSO'
 ]);
+const NON_MANUAL_FICHA_SQL = 'COALESCE(is_manual_card, 0) = 0';
+const DEFAULT_SUPPLY_STATUS = 'tudo_ok';
+
+function appendNonManualFichaClause(whereParts) {
+  if (!Array.isArray(whereParts)) return;
+  if (!whereParts.includes(NON_MANUAL_FICHA_SQL)) {
+    whereParts.push(NON_MANUAL_FICHA_SQL);
+  }
+}
 
 function normalizeNameCase(value) {
   if (typeof value !== 'string') return '';
@@ -139,6 +152,11 @@ function normalizeFichaPayload(dados) {
     produtos: normalizeProdutos(dados?.produtos),
     comNomes: normalizeComNomesValue(comNomesRaw)
   };
+}
+
+function normalizeSupplyStatusValue(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return SUPPLY_STATUS_VALUES.has(normalized) ? normalized : DEFAULT_SUPPLY_STATUS;
 }
 
 function normalizarTextoBusca(valor) {
@@ -263,10 +281,102 @@ function extractFichaThumbSrc(ficha) {
   })();
 
   const fromImages = extractFirstImageSrcFromArray(parsedImages);
-  if (fromImages) return fromImages;
+  if (fromImages && /^https?:\/\//i.test(fromImages)) return fromImages;
 
   const single = String(ficha?.imagem_data || '').trim();
-  return single || '';
+  if (/^https?:\/\//i.test(single)) return single;
+
+  return '';
+}
+
+function calculateFichaTotalItens(produtosRaw) {
+  if (!produtosRaw) return 0;
+
+  let produtos = produtosRaw;
+  if (typeof produtosRaw === 'string') {
+    try {
+      produtos = JSON.parse(produtosRaw);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  if (!Array.isArray(produtos)) return 0;
+
+  return produtos.reduce((total, item) => {
+    const quantidade = Number.parseInt(String(item?.quantidade || '0'), 10) || 0;
+    return total + quantidade;
+  }, 0);
+}
+
+function containsInlineBase64Image(value) {
+  if (typeof value !== 'string') return false;
+  return value.includes('data:image');
+}
+
+function payloadContainsInlineBase64Images(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+  if (containsInlineBase64Image(payload.imagemData)) return true;
+  if (containsInlineBase64Image(payload.imagensData)) return true;
+  return false;
+}
+
+function isManualCardRecord(ficha) {
+  return Number(ficha?.is_manual_card || 0) === 1;
+}
+
+function getFichaRecencyTimestamp(ficha) {
+  const candidates = [
+    ficha?.kanban_status_updated_at,
+    ficha?.data_atualizacao,
+    ficha?.data_criacao
+  ];
+
+  for (const candidate of candidates) {
+    const value = Date.parse(String(candidate || ''));
+    if (!Number.isNaN(value)) return value;
+  }
+
+  return 0;
+}
+
+function normalizeNumeroVendaKey(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+function dedupeKanbanCards(cards) {
+  const deduped = [];
+  const byNumeroVenda = new Map();
+
+  cards.forEach(card => {
+    const key = normalizeNumeroVendaKey(card?.numero_venda);
+    if (!key) {
+      deduped.push(card);
+      return;
+    }
+
+    const current = byNumeroVenda.get(key);
+    if (!current) {
+      byNumeroVenda.set(key, card);
+      return;
+    }
+
+    const currentTs = getFichaRecencyTimestamp(current);
+    const candidateTs = getFichaRecencyTimestamp(card);
+    if (candidateTs > currentTs) {
+      byNumeroVenda.set(key, card);
+      return;
+    }
+
+    if (candidateTs === currentTs && Number(card?.id || 0) > Number(current?.id || 0)) {
+      byNumeroVenda.set(key, card);
+    }
+  });
+
+  return [...deduped, ...Array.from(byNumeroVenda.values())];
 }
 
 function summarizeFicha(ficha) {
@@ -280,12 +390,139 @@ function summarizeFicha(ficha) {
     status: ficha.status,
     evento: ficha.evento,
     arte: ficha.arte,
-    produtos: ficha.produtos,
     material: ficha.material,
     kanban_status: ficha.kanban_status,
     kanban_ordem: ficha.kanban_ordem,
+    totalItens: calculateFichaTotalItens(ficha.produtos),
     thumbSrc: extractFichaThumbSrc(ficha)
   };
+}
+
+function summarizeKanbanCard(ficha) {
+  return {
+    id: ficha.id,
+    cliente: ficha.cliente,
+    numero_venda: ficha.numero_venda,
+    data_inicio: ficha.data_inicio,
+    data_entrega: ficha.data_entrega,
+    evento: ficha.evento,
+    arte: ficha.arte,
+    material: ficha.material,
+    kanban_status: ficha.kanban_status,
+    kanban_ordem: ficha.kanban_ordem,
+    supply_status: normalizeSupplyStatusValue(ficha.supply_status),
+    thumbSrc: extractFichaThumbSrc(ficha),
+    is_manual_card: isManualCardRecord(ficha),
+    status: ficha.status,
+    data_criacao: ficha.data_criacao,
+    data_atualizacao: ficha.data_atualizacao,
+    kanban_status_updated_at: ficha.kanban_status_updated_at
+  };
+}
+
+function matchesKanbanCurrentWeek(rawDate) {
+  const [yearStr, monthStr, dayStr] = String(rawDate || '').trim().split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+
+  const entrega = new Date(year, month - 1, day);
+  if (Number.isNaN(entrega.getTime())) return false;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayOfWeek = today.getDay();
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+
+  const friday = new Date(monday);
+  friday.setDate(monday.getDate() + 4);
+  friday.setHours(23, 59, 59, 999);
+
+  return entrega.getTime() >= monday.getTime() && entrega.getTime() <= friday.getTime();
+}
+
+function normalizeKanbanFilterText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function normalizeKanbanPersonalizacaoValue(value) {
+  return normalizeKanbanFilterText(value)
+    .replace(/[\s/-]+/g, '_')
+    .replace(/_e_/g, '_');
+}
+
+function matchesKanbanCardsFilters(card, filters) {
+  const clienteFilter = normalizeKanbanFilterText(filters?.cliente);
+  if (clienteFilter) {
+    const clienteValue = normalizeKanbanFilterText(card?.cliente);
+    const materialValue = normalizeKanbanFilterText(card?.material);
+    if (!clienteValue.includes(clienteFilter) && !materialValue.includes(clienteFilter)) {
+      return false;
+    }
+  }
+
+  if (filters?.onlyCurrentWeek && !matchesKanbanCurrentWeek(card?.data_entrega)) {
+    return false;
+  }
+
+  const tecidoFilter = normalizeKanbanFilterText(filters?.tecido);
+  if (tecidoFilter && normalizeKanbanFilterText(card?.material) !== tecidoFilter) {
+    return false;
+  }
+
+  const personalizacaoFilter = normalizeKanbanPersonalizacaoValue(filters?.personalizacao);
+  if (personalizacaoFilter && normalizeKanbanPersonalizacaoValue(card?.arte) !== personalizacaoFilter) {
+    return false;
+  }
+
+  const supplyStatusFilter = normalizeSupplyStatusValue(filters?.supplyStatus);
+  if (filters?.supplyStatus && normalizeSupplyStatusValue(card?.supply_status) !== supplyStatusFilter) {
+    return false;
+  }
+
+  return true;
+}
+
+async function fetchKanbanCards(filters = {}) {
+  const rows = await dbAll(
+    `
+      SELECT
+        id,
+        cliente,
+        numero_venda,
+        data_inicio,
+        data_entrega,
+        evento,
+        arte,
+        material,
+        status,
+        kanban_status,
+        kanban_ordem,
+        supply_status,
+        imagens_data,
+        imagem_data,
+        is_manual_card,
+        data_criacao,
+        data_atualizacao,
+        kanban_status_updated_at
+      FROM fichas
+      WHERE status != 'entregue'
+      ORDER BY id DESC
+    `
+  );
+
+  return dedupeKanbanCards(rows)
+    .filter(card => matchesKanbanCardsFilters(card, filters))
+    .map(summarizeKanbanCard);
 }
 
 function fichaCorrespondeTermoBusca(ficha, termo) {
@@ -407,6 +644,8 @@ async function initDatabase() {
         imagem_data TEXT,
         imagens_data TEXT,
         produtos TEXT,
+        is_manual_card INTEGER DEFAULT 0,
+        supply_status TEXT DEFAULT 'tudo_ok',
         data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
         data_atualizacao DATETIME DEFAULT CURRENT_TIMESTAMP,
         data_entregue DATETIME,
@@ -466,7 +705,9 @@ async function initDatabase() {
       "kanban_status TEXT DEFAULT 'pendente'",
       'kanban_status_updated_at DATETIME',
       'kanban_ordem INTEGER',
-      'auto_entregue_em DATETIME'
+      'auto_entregue_em DATETIME',
+      'is_manual_card INTEGER DEFAULT 0',
+      "supply_status TEXT DEFAULT 'tudo_ok'"
     ];
 
     for (const coluna of migrações) {
@@ -504,10 +745,22 @@ async function initDatabase() {
         SET kanban_status_updated_at = COALESCE(kanban_status_updated_at, data_atualizacao, data_criacao, CURRENT_TIMESTAMP)
         WHERE kanban_status_updated_at IS NULL OR trim(kanban_status_updated_at) = ''
       `);
+      await executeDb(`
+        UPDATE fichas
+        SET is_manual_card = 0
+        WHERE is_manual_card IS NULL
+      `);
+      await executeDb(`
+        UPDATE fichas
+        SET supply_status = '${DEFAULT_SUPPLY_STATUS}'
+        WHERE supply_status IS NULL OR trim(supply_status) = ''
+      `);
       await preencherKanbanOrdemInicial();
       await executeDb(`CREATE INDEX IF NOT EXISTS idx_fichas_kanban_status ON fichas(kanban_status)`);
       await executeDb(`CREATE INDEX IF NOT EXISTS idx_fichas_kanban_status_updated_at ON fichas(kanban_status_updated_at)`);
       await executeDb(`CREATE INDEX IF NOT EXISTS idx_fichas_kanban_ordem ON fichas(kanban_status, kanban_ordem)`);
+      await executeDb(`CREATE INDEX IF NOT EXISTS idx_fichas_manual_card ON fichas(is_manual_card)`);
+      await executeDb(`CREATE INDEX IF NOT EXISTS idx_fichas_supply_status ON fichas(supply_status)`);
     } catch (e) {
       // Ignora se a coluna ainda não existir por qualquer motivo.
     }
@@ -709,6 +962,7 @@ async function autoEntregarFichasNaCostura() {
       FROM fichas
       WHERE
         status != 'entregue'
+        AND ${NON_MANUAL_FICHA_SQL}
         AND kanban_status = 'na_costura'
         AND kanban_status_updated_at IS NOT NULL
         AND julianday(replace(replace(kanban_status_updated_at, 'T', ' '), 'Z', '')) <= julianday(?, '-7 days')
@@ -725,6 +979,7 @@ async function autoEntregarFichasNaCostura() {
         data_atualizacao = ?
       WHERE
         status != 'entregue'
+        AND ${NON_MANUAL_FICHA_SQL}
         AND kanban_status = 'na_costura'
         AND kanban_status_updated_at IS NOT NULL
         AND julianday(replace(replace(kanban_status_updated_at, 'T', ' '), 'Z', '')) <= julianday(?, '-7 days')
@@ -1416,6 +1671,7 @@ async function getLastFichaCreatedAt() {
       `
         SELECT data_criacao, data_atualizacao
         FROM fichas
+        WHERE ${NON_MANUAL_FICHA_SQL}
         ORDER BY replace(replace(COALESCE(data_criacao, data_atualizacao, CURRENT_TIMESTAMP), 'T', ' '), 'Z', '') DESC, id DESC
         LIMIT 1
       `
@@ -1547,13 +1803,11 @@ app.get('/api/fichas', async (req, res) => {
         'material',
         'kanban_status',
         'kanban_ordem',
-        'imagem_data',
-        'imagens_data',
         'produtos'
       ].join(', ')
       : '*';
 
-    let whereClause = ' WHERE 1=1';
+    let whereClause = ` WHERE 1=1 AND ${NON_MANUAL_FICHA_SQL}`;
     const params = [];
 
     if (status) {
@@ -1670,7 +1924,7 @@ app.get('/api/fichas/:id', async (req, res) => {
     const paramsData = parseWithZod(res, positiveIdParamSchema, req.params, 'ID da ficha inválido');
     if (!paramsData) return;
 
-    const ficha = await dbGet('SELECT * FROM fichas WHERE id = ?', [paramsData.id]);
+    const ficha = await dbGet(`SELECT * FROM fichas WHERE id = ? AND ${NON_MANUAL_FICHA_SQL}`, [paramsData.id]);
 
     if (!ficha) {
       return res.status(404).json({ error: 'Ficha não encontrada' });
@@ -1700,6 +1954,11 @@ app.post('/api/fichas', async (req, res) => {
   try {
     const bodyData = parseWithZod(res, fichaBodySchema, req.body, 'Dados da ficha inválidos');
     if (!bodyData) return;
+    if (payloadContainsInlineBase64Images(bodyData)) {
+      return res.status(422).json({
+        error: 'Imagens em base64 não são mais aceitas. Reenvie as imagens usando o upload para Cloudinary.'
+      });
+    }
 
     if (idempotencyKey) {
       const existente = await getIdempotencyRecord(idempotencyRoute, idempotencyKey);
@@ -1744,8 +2003,8 @@ app.post('/api/fichas', async (req, res) => {
         gola, cor_gola, acabamento_gola, largura_gola, cor_peitilho_interno, cor_peitilho_externo, cor_pe_de_gola_interno, cor_pe_de_gola_externo, cor_botao,
         abertura_lateral, cor_abertura_lateral, reforco_gola, cor_reforco, bolso,
         filete, filete_local, filete_cor, faixa, faixa_local, faixa_cor,
-        arte, com_nomes, observacoes, imagem_data, imagens_data, produtos, data_criacao, data_atualizacao
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        arte, com_nomes, observacoes, imagem_data, imagens_data, produtos, is_manual_card, supply_status, data_criacao, data_atualizacao
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -1759,7 +2018,7 @@ app.post('/api/fichas', async (req, res) => {
       dados.filete, dados.fileteLocal, dados.fileteCor,
       dados.faixa, dados.faixaLocal, dados.faixaCor,
       dados.arte, dados.comNomes, dados.observacoes, dados.imagemData, dados.imagensData,
-      produtosJson, now, now
+      produtosJson, 0, DEFAULT_SUPPLY_STATUS, now, now
     ];
 
     const result = await dbRun(sql, params);
@@ -1806,9 +2065,14 @@ app.put('/api/fichas/:id', async (req, res) => {
 
     const bodyData = parseWithZod(res, fichaBodySchema, req.body, 'Dados da ficha inválidos');
     if (!bodyData) return;
+    if (payloadContainsInlineBase64Images(bodyData)) {
+      return res.status(422).json({
+        error: 'Imagens em base64 não são mais aceitas. Reenvie as imagens usando o upload para Cloudinary.'
+      });
+    }
 
     const fichaExiste = await dbGet(
-      'SELECT id, status, kanban_status, imagens_data, imagem_data FROM fichas WHERE id = ?',
+      `SELECT id, status, kanban_status, imagens_data, imagem_data FROM fichas WHERE id = ? AND ${NON_MANUAL_FICHA_SQL}`,
       [paramsData.id]
     );
 
@@ -1898,7 +2162,7 @@ app.patch('/api/fichas/:id/pendente', async (req, res) => {
     const paramsData = parseWithZod(res, positiveIdParamSchema, req.params, 'ID da ficha inválido');
     if (!paramsData) return;
 
-    const fichaExiste = await dbGet('SELECT id FROM fichas WHERE id = ?', [paramsData.id]);
+    const fichaExiste = await dbGet(`SELECT id FROM fichas WHERE id = ? AND ${NON_MANUAL_FICHA_SQL}`, [paramsData.id]);
 
     if (!fichaExiste) {
       return res.status(404).json({ error: 'Ficha não encontrada' });
@@ -2034,6 +2298,139 @@ app.patch('/api/kanban/order', async (req, res) => {
   }
 });
 
+app.get('/api/kanban/cards', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    const queryData = parseWithZod(res, kanbanCardsQuerySchema, req.query, 'Parâmetros do kanban inválidos');
+    if (!queryData) return;
+
+    const items = await fetchKanbanCards(queryData);
+    res.json({
+      items,
+      total: items.length
+    });
+  } catch (error) {
+    console.error('Erro ao carregar cartões do kanban:', error);
+    res.status(500).json({ error: 'Erro ao carregar cartões do kanban' });
+  }
+});
+
+app.post('/api/kanban/manual-cards', async (req, res) => {
+  try {
+    const bodyData = parseWithZod(res, kanbanManualCardBodySchema, req.body, 'Dados do cartão manual inválidos');
+    if (!bodyData) return;
+
+    const cliente = normalizeNameCase(bodyData.cliente || '');
+    const kanbanStatus = typeof bodyData.kanbanStatus === 'string'
+      ? bodyData.kanbanStatus.trim().toLowerCase()
+      : 'pendente';
+    const targetStatus = KANBAN_STATUS_VALUES.has(kanbanStatus) ? kanbanStatus : 'pendente';
+    const supplyStatus = normalizeSupplyStatusValue(bodyData.supplyStatus);
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
+    const kanbanOrder = await getNextKanbanOrder(targetStatus);
+
+    const result = await dbRun(
+      `
+        INSERT INTO fichas (
+          cliente,
+          data_inicio,
+          data_entrega,
+          evento,
+          status,
+          kanban_status,
+          kanban_status_updated_at,
+          kanban_ordem,
+          material,
+          arte,
+          is_manual_card,
+          supply_status,
+          data_criacao,
+          data_atualizacao
+        ) VALUES (?, ?, ?, ?, 'pendente', ?, ?, ?, ?, ?, 1, ?, ?, ?)
+      `,
+      [
+        cliente,
+        today,
+        bodyData.dataEntrega,
+        bodyData.evento || 'nao',
+        targetStatus,
+        now,
+        kanbanOrder,
+        bodyData.material || '',
+        bodyData.arte || '',
+        supplyStatus,
+        now,
+        now
+      ]
+    );
+
+    const createdId = Number(result.lastInsertRowid);
+    const createdCard = await dbGet(
+      `
+        SELECT
+          id,
+          cliente,
+          numero_venda,
+          data_inicio,
+          data_entrega,
+          evento,
+          arte,
+          material,
+          status,
+          kanban_status,
+          kanban_ordem,
+          supply_status,
+          imagens_data,
+          imagem_data,
+          is_manual_card,
+          data_criacao,
+          data_atualizacao,
+          kanban_status_updated_at
+        FROM fichas
+        WHERE id = ?
+      `,
+      [createdId]
+    );
+
+    console.log(`[kanban] Cartão manual #${createdId} criado`);
+    res.status(201).json(summarizeKanbanCard(createdCard));
+  } catch (error) {
+    console.error('Erro ao criar cartão manual:', error);
+    res.status(500).json({ error: 'Erro ao criar cartão manual' });
+  }
+});
+
+app.patch('/api/fichas/:id/supply-status', async (req, res) => {
+  try {
+    const paramsData = parseWithZod(res, positiveIdParamSchema, req.params, 'ID da ficha inválido');
+    if (!paramsData) return;
+    const bodyData = parseWithZod(res, supplyStatusBodySchema, req.body, 'Dados de insumos inválidos');
+    if (!bodyData) return;
+
+    const fichaExiste = await dbGet('SELECT id FROM fichas WHERE id = ?', [paramsData.id]);
+    if (!fichaExiste) {
+      return res.status(404).json({ error: 'Ficha não encontrada' });
+    }
+
+    const now = new Date().toISOString();
+    const supplyStatus = normalizeSupplyStatusValue(bodyData.supplyStatus);
+    await dbRun(
+      'UPDATE fichas SET supply_status = ?, data_atualizacao = ? WHERE id = ?',
+      [supplyStatus, now, paramsData.id]
+    );
+
+    res.json({
+      id: paramsData.id,
+      supplyStatus,
+      message: 'Status de insumos atualizado com sucesso'
+    });
+  } catch (error) {
+    console.error('Erro ao atualizar status de insumos:', error);
+    res.status(500).json({ error: 'Erro ao atualizar status de insumos' });
+  }
+});
+
 // Deletar ficha
 app.delete('/api/fichas/:id', async (req, res) => {
   try {
@@ -2092,7 +2489,7 @@ app.get('/api/clientes/lista', async (req, res) => {
         c.primeiro_pedido, 
         c.ultimo_pedido,
         c.data_criacao,
-        (SELECT COUNT(*) FROM fichas WHERE fichas.cliente = c.nome) as total_pedidos
+        (SELECT COUNT(*) FROM fichas WHERE fichas.cliente = c.nome AND ${NON_MANUAL_FICHA_SQL}) as total_pedidos
       FROM clientes c
       ORDER BY c.nome ASC
     `);
@@ -2141,7 +2538,7 @@ app.put('/api/clientes/:id', async (req, res) => {
 
     if (nomeFinal !== clienteExiste.nome) {
       await dbRun(
-        `UPDATE fichas SET cliente = ? WHERE lower(cliente) = lower(?)`,
+        `UPDATE fichas SET cliente = ? WHERE lower(cliente) = lower(?) AND ${NON_MANUAL_FICHA_SQL}`,
         [nomeFinal, clienteExiste.nome]
       );
       console.log(`[clientes] Nome atualizado nas fichas: "${clienteExiste.nome}" -> "${nomeFinal}"`);
@@ -2271,7 +2668,7 @@ app.get('/api/relatorio-clientes/:id', async (req, res) => {
 
     const fichasLimit = Number(queryData.fichasLimit) || 10;
     const fichasOffset = Number(queryData.fichasOffset) || 0;
-    const where = ['lower(cliente) = lower(?)'];
+    const where = [NON_MANUAL_FICHA_SQL, 'lower(cliente) = lower(?)'];
     const args = [cliente.nome];
 
     if (queryData.dataInicio && queryData.dataFim) {
@@ -2444,13 +2841,13 @@ app.get('/api/estatisticas', async (req, res) => {
     setShortCdnCache(res, 60);
     const stats = {};
 
-    const totalFichas = await dbGet('SELECT COUNT(*) as total FROM fichas');
+    const totalFichas = await dbGet(`SELECT COUNT(*) as total FROM fichas WHERE ${NON_MANUAL_FICHA_SQL}`);
     stats.totalFichas = totalFichas?.total || 0;
 
-    const pendentes = await dbGet("SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente'");
+    const pendentes = await dbGet(`SELECT COUNT(*) as total FROM fichas WHERE status = 'pendente' AND ${NON_MANUAL_FICHA_SQL}`);
     stats.pendentes = pendentes?.total || 0;
 
-    const entregues = await dbGet("SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue'");
+    const entregues = await dbGet(`SELECT COUNT(*) as total FROM fichas WHERE status = 'entregue' AND ${NON_MANUAL_FICHA_SQL}`);
     stats.entregues = entregues?.total || 0;
 
     const totalClientes = await dbGet('SELECT COUNT(*) as total FROM clientes');
@@ -2459,12 +2856,12 @@ app.get('/api/estatisticas', async (req, res) => {
     const now = new Date();
     const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const esteMes = await dbGet(
-      "SELECT COUNT(*) as total FROM fichas WHERE substr(data_inicio, 1, 7) = ?",
+      `SELECT COUNT(*) as total FROM fichas WHERE substr(data_inicio, 1, 7) = ? AND ${NON_MANUAL_FICHA_SQL}`,
       [mesAtual]
     );
     stats.esteMes = esteMes?.total || 0;
 
-    const fichas = await dbAll('SELECT produtos FROM fichas');
+    const fichas = await dbAll(`SELECT produtos FROM fichas WHERE ${NON_MANUAL_FICHA_SQL}`);
     let totalItens = 0;
     fichas.forEach(ficha => {
       if (ficha.produtos) {
@@ -2808,6 +3205,7 @@ function obterReferenciaPeriodoRelatorio(now = new Date()) {
 }
 
 function adicionarFiltrosRelatorio(whereParts, params, queryData, campoDataExpr) {
+  appendNonManualFichaClause(whereParts);
   const cliente = String(queryData?.cliente || '').trim();
   const clienteDataInicio = queryData?.clienteDataInicio;
   const clienteDataFim = queryData?.clienteDataFim;
@@ -3317,13 +3715,13 @@ app.get('/api/relatorio/comparativo', async (req, res) => {
 
     // Buscar dados do período atual
     const fichasAtual = await dbAll(
-      `SELECT produtos, status, cliente FROM fichas WHERE data_inicio BETWEEN ? AND ?${clienteWhere}`,
+      `SELECT produtos, status, cliente FROM fichas WHERE ${NON_MANUAL_FICHA_SQL} AND data_inicio BETWEEN ? AND ?${clienteWhere}`,
       [atual.inicio, atual.fim, ...clienteParams]
     );
 
     // Buscar dados do período anterior
     const fichasAnterior = await dbAll(
-      `SELECT produtos, status, cliente FROM fichas WHERE data_inicio BETWEEN ? AND ?${clienteWhere}`,
+      `SELECT produtos, status, cliente FROM fichas WHERE ${NON_MANUAL_FICHA_SQL} AND data_inicio BETWEEN ? AND ?${clienteWhere}`,
       [anterior.inicio, anterior.fim, ...clienteParams]
     );
 

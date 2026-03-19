@@ -1680,9 +1680,17 @@
       }
 
       const rangeHeatmap = obterRangeUltimos365Dias();
+      const heatmapParams = new URLSearchParams({
+        ...rangeHeatmap,
+        resumido: '1'
+      });
+      const personalParams = new URLSearchParams({
+        ...rangePersonalizacoes,
+        resumido: '1'
+      });
       const [resHeatmap, resPersonal] = await Promise.all([
-        fetch(`${db.baseURL}/fichas?${new URLSearchParams(rangeHeatmap).toString()}`),
-        fetch(`${db.baseURL}/fichas?${new URLSearchParams(rangePersonalizacoes).toString()}`)
+        fetch(`${db.baseURL}/fichas?${heatmapParams.toString()}`),
+        fetch(`${db.baseURL}/fichas?${personalParams.toString()}`)
       ]);
       if (!resHeatmap.ok || !resPersonal.ok) throw new Error('Erro ao carregar fichas');
 
@@ -1910,5 +1918,4 @@
     });
   }
 })();
-
 

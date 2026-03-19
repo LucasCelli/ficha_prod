@@ -39,20 +39,25 @@
   const NAME_EXCEPTIONS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
   const UPPERCASE_WORD_PATTERN = /^[A-ZÀ-Ý]{1,4}$/;
   const STORAGE_FILTER_KEY = 'kanban_filters_v1';
-  const STORAGE_MANUAL_CARDS_KEY = 'kanban_manual_cards_v1';
-  const STORAGE_SUPPLY_STATUS_KEY = 'kanban_supply_status_v1';
-  const PREVIEW_READY_MESSAGE = 'ficha-preview-ready';
+  const LEGACY_STORAGE_MANUAL_CARDS_KEY = 'kanban_manual_cards_v1';
+  const LEGACY_STORAGE_SUPPLY_STATUS_KEY = 'kanban_supply_status_v1';
+  const LEGACY_STORAGE_MANUAL_MIGRATED_IDS_KEY = 'kanban_manual_cards_migrated_ids_v2';
   const TAB_RETURN_REFRESH_MIN_AWAY_MS = 30000;
   const TAB_RETURN_REFRESH_COOLDOWN_MS = 15000;
 
   const state = {
     fichas: [],
+    board: {
+      grouped: Object.create(null),
+      totalVisible: 0
+    },
     isLoading: false,
+    lastFetchRequestId: 0,
     filters: {
       cliente: '',
       onlyCurrentWeek: false,
       tecido: '',
-      status: '',
+      supplyStatus: '',
       personalizacao: ''
     },
     drag: {
@@ -61,25 +66,33 @@
       previewStatus: null,
       previewEl: null
     },
+    render: {
+      frameId: null,
+      isFull: true,
+      refreshFilters: true,
+      dirtyStatuses: new Set()
+    },
     pendingPersistById: Object.create(null),
     pendingDeliverById: Object.create(null),
     pendingSortByStatus: Object.create(null),
-    manualCards: [],
-    supplyStatusById: Object.create(null),
     isCreatingManualCard: false,
     lastMovedFichaId: null,
     lastHiddenAt: Date.now(),
-    lastAutoRefreshAt: 0
+    lastAutoRefreshAt: 0,
+    viewRequestId: 0,
+    previewPointerRaf: 0,
+    previewPointerX: 0,
+    previewPointerY: 0
   };
 
   const ui = {
     viewModal: null,
     viewOverlay: null,
-    viewFrame: null,
     viewFichaId: null,
     viewCloseBtn: null,
     viewLoading: null,
-    viewLoadingTimeout: null,
+    viewContent: null,
+    viewOpenLink: null,
     viewCurrentFichaId: null,
     createModal: null,
     createOverlay: null,
@@ -116,13 +129,14 @@
     }
 
     state.filters = loadFilters();
-    state.manualCards = loadManualCards();
-    state.supplyStatusById = loadSupplyStatusMap();
-
     initEventListeners();
     hydrateFilterControls();
     await carregarFichas();
-    renderKanban();
+    const migrated = await migrateLegacyKanbanData();
+    if (migrated) {
+      await carregarFichas({ silentLoading: true });
+    }
+    renderKanban(null, { refreshFilters: true });
   }
 
   function initEventListeners() {
@@ -133,10 +147,11 @@
     const kanbanBoard = document.getElementById('kanbanBoard');
     ui.viewModal = document.getElementById('kanbanViewModal');
     ui.viewOverlay = ui.viewModal ? ui.viewModal.querySelector('.kanban-view-modal-overlay') : null;
-    ui.viewFrame = document.getElementById('kanbanViewFrame');
     ui.viewFichaId = document.getElementById('kanbanViewFichaId');
     ui.viewCloseBtn = document.getElementById('btnCloseKanbanViewModal');
     ui.viewLoading = document.getElementById('kanbanViewLoading');
+    ui.viewContent = document.getElementById('kanbanViewContent');
+    ui.viewOpenLink = document.getElementById('kanbanViewOpenLink');
     ui.createModal = document.getElementById('kanbanCreateCardModal');
     ui.createOverlay = ui.createModal ? ui.createModal.querySelector('.kanban-create-modal-overlay') : null;
     ui.createCloseBtn = document.getElementById('btnCloseKanbanCreateModal');
@@ -156,17 +171,16 @@
     renderGlobalFilterMenu();
 
     if (filterCliente) {
-      filterCliente.addEventListener('input', debounce(event => {
+      filterCliente.addEventListener('input', debounce(async event => {
         state.filters.cliente = event.target.value || '';
         saveFilters();
-        renderKanban();
-      }, 180));
+        await carregarFichas({ silentLoading: true });
+      }, 220));
     }
 
     if (btnAtualizar) {
       btnAtualizar.addEventListener('click', async () => {
         await carregarFichas();
-        renderKanban();
         if (typeof window.mostrarInfo === 'function') {
           window.mostrarInfo('Quadro atualizado');
         }
@@ -178,11 +192,11 @@
     }
 
     if (badgeFiltroSemanaAtual) {
-      badgeFiltroSemanaAtual.addEventListener('click', () => {
+      badgeFiltroSemanaAtual.addEventListener('click', async () => {
         state.filters.onlyCurrentWeek = !state.filters.onlyCurrentWeek;
         saveFilters();
         syncCurrentWeekFilterButton();
-        renderKanban();
+        await carregarFichas({ silentLoading: true });
       });
     }
 
@@ -229,14 +243,9 @@
       ui.createForm.addEventListener('submit', handleCreateCardSubmit);
     }
 
-    if (ui.viewFrame) {
-      ui.viewFrame.addEventListener('error', handleViewFrameError);
-    }
-
-    window.addEventListener('message', handleViewFrameMessage);
-
     document.addEventListener('keydown', handleGlobalKeydown);
     document.addEventListener('click', handleDocumentClick);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     document.querySelectorAll('.kanban-column').forEach(column => {
       column.addEventListener('dragenter', handleDragEnterColumn);
@@ -285,7 +294,7 @@
 
     const filterState = {
       tecido: String(state.filters.tecido || '').trim(),
-      status: String(state.filters.status || '').trim(),
+      supplyStatus: String(state.filters.supplyStatus || '').trim(),
       personalizacao: String(state.filters.personalizacao || '').trim()
     };
     const tecidoOptions = getGlobalTecidoFilterOptions();
@@ -302,7 +311,7 @@
     const statusItemsHtml = renderGlobalFilterOptionItems({
       filterKind: 'status',
       allLabel: 'Todos os status',
-      selectedValue: filterState.status,
+      selectedValue: filterState.supplyStatus,
       options: statusOptions
     });
 
@@ -381,7 +390,7 @@
     `;
   }
 
-  function handleGlobalFilterMenuClick(event) {
+  async function handleGlobalFilterMenuClick(event) {
     const optionButton = event.target.closest('button[data-action="set-global-filter"]');
     if (!optionButton) return;
 
@@ -391,7 +400,7 @@
     const filterValue = decodeURIComponent(String(optionButton.dataset.filterValue || ''));
     setGlobalFilter(filterKind, filterValue);
     saveFilters();
-    renderKanban();
+    await carregarFichas({ silentLoading: true });
     renderGlobalFilterMenu();
   }
 
@@ -405,7 +414,7 @@
 
     if (filterKind === 'status') {
       const value = String(filterValue || '').trim();
-      state.filters.status = value ? normalizeSupplyStatus(value) : '';
+      state.filters.supplyStatus = value ? normalizeSupplyStatus(value) : '';
       return;
     }
 
@@ -416,7 +425,7 @@
   function hasActiveGlobalFilters() {
     return Boolean(
       String(state.filters.tecido || '').trim() ||
-      String(state.filters.status || '').trim() ||
+      String(state.filters.supplyStatus || '').trim() ||
       String(state.filters.personalizacao || '').trim()
     );
   }
@@ -428,33 +437,13 @@
     ui.globalFilterToggle.setAttribute('aria-pressed', isActive ? 'true' : 'false');
   }
 
-  function getFichasForGlobalFilterOptions(excludeFilterKind = '') {
-    const clienteTerm = normalizeText(state.filters.cliente);
-    const onlyCurrentWeek = Boolean(state.filters.onlyCurrentWeek);
-    const tecidoFilter = excludeFilterKind === 'tecido' ? '' : String(state.filters.tecido || '').trim();
-    const statusRaw = excludeFilterKind === 'status' ? '' : String(state.filters.status || '').trim();
-    const statusFilter = statusRaw ? normalizeSupplyStatus(statusRaw) : '';
-    const personalizacaoRaw = excludeFilterKind === 'personalizacao' ? '' : String(state.filters.personalizacao || '').trim();
-    const personalizacaoFilter = personalizacaoRaw ? normalizePersonalizacaoFilterValue(personalizacaoRaw) : '';
-
-    const filtered = state.fichas.filter(ficha => {
-      const statusFicha = String(ficha.status || '').toLowerCase();
-      if (statusFicha === 'entregue') return false;
-
-      if (!matchesSearchTerm(ficha, clienteTerm)) return false;
-      if (onlyCurrentWeek && !isEntregaNaSemanaAtualAteSexta(ficha?.data_entrega)) return false;
-      if (tecidoFilter && getTecidoFilterValue(ficha) !== tecidoFilter) return false;
-      if (statusFilter && getSupplyStatusByFichaId(Number(ficha?.id || 0)) !== statusFilter) return false;
-      if (personalizacaoFilter && getPersonalizacaoFilterValue(ficha) !== personalizacaoFilter) return false;
-      return true;
-    });
-
-    return dedupeByNumeroVenda(filtered);
+  function getFichasForGlobalFilterOptions() {
+    return Array.isArray(state.fichas) ? state.fichas : [];
   }
 
   function getGlobalTecidoFilterOptions() {
     const map = new Map();
-    getFichasForGlobalFilterOptions('tecido').forEach(ficha => {
+    getFichasForGlobalFilterOptions().forEach(ficha => {
       const value = getTecidoFilterValue(ficha);
       const label = getTecidoLabel(ficha?.material);
       const current = map.get(value);
@@ -469,7 +458,7 @@
 
   function getGlobalSupplyStatusFilterOptions() {
     const map = new Map();
-    getFichasForGlobalFilterOptions('status').forEach(ficha => {
+    getFichasForGlobalFilterOptions().forEach(ficha => {
       const value = getSupplyStatusByFichaId(Number(ficha?.id || 0));
       const label = SUPPLY_STATUS_LABELS[value] || SUPPLY_STATUS_LABELS.tudo_ok;
       const current = map.get(value);
@@ -484,7 +473,7 @@
 
   function getGlobalPersonalizacaoFilterOptions() {
     const map = new Map();
-    getFichasForGlobalFilterOptions('personalizacao').forEach(ficha => {
+    getFichasForGlobalFilterOptions().forEach(ficha => {
       const value = getPersonalizacaoFilterValue(ficha);
       const label = getPersonalizacaoLabel(ficha?.arte) || 'Não informado';
       const current = map.get(value);
@@ -497,20 +486,41 @@
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
   }
 
-  async function carregarFichas() {
-    state.isLoading = true;
-    renderKanban();
+  async function carregarFichas({ silentLoading = false } = {}) {
+    const requestId = ++state.lastFetchRequestId;
+    if (!silentLoading) {
+      state.isLoading = true;
+      renderKanban(null, { refreshFilters: true });
+    }
 
     try {
-      const fichas = await db.listarFichas({ resumido: true });
-      const fichasApi = (Array.isArray(fichas) ? fichas : []).map(normalizeFichaKanbanStatus);
-      const manualCards = Array.isArray(state.manualCards)
-        ? state.manualCards.map(normalizeFichaKanbanStatus)
-        : [];
-      state.fichas = [...fichasApi, ...manualCards];
-      pruneSupplyStatusMap();
+      const resultado = await db.listarKanbanCards({
+        cliente: state.filters.cliente,
+        onlyCurrentWeek: state.filters.onlyCurrentWeek,
+        tecido: state.filters.tecido,
+        personalizacao: state.filters.personalizacao,
+        supplyStatus: state.filters.supplyStatus
+      });
+
+      if (requestId !== state.lastFetchRequestId) return false;
+
+      state.fichas = (Array.isArray(resultado?.items) ? resultado.items : []).map(normalizeFichaKanbanStatus);
+      syncBoardState();
+      return true;
+    } catch (error) {
+      if (requestId !== state.lastFetchRequestId) return false;
+      console.error('Erro ao carregar cartões do kanban:', error);
+      state.fichas = [];
+      syncBoardState();
+      if (typeof window.mostrarErro === 'function') {
+        window.mostrarErro('Erro ao carregar cartões do kanban');
+      }
+      return false;
     } finally {
-      state.isLoading = false;
+      if (requestId === state.lastFetchRequestId) {
+        state.isLoading = false;
+        renderKanban(null, { refreshFilters: true });
+      }
     }
   }
 
@@ -520,36 +530,100 @@
     return {
       ...ficha,
       id: Number.isInteger(idRaw) && idRaw > 0 ? idRaw : fallbackId,
-      is_manual_card: ficha?.is_manual_card === true,
+      is_manual_card: ficha?.is_manual_card === true || Number(ficha?.is_manual_card || 0) === 1,
+      supply_status: normalizeSupplyStatus(ficha?.supply_status),
       kanban_status: normalizeBoardStatus(ficha?.kanban_status),
       kanban_ordem: normalizeBoardOrder(ficha?.kanban_ordem)
     };
   }
 
-  function renderKanban() {
+  function createEmptyKanbanGroups() {
+    const grouped = Object.create(null);
+    COLUMN_DEFINITIONS.forEach(column => {
+      grouped[column.key] = [];
+    });
+    return grouped;
+  }
+
+  function syncBoardState() {
+    const grouped = createEmptyKanbanGroups();
+
+    (Array.isArray(state.fichas) ? state.fichas : []).forEach(ficha => {
+      const status = getBoardStatus(ficha);
+      if (!grouped[status]) grouped[status] = [];
+      grouped[status].push(ficha);
+    });
+
+    COLUMN_DEFINITIONS.forEach(column => {
+      grouped[column.key] = sortColumnFichasForDisplay(column.key, grouped[column.key] || []);
+    });
+
+    state.board = {
+      grouped,
+      totalVisible: Array.isArray(state.fichas) ? state.fichas.length : 0
+    };
+  }
+
+  function renderKanban(statuses = null, { refreshFilters = false } = {}) {
+    const validStatuses = Array.isArray(statuses)
+      ? statuses
+        .map(status => String(status || '').trim().toLowerCase())
+        .filter(status => VALID_STATUS.has(status))
+      : [];
+
+    if (!validStatuses.length) {
+      state.render.isFull = true;
+      state.render.dirtyStatuses.clear();
+    } else if (!state.render.isFull) {
+      validStatuses.forEach(status => state.render.dirtyStatuses.add(status));
+    }
+
+    if (refreshFilters) {
+      state.render.refreshFilters = true;
+    }
+
+    if (state.render.frameId) return;
+    state.render.frameId = requestAnimationFrame(() => {
+      state.render.frameId = null;
+      flushKanbanRender();
+    });
+  }
+
+  function flushKanbanRender() {
     if (state.isLoading) {
       COLUMN_DEFINITIONS.forEach(column => {
         renderLoadingColumn(column.key);
         updateColumnCounter(column.key, 0);
       });
       updateTotalCounterLoading();
+      state.render.isFull = false;
+      state.render.refreshFilters = false;
+      state.render.dirtyStatuses.clear();
       return;
     }
 
-    const fichasFiltradas = getFichasFiltradas();
-    const fichasSemRepeticao = dedupeByNumeroVenda(fichasFiltradas);
-    const agrupadas = groupByColumn(fichasSemRepeticao);
+    syncBoardState();
 
-    COLUMN_DEFINITIONS.forEach(column => {
-      const cards = sortColumnFichasForDisplay(column.key, agrupadas[column.key] || []);
-      renderColumn(column.key, cards);
-      updateColumnCounter(column.key, cards.length);
+    const statusesToRender = state.render.isFull || state.render.dirtyStatuses.size === 0
+      ? COLUMN_DEFINITIONS.map(column => column.key)
+      : Array.from(state.render.dirtyStatuses);
+
+    statusesToRender.forEach(statusKey => {
+      const cards = state.board.grouped[statusKey] || [];
+      renderColumn(statusKey, cards);
+      updateColumnCounter(statusKey, cards.length);
     });
 
-    updateTotalCounter(fichasSemRepeticao.length);
-    renderGlobalFilterMenu();
-    syncGlobalFilterToggleState();
+    updateTotalCounter(state.board.totalVisible);
+    if (state.render.refreshFilters || state.render.isFull) {
+      renderGlobalFilterMenu();
+      syncGlobalFilterToggleState();
+    }
     animateMovedCardIfNeeded();
+
+    state.render.isFull = false;
+    state.render.refreshFilters = false;
+    state.render.dirtyStatuses.clear();
   }
 
   function renderLoadingColumn(statusKey) {
@@ -574,29 +648,6 @@
         <div class="skeleton-line skeleton-medium"></div>
       </div>
     `;
-  }
-
-  function getFichasFiltradas() {
-    const clienteTerm = normalizeText(state.filters.cliente);
-    const onlyCurrentWeek = Boolean(state.filters.onlyCurrentWeek);
-    const tecidoFilter = String(state.filters.tecido || '').trim();
-    const statusRaw = String(state.filters.status || '').trim();
-    const statusFilter = statusRaw ? normalizeSupplyStatus(statusRaw) : '';
-    const personalizacaoRaw = String(state.filters.personalizacao || '').trim();
-    const personalizacaoFilter = personalizacaoRaw ? normalizePersonalizacaoFilterValue(personalizacaoRaw) : '';
-
-    return state.fichas
-      .filter(ficha => {
-        const statusFicha = String(ficha.status || '').toLowerCase();
-        if (statusFicha === 'entregue') return false;
-
-        if (!matchesSearchTerm(ficha, clienteTerm)) return false;
-        if (onlyCurrentWeek && !isEntregaNaSemanaAtualAteSexta(ficha?.data_entrega)) return false;
-        if (tecidoFilter && getTecidoFilterValue(ficha) !== tecidoFilter) return false;
-        if (statusFilter && getSupplyStatusByFichaId(Number(ficha?.id || 0)) !== statusFilter) return false;
-        if (personalizacaoFilter && getPersonalizacaoFilterValue(ficha) !== personalizacaoFilter) return false;
-        return true;
-      });
   }
 
   function matchesSearchTerm(ficha, searchTerm) {
@@ -753,11 +804,8 @@
              <i class="fas fa-check"></i>
            </button>`
         : '';
-      const viewButton = isManualCard
-        ? `<button type="button" class="kanban-btn-view-icon" data-action="view-manual" data-id="${fichaId}" aria-label="Cartão manual sem ficha vinculada" title="Cartão manual sem ficha vinculada">
-             <i class="fas fa-ban"></i>
-           </button>`
-        : `<button type="button" class="kanban-btn-view-icon" data-action="view" data-id="${fichaId}" aria-label="Visualizar ficha #${fichaId}"${thumbnailAttr}>
+      const viewTitle = isManualCard ? 'Visualizar cartão manual' : `Visualizar ficha #${fichaId}`;
+      const viewButton = `<button type="button" class="kanban-btn-view-icon" data-action="view" data-id="${fichaId}" aria-label="${viewTitle}" title="${viewTitle}"${thumbnailAttr}>
              <i class="fas fa-eye"></i>
            </button>`;
 
@@ -842,18 +890,22 @@
 
       const current = normalizeSupplyStatus(supplyStatusButton.dataset.currentStatus);
       const next = getNextSupplyStatus(current);
-      setSupplyStatusByFichaId(fichaId, next);
+      const ficha = findFichaById(fichaId);
+      if (!ficha) return;
 
-      supplyStatusButton.dataset.currentStatus = next;
-      supplyStatusButton.className = `kanban-card-supply-status is-${next}`;
-      supplyStatusButton.textContent = SUPPLY_STATUS_LABELS[next] || SUPPLY_STATUS_LABELS.tudo_ok;
-      return;
-    }
+      const previous = normalizeSupplyStatus(ficha.supply_status);
+      ficha.supply_status = next;
+      renderKanban([getBoardStatus(ficha)], { refreshFilters: true });
 
-    const viewManualButton = event.target.closest('button[data-action="view-manual"]');
-    if (viewManualButton) {
-      if (typeof window.mostrarInfo === 'function') {
-        window.mostrarInfo('Cartão manual sem ficha vinculada');
+      try {
+        await db.atualizarSupplyStatus(fichaId, next);
+        await carregarFichas({ silentLoading: true });
+      } catch (error) {
+        ficha.supply_status = previous;
+        renderKanban([getBoardStatus(ficha)], { refreshFilters: true });
+        if (typeof window.mostrarErro === 'function') {
+          window.mostrarErro('Não foi possível atualizar o status de insumos');
+        }
       }
       return;
     }
@@ -875,12 +927,12 @@
     if (!thumbSrc) return;
 
     showPreviewTooltip(thumbSrc);
-    positionPreviewTooltip(event.clientX, event.clientY);
+    schedulePreviewTooltipPosition(event.clientX, event.clientY);
   }
 
   function handleBoardMouseMove(event) {
     if (!ui.previewTooltip || ui.previewTooltip.hidden) return;
-    positionPreviewTooltip(event.clientX, event.clientY);
+    schedulePreviewTooltipPosition(event.clientX, event.clientY);
   }
 
   function handleBoardMouseOut(event) {
@@ -927,6 +979,17 @@
     ui.previewTooltip.hidden = true;
   }
 
+  function schedulePreviewTooltipPosition(clientX, clientY) {
+    state.previewPointerX = clientX;
+    state.previewPointerY = clientY;
+    if (state.previewPointerRaf) return;
+
+    state.previewPointerRaf = requestAnimationFrame(() => {
+      state.previewPointerRaf = 0;
+      positionPreviewTooltip(state.previewPointerX, state.previewPointerY);
+    });
+  }
+
   function positionPreviewTooltip(clientX, clientY) {
     if (!ui.previewTooltip || ui.previewTooltip.hidden) return;
 
@@ -956,26 +1019,17 @@
 
     const ficha = findFichaById(fichaId);
     if (!ficha) return;
-
-    if (isManualFicha(ficha)) {
-      ficha.status = 'entregue';
-      saveManualCards();
-      renderKanban();
-      if (typeof window.mostrarInfo === 'function') {
-        window.mostrarInfo(`Cartão manual #${fichaId} marcado como entregue`);
-      }
-      return;
-    }
+    const statusKey = getBoardStatus(ficha);
 
     state.pendingDeliverById[key] = true;
-    renderKanban();
+    renderKanban([statusKey], { refreshFilters: true });
 
     try {
       await db.marcarComoEntregue(fichaId);
-      ficha.status = 'entregue';
+      state.fichas = state.fichas.filter(item => Number(item.id) !== fichaId);
 
       if (typeof window.mostrarInfo === 'function') {
-        window.mostrarInfo(`Ficha #${fichaId} marcada como entregue`);
+        window.mostrarInfo(`${isManualFicha(ficha) ? 'Cartão manual' : 'Ficha'} #${fichaId} marcada como entregue`);
       }
     } catch (error) {
       console.error('Erro ao marcar ficha como entregue pelo Kanban:', error);
@@ -984,7 +1038,7 @@
       }
     } finally {
       delete state.pendingDeliverById[key];
-      renderKanban();
+      renderKanban([statusKey], { refreshFilters: true });
     }
   }
 
@@ -1005,12 +1059,11 @@
     }
 
     state.pendingSortByStatus[statusKey] = true;
-    renderKanban();
+    renderKanban([statusKey], { refreshFilters: true });
 
     try {
       applyColumnOrder(statusKey, orderedIds);
-      saveManualCards();
-      renderKanban();
+      renderKanban([statusKey], { refreshFilters: true });
       await db.atualizarKanbanOrdem(statusKey, orderedIds);
 
       if (typeof window.mostrarInfo === 'function') {
@@ -1023,7 +1076,7 @@
       }
     } finally {
       delete state.pendingSortByStatus[statusKey];
-      renderKanban();
+      renderKanban([statusKey], { refreshFilters: true });
     }
   }
 
@@ -1038,31 +1091,24 @@
     closeViewModal();
   }
 
-  function handleViewFrameError() {
-    if (!ui.viewModal || ui.viewModal.hidden) return;
-    setViewModalLoading('error');
-  }
+  async function handleVisibilityChange() {
+    if (document.hidden) {
+      state.lastHiddenAt = Date.now();
+      return;
+    }
 
-  function handleViewFrameMessage(event) {
-    if (!ui.viewFrame || event.source !== ui.viewFrame.contentWindow) return;
+    const now = Date.now();
+    const awayFor = now - state.lastHiddenAt;
+    const sinceLastAutoRefresh = now - state.lastAutoRefreshAt;
+    if (awayFor < TAB_RETURN_REFRESH_MIN_AWAY_MS) return;
+    if (sinceLastAutoRefresh < TAB_RETURN_REFRESH_COOLDOWN_MS) return;
 
-    const data = event.data;
-    if (!data || data.type !== PREVIEW_READY_MESSAGE) return;
-    if (!ui.viewModal || ui.viewModal.hidden) return;
-
-    const payloadId = data.fichaId != null ? String(data.fichaId) : '';
-    if (payloadId && ui.viewCurrentFichaId && payloadId !== ui.viewCurrentFichaId) return;
-
-    setViewModalLoading(false);
+    state.lastAutoRefreshAt = now;
+    await carregarFichas({ silentLoading: true });
   }
 
   function setViewModalLoading(mode) {
     if (!ui.viewModal) return;
-
-    if (ui.viewLoadingTimeout) {
-      clearTimeout(ui.viewLoadingTimeout);
-      ui.viewLoadingTimeout = null;
-    }
 
     const isError = mode === 'error';
     const isLoading = mode === true || isError;
@@ -1079,40 +1125,126 @@
         if (textEl) textEl.textContent = 'Falha ao carregar a visualização.';
         if (iconEl) iconEl.className = 'fas fa-exclamation-triangle';
       } else {
-        if (textEl) textEl.textContent = 'Carregando preview...';
+        if (textEl) textEl.textContent = 'Carregando detalhes...';
         if (iconEl) iconEl.className = 'fas fa-spinner fa-spin';
       }
     }
 
-    if (mode === true) {
-      ui.viewLoadingTimeout = setTimeout(() => {
-        if (!ui.viewModal || ui.viewModal.hidden) return;
-        setViewModalLoading('error');
-      }, 15000);
+    if (ui.viewContent) {
+      ui.viewContent.setAttribute('aria-busy', isLoading ? 'true' : 'false');
     }
   }
 
-  function openViewModal(fichaId) {
-    if (!ui.viewModal || !ui.viewFrame) return;
+  function renderViewModalDetails(card, details = null) {
+    if (!ui.viewContent) return;
 
+    const source = details && typeof details === 'object' ? details : card;
+    const thumbSrc = getFichaThumbnailSrc(source);
+    const supplyStatus = SUPPLY_STATUS_LABELS[normalizeSupplyStatus(card?.supply_status)] || SUPPLY_STATUS_LABELS.tudo_ok;
+    const etapa = COLUMN_DEFINITIONS.find(column => column.key === getBoardStatus(card))?.label || 'Pendente';
+    const statusFicha = String(source?.status || card?.status || 'pendente').trim() || 'pendente';
+    const numeroVenda = String(source?.numero_venda || card?.numero_venda || '').trim();
+    const vendedor = String(source?.vendedor || '').trim();
+    const material = getTecidoLabel(source?.material || card?.material);
+    const personalizacao = getPersonalizacaoLabel(source?.arte || card?.arte) || 'Não informado';
+    const dataEntrega = source?.data_entrega ? formatDateShort(source.data_entrega) : '-';
+    const dataInicio = source?.data_inicio ? formatDateShort(source.data_inicio) : '-';
+    const observacoes = escapeHtml(String(source?.observacoes || '').trim() || 'Sem observações');
+    const produtos = Array.isArray(source?.produtos)
+      ? source.produtos
+      : parseProductsValue(source?.produtos);
+    const totalItens = produtos.reduce((total, item) => total + (parseInt(item?.quantidade, 10) || 0), 0);
+    const tags = [
+      `<span class="kanban-view-tag">${escapeHtml(etapa)}</span>`,
+      `<span class="kanban-view-tag">${escapeHtml(supplyStatus)}</span>`,
+      `<span class="kanban-view-tag">${escapeHtml(statusFicha)}</span>`,
+      isManualFicha(card) ? '<span class="kanban-view-tag">Cartão manual</span>' : ''
+    ].filter(Boolean).join('');
+
+    ui.viewContent.innerHTML = `
+      <div class="kanban-view-details">
+        <div class="kanban-view-summary">
+          ${thumbSrc ? `<div class="kanban-view-image"><img src="${escapeHtml(thumbSrc)}" alt="Preview do cartão"></div>` : ''}
+          <div class="kanban-view-copy">
+            <div class="kanban-view-tags">${tags}</div>
+            <dl class="kanban-view-grid">
+              <div><dt>Entrega</dt><dd>${escapeHtml(dataEntrega)}</dd></div>
+              <div><dt>Início</dt><dd>${escapeHtml(dataInicio)}</dd></div>
+              <div><dt>Material</dt><dd>${escapeHtml(material)}</dd></div>
+              <div><dt>Personalização</dt><dd>${escapeHtml(personalizacao)}</dd></div>
+              ${numeroVenda ? `<div><dt>Pedido</dt><dd>#${escapeHtml(numeroVenda)}</dd></div>` : ''}
+              ${vendedor ? `<div><dt>Vendedor</dt><dd>${escapeHtml(formatDisplayName(vendedor))}</dd></div>` : ''}
+              ${!isManualFicha(card) ? `<div><dt>Itens</dt><dd>${String(totalItens || 0)}</dd></div>` : ''}
+            </dl>
+          </div>
+        </div>
+        <div class="kanban-view-observacoes">
+          <strong>Observações</strong>
+          <p>${observacoes}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  async function openViewModal(fichaId) {
+    if (!ui.viewModal || !ui.viewContent) return;
+
+    const card = findFichaById(fichaId);
+    if (!card) return;
+
+    const requestId = ++state.viewRequestId;
     ui.viewCurrentFichaId = String(fichaId);
     if (ui.viewFichaId) ui.viewFichaId.textContent = `#${fichaId}`;
+    if (ui.viewOpenLink) {
+      ui.viewOpenLink.hidden = isManualFicha(card);
+      if (!isManualFicha(card)) {
+        ui.viewOpenLink.href = `/ficha?visualizar=${fichaId}`;
+      } else {
+        ui.viewOpenLink.removeAttribute('href');
+      }
+    }
+    ui.viewContent.innerHTML = '';
     setViewModalLoading(true);
-    ui.viewFrame.src = `/ficha?visualizar=${fichaId}`;
 
     ui.viewModal.hidden = false;
     ui.viewModal.setAttribute('aria-hidden', 'false');
     syncModalBodyLock();
+
+    if (isManualFicha(card)) {
+      renderViewModalDetails(card);
+      setViewModalLoading(false);
+      return;
+    }
+
+    try {
+      const details = await db.buscarFicha(fichaId);
+      if (requestId !== state.viewRequestId) return;
+      if (!details) {
+        setViewModalLoading('error');
+        return;
+      }
+      renderViewModalDetails(card, details);
+      setViewModalLoading(false);
+    } catch (error) {
+      if (requestId !== state.viewRequestId) return;
+      console.error('Erro ao carregar detalhes da ficha no kanban:', error);
+      setViewModalLoading('error');
+    }
   }
 
   function closeViewModal() {
     if (!ui.viewModal) return;
 
     ui.viewCurrentFichaId = null;
+    state.viewRequestId += 1;
     setViewModalLoading(false);
     ui.viewModal.hidden = true;
     ui.viewModal.setAttribute('aria-hidden', 'true');
-    if (ui.viewFrame) ui.viewFrame.src = 'about:blank';
+    if (ui.viewContent) ui.viewContent.innerHTML = '';
+    if (ui.viewOpenLink) {
+      ui.viewOpenLink.hidden = true;
+      ui.viewOpenLink.removeAttribute('href');
+    }
     syncModalBodyLock();
   }
 
@@ -1192,29 +1324,18 @@
     setCreateModalSubmitting(true);
 
     try {
-      const manualCardId = generateManualCardId();
-      const newCard = normalizeFichaKanbanStatus({
-        id: manualCardId,
+      await db.criarKanbanManualCard({
         cliente: titulo,
-        data_entrega: dataEntrega,
+        dataEntrega,
         evento,
         arte,
         material: tecido,
-        status: 'pendente',
-        kanban_status: targetStatus,
-        kanban_ordem: getNextColumnOrder(targetStatus),
-        is_manual_card: true,
-        data_criacao: new Date().toISOString(),
-        data_atualizacao: new Date().toISOString()
+        kanbanStatus: targetStatus,
+        supplyStatus
       });
-
-      state.manualCards.push(newCard);
-      state.fichas.push(newCard);
-      saveManualCards();
-      setSupplyStatusByFichaId(newCard.id, supplyStatus);
+      await carregarFichas({ silentLoading: true });
 
       closeCreateModal();
-      renderKanban();
 
       if (typeof window.mostrarSucesso === 'function') {
         window.mostrarSucesso('Cartão manual criado com sucesso');
@@ -1305,7 +1426,6 @@
 
     const ficha = findFichaById(draggedId);
     if (!ficha) return;
-    const isManualCard = isManualFicha(ficha);
 
     const currentStatus = getBoardStatus(ficha);
     const sourceStatus = VALID_STATUS.has(state.drag.sourceStatus) ? state.drag.sourceStatus : currentStatus;
@@ -1338,9 +1458,8 @@
         if (arraysEqual(beforeOrder, sourceFinalOrder)) return;
 
         applyColumnOrder(sourceStatus, sourceFinalOrder);
-        saveManualCards();
         state.lastMovedFichaId = draggedId;
-        renderKanban();
+        renderKanban([sourceStatus], { refreshFilters: true });
 
         await db.atualizarKanbanOrdem(sourceStatus, sourceFinalOrder);
       } else {
@@ -1351,30 +1470,20 @@
 
         applyColumnOrder(sourceStatus, sourceFinalOrder);
         applyColumnOrder(targetStatus, targetFinalOrder);
-        saveManualCards();
 
         state.lastMovedFichaId = draggedId;
-        renderKanban();
+        renderKanban([sourceStatus, targetStatus], { refreshFilters: true });
+
+        const response = await db.atualizarKanbanStatus(draggedId, targetStatus);
+        const persistedStatus = normalizeBoardStatus(response?.kanbanStatus || targetStatus);
+        setBoardStatus(draggedId, persistedStatus);
 
         const persistPromises = [];
-        if (isManualCard) {
-          if (sourceFinalOrder.length) {
-            persistPromises.push(db.atualizarKanbanOrdem(sourceStatus, sourceFinalOrder));
-          }
-          if (targetFinalOrder.length) {
-            persistPromises.push(db.atualizarKanbanOrdem(targetStatus, targetFinalOrder));
-          }
-        } else {
-          const response = await db.atualizarKanbanStatus(draggedId, targetStatus);
-          const persistedStatus = normalizeBoardStatus(response?.kanbanStatus || targetStatus);
-          setBoardStatus(draggedId, persistedStatus);
-
-          if (sourceFinalOrder.length) {
-            persistPromises.push(db.atualizarKanbanOrdem(sourceStatus, sourceFinalOrder));
-          }
-          if (targetFinalOrder.length) {
-            persistPromises.push(db.atualizarKanbanOrdem(persistedStatus, targetFinalOrder));
-          }
+        if (sourceFinalOrder.length) {
+          persistPromises.push(db.atualizarKanbanOrdem(sourceStatus, sourceFinalOrder));
+        }
+        if (targetFinalOrder.length) {
+          persistPromises.push(db.atualizarKanbanOrdem(persistedStatus, targetFinalOrder));
         }
 
         if (persistPromises.length) {
@@ -1385,7 +1494,6 @@
     } catch (error) {
       console.error('Erro ao persistir status do kanban:', error);
       restoreKanbanSnapshot(snapshot);
-      saveManualCards();
       state.lastMovedFichaId = draggedId;
 
       if (typeof window.mostrarErro === 'function') {
@@ -1393,7 +1501,7 @@
       }
     } finally {
       delete state.pendingPersistById[String(draggedId)];
-      renderKanban();
+      renderKanban([sourceStatus, targetStatus], { refreshFilters: true });
     }
   }
 
@@ -1682,15 +1790,14 @@
   }
 
   function getSupplyStatusByFichaId(fichaId) {
-    const key = String(Number(fichaId) || 0);
-    return normalizeSupplyStatus(state.supplyStatusById[key]);
+    const ficha = findFichaById(fichaId);
+    return normalizeSupplyStatus(ficha?.supply_status);
   }
 
   function setSupplyStatusByFichaId(fichaId, statusValue) {
-    const key = String(Number(fichaId) || 0);
-    if (!key || key === '0') return;
-    state.supplyStatusById[key] = normalizeSupplyStatus(statusValue);
-    saveSupplyStatusMap();
+    const ficha = findFichaById(fichaId);
+    if (!ficha) return;
+    ficha.supply_status = normalizeSupplyStatus(statusValue);
   }
 
   function normalizeSupplyStatus(value) {
@@ -1706,9 +1813,9 @@
     return SUPPLY_STATUS_FLOW[nextIndex];
   }
 
-  function loadSupplyStatusMap() {
+  function loadLegacySupplyStatusMap() {
     try {
-      const raw = localStorage.getItem(STORAGE_SUPPLY_STATUS_KEY);
+      const raw = localStorage.getItem(LEGACY_STORAGE_SUPPLY_STATUS_KEY);
       if (!raw) return Object.create(null);
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object') return Object.create(null);
@@ -1725,28 +1832,9 @@
     }
   }
 
-  function saveSupplyStatusMap() {
-    localStorage.setItem(STORAGE_SUPPLY_STATUS_KEY, JSON.stringify(state.supplyStatusById));
-  }
-
-  function pruneSupplyStatusMap() {
-    const validIds = new Set(state.fichas.map(ficha => String(Number(ficha?.id) || 0)).filter(id => id !== '0'));
-    let changed = false;
-
-    Object.keys(state.supplyStatusById).forEach(id => {
-      if (validIds.has(id)) return;
-      delete state.supplyStatusById[id];
-      changed = true;
-    });
-
-    if (changed) {
-      saveSupplyStatusMap();
-    }
-  }
-
-  function loadManualCards() {
+  function loadLegacyManualCards() {
     try {
-      const raw = localStorage.getItem(STORAGE_MANUAL_CARDS_KEY);
+      const raw = localStorage.getItem(LEGACY_STORAGE_MANUAL_CARDS_KEY);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return [];
@@ -1758,39 +1846,82 @@
     }
   }
 
-  function saveManualCards() {
-    const manualFromState = state.fichas
-      .filter(isManualFicha)
-      .map(card => ({
-        id: Number(card.id),
-        cliente: String(card.cliente || ''),
-        data_entrega: String(card.data_entrega || ''),
-        evento: normalizeEventoValue(card.evento),
-        arte: String(card.arte || ''),
-        material: String(card.material || ''),
-        status: String(card.status || 'pendente'),
-        kanban_status: normalizeBoardStatus(card.kanban_status),
-        kanban_ordem: normalizeBoardOrder(card.kanban_ordem),
-        is_manual_card: true,
-        data_criacao: String(card.data_criacao || ''),
-        data_atualizacao: new Date().toISOString()
-      }));
+  function loadMigratedLegacyManualIds() {
+    try {
+      const raw = localStorage.getItem(LEGACY_STORAGE_MANUAL_MIGRATED_IDS_KEY);
+      if (!raw) return new Set();
+      const parsed = JSON.parse(raw);
+      return new Set(Array.isArray(parsed) ? parsed.map(item => String(item)) : []);
+    } catch (_) {
+      return new Set();
+    }
+  }
 
-    state.manualCards = manualFromState;
-    localStorage.setItem(STORAGE_MANUAL_CARDS_KEY, JSON.stringify(manualFromState));
+  function saveMigratedLegacyManualIds(ids) {
+    localStorage.setItem(LEGACY_STORAGE_MANUAL_MIGRATED_IDS_KEY, JSON.stringify(Array.from(ids)));
   }
 
   function isManualFicha(ficha) {
     return ficha?.is_manual_card === true;
   }
 
-  function generateManualCardId() {
-    const base = Date.now() + 9000000000000;
-    let candidate = base;
-    while (findFichaById(candidate)) {
-      candidate += 1;
+  async function migrateLegacyKanbanData() {
+    const legacyManualCards = loadLegacyManualCards();
+    const legacySupplyMap = loadLegacySupplyStatusMap();
+    if (!legacyManualCards.length && Object.keys(legacySupplyMap).length === 0) {
+      return false;
     }
-    return candidate;
+
+    let changed = false;
+    const migratedIds = loadMigratedLegacyManualIds();
+    const allCardsResult = await db.listarKanbanCards({});
+    const allCards = Array.isArray(allCardsResult?.items) ? allCardsResult.items : [];
+    const allCardsById = new Set(allCards.map(card => Number(card?.id || 0)).filter(id => id > 0));
+
+    for (const card of legacyManualCards) {
+      const legacyId = String(card?.id || '');
+      if (!legacyId || migratedIds.has(legacyId)) continue;
+
+      const migrated = await db.criarKanbanManualCard({
+        cliente: String(card?.cliente || '').trim() || 'Cartão manual',
+        dataEntrega: String(card?.data_entrega || '').trim() || getTodayIsoDate(),
+        evento: normalizeEventoValue(card?.evento),
+        arte: String(card?.arte || '').trim(),
+        material: String(card?.material || '').trim(),
+        kanbanStatus: normalizeBoardStatus(card?.kanban_status),
+        supplyStatus: normalizeSupplyStatus(legacySupplyMap[legacyId])
+      });
+
+      if (migrated) {
+        migratedIds.add(legacyId);
+        saveMigratedLegacyManualIds(migratedIds);
+        changed = true;
+      }
+    }
+
+    const manualLegacyIds = new Set(legacyManualCards.map(card => String(card?.id || '')).filter(Boolean));
+    const realCardSupplyEntries = Object.entries(legacySupplyMap)
+      .filter(([legacyId]) => !manualLegacyIds.has(String(legacyId)));
+
+    for (const [legacyId, legacyStatus] of realCardSupplyEntries) {
+      const numericId = Number(legacyId);
+      if (!Number.isInteger(numericId) || numericId <= 0) continue;
+      if (!allCardsById.has(numericId)) continue;
+      const normalizedStatus = normalizeSupplyStatus(legacyStatus);
+      if (normalizedStatus === 'tudo_ok') continue;
+      const ficha = allCards.find(card => Number(card?.id || 0) === numericId);
+      if (!ficha || normalizeSupplyStatus(ficha.supply_status) === normalizedStatus) continue;
+      await db.atualizarSupplyStatus(numericId, normalizedStatus);
+      changed = true;
+    }
+
+    if (legacyManualCards.length === 0 || legacyManualCards.length === migratedIds.size) {
+      localStorage.removeItem(LEGACY_STORAGE_MANUAL_CARDS_KEY);
+      localStorage.removeItem(LEGACY_STORAGE_SUPPLY_STATUS_KEY);
+      localStorage.removeItem(LEGACY_STORAGE_MANUAL_MIGRATED_IDS_KEY);
+    }
+
+    return changed;
   }
 
   function getNextColumnOrder(statusKey) {
@@ -1822,7 +1953,7 @@
     try {
       const raw = localStorage.getItem(STORAGE_FILTER_KEY);
       if (!raw) {
-        return { cliente: '', onlyCurrentWeek: false, tecido: '', status: '', personalizacao: '' };
+        return { cliente: '', onlyCurrentWeek: false, tecido: '', supplyStatus: '', personalizacao: '' };
       }
 
       const parsed = JSON.parse(raw);
@@ -1830,15 +1961,15 @@
         cliente: typeof parsed.cliente === 'string' ? parsed.cliente : '',
         onlyCurrentWeek: parsed.onlyCurrentWeek === true,
         tecido: typeof parsed.tecido === 'string' ? parsed.tecido.trim() : '',
-        status: typeof parsed.status === 'string' && parsed.status.trim()
-          ? normalizeSupplyStatus(parsed.status)
+        supplyStatus: typeof (parsed.supplyStatus ?? parsed.status) === 'string' && String(parsed.supplyStatus ?? parsed.status).trim()
+          ? normalizeSupplyStatus(parsed.supplyStatus ?? parsed.status)
           : '',
         personalizacao: typeof parsed.personalizacao === 'string' && parsed.personalizacao.trim()
           ? normalizePersonalizacaoFilterValue(parsed.personalizacao)
           : ''
       };
     } catch (_) {
-      return { cliente: '', onlyCurrentWeek: false, tecido: '', status: '', personalizacao: '' };
+      return { cliente: '', onlyCurrentWeek: false, tecido: '', supplyStatus: '', personalizacao: '' };
     }
   }
 
@@ -2052,6 +2183,21 @@
   }
 
   function parseImagesValue(value) {
+    if (Array.isArray(value)) return value;
+    if (typeof value !== 'string') return [];
+
+    const text = value.trim();
+    if (!text) return [];
+
+    try {
+      const parsed = JSON.parse(text);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function parseProductsValue(value) {
     if (Array.isArray(value)) return value;
     if (typeof value !== 'string') return [];
 

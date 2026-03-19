@@ -184,10 +184,16 @@
             <div class="kanban-view-modal-body">
                 <div id="kanbanViewLoading" class="kanban-view-modal-loading" aria-live="polite">
                     <i class="fas fa-spinner fa-spin"></i>
-                    <span>Carregando preview...</span>
+                    <span>Carregando detalhes...</span>
                 </div>
-                <iframe id="kanbanViewFrame" class="kanban-view-modal-iframe" title="Visualização da Ficha"
-                    loading="lazy"></iframe>
+                <div id="kanbanViewContent" class="kanban-view-modal-panel" aria-live="polite" aria-busy="false"></div>
+            </div>
+            <div class="kanban-view-modal-actions">
+                <a id="kanbanViewOpenLink" class="btn btn-primary" href="#" target="_blank" rel="noopener noreferrer"
+                    hidden>
+                    <i class="fas fa-external-link-alt"></i>
+                    <span>Abrir ficha completa</span>
+                </a>
             </div>
         </div>
     </div>

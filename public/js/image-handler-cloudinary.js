@@ -96,8 +96,7 @@
             throw new Error(result.error || 'Erro no upload');
           }
         } else {
-          const base64 = await fileToBase64(file);
-          imagens.push({ src: base64, descricao: '' });
+          throw new Error('Upload indisponível: Cloudinary não foi carregado.');
         }
       } catch (error) {
         toast('Erro ao enviar imagem: ' + error.message, 'error');
@@ -107,15 +106,6 @@
     esconderLoading();
     renderizarImagens();
     atualizarContador();
-  }
-
-  function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
   }
 
   // Renderização

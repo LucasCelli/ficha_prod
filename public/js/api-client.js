@@ -8,6 +8,17 @@ class APIClient {
     this.initialized = false;
   }
 
+  containsInlineBase64Image(value) {
+    return typeof value === 'string' && value.includes('data:image');
+  }
+
+  payloadContainsInlineBase64Images(payload) {
+    if (!payload || typeof payload !== 'object') return false;
+    if (this.containsInlineBase64Image(payload.imagemData)) return true;
+    if (this.containsInlineBase64Image(payload.imagensData)) return true;
+    return false;
+  }
+
   detectBaseURL() {
     const hostname = window.location.hostname;
 
@@ -179,6 +190,10 @@ class APIClient {
       imagensData: dados.imagensData || '[]'
     };
 
+    if (this.payloadContainsInlineBase64Images(dadosEnvio)) {
+      throw new Error('Algumas imagens ainda estão em base64. Reenvie-as para o Cloudinary antes de salvar.');
+    }
+
     const headers = { 'Content-Type': 'application/json' };
     if (idempotencyKey) {
       headers['Idempotency-Key'] = idempotencyKey;
@@ -257,6 +272,69 @@ class APIClient {
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.error || 'Erro ao atualizar ordem do kanban');
+    }
+
+    return response.json();
+  }
+
+  async listarKanbanCards(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.cliente) params.set('cliente', String(filters.cliente));
+    if (filters.onlyCurrentWeek === true) params.set('onlyCurrentWeek', '1');
+    if (filters.tecido) params.set('tecido', String(filters.tecido));
+    if (filters.personalizacao) params.set('personalizacao', String(filters.personalizacao));
+    if (filters.supplyStatus) params.set('supplyStatus', String(filters.supplyStatus));
+
+    const query = params.toString();
+    const response = await fetch(
+      query ? `${this.baseURL}/kanban/cards?${query}` : `${this.baseURL}/kanban/cards`
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Erro ao carregar cartões do kanban');
+    }
+
+    const data = await response.json();
+    return {
+      items: Array.isArray(data?.items) ? data.items : [],
+      total: Number(data?.total) || 0
+    };
+  }
+
+  async criarKanbanManualCard(dados) {
+    const response = await fetch(`${this.baseURL}/kanban/manual-cards`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cliente: dados?.cliente || '',
+        dataEntrega: dados?.dataEntrega || '',
+        evento: dados?.evento || 'nao',
+        arte: dados?.arte || '',
+        material: dados?.material || '',
+        kanbanStatus: dados?.kanbanStatus || 'pendente',
+        supplyStatus: dados?.supplyStatus || 'tudo_ok'
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Erro ao criar cartão manual');
+    }
+
+    return response.json();
+  }
+
+  async atualizarSupplyStatus(id, supplyStatus) {
+    const response = await fetch(`${this.baseURL}/fichas/${id}/supply-status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ supplyStatus })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Erro ao atualizar status de insumos');
     }
 
     return response.json();
