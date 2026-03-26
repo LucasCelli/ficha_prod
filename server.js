@@ -52,7 +52,7 @@ function generateCloudinarySignature(paramsToSign) {
   return crypto.createHash('sha1').update(stringToSign).digest('hex');
 }
 
-const NAME_EXCEPTIONS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+const NAME_EXCEPTIONS = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'o']);
 const UPPERCASE_WORD_PATTERN = /^[A-ZÀ-Ý]{1,4}$/;
 const AUTO_OBS_MARKERS = Object.freeze([
   'TECIDO',
@@ -108,6 +108,42 @@ function normalizeNameCase(value) {
     .join(' ');
 }
 
+function extractClienteParts(cliente, clienteAuxiliar) {
+  const nomeOriginal = String(cliente || '').trim().replace(/\s+/g, ' ');
+  const auxiliarOriginal = String(clienteAuxiliar || '').trim().replace(/\s+/g, ' ');
+  if (auxiliarOriginal) {
+    return {
+      cliente: normalizeNameCase(nomeOriginal),
+      clienteAuxiliar: normalizeNameCase(auxiliarOriginal),
+      fromLegacyFormat: false
+    };
+  }
+
+  const legacyMatch = nomeOriginal.match(/^(.*)\(([^()]+)\)\s*$/);
+  if (!legacyMatch) {
+    return { cliente: nomeOriginal, clienteAuxiliar: "", fromLegacyFormat: false };
+  }
+
+  const nomeBase = String(legacyMatch[1] || '').trim().replace(/\s+/g, ' ');
+  const nomeAuxiliarLegacy = String(legacyMatch[2] || '').trim().replace(/\s+/g, ' ');
+  if (!nomeBase || !nomeAuxiliarLegacy) {
+    return { cliente: normalizeNameCase(nomeOriginal), clienteAuxiliar: "", fromLegacyFormat: false };
+  }
+
+  return {
+    cliente: normalizeNameCase(nomeBase),
+    clienteAuxiliar: normalizeNameCase(nomeAuxiliarLegacy),
+    fromLegacyFormat: true
+  };
+}
+
+function formatClienteDisplayName(cliente, clienteAuxiliar) {
+  const partes = extractClienteParts(cliente, clienteAuxiliar);
+  if (!partes.cliente) return partes.clienteAuxiliar;
+  if (!partes.clienteAuxiliar) return partes.cliente;
+  return `${partes.cliente} (${partes.clienteAuxiliar})`;
+}
+
 function normalizeProdutos(produtos) {
   if (!Array.isArray(produtos)) return [];
 
@@ -152,9 +188,11 @@ function normalizeComNomesValue(value) {
 
 function normalizeFichaPayload(dados) {
   const comNomesRaw = dados?.comNomes ?? dados?.com_nomes;
+  const clienteParts = extractClienteParts(dados?.cliente || "", dados?.clienteAuxiliar || dados?.cliente_auxiliar || "");
   return {
     ...dados,
-    cliente: normalizeNameCase(dados?.cliente || ''),
+    cliente: normalizeNameCase(clienteParts.cliente || ""),
+    clienteAuxiliar: normalizeNameCase(clienteParts.clienteAuxiliar || ""),
     vendedor: normalizeNameCase(dados?.vendedor || ''),
     corPeDeGolaInterno: normalizeNameCase(dados?.corPeDeGolaInterno || ''),
     corPeDeGolaExterno: normalizeNameCase(dados?.corPeDeGolaExterno || ''),
@@ -390,9 +428,13 @@ function dedupeKanbanCards(cards) {
 }
 
 function summarizeFicha(ficha) {
+  const clienteParts = extractClienteParts(ficha.cliente, ficha.cliente_auxiliar);
+
   return {
     id: ficha.id,
-    cliente: ficha.cliente,
+    cliente: clienteParts.cliente,
+    cliente_auxiliar: clienteParts.clienteAuxiliar,
+    cliente_exibicao: formatClienteDisplayName(ficha.cliente, ficha.cliente_auxiliar),
     vendedor: ficha.vendedor,
     data_inicio: ficha.data_inicio,
     numero_venda: ficha.numero_venda,
@@ -412,6 +454,8 @@ function summarizeKanbanCard(ficha) {
   return {
     id: ficha.id,
     cliente: ficha.cliente,
+    cliente_auxiliar: ficha.cliente_auxiliar,
+    cliente_exibicao: formatClienteDisplayName(ficha.cliente, ficha.cliente_auxiliar),
     numero_venda: ficha.numero_venda,
     data_inicio: ficha.data_inicio,
     data_entrega: ficha.data_entrega,
@@ -474,8 +518,10 @@ function matchesKanbanCardsFilters(card, filters) {
   const clienteFilter = normalizeKanbanFilterText(filters?.cliente);
   if (clienteFilter) {
     const clienteValue = normalizeKanbanFilterText(card?.cliente);
+    const clienteAuxiliarValue = normalizeKanbanFilterText(card?.cliente_auxiliar);
+    const clienteDisplayValue = normalizeKanbanFilterText(formatClienteDisplayName(card?.cliente, card?.cliente_auxiliar));
     const materialValue = normalizeKanbanFilterText(card?.material);
-    if (!clienteValue.includes(clienteFilter) && !materialValue.includes(clienteFilter)) {
+    if (!clienteValue.includes(clienteFilter) && !clienteAuxiliarValue.includes(clienteFilter) && !clienteDisplayValue.includes(clienteFilter) && !materialValue.includes(clienteFilter)) {
       return false;
     }
   }
@@ -508,6 +554,7 @@ async function fetchKanbanCards(filters = {}) {
       SELECT
         id,
         cliente,
+        cliente_auxiliar,
         numero_venda,
         data_inicio,
         data_entrega,
@@ -541,6 +588,8 @@ function fichaCorrespondeTermoBusca(ficha, termo) {
 
   const camposBusca = [
     ficha?.cliente,
+    ficha?.cliente_auxiliar,
+    formatClienteDisplayName(ficha?.cliente, ficha?.cliente_auxiliar),
     ficha?.vendedor,
     ficha?.numero_venda,
     extrairTextoProdutosBusca(ficha?.produtos),
@@ -637,6 +686,7 @@ async function initDatabase() {
       CREATE TABLE IF NOT EXISTS fichas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         cliente TEXT NOT NULL,
+        cliente_auxiliar TEXT,
         vendedor TEXT,
         data_inicio DATE,
         numero_venda TEXT,
@@ -734,6 +784,7 @@ async function initDatabase() {
       'cor_abertura_lateral TEXT',
       'filete_local TEXT',
       'filete_cor TEXT',
+      'cliente_auxiliar TEXT',
       'faixa_local TEXT',
       'faixa_cor TEXT',
       'com_nomes INTEGER DEFAULT 0',
@@ -1828,6 +1879,7 @@ app.get('/api/fichas', async (req, res) => {
       ? [
         'id',
         'cliente',
+        'cliente_auxiliar',
         'vendedor',
         'data_inicio',
         'numero_venda',
@@ -1853,8 +1905,8 @@ app.get('/api/fichas', async (req, res) => {
     }
 
     if (cliente) {
-      whereClause += ' AND cliente LIKE ?';
-      params.push(`%${cliente}%`);
+      whereClause += " AND (cliente LIKE ? OR cliente_auxiliar LIKE ? OR (cliente || CASE WHEN cliente_auxiliar IS NOT NULL AND trim(cliente_auxiliar) != '' THEN ' (' || cliente_auxiliar || ')' ELSE '' END) LIKE ?)";
+      params.push(`%${cliente}%`, `%${cliente}%`, `%${cliente}%`);
     }
 
     if (vendedor) {
@@ -1975,6 +2027,10 @@ app.get('/api/fichas/:id', async (req, res) => {
       }
     }
 
+    const clienteParts = extractClienteParts(ficha.cliente, ficha.cliente_auxiliar);
+    ficha.cliente = clienteParts.cliente;
+    ficha.cliente_auxiliar = clienteParts.clienteAuxiliar;
+    ficha.cliente_exibicao = formatClienteDisplayName(ficha.cliente, ficha.cliente_auxiliar);
     res.json(ficha);
   } catch (error) {
     console.error('Erro ao buscar ficha:', error);
@@ -2035,17 +2091,17 @@ app.post('/api/fichas', async (req, res) => {
 
     const sql = `
       INSERT INTO fichas (
-        cliente, vendedor, data_inicio, numero_venda, data_entrega, evento,
+        cliente, cliente_auxiliar, vendedor, data_inicio, numero_venda, data_entrega, evento,
         material, composicao, cor_material, manga, acabamento_manga, largura_manga, cor_acabamento_manga,
         gola, cor_gola, acabamento_gola, largura_gola, cor_peitilho_interno, cor_peitilho_externo, cor_pe_de_gola_interno, cor_pe_de_gola_externo, cor_botao,
         abertura_lateral, cor_abertura_lateral, reforco_gola, cor_reforco, bolso,
         filete, filete_local, filete_cor, faixa, faixa_local, faixa_cor,
         arte, com_nomes, observacoes, imagem_data, imagens_data, produtos, is_manual_card, supply_status, data_criacao, data_atualizacao
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
-      dados.cliente, dados.vendedor, dados.dataInicio, dados.numeroVenda,
+      dados.cliente, dados.clienteAuxiliar, dados.vendedor, dados.dataInicio, dados.numeroVenda,
       dados.dataEntrega, dados.evento || 'nao',
       dados.material, dados.composicao, dados.corMaterial, dados.manga,
       dados.acabamentoManga, dados.larguraManga, dados.corAcabamentoManga,
@@ -2123,7 +2179,7 @@ app.put('/api/fichas/:id', async (req, res) => {
 
     const sql = `
       UPDATE fichas SET
-        cliente = ?, vendedor = ?, data_inicio = ?, numero_venda = ?,
+        cliente = ?, cliente_auxiliar = ?, vendedor = ?, data_inicio = ?, numero_venda = ?,
         data_entrega = ?, evento = ?, status = ?,
         material = ?, composicao = ?, cor_material = ?, manga = ?,
         acabamento_manga = ?, largura_manga = ?, cor_acabamento_manga = ?,
@@ -2138,7 +2194,7 @@ app.put('/api/fichas/:id', async (req, res) => {
     `;
 
     const params = [
-      dados.cliente, dados.vendedor, dados.dataInicio, dados.numeroVenda,
+      dados.cliente, dados.clienteAuxiliar, dados.vendedor, dados.dataInicio, dados.numeroVenda,
       dados.dataEntrega, dados.evento || 'nao', dados.status || 'pendente',
       dados.material, dados.composicao, dados.corMaterial, dados.manga,
       dados.acabamentoManga, dados.larguraManga, dados.corAcabamentoManga,
@@ -3555,13 +3611,14 @@ app.get('/api/relatorio/clientes-top', async (req, res) => {
     const whereParts = ["cliente IS NOT NULL", "cliente != ''"];
     const params = [];
     adicionarFiltrosRelatorio(whereParts, params, queryData, 'data_inicio');
-    const fichas = await dbAll(`SELECT cliente, numero_venda, produtos FROM fichas WHERE ${whereParts.join(' AND ')}`, params);
+    const fichas = await dbAll(`SELECT cliente, cliente_auxiliar, numero_venda, produtos FROM fichas WHERE ${whereParts.join(' AND ')}`, params);
 
     // Agrupar por cliente
     const clientesMap = {};
     fichas.forEach(ficha => {
-      if (!clientesMap[ficha.cliente]) {
-        clientesMap[ficha.cliente] = { total_pedidos: 0, total_itens: 0, numeroVendasContados: new Set() };
+      const clienteExibicao = formatClienteDisplayName(ficha.cliente, ficha.cliente_auxiliar) || ficha.cliente;
+      if (!clientesMap[clienteExibicao]) {
+        clientesMap[clienteExibicao] = { total_pedidos: 0, total_itens: 0, numeroVendasContados: new Set() };
       }
 
       const numeroVendaNormalizado = typeof ficha.numero_venda === 'string'
@@ -3571,19 +3628,19 @@ app.get('/api/relatorio/clientes-top', async (req, res) => {
       // Se numero_venda existir, conta apenas uma vez por cliente.
       // Se estiver vazio/nulo, mantém contagem por ficha.
       if (numeroVendaNormalizado) {
-        if (!clientesMap[ficha.cliente].numeroVendasContados.has(numeroVendaNormalizado)) {
-          clientesMap[ficha.cliente].numeroVendasContados.add(numeroVendaNormalizado);
-          clientesMap[ficha.cliente].total_pedidos++;
+        if (!clientesMap[clienteExibicao].numeroVendasContados.has(numeroVendaNormalizado)) {
+          clientesMap[clienteExibicao].numeroVendasContados.add(numeroVendaNormalizado);
+          clientesMap[clienteExibicao].total_pedidos++;
         }
       } else {
-        clientesMap[ficha.cliente].total_pedidos++;
+        clientesMap[clienteExibicao].total_pedidos++;
       }
 
       if (ficha.produtos) {
         try {
           const produtos = typeof ficha.produtos === 'string' ? JSON.parse(ficha.produtos) : ficha.produtos;
           produtos.forEach(p => {
-            clientesMap[ficha.cliente].total_itens += parseInt(p.quantidade) || 0;
+            clientesMap[clienteExibicao].total_itens += parseInt(p.quantidade) || 0;
           });
         } catch (e) {}
       }

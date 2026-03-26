@@ -53,7 +53,8 @@
     try {
       await db.init();
       criarPaginacao();
-      initEventListeners(); // CORREÇÃO: Inicializar listeners ANTES de carregar dados`r`n      verificarParametrosURL();
+      initEventListeners(); // CORRECAO: Inicializar listeners antes de carregar dados
+      verificarParametrosURL();
       await carregarFichas({ resetPage: true });
       await atualizarEstatisticas();
     } catch (error) {
@@ -442,7 +443,7 @@
     const isPendente = ficha.status === 'pendente';
     const diasAtraso = calcularDiasAtraso(ficha.data_entrega, ficha.status);
     const miniaturaSrc = obterMiniaturaFicha(ficha);
-    const clienteFormatado = capitalizeFirstLetter(ficha.cliente);
+    const clienteFormatado = formatarNomeClienteFicha(ficha);
     const vendedorFormatado = capitalizeFirstLetter(ficha.vendedor);
     const personalizacaoLabel = getPersonalizacaoLabel(ficha.arte);
 
@@ -1375,12 +1376,31 @@
           .split(/([-/])/)
           .map(parte => {
             if (!parte || parte === '-' || parte === '/') return parte;
-            if (index > 0 && ['de', 'da', 'do', 'das', 'dos', 'e'].includes(parte)) return parte;
-            return parte.charAt(0).toUpperCase() + parte.slice(1);
+            if (index > 0 && ['de', 'da', 'do', 'das', 'dos', 'e', 'o'].includes(parte)) return parte;
+            return parte.replace(/^([^A-Za-zÀ-ÿ]*)([A-Za-zÀ-ÿ])/, (_, prefixo, letra) => prefixo + letra.toUpperCase());
           })
           .join('');
       })
       .join(' ');
+  }
+
+  function formatarNomeClienteFicha(ficha) {
+    if (window.appUtils && typeof window.appUtils.formatClientDisplayName === 'function') {
+      return capitalizeFirstLetter(window.appUtils.formatClientDisplayName(
+        ficha?.cliente,
+        ficha?.cliente_auxiliar || ficha?.clienteAuxiliar,
+        ficha?.cliente_exibicao || ficha?.clienteExibicao
+      ));
+    }
+
+    const nomeExibicao = String(ficha?.cliente_exibicao || '').trim();
+    if (nomeExibicao) return capitalizeFirstLetter(nomeExibicao);
+
+    const nomeBase = String(ficha?.cliente || '').trim().replace(/\s+/g, ' ');
+    const nomeAuxiliar = String(ficha?.cliente_auxiliar || ficha?.clienteAuxiliar || '').trim().replace(/\s+/g, ' ');
+    if (!nomeBase) return nomeAuxiliar;
+    if (!nomeAuxiliar) return capitalizeFirstLetter(nomeBase);
+    return capitalizeFirstLetter(`${nomeBase} (${nomeAuxiliar})`.replace(' )', ')'));
   }
 
   function calcularTotalItens(produtos) {

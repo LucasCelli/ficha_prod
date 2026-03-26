@@ -25,6 +25,8 @@
   const camposBancoParaForm = {
     'id': 'id',
     'cliente': 'cliente',
+    'cliente_auxiliar': 'clienteAuxiliar',
+    'cliente_exibicao': 'clienteExibicao',
     'vendedor': 'vendedor',
     'data_inicio': 'dataInicio',
     'numero_venda': 'numeroVenda',
@@ -114,20 +116,51 @@
     return COM_NOMES_VALOR_NENHUM;
   }
 
+  function extrairClienteLegado(cliente, clienteAuxiliar) {
+    const nomeOriginal = String(cliente || '').trim().replace(/\s+/g, ' ');
+    const auxiliarOriginal = String(clienteAuxiliar || '').trim().replace(/\s+/g, ' ');
+    if (auxiliarOriginal) return { cliente: nomeOriginal, clienteAuxiliar: auxiliarOriginal };
+
+    const legacyMatch = nomeOriginal.match(/^(.*)\(([^()]+)\)\s*$/);
+    if (!legacyMatch) return { cliente: nomeOriginal, clienteAuxiliar: "" };
+
+    const nomeBase = String(legacyMatch[1] || '').trim().replace(/\s+/g, ' ');
+    const nomeAux = String(legacyMatch[2] || '').trim().replace(/\s+/g, ' ');
+    if (!nomeBase || !nomeAux) return { cliente: nomeOriginal, clienteAuxiliar: "" };
+
+    return { cliente: nomeBase, clienteAuxiliar: nomeAux };
+  }
+
   function converterBancoParaForm(fichaBanco) {
     const fichaForm = {};
     for (const [chaveBanco, valor] of Object.entries(fichaBanco)) {
       const chaveForm = camposBancoParaForm[chaveBanco] || chaveBanco;
       fichaForm[chaveForm] = valor;
     }
+
+    const clienteLegado = extrairClienteLegado(fichaForm.cliente, fichaForm.clienteAuxiliar ?? fichaForm.cliente_auxiliar);
+    fichaForm.cliente = clienteLegado.cliente;
+    fichaForm.clienteAuxiliar = clienteLegado.clienteAuxiliar;
     return fichaForm;
   }
 
-  function atualizarTituloEdicao(id, clienteNome) {
+  function formatarNomeClienteExibicao(cliente, clienteAuxiliar) {
+    if (window.appUtils && typeof window.appUtils.formatClientDisplayName === 'function') {
+      return window.appUtils.formatClientDisplayName(cliente, clienteAuxiliar);
+    }
+
+    const nomeBase = String(cliente || '').trim().replace(/\s+/g, ' ');
+    const nomeAuxiliar = String(clienteAuxiliar || '').trim().replace(/\s+/g, ' ');
+    if (!nomeBase) return nomeAuxiliar;
+    if (!nomeAuxiliar) return nomeBase;
+    return `${nomeBase} (${nomeAuxiliar})`.replace(' )', ')');
+  }
+
+  function atualizarTituloEdicao(id, clienteNome, clienteAuxiliar) {
     const header = document.querySelector('header h1');
     if (!header) return;
 
-    const nomeBase = (clienteNome || document.getElementById('cliente')?.value || '').trim();
+    const nomeBase = formatarNomeClienteExibicao(clienteNome || document.getElementById('cliente')?.value || '', clienteAuxiliar || document.getElementById('clienteAuxiliar')?.value || '').trim();
     const nomeExibicao = nomeBase ? nomeBase.toUpperCase() : 'SEM_CLIENTE';
 
     header.innerHTML = '';
@@ -757,7 +790,7 @@
         novaUrl.searchParams.set('editar', id);
         window.history.replaceState({}, '', novaUrl);
 
-        atualizarTituloEdicao(fichaAtualId, dados.cliente);
+        atualizarTituloEdicao(fichaAtualId, dados.cliente, dados.clienteAuxiliar);
 
         configurarBotoesAcao();
       }
@@ -936,6 +969,7 @@
 
     const dados = {
       cliente: document.getElementById('cliente')?.value || '',
+      clienteAuxiliar: document.getElementById('clienteAuxiliar')?.value || '',
       vendedor: document.getElementById('vendedor')?.value || '',
       dataInicio: document.getElementById('dataInicio')?.value || '',
       numeroVenda: document.getElementById('numeroVenda')?.value || '',
@@ -1079,7 +1113,7 @@
         configurarBotoesAcao();
       }, 100);
 
-      atualizarTituloEdicao(id, ficha.cliente);
+      atualizarTituloEdicao(id, ficha.cliente, ficha.clienteAuxiliar ?? ficha.cliente_auxiliar);
 
     } catch (error) {
       mostrarToast('Erro ao carregar ficha para edição', 'error');
@@ -1146,7 +1180,7 @@
     const acabamentoMangaFicha = String(ficha.acabamentoManga ?? ficha.acabamento_manga ?? '').trim();
 
     const camposTexto = [
-      'cliente', 'vendedor', 'dataInicio', 'numeroVenda',
+      'cliente', 'clienteAuxiliar', 'vendedor', 'dataInicio', 'numeroVenda',
       'dataEntrega', 'evento', 'material', 'composicao',
       'corMaterial', 'manga', 'acabamentoManga', 'larguraManga', 'corAcabamentoManga',
       'gola', 'corGola', 'acabamentoGola', 'larguraGola',

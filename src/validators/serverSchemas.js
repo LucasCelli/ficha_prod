@@ -171,6 +171,7 @@ export const fichaQuerySchema = z.object({
 
 export const fichaBodySchema = z.object({
   cliente: requiredTextSchema,
+  clienteAuxiliar: optionalTextSchema,
   vendedor: optionalTextSchema,
   dataInicio: optionalIsoDateSchema,
   numeroVenda: optionalTextSchema,

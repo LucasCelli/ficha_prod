@@ -96,6 +96,28 @@
     return text || fallback;
   }
 
+  function formatarNomeClienteExibicao(item) {
+    const nomeBase = normalizeString(item && item.cliente, '');
+    const nomeAuxiliar = normalizeString(item && (item.cliente_auxiliar || item.clienteAuxiliar), '');
+    if (window.appUtils && typeof window.appUtils.formatClientDisplayName === 'function') {
+      return normalizeString(
+        window.appUtils.formatClientDisplayName(
+          nomeBase,
+          nomeAuxiliar,
+          normalizeString(item && (item.cliente_exibicao || item.clienteExibicao), '')
+        ),
+        'Cliente nao informado'
+      );
+    }
+
+    const nomeExibicao = normalizeString(item && (item.cliente_exibicao || item.clienteExibicao), '');
+    if (nomeExibicao) return nomeExibicao;
+
+    if (!nomeBase) return nomeAuxiliar || 'Cliente nao informado';
+    if (!nomeAuxiliar) return nomeBase;
+    return `${nomeBase} (${nomeAuxiliar})`.replace(' )', ')');
+  }
+
   function buildDefaultSnapshot() {
     return {
       fetchedAt: Date.now(),
@@ -265,7 +287,7 @@
     const list = Array.isArray(rawList) ? rawList : [];
     return list.map(item => ({
       id: Number(item && item.id),
-      cliente: normalizeString(item && item.cliente, 'Cliente não informado'),
+      cliente: formatarNomeClienteExibicao(item),
       numeroVenda: normalizeString(item && (item.numero_venda || item.numeroVenda), ''),
       dataEntrega: normalizeString(item && (item.data_entrega || item.dataEntrega), ''),
       status: normalizeString(item && item.status, ''),
@@ -460,7 +482,7 @@
         const key = `${ficha.id}:${deliveredTs}`;
         if (autoDeliveryMap[key]) return null;
 
-        const cliente = normalizeString(ficha && ficha.cliente, 'Cliente não informado');
+        const cliente = formatarNomeClienteExibicao(ficha);
         return {
           id: `auto-delivery-${ficha.id}-${deliveredTs}`,
           kind: 'auto_delivery',

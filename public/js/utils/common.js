@@ -40,6 +40,71 @@
     return parsed.toLocaleDateString('pt-BR');
   }
 
+  const NAME_EXCEPTIONS = new Set(['da', 'de', 'do', 'das', 'dos', 'e', 'o']);
+  const UPPERCASE_WORD_PATTERN = /^[A-ZÀ-Ý]{1,4}$/;
+
+  function normalizeNameCase(value) {
+    if (typeof value !== 'string') return '';
+    const text = value.trim().replace(/\s+/g, ' ');
+    if (!text) return '';
+
+    const originalWords = text.split(' ');
+    const preserveUppercaseIndexes = new Set();
+    if (originalWords.length > 1) {
+      if (UPPERCASE_WORD_PATTERN.test(originalWords[0])) preserveUppercaseIndexes.add(0);
+      const lastIndex = originalWords.length - 1;
+      if (UPPERCASE_WORD_PATTERN.test(originalWords[lastIndex])) preserveUppercaseIndexes.add(lastIndex);
+    }
+
+    return text
+      .toLowerCase()
+      .split(' ')
+      .map((word, index) => {
+        if (preserveUppercaseIndexes.has(index)) return word.toUpperCase();
+        return word
+          .split(/([-/])/)
+          .map(part => {
+            if (!part || part === '-' || part === '/') return part;
+            if (index > 0 && NAME_EXCEPTIONS.has(part)) return part;
+            return part.charAt(0).toUpperCase() + part.slice(1);
+          })
+          .join('');
+      })
+      .join(' ');
+  }
+
+  function extractClientParts(cliente, clienteAuxiliar, clienteExibicao = '') {
+    const nomeAuxiliar = String(clienteAuxiliar || '').trim().replace(/\s+/g, ' ');
+    if (nomeAuxiliar) {
+      return {
+        cliente: normalizeNameCase(String(cliente || '').trim().replace(/\s+/g, ' ')),
+        clienteAuxiliar: normalizeNameCase(nomeAuxiliar)
+      };
+    }
+
+    const nomeBase = String(cliente || '').trim().replace(/\s+/g, ' ');
+    const origem = nomeBase || String(clienteExibicao || '').trim().replace(/\s+/g, ' ');
+    const legacyMatch = origem.match(/^(.*)\(([^()]+)\)\s*$/);
+    if (!legacyMatch) {
+      return {
+        cliente: normalizeNameCase(nomeBase || origem),
+        clienteAuxiliar: ''
+      };
+    }
+
+    return {
+      cliente: normalizeNameCase(String(legacyMatch[1] || '').trim().replace(/\s+/g, ' ')),
+      clienteAuxiliar: normalizeNameCase(String(legacyMatch[2] || '').trim().replace(/\s+/g, ' '))
+    };
+  }
+
+  function formatClientDisplayName(cliente, clienteAuxiliar, clienteExibicao = '') {
+    const partes = extractClientParts(cliente, clienteAuxiliar, clienteExibicao);
+    if (!partes.cliente) return partes.clienteAuxiliar;
+    if (!partes.clienteAuxiliar) return partes.cliente;
+    return `${partes.cliente} (${partes.clienteAuxiliar})`;
+  }
+
   const HTML_FILE_TO_ROUTE = Object.freeze({
     'index.html': '/',
     'dashboard.html': '/dashboard',
@@ -311,6 +376,8 @@
     debounce,
     escapeHtml,
     normalizeText,
+    normalizeNameCase,
+    formatClientDisplayName,
     formatDateBrIso,
     toCleanPath,
     navigate: navigateWithTransition

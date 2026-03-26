@@ -149,6 +149,7 @@ class APIClient {
 
     const dadosEnvio = {
       cliente: dados.cliente || '',
+      clienteAuxiliar: dados.clienteAuxiliar || '',
       vendedor: dados.vendedor || '',
       dataInicio: dados.dataInicio || '',
       numeroVenda: dados.numeroVenda || '',

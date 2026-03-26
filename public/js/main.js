@@ -164,17 +164,45 @@
       .filter(Boolean);
   }
 
+  function extrairClienteLegado(cliente, clienteAuxiliar) {
+    const nomeOriginal = String(cliente || '').trim().replace(/\s+/g, ' ');
+    const auxiliarOriginal = String(clienteAuxiliar || '').trim().replace(/\s+/g, ' ');
+    if (auxiliarOriginal) return { cliente: nomeOriginal, clienteAuxiliar: auxiliarOriginal };
+
+    const legacyMatch = nomeOriginal.match(/^(.*)\(([^()]+)\)\s*$/);
+    if (!legacyMatch) return { cliente: nomeOriginal, clienteAuxiliar: "" };
+
+    const nomeBase = String(legacyMatch[1] || '').trim().replace(/\s+/g, ' ');
+    const nomeAux = String(legacyMatch[2] || '').trim().replace(/\s+/g, ' ');
+    if (!nomeBase || !nomeAux) return { cliente: nomeOriginal, clienteAuxiliar: "" };
+
+    return { cliente: nomeBase, clienteAuxiliar: nomeAux };
+  }
+
   function normalizarFichaVisualizacao(ficha) {
-    if (!ficha || typeof ficha !== 'object') return null;
+    if (!ficha || typeof ficha !== "object") return null;
 
     const imagens = normalizarImagensFicha(ficha);
-    const observacoesHtml = String(obterValorFicha(ficha, 'observacoesHtml', '') || '');
-    const observacoesPlainText = String(obterValorFicha(ficha, 'observacoesPlainText', '') || '');
-    const observacoes = String(obterValorFicha(ficha, 'observacoes', '') || observacoesHtml || observacoesPlainText || '');
+    const observacoesHtml = String(obterValorFicha(ficha, "observacoesHtml", "") || "");
+    const observacoesPlainText = String(obterValorFicha(ficha, "observacoesPlainText", "") || "");
+    const observacoes = String(obterValorFicha(ficha, "observacoes", "") || observacoesHtml || observacoesPlainText || "");
+    const clienteLegado = extrairClienteLegado(
+      obterValorFicha(ficha, 'cliente', ''),
+      obterValorFicha(ficha, 'clienteAuxiliar', obterValorFicha(ficha, 'cliente_auxiliar', ''))
+    );
+    const clienteExibicao = window.appUtils && typeof window.appUtils.formatClientDisplayName === 'function'
+      ? window.appUtils.formatClientDisplayName(
+        clienteLegado.cliente,
+        clienteLegado.clienteAuxiliar,
+        obterValorFicha(ficha, 'clienteExibicao', obterValorFicha(ficha, 'cliente_exibicao', ''))
+      )
+      : String(obterValorFicha(ficha, 'clienteExibicao', obterValorFicha(ficha, 'cliente_exibicao', '')) || '');
 
     return {
       id: obterValorFicha(ficha, 'id', ''),
-      cliente: String(obterValorFicha(ficha, 'cliente', '') || ''),
+      cliente: String(clienteLegado.cliente || ""),
+      clienteAuxiliar: String(clienteLegado.clienteAuxiliar || ""),
+      clienteExibicao: String(clienteExibicao || ''),
       vendedor: String(obterValorFicha(ficha, 'vendedor', '') || ''),
       dataInicio: String(obterValorFicha(ficha, 'dataInicio', '') || ''),
       numeroVenda: String(obterValorFicha(ficha, 'numeroVenda', '') || ''),
@@ -313,6 +341,7 @@
     await loadCloudinaryConfig();
     await loadCatalog();
     initDefaultDates();
+    initDatePickerInteractions();
     initEventoAlert();
     initCatalogInUI();
     initProductTable();
@@ -397,12 +426,24 @@
           .split(/([-/])/)
           .map(parte => {
             if (!parte || parte === '-' || parte === '/') return parte;
-            if (index > 0 && ['de', 'da', 'do', 'das', 'dos', 'e'].includes(parte)) return parte;
-            return parte.charAt(0).toUpperCase() + parte.slice(1);
+            if (index > 0 && ['de', 'da', 'do', 'das', 'dos', 'e', 'o'].includes(parte)) return parte;
+            return parte.replace(/^([^A-Za-zÀ-ÿ]*)([A-Za-zÀ-ÿ])/, (_, prefixo, letra) => prefixo + letra.toUpperCase());
           })
           .join('');
       })
       .join(' ');
+  }
+
+  function formatarNomeClienteExibicao(cliente, clienteAuxiliar) {
+    if (window.appUtils && typeof window.appUtils.formatClientDisplayName === 'function') {
+      return window.appUtils.formatClientDisplayName(cliente, clienteAuxiliar);
+    }
+
+    const nomeBase = String(cliente || '').trim().replace(/\s+/g, ' ');
+    const nomeAuxiliar = String(clienteAuxiliar || '').trim().replace(/\s+/g, ' ');
+    if (!nomeBase) return nomeAuxiliar;
+    if (!nomeAuxiliar) return nomeBase;
+    return `${nomeBase} (${nomeAuxiliar})`.replace(' )', ')');
   }
 
   function normalizarProdutoParaRegra(valor) {
@@ -670,6 +711,33 @@
     if (dataInicio && !dataInicio.value) {
       dataInicio.value = hojeStr;
     }
+  }
+
+  function initDatePickerInteractions() {
+    const dateInputs = Array.from(document.querySelectorAll('input[type="date"]'));
+    if (dateInputs.length === 0) return;
+
+    const isTouchDevice = window.matchMedia?.('(pointer: coarse)')?.matches
+      || navigator.maxTouchPoints > 0
+      || navigator.msMaxTouchPoints > 0;
+    if (!isTouchDevice) return;
+
+    dateInputs.forEach(input => {
+      if (input.dataset.datePickerEnhanced === 'true') return;
+      input.dataset.datePickerEnhanced = 'true';
+
+      const abrirCalendario = () => {
+        if (typeof input.showPicker !== 'function') return;
+        try {
+          input.showPicker();
+        } catch (_) {
+          // Ignora navegadores que bloqueiam o showPicker fora do gesto do usuario.
+        }
+      };
+
+      input.addEventListener('click', abrirCalendario);
+      input.addEventListener('focus', abrirCalendario);
+    });
   }
 
   function initEventoAlert() {
@@ -2269,6 +2337,7 @@
 
     return {
       cliente: document.getElementById('cliente')?.value || '',
+      clienteAuxiliar: document.getElementById('clienteAuxiliar')?.value || '',
       vendedor: document.getElementById('vendedor')?.value || '',
       dataInicio: document.getElementById('dataInicio')?.value || '',
       numeroVenda: document.getElementById('numeroVenda')?.value || '',
@@ -2408,6 +2477,7 @@
     };
 
     setVal('cliente', ficha.cliente);
+    setVal('clienteAuxiliar', ficha.clienteAuxiliar ?? ficha.cliente_auxiliar);
     setVal('vendedor', ficha.vendedor);
     setVal('dataInicio', ficha.dataInicio);
     setVal('numeroVenda', ficha.numeroVenda);
@@ -2886,7 +2956,7 @@
 
   function montarNomeArquivoFichaPdf() {
     const numeroVenda = slugNomeArquivo(document.getElementById('numeroVenda')?.value || '');
-    const cliente = slugNomeArquivo(document.getElementById('cliente')?.value || '');
+    const cliente = slugNomeArquivo(formatarNomeClienteExibicao(document.getElementById('cliente')?.value || '', document.getElementById('clienteAuxiliar')?.value || ''));
     const base = [numeroVenda, cliente].filter(Boolean).join('-') || 'ficha-tecnica';
     const data = new Date().toISOString().slice(0, 10);
     return `${base}-${data}.pdf`;
@@ -3518,7 +3588,7 @@
 
     setText('print-dataEmissao', dataEmissao);
     setText('print-numeroVenda', getValorCampo('numeroVenda'), '-');
-    setText('print-cliente', capitalizeFirstLetter(getValorCampo('cliente')), '-');
+    setText('print-cliente', capitalizeFirstLetter(formatarNomeClienteExibicao(getValorCampo('cliente'), getValorCampo('clienteAuxiliar'))), '-');
     setText('print-vendedor', capitalizeFirstLetter(getValorCampo('vendedor')), '-');
 
     setTextWithHighlight('print-dataInicio', formatarDataBrasil(getValorCampo('dataInicio')), isEvento, '-');
