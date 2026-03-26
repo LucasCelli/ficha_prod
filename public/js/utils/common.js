@@ -83,7 +83,11 @@
     }
 
     const nomeBase = String(cliente || '').trim().replace(/\s+/g, ' ');
-    const origem = nomeBase || String(clienteExibicao || '').trim().replace(/\s+/g, ' ');
+    const nomeExibicaoNormalizado = String(clienteExibicao || '').trim().replace(/\s+/g, ' ');
+    const clienteExibicaoTemAlias = /\([^()]+\)\s*$/.test(nomeExibicaoNormalizado);
+    const origem = clienteExibicaoTemAlias
+      ? nomeExibicaoNormalizado
+      : (nomeBase || nomeExibicaoNormalizado);
     const legacyMatch = origem.match(/^(.*)\(([^()]+)\)\s*$/);
     if (!legacyMatch) {
       return {
