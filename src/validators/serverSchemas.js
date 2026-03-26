@@ -107,6 +107,35 @@ const requiredIsoDateSchema = z.preprocess(
     .refine(isValidISODate, 'Data inválida')
 );
 
+const fichaProdutoSchema = z.object({
+  tamanho: optionalTextSchema,
+  quantidade: z.preprocess(
+    value => {
+      if (value === undefined || value === null) return undefined;
+      return String(value).trim();
+    },
+    z.string().optional()
+  ),
+  produto: optionalTextSchema,
+  descricao: optionalTextSchema,
+  detalhesProduto: optionalTextSchema,
+  detalhes: optionalTextSchema
+}).passthrough().superRefine((item, ctx) => {
+  const tamanho = String(item.tamanho || '').trim();
+  const quantidade = String(item.quantidade || '').trim();
+  const produto = String(item.produto || item.descricao || '').trim();
+  const detalhes = String(item.detalhesProduto || item.detalhes || '').trim();
+  const temConteudo = Boolean(tamanho || produto || detalhes || (quantidade && quantidade !== '1'));
+
+  if (!temConteudo || produto) return;
+
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['produto'],
+    message: 'Produto é obrigatório quando a linha possui dados.'
+  });
+});
+
 export const positiveIdParamSchema = z.object({
   id: z.preprocess(parsePositiveInt, z.number().int().positive())
 });
@@ -185,7 +214,7 @@ export const fichaBodySchema = z.object({
   observacoes: optionalTextSchema,
   imagemData: optionalTextSchema,
   imagensData: optionalTextSchema,
-  produtos: z.array(z.record(z.any())).optional(),
+  produtos: z.array(fichaProdutoSchema).optional(),
   comNomes: z.union([z.boolean(), z.number().int().min(0).max(3), z.string()]).optional(),
   com_nomes: z.union([z.boolean(), z.number().int().min(0).max(3), z.string()]).optional()
 }).passthrough();

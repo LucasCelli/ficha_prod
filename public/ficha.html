@@ -33,7 +33,7 @@
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 </head>
 
-<body class="page-index">
+<body class="page-index page-ficha">
     <!-- VERSÃO NORMAL -->
     <div id="normal-version" class="container">
         <header>
@@ -53,8 +53,6 @@
                         protegido
                         e pronto para a próxima etapa!</p>
                 </div>
-            </div>
-            <div class="header-actions actions" id="acoesContainerTopo">
             </div>
         </header>
 
@@ -540,16 +538,10 @@
                 </div>
             </section>
 
-            <!-- AÇÕES -->
-            <section class="card">
-                <div class="card-header">
-                    <i class="fas fa-tools"></i>
-                    <span>Ações</span>
-                </div>
-                <div class="card-body actions" id="acoesContainer">
-                </div>
-            </section>
         </main>
+    </div>
+
+    <div class="ficha-floating-toolbar" id="acoesContainerTopo" aria-label="Ações da ficha">
     </div>
 
     <!-- VERSÃO DE IMPRESSÃO -->
@@ -706,7 +698,6 @@
     <script src="js/utils/toast.js"></script>
     <script src="js/custom-datalist.js"></script>
     <script src="js/api-client.js"></script>
-    <script src="js/image-handler-cloudinary.js"></script>
     <script src="js/cloudinary-upload.js"></script>
     <script type="module" src="js/ficha/main.js"></script>
     <script nomodule src="js/main.js" defer></script>

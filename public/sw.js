@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'app-shell-v9';
+const CACHE_VERSION = 'app-shell-v10';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 const API_CACHE = `api-${CACHE_VERSION}`;
@@ -83,7 +83,6 @@ const PRECACHE_URLS = [
   '/js/main.js',
   '/js/kanban.js',
   '/js/integration.js',
-  '/js/image-handler-cloudinary.js',
   '/js/dashboard.js',
   '/js/home.js',
   '/js/cloudinary-upload.js',

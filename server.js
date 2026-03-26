@@ -111,17 +111,27 @@ function normalizeNameCase(value) {
 function normalizeProdutos(produtos) {
   if (!Array.isArray(produtos)) return [];
 
-  return produtos.map(produto => {
-    if (!produto || typeof produto !== 'object') return produto;
-    const produtoPrincipal = normalizeNameCase(produto.produto || produto.descricao || '');
-    const detalhesProduto = normalizeNameCase(produto.detalhesProduto || produto.detalhes || '');
-    return {
-      ...produto,
-      produto: produtoPrincipal,
-      descricao: produtoPrincipal,
-      detalhesProduto
-    };
-  });
+  return produtos
+    .map(produto => {
+      if (!produto || typeof produto !== 'object') return null;
+      const tamanho = String(produto.tamanho || '').trim();
+      const quantidade = String(produto.quantidade || '').trim();
+      const produtoPrincipal = normalizeNameCase(produto.produto || produto.descricao || '');
+      const detalhesProduto = normalizeNameCase(produto.detalhesProduto || produto.detalhes || '');
+      const temConteudo = Boolean(tamanho || produtoPrincipal || detalhesProduto || (quantidade && quantidade !== '1'));
+
+      if (!temConteudo) return null;
+
+      return {
+        ...produto,
+        tamanho,
+        quantidade,
+        produto: produtoPrincipal,
+        descricao: produtoPrincipal,
+        detalhesProduto
+      };
+    })
+    .filter(Boolean);
 }
 
 function normalizeComNomesValue(value) {

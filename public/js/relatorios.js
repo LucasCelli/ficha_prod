@@ -1882,6 +1882,13 @@
   function obterDataCriacaoFicha(ficha) {
     const raw = ficha?.data_criacao || ficha?.created_at || ficha?.data_inicio;
     if (!raw) return null;
+    if (typeof raw === 'string') {
+      const matchDateOnly = raw.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (matchDateOnly) {
+        const [, year, month, day] = matchDateOnly;
+        return new Date(Number(year), Number(month) - 1, Number(day));
+      }
+    }
     const data = new Date(raw);
     return Number.isNaN(data.getTime()) ? null : data;
   }
@@ -1918,4 +1925,3 @@
     });
   }
 })();
-

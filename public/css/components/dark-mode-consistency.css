@@ -284,12 +284,16 @@ html[data-theme='dark'] .image-upload {
   color: var(--color-neutral-400);
 }
 
+html[data-theme='dark'] .image-upload:hover,
+html[data-theme='dark'] .image-upload:focus-visible,
 html[data-theme='dark'] .image-upload--active,
 html[data-theme='dark'] .image-upload.drag-over {
-  background: var(--color-primary-strong);
+  background: color-mix(in srgb, var(--color-primary) 22%, var(--color-neutral-900));
   border-color: var(--color-primary);
-  color: var(--color-primary-soft);
+  color: var(--color-text);
+  box-shadow: 0 0 0 3px var(--color-info-soft), var(--shadow-sm);
 }
+
 
 html[data-theme='dark'] .confirm-modal-content,
 html[data-theme='dark'] .image-modal-content {
