@@ -2050,7 +2050,7 @@
       if (!imagem) return;
 
       if (imagem.isPending) {
-        toastImagem('Aguarde o envio da imagem terminar para remove-la.', 'warning');
+        toastImagem('Aguarde o envio da imagem terminar para removê-la.', 'warning');
         return;
       }
 
@@ -2070,9 +2070,9 @@
           }
 
           if (result.shared) {
-            toastImagem('Imagem compartilhada: removida apenas desta ficha. A ficha original nao foi alterada.', 'warning');
+            toastImagem('Imagem compartilhada: removida apenas desta ficha. A ficha original não foi alterada.', 'warning');
           } else if (result.notFound) {
-            toastImagem('Imagem removida desta ficha. O arquivo ja nao existia na nuvem.', 'warning');
+            toastImagem('Imagem removida desta ficha. O arquivo já não existia na nuvem.', 'warning');
           } else {
             toastImagem('Imagem removida com sucesso!', 'success');
           }

@@ -106,14 +106,14 @@
           nomeAuxiliar,
           normalizeString(item && (item.cliente_exibicao || item.clienteExibicao), '')
         ),
-        'Cliente nao informado'
+        'Cliente não informado'
       );
     }
 
     const nomeExibicao = normalizeString(item && (item.cliente_exibicao || item.clienteExibicao), '');
     if (nomeExibicao) return nomeExibicao;
 
-    if (!nomeBase) return nomeAuxiliar || 'Cliente nao informado';
+    if (!nomeBase) return nomeAuxiliar || 'Cliente não informado';
     if (!nomeAuxiliar) return nomeBase;
     return `${nomeBase} (${nomeAuxiliar})`.replace(' )', ')');
   }

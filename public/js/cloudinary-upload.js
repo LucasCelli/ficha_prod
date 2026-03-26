@@ -258,12 +258,12 @@
 
       if (response.ok) {
         if (responseData.shared) {
-          if (!silent) mostrarAviso('Imagem compartilhada: removida apenas desta ficha. A ficha original nao foi alterada.');
+          if (!silent) mostrarAviso('Imagem compartilhada: removida apenas desta ficha. A ficha original não foi alterada.');
           return { success: true, shared: true };
         }
 
         if (responseData.notFound) {
-          if (!silent) mostrarAviso('Imagem removida desta ficha. O arquivo ja nao existia na nuvem.');
+          if (!silent) mostrarAviso('Imagem removida desta ficha. O arquivo já não existia na nuvem.');
           return { success: true, notFound: true };
         }
 
@@ -272,7 +272,7 @@
       }
 
       if (response.status === 409 || responseData.shared) {
-          if (!silent) mostrarAviso('Imagem compartilhada: removida apenas desta ficha. A ficha original nao foi alterada.');
+          if (!silent) mostrarAviso('Imagem compartilhada: removida apenas desta ficha. A ficha original não foi alterada.');
           return { success: true, shared: true };
       }
 

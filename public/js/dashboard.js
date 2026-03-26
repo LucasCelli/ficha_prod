@@ -1068,12 +1068,12 @@
 
       const payloadDuplicacao = prepararDadosParaDuplicacao(dadosDuplicados);
       if (!payloadDuplicacao) {
-        throw new Error('Falha ao preparar dados para duplicacao');
+        throw new Error('Falha ao preparar dados para duplicação');
       }
 
       const rascunhoSalvo = salvarRascunhoDuplicacao(payloadDuplicacao);
       if (!rascunhoSalvo) {
-        throw new Error('Falha ao salvar rascunho da duplicacao');
+        throw new Error('Falha ao salvar rascunho da duplicação');
       }
 
       window.location.href = '/ficha?duplicar=1';
