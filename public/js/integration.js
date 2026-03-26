@@ -25,6 +25,8 @@
   const camposBancoParaForm = {
     'id': 'id',
     'cliente': 'cliente',
+    'cliente_auxiliar': 'clienteAuxiliar',
+    'cliente_exibicao': 'clienteExibicao',
     'vendedor': 'vendedor',
     'data_inicio': 'dataInicio',
     'numero_venda': 'numeroVenda',
@@ -69,32 +71,7 @@
   };
 
   const COM_NOMES_VALOR_NENHUM = '0';
-  const TEMPLATE_FILES = Object.freeze([
-    'camiseta_mc_gr.json',
-    'camiseta_ml_gr.json',
-    'camiseta_mc_gv.json',
-    'camiseta_ml_gv.json',
-    'baby_mc_gr.json',
-    'baby_ml_gr.json',
-    'baby_mc_gv.json',
-    'baby_ml_gv.json',
-    'camiseta_mc_gp.json',
-    'camiseta_ml_gp.json',
-    'camisa_masc_mc.json',
-    'camisa_masc_ml.json',
-    'baby_mc_gp.json',
-    'baby_ml_gp.json',
-    'camisa_fem_mc.json',
-    'camisa_fem_ml.json'
-  ]);
-  const TEMPLATE_LABELS_GOLA = Object.freeze({
-    polo: 'Gola Polo',
-    social: 'Gola Social',
-    redonda: 'Gola Redonda',
-    v: 'Gola V',
-    v_polo: 'Gola V Polo'
-  });
-  let templateLoaderState = null;
+  let menuAcoesFichaState = null;
 
   function obterChaveIdempotenciaCriacao() {
     if (chaveIdempotenciaCriacao) return chaveIdempotenciaCriacao;
@@ -139,20 +116,51 @@
     return COM_NOMES_VALOR_NENHUM;
   }
 
+  function extrairClienteLegado(cliente, clienteAuxiliar) {
+    const nomeOriginal = String(cliente || '').trim().replace(/\s+/g, ' ');
+    const auxiliarOriginal = String(clienteAuxiliar || '').trim().replace(/\s+/g, ' ');
+    if (auxiliarOriginal) return { cliente: nomeOriginal, clienteAuxiliar: auxiliarOriginal };
+
+    const legacyMatch = nomeOriginal.match(/^(.*)\(([^()]+)\)\s*$/);
+    if (!legacyMatch) return { cliente: nomeOriginal, clienteAuxiliar: "" };
+
+    const nomeBase = String(legacyMatch[1] || '').trim().replace(/\s+/g, ' ');
+    const nomeAux = String(legacyMatch[2] || '').trim().replace(/\s+/g, ' ');
+    if (!nomeBase || !nomeAux) return { cliente: nomeOriginal, clienteAuxiliar: "" };
+
+    return { cliente: nomeBase, clienteAuxiliar: nomeAux };
+  }
+
   function converterBancoParaForm(fichaBanco) {
     const fichaForm = {};
     for (const [chaveBanco, valor] of Object.entries(fichaBanco)) {
       const chaveForm = camposBancoParaForm[chaveBanco] || chaveBanco;
       fichaForm[chaveForm] = valor;
     }
+
+    const clienteLegado = extrairClienteLegado(fichaForm.cliente, fichaForm.clienteAuxiliar ?? fichaForm.cliente_auxiliar);
+    fichaForm.cliente = clienteLegado.cliente;
+    fichaForm.clienteAuxiliar = clienteLegado.clienteAuxiliar;
     return fichaForm;
   }
 
-  function atualizarTituloEdicao(id, clienteNome) {
+  function formatarNomeClienteExibicao(cliente, clienteAuxiliar) {
+    if (window.appUtils && typeof window.appUtils.formatClientDisplayName === 'function') {
+      return window.appUtils.formatClientDisplayName(cliente, clienteAuxiliar);
+    }
+
+    const nomeBase = String(cliente || '').trim().replace(/\s+/g, ' ');
+    const nomeAuxiliar = String(clienteAuxiliar || '').trim().replace(/\s+/g, ' ');
+    if (!nomeBase) return nomeAuxiliar;
+    if (!nomeAuxiliar) return nomeBase;
+    return `${nomeBase} (${nomeAuxiliar})`.replace(' )', ')');
+  }
+
+  function atualizarTituloEdicao(id, clienteNome, clienteAuxiliar) {
     const header = document.querySelector('header h1');
     if (!header) return;
 
-    const nomeBase = (clienteNome || document.getElementById('cliente')?.value || '').trim();
+    const nomeBase = formatarNomeClienteExibicao(clienteNome || document.getElementById('cliente')?.value || '', clienteAuxiliar || document.getElementById('clienteAuxiliar')?.value || '').trim();
     const nomeExibicao = nomeBase ? nomeBase.toUpperCase() : 'SEM_CLIENTE';
 
     header.innerHTML = '';
@@ -223,9 +231,8 @@
   }
 
   function configurarBotoesAcao() {
-    const containerPrincipal = document.getElementById('acoesContainer');
     const containerTopo = document.getElementById('acoesContainerTopo');
-    const containers = [containerPrincipal, containerTopo].filter(Boolean);
+    const containers = [containerTopo].filter(Boolean);
     if (containers.length === 0) return;
 
     containers.forEach(container => {
@@ -240,21 +247,24 @@
       }
     };
 
-    const botoes = [];
+    const botoesEsquerda = [];
+    const botoesCentro = [];
+    const botoesDireita = [];
+
     const botaoHomeHub = {
       id: 'btnHomeHub',
       classe: 'btn-secondary',
       icone: 'fa-house',
-      texto: 'In\u00EDcio',
+      texto: 'Painel de Controle',
       onClick: () => {
-        window.location.href = '/';
+        window.location.href = '/dashboard';
       }
     };
 
     if (modoVisualizacao) {
-      botoes.push({ id: 'btnImprimir', classe: 'btn-secondary', extraClasse: 'btn-action-print', icone: 'fa-print', texto: 'Imprimir', onClick: acaoImprimir });
-      botoes.push({ id: 'btnDuplicar', classe: 'btn-primary', icone: 'fa-copy', texto: 'Duplicar Ficha', onClick: duplicarFicha });
-      botoes.push({
+      botoesEsquerda.push({ id: 'btnImprimir', classe: 'btn-secondary', extraClasse: 'btn-action-print', icone: 'fa-print', texto: 'Imprimir', onClick: acaoImprimir });
+      botoesCentro.push({ id: 'btnDuplicar', classe: 'btn-primary', icone: 'fa-copy', texto: 'Duplicar Ficha', onClick: duplicarFicha });
+      botoesDireita.push({
         id: 'btnEditar',
         classe: 'btn-warning',
         icone: 'fa-edit',
@@ -263,19 +273,9 @@
           window.location.href = `/ficha?editar=${fichaAtualId}`;
         }
       });
-      botoes.push({
-        id: 'btnDashboard',
-        classe: 'btn-secondary',
-        icone: 'fa-chart-line',
-        texto: 'Painel de Controle',
-        onClick: () => {
-          window.location.href = '/dashboard';
-        },
-        alinharDireita: true
-      });
-      botoes.push(botaoHomeHub);
+      botoesDireita.push(botaoHomeHub);
     } else if (fichaAtualId) {
-      botoes.push({
+      botoesEsquerda.push({
         id: 'btnSalvarDB',
         classe: 'btn-success',
         extraClasse: 'btn-action-save',
@@ -283,37 +283,9 @@
         texto: `Atualizar Ficha #${fichaAtualId}`,
         onClick: salvarNoBanco
       });
-      botoes.push({ id: 'btnImprimir', classe: 'btn-secondary', extraClasse: 'btn-action-print', icone: 'fa-print', texto: 'Imprimir', onClick: acaoImprimir });
-      botoes.push({
-        id: 'btnBaixar',
-        classe: 'btn-secondary',
-        icone: 'fa-download',
-        texto: 'Baixar Ficha',
-        onClick: () => {
-          if (typeof salvarFicha === 'function') salvarFicha();
-        }
-      });
-      botoes.push({
-        id: 'btnCarregar',
-        classe: 'btn-warning',
-        icone: 'fa-upload',
-        texto: 'Carregar Ficha',
-        onClick: () => {
-          if (typeof carregarFichaDeArquivo === 'function') carregarFichaDeArquivo();
-        }
-      });
-      botoes.push({
-        id: 'btnDashboard',
-        classe: 'btn-secondary',
-        icone: 'fa-chart-line',
-        texto: 'Painel de Controle',
-        onClick: () => {
-          window.location.href = '/dashboard';
-        },
-        alinharDireita: true
-      });
-      botoes.push(botaoHomeHub);
-      botoes.push({
+      botoesEsquerda.push({ id: 'btnImprimir', classe: 'btn-secondary', extraClasse: 'btn-action-print', icone: 'fa-print', texto: 'Imprimir', onClick: acaoImprimir });
+      botoesCentro.push({ id: 'btnMenuAcoesFicha', isMenuAcoes: true });
+      botoesDireita.push({
         id: 'btnNovaFicha',
         classe: 'btn-primary',
         icone: 'fa-plus',
@@ -322,56 +294,47 @@
           window.location.href = '/ficha';
         }
       });
+      botoesDireita.push(botaoHomeHub);
     } else {
-      botoes.push({ id: 'btnSalvarDB', classe: 'btn-success', extraClasse: 'btn-action-save', icone: 'fa-save', texto: 'Salvar Ficha', onClick: salvarNoBanco });
-      botoes.push({ id: 'btnImprimir', classe: 'btn-secondary', extraClasse: 'btn-action-print', icone: 'fa-print', texto: 'Imprimir', onClick: acaoImprimir });
-      botoes.push({
-        id: 'btnBaixar',
-        classe: 'btn-secondary',
-        icone: 'fa-download',
-        texto: 'Baixar Ficha',
-        onClick: () => {
-          if (typeof salvarFicha === 'function') salvarFicha();
-        }
-      });
-      botoes.push({
-        id: 'btnCarregar',
-        classe: 'btn-warning',
-        icone: 'fa-upload',
-        texto: 'Carregar Ficha',
-        onClick: () => {
-          if (typeof carregarFichaDeArquivo === 'function') carregarFichaDeArquivo();
-        }
-      });
-      botoes.push({
-        id: 'btnDashboard',
-        classe: 'btn-secondary',
-        icone: 'fa-chart-line',
-        texto: 'Painel de Controle',
-        onClick: () => {
-          window.location.href = '/dashboard';
-        },
-        alinharDireita: true
-      });
-      botoes.push(botaoHomeHub);
+      botoesEsquerda.push({ id: 'btnSalvarDB', classe: 'btn-success', extraClasse: 'btn-action-save', icone: 'fa-save', texto: 'Salvar Ficha', onClick: salvarNoBanco });
+      botoesEsquerda.push({ id: 'btnImprimir', classe: 'btn-secondary', extraClasse: 'btn-action-print', icone: 'fa-print', texto: 'Imprimir', onClick: acaoImprimir });
+      botoesCentro.push({ id: 'btnMenuAcoesFicha', isMenuAcoes: true });
+      botoesDireita.push(botaoHomeHub);
     }
 
     containers.forEach(container => {
-      const usarIds = container === containerPrincipal;
-      botoes.forEach(botaoDef => {
-        const btn = criarBotao(usarIds ? botaoDef.id : '', botaoDef.classe, botaoDef.icone, botaoDef.texto, botaoDef.onClick, botaoDef.extraClasse);
-        if (botaoDef.id === 'btnSalvarDB') {
-          btn.dataset.action = 'save-db';
-          btn.dataset.defaultHtml = btn.innerHTML;
-        }
-        if (botaoDef.alinharDireita) btn.style.marginLeft = 'auto';
-        container.appendChild(btn);
-      });
+      const grupoEsquerda = document.createElement('div');
+      grupoEsquerda.className = 'ficha-toolbar-group ficha-toolbar-group--left';
+      const grupoCentro = document.createElement('div');
+      grupoCentro.className = 'ficha-toolbar-group ficha-toolbar-group--center';
+      const grupoDireita = document.createElement('div');
+      grupoDireita.className = 'ficha-toolbar-group ficha-toolbar-group--right';
 
-      if (container === containerTopo && !modoVisualizacao) {
-        const btnTemplate = criarBotaoCarregarTemplate();
-        container.appendChild(btnTemplate);
+      function adicionarItens(grupo, itens) {
+        itens.forEach(botaoDef => {
+          if (botaoDef.isMenuAcoes) {
+            grupo.appendChild(criarMenuAcoesFicha());
+            return;
+          }
+
+          const btn = criarBotao(botaoDef.id, botaoDef.classe, botaoDef.icone, botaoDef.texto, botaoDef.onClick, botaoDef.extraClasse);
+          if (botaoDef.id === 'btnSalvarDB') {
+            btn.dataset.action = 'save-db';
+            btn.dataset.defaultHtml = btn.innerHTML;
+          }
+          grupo.appendChild(btn);
+        });
       }
+
+      adicionarItens(grupoEsquerda, botoesEsquerda);
+      adicionarItens(grupoCentro, botoesCentro);
+      adicionarItens(grupoDireita, botoesDireita);
+
+      [grupoEsquerda, grupoCentro, grupoDireita].forEach(grupo => {
+        if (grupo.childElementCount > 0) {
+          container.appendChild(grupo);
+        }
+      });
     });
 
     if (salvamentoEmAndamento) {
@@ -405,170 +368,106 @@
     return btn;
   }
 
-  function obterLabelGola(valorGola) {
-    const valor = String(valorGola || '').trim().toLowerCase();
-    if (!valor) return 'Gola não definida';
-    return TEMPLATE_LABELS_GOLA[valor] || `Gola ${valor}`;
+  function fecharMenuAcoesFicha() {
+    if (!menuAcoesFichaState) return;
+    menuAcoesFichaState.tooltip.classList.remove('is-open');
+    menuAcoesFichaState.button.setAttribute('aria-expanded', 'false');
   }
 
-  function obterTituloTemplate(templateData, fileName) {
-    const produto =
-      templateData?.produtos?.[0]?.produto ||
-      templateData?.produtos?.[0]?.descricao ||
-      fileName.replace('.json', '').replace(/_/g, ' ');
-    return `${produto} | ${obterLabelGola(templateData?.gola)}`;
+  function abrirMenuAcoesFicha() {
+    if (!menuAcoesFichaState) return;
+    menuAcoesFichaState.tooltip.classList.add('is-open');
+    menuAcoesFichaState.button.setAttribute('aria-expanded', 'true');
   }
 
-  function gerarImagemTemplateHtml(fileName) {
-    const imageName = fileName.replace('.json', '.svg');
-    const imagePath = `img/template/${imageName}`;
-    return `<img src="${imagePath}" class="template-card-img" alt="Template" onerror="this.onerror=null; this.outerHTML='<i class=\\\'fas fa-tshirt template-fallback-icon\\\'></i>';">`;
+  function preencherConteudoMenuAcoes(menuContent) {
+    if (!menuContent) return;
+
+    menuContent.innerHTML = `
+      <button type="button" class="menu-acoes-ficha-item" data-action="carregar-ficha">
+        <i class="fas fa-upload" aria-hidden="true"></i>
+        <span>Carregar ficha</span>
+      </button>
+      <button type="button" class="menu-acoes-ficha-item" data-action="baixar-ficha">
+        <i class="fas fa-download" aria-hidden="true"></i>
+        <span>Baixar ficha</span>
+      </button>
+    `;
   }
 
-  function normalizarTemplateParaFormulario(templateData) {
-    const dados = JSON.parse(JSON.stringify(templateData || {}));
-    if (dados.imagens && !dados.imagensData) {
-      dados.imagensData = JSON.stringify(dados.imagens);
-    }
-    if (!dados.imagensData) {
-      dados.imagensData = '[]';
-    }
-    return dados;
-  }
-
-  async function carregarTemplatesDisponiveis() {
-    const templates = [];
-
-    for (const fileName of TEMPLATE_FILES) {
-      const response = await fetch(`data/templates/${fileName}`, { cache: 'no-cache' });
-      if (!response.ok) continue;
-
-      const data = await response.json();
-      templates.push({
-        fileName,
-        data,
-        title: obterTituloTemplate(data, fileName),
-        golaLabel: obterLabelGola(data?.gola),
-        svg: gerarImagemTemplateHtml(fileName)
-      });
-    }
-
-    return templates;
-  }
-
-  function fecharTooltipTemplate() {
-    if (!templateLoaderState) return;
-    templateLoaderState.tooltip.classList.remove('is-open');
-    templateLoaderState.button.setAttribute('aria-expanded', 'false');
-  }
-
-  function abrirTooltipTemplate() {
-    if (!templateLoaderState) return;
-    templateLoaderState.tooltip.classList.add('is-open');
-    templateLoaderState.button.setAttribute('aria-expanded', 'true');
-  }
-
-  function criarBotaoCarregarTemplate() {
+  function criarMenuAcoesFicha() {
     const wrapper = document.createElement('div');
-    wrapper.className = 'template-loader';
+    wrapper.className = 'menu-acoes-ficha';
 
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'btn btn-secondary';
-    button.id = 'btnCarregarTemplate';
-    button.innerHTML = '<i class="fas fa-layer-group"></i><span>Carregar template</span>';
+    button.id = 'btnMenuAcoesFicha';
+    button.innerHTML = '<i class="fas fa-ellipsis-h"></i><span>Mais ações</span>';
     button.setAttribute('aria-expanded', 'false');
     button.setAttribute('aria-haspopup', 'dialog');
 
     const tooltip = document.createElement('div');
-    tooltip.className = 'template-tooltip';
+    tooltip.className = 'menu-acoes-ficha-popover';
     tooltip.innerHTML = `
-      <div class="template-tooltip-header">
-        <strong>Templates prontos</strong>
-        <span>Escolha para preencher o formulário</span>
+      <div class="menu-acoes-ficha-header">
+        <strong>Ações da ficha</strong>
+        <span>Escolha uma ação complementar</span>
       </div>
-      <div class="template-tooltip-content"></div>
+      <div class="menu-acoes-ficha-content"></div>
     `;
 
     wrapper.appendChild(button);
     wrapper.appendChild(tooltip);
 
-    templateLoaderState = {
+    menuAcoesFichaState = {
       wrapper,
       button,
-      tooltip,
-      carregado: false
+      tooltip
     };
 
-    button.addEventListener('click', async (event) => {
+    const content = tooltip.querySelector('.menu-acoes-ficha-content');
+    preencherConteudoMenuAcoes(content);
+
+    button.addEventListener('click', (event) => {
       event.stopPropagation();
       const aberto = tooltip.classList.contains('is-open');
       if (aberto) {
-        fecharTooltipTemplate();
+        fecharMenuAcoesFicha();
         return;
       }
 
-      abrirTooltipTemplate();
+      abrirMenuAcoesFicha();
+    });
 
-      if (templateLoaderState.carregado) return;
+    tooltip.addEventListener('click', (event) => {
+      const actionButton = event.target.closest('.menu-acoes-ficha-item');
+      if (!actionButton) return;
 
-      const content = tooltip.querySelector('.template-tooltip-content');
-      if (!content) return;
+      const action = actionButton.dataset.action || '';
+      if (action === 'carregar-ficha') {
+        fecharMenuAcoesFicha();
+        if (typeof carregarFichaDeArquivo === 'function') carregarFichaDeArquivo();
+        return;
+      }
 
-      content.innerHTML = `<div class="template-loader-status">
-          <i class="fas fa-spinner fa-spin"></i>
-          Carregando templates...
-        </div>`;
-
-      try {
-        const templates = await carregarTemplatesDisponiveis();
-        content.innerHTML = '';
-
-        if (!templates.length) {
-          content.innerHTML = '<div class="template-loader-status">Nenhum template encontrado.</div>';
-          templateLoaderState.carregado = true;
-          return;
-        }
-
-        templates.forEach(template => {
-          const card = document.createElement('button');
-          card.type = 'button';
-          card.className = 'template-card';
-          card.innerHTML = `
-            <div class="template-card-preview">${template.svg}</div>
-            <div class="template-card-title">${template.title}</div>
-          `;
-
-          card.addEventListener('click', () => {
-            const dados = normalizarTemplateParaFormulario(template.data);
-            preencherFormulario(dados);
-            if (typeof window.atualizarDataInicioDeTemplate === 'function') {
-              window.atualizarDataInicioDeTemplate();
-            }
-            fecharTooltipTemplate();
-            mostrarToast(`Template "${template.title}" carregado.`, 'success');
-          });
-
-          content.appendChild(card);
-        });
-
-        templateLoaderState.carregado = true;
-      } catch (error) {
-        content.innerHTML = '<div class="template-loader-status">Erro ao carregar templates.</div>';
+      if (action === 'baixar-ficha') {
+        fecharMenuAcoesFicha();
+        if (typeof salvarFicha === 'function') salvarFicha();
       }
     });
 
-    if (!window.__templateTooltipClickHandler) {
-      window.__templateTooltipClickHandler = true;
+    if (!window.__menuAcoesFichaClickHandler) {
+      window.__menuAcoesFichaClickHandler = true;
 
       document.addEventListener('click', (event) => {
-        if (!templateLoaderState) return;
-        if (templateLoaderState.wrapper.contains(event.target)) return;
-        fecharTooltipTemplate();
+        if (!menuAcoesFichaState) return;
+        if (menuAcoesFichaState.wrapper.contains(event.target)) return;
+        fecharMenuAcoesFicha();
       });
 
       document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') fecharTooltipTemplate();
+        if (event.key === 'Escape') fecharMenuAcoesFicha();
       });
     }
 
@@ -849,16 +748,6 @@
         throw new Error('Falha ao preparar duplicação');
       }
 
-      const fichaOrigemId = Number.parseInt(String(fichaAtualId || ''), 10);
-      if (window.SystemLog && typeof window.SystemLog.track === 'function') {
-        window.SystemLog.track(
-          'ficha_duplicada',
-          'Ficha duplicada',
-          Number.isInteger(fichaOrigemId) && fichaOrigemId > 0 ? fichaOrigemId : null,
-          { origem: '/ficha' }
-        );
-      }
-
     } catch (error) {
       mostrarToast('Erro ao duplicar ficha', 'error');
     }
@@ -871,6 +760,11 @@
 
     let dados = null;
     try {
+      if (typeof window.hasPendingImageUploads === 'function' && window.hasPendingImageUploads()) {
+        mostrarToast('Aguarde o envio das imagens terminar para salvar a ficha.', 'warning');
+        return;
+      }
+
       dados = coletarDadosFormulario();
 
       if (!validarCamposObrigatorios(dados)) {
@@ -896,7 +790,7 @@
         novaUrl.searchParams.set('editar', id);
         window.history.replaceState({}, '', novaUrl);
 
-        atualizarTituloEdicao(fichaAtualId, dados.cliente);
+        atualizarTituloEdicao(fichaAtualId, dados.cliente, dados.clienteAuxiliar);
 
         configurarBotoesAcao();
       }
@@ -962,6 +856,19 @@
       return false;
     }
 
+    const invalidProductRow = window.fichaProductUtils?.findFirstInvalidProductRow?.();
+    if (invalidProductRow) {
+      mostrarToast(`Informe o produto na linha ${invalidProductRow.index + 1}.`, 'error');
+      invalidProductRow.row.querySelector('.produto')?.focus();
+      return false;
+    }
+
+    const produtosValidos = window.fichaProductUtils?.collectProductsFromTable?.() || [];
+    if (produtosValidos.length === 0) {
+      mostrarToast('Adicione pelo menos um produto para salvar a ficha.', 'error');
+      document.querySelector('#produtosTable .produto')?.focus();
+      return false;
+    }
     return true;
   }
 
@@ -1046,12 +953,23 @@
     const isPolo = gola === 'polo' || gola === 'v_polo';
     const isSocial = gola === 'social';
     const temGola = gola !== '';
+    const isRegataAtivo = typeof window.isModoRegataAtivo === 'function' && window.isModoRegataAtivo();
+    const viesVal = document.getElementById('vies')?.value || '';
+    const acabamentoManga = isRegataAtivo
+      ? (viesVal === 'sim' ? 'vies' : '')
+      : (document.getElementById('acabamentoManga')?.value || '');
+    const temAcabamentoMangaExtra = isRegataAtivo
+      ? (viesVal === 'sim')
+      : (acabamentoManga.startsWith('punho') || acabamentoManga.includes('vies'));
+    const larguraManga = temAcabamentoMangaExtra ? (document.getElementById('larguraManga')?.value || '') : '';
+    const corAcabamentoManga = temAcabamentoMangaExtra ? (document.getElementById('corAcabamentoManga')?.value || '') : '';
     const reforcoGola = (temGola && !isSocial) ? (document.getElementById('reforcoGola')?.value || 'nao') : 'nao';
     const aberturaLateral = isPolo ? (document.getElementById('aberturaLateral')?.value || 'nao') : 'nao';
     const observacoes = coletarObservacoesFormulario();
 
     const dados = {
       cliente: document.getElementById('cliente')?.value || '',
+      clienteAuxiliar: document.getElementById('clienteAuxiliar')?.value || '',
       vendedor: document.getElementById('vendedor')?.value || '',
       dataInicio: document.getElementById('dataInicio')?.value || '',
       numeroVenda: document.getElementById('numeroVenda')?.value || '',
@@ -1062,9 +980,9 @@
       composicao: document.getElementById('composicao')?.value || '',
       corMaterial: document.getElementById('corMaterial')?.value || '',
       manga: document.getElementById('manga')?.value || '',
-      acabamentoManga: document.getElementById('acabamentoManga')?.value || '',
-      larguraManga: document.getElementById('larguraManga')?.value || '',
-      corAcabamentoManga: document.getElementById('corAcabamentoManga')?.value || '',
+      acabamentoManga,
+      larguraManga,
+      corAcabamentoManga,
       gola,
       corGola: (temGola && !isSocial) ? (document.getElementById('corGola')?.value || '') : '',
       acabamentoGola: (isPolo || isSocial) ? '' : (document.getElementById('acabamentoGola')?.value || ''),
@@ -1096,21 +1014,11 @@
   }
 
   function coletarProdutos() {
-    const produtos = [];
-    const rows = document.querySelectorAll('#produtosTable tr');
+    if (window.fichaProductUtils?.collectProductsFromTable) {
+      return window.fichaProductUtils.collectProductsFromTable();
+    }
 
-    rows.forEach(row => {
-      const tamanho = row.querySelector('.tamanho')?.value || '';
-      const quantidade = row.querySelector('.quantidade')?.value || '';
-      const produto = row.querySelector('.produto')?.value || row.querySelector('.descricao')?.value || '';
-      const detalhesProduto = row.querySelector('.detalhes-produto')?.value || '';
-
-      if (tamanho || quantidade || produto || detalhesProduto) {
-        produtos.push({ tamanho, quantidade, produto, detalhesProduto, descricao: produto });
-      }
-    });
-
-    return produtos;
+    return [];
   }
 
   async function verificarParametrosURL() {
@@ -1205,7 +1113,7 @@
         configurarBotoesAcao();
       }, 100);
 
-      atualizarTituloEdicao(id, ficha.cliente);
+      atualizarTituloEdicao(id, ficha.cliente, ficha.clienteAuxiliar ?? ficha.cliente_auxiliar);
 
     } catch (error) {
       mostrarToast('Erro ao carregar ficha para edição', 'error');
@@ -1269,9 +1177,10 @@
   function preencherFormulario(ficha) {
     window.__preenchendoFicha = true;
     const observacoesSalvas = ficha.observacoesHtml || ficha.observacoes || '';
+    const acabamentoMangaFicha = String(ficha.acabamentoManga ?? ficha.acabamento_manga ?? '').trim();
 
     const camposTexto = [
-      'cliente', 'vendedor', 'dataInicio', 'numeroVenda',
+      'cliente', 'clienteAuxiliar', 'vendedor', 'dataInicio', 'numeroVenda',
       'dataEntrega', 'evento', 'material', 'composicao',
       'corMaterial', 'manga', 'acabamentoManga', 'larguraManga', 'corAcabamentoManga',
       'gola', 'corGola', 'acabamentoGola', 'larguraGola',
@@ -1321,8 +1230,15 @@
 
                 if (selectTamanho) selectTamanho.value = produto.tamanho || '';
                 if (inputQuantidade) inputQuantidade.value = produto.quantidade || '';
-                if (inputProduto) inputProduto.value = produtoPrincipal;
-                if (inputDetalhesProduto) inputDetalhesProduto.value = detalhesProduto;
+                if (inputProduto) {
+                  inputProduto.value = produtoPrincipal;
+                  inputProduto.dispatchEvent(new Event('input', { bubbles: true }));
+                  inputProduto.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (inputDetalhesProduto) {
+                  inputDetalhesProduto.value = detalhesProduto;
+                  inputDetalhesProduto.dispatchEvent(new Event('input', { bubbles: true }));
+                }
               }
             }
           });
@@ -1386,9 +1302,18 @@
       selectComNomes.value = valorSalvo !== COM_NOMES_VALOR_NENHUM ? valorSalvo : valorPorTexto;
     }
 
+    const viesSelect = document.getElementById('vies');
+    if (viesSelect) {
+      viesSelect.value = acabamentoMangaFicha.toLowerCase().includes('vies') ? 'sim' : '';
+    }
+
     // Mostrar campos condicionais
     setTimeout(() => {
-      const acabamentoMangaVal = String(ficha.acabamentoManga || '').trim().toLowerCase();
+      if (typeof window.atualizarControlesMangaPorProduto === 'function') {
+        window.atualizarControlesMangaPorProduto();
+      }
+
+      const acabamentoMangaVal = acabamentoMangaFicha.toLowerCase();
       const temAcabamentoMangaExtra = acabamentoMangaVal.startsWith('punho') || acabamentoMangaVal.includes('vies');
       if (temAcabamentoMangaExtra) {
         const larguraMangaContainer = document.getElementById('larguraMangaContainer');

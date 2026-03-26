@@ -246,7 +246,7 @@
 
   async function deleteImage(publicId, options = {}) {
     try {
-      const { excludeFichaId = null } = options;
+      const { excludeFichaId = null, silent = false } = options;
       const safePublicId = publicId.replace(/\//g, '_SLASH_');
       const query = excludeFichaId ? `?excludeFichaId=${encodeURIComponent(excludeFichaId)}` : '';
 
@@ -258,28 +258,28 @@
 
       if (response.ok) {
         if (responseData.shared) {
-          mostrarAviso('Imagem compartilhada: removida apenas desta ficha. A ficha original não foi alterada.');
+          if (!silent) mostrarAviso('Imagem compartilhada: removida apenas desta ficha. A ficha original nao foi alterada.');
           return { success: true, shared: true };
         }
 
         if (responseData.notFound) {
-          mostrarAviso('Imagem removida desta ficha. O arquivo já não existia na nuvem.');
+          if (!silent) mostrarAviso('Imagem removida desta ficha. O arquivo ja nao existia na nuvem.');
           return { success: true, notFound: true };
         }
 
-        mostrarSucesso('Imagem removida com sucesso!');
+        if (!silent) mostrarSucesso('Imagem removida com sucesso!');
         return { success: true };
       }
 
       if (response.status === 409 || responseData.shared) {
-          mostrarAviso('Imagem compartilhada: removida apenas desta ficha. A ficha original não foi alterada.');
+          if (!silent) mostrarAviso('Imagem compartilhada: removida apenas desta ficha. A ficha original nao foi alterada.');
           return { success: true, shared: true };
       }
 
       throw new Error(responseData.error || 'Erro ao deletar imagem');
 
     } catch (error) {
-      mostrarErro(`Erro ao remover: ${error.message}`);
+      if (!silent) mostrarErro(`Erro ao remover: ${error.message}`);
       return { success: false, error: error.message };
     }
   }

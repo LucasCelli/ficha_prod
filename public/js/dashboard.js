@@ -53,7 +53,7 @@
     try {
       await db.init();
       criarPaginacao();
-      initEventListeners(); // CORREÇÃO: Inicializar listeners ANTES de carregar dados
+      initEventListeners(); // CORRECAO: Inicializar listeners antes de carregar dados
       verificarParametrosURL();
       await carregarFichas({ resetPage: true });
       await atualizarEstatisticas();
@@ -347,10 +347,13 @@
       link.addEventListener('click', e => {
         e.preventDefault();
         const card = link.closest('.ficha-item');
-        const btnVisualizar = card?.querySelector('.btn-visualizar');
-        if (btnVisualizar instanceof HTMLButtonElement) {
-          btnVisualizar.click();
+        const botaoVisualizar = card?.querySelector('.btn-visualizar');
+        if (botaoVisualizar) {
+          botaoVisualizar.click();
+          return;
         }
+        const id = parseInt(link.dataset.id);
+        if (!Number.isNaN(id)) visualizarFicha(id);
       });
     });
 
@@ -433,12 +436,14 @@
   function criarCardFicha(ficha) {
     const dataInicio = ficha.data_inicio ? formatarData(ficha.data_inicio) : '-';
     const dataEntrega = ficha.data_entrega ? formatarData(ficha.data_entrega) : '-';
-    const totalItens = calcularTotalItens(ficha.produtos || []);
+    const totalItens = Number.isFinite(Number(ficha.totalItens))
+      ? Number(ficha.totalItens)
+      : calcularTotalItens(ficha.produtos || []);
     const isEvento = ficha.evento === 'sim';
     const isPendente = ficha.status === 'pendente';
     const diasAtraso = calcularDiasAtraso(ficha.data_entrega, ficha.status);
     const miniaturaSrc = obterMiniaturaFicha(ficha);
-    const clienteFormatado = capitalizeFirstLetter(ficha.cliente);
+    const clienteFormatado = formatarNomeClienteFicha(ficha);
     const vendedorFormatado = capitalizeFirstLetter(ficha.vendedor);
     const personalizacaoLabel = getPersonalizacaoLabel(ficha.arte);
 
@@ -452,7 +457,7 @@
       </div>
       <div class="ficha-main">
         <div class="ficha-header">
-          <a class="ficha-cliente ficha-cliente-link" href="/ficha?visualizar=${ficha.id}" data-id="${ficha.id}" title="Visualizar ficha">
+          <a class="ficha-cliente ficha-cliente-link" href="/ficha?visualizar=${ficha.id}" data-id="${ficha.id}" data-skip-nav-intercept="true" title="Visualizar ficha">
             ${clienteFormatado || 'Cliente não informado'}
           </a>
           ${diasAtraso > 0 ? `
@@ -1071,10 +1076,6 @@
         throw new Error('Falha ao salvar rascunho da duplicacao');
       }
 
-      if (window.SystemLog && typeof window.SystemLog.track === 'function') {
-        window.SystemLog.track('ficha_duplicada', 'Ficha duplicada', Number(fichaVisualizadaId) || null, { origem: 'dashboard_modal' });
-      }
-
       window.location.href = '/ficha?duplicar=1';
     } catch (error) {
       console.error('Erro ao duplicar ficha pelo modal:', error);
@@ -1375,12 +1376,31 @@
           .split(/([-/])/)
           .map(parte => {
             if (!parte || parte === '-' || parte === '/') return parte;
-            if (index > 0 && ['de', 'da', 'do', 'das', 'dos', 'e'].includes(parte)) return parte;
-            return parte.charAt(0).toUpperCase() + parte.slice(1);
+            if (index > 0 && ['de', 'da', 'do', 'das', 'dos', 'e', 'o'].includes(parte)) return parte;
+            return parte.replace(/^([^A-Za-zÀ-ÿ]*)([A-Za-zÀ-ÿ])/, (_, prefixo, letra) => prefixo + letra.toUpperCase());
           })
           .join('');
       })
       .join(' ');
+  }
+
+  function formatarNomeClienteFicha(ficha) {
+    if (window.appUtils && typeof window.appUtils.formatClientDisplayName === 'function') {
+      return capitalizeFirstLetter(window.appUtils.formatClientDisplayName(
+        ficha?.cliente,
+        ficha?.cliente_auxiliar || ficha?.clienteAuxiliar,
+        ficha?.cliente_exibicao || ficha?.clienteExibicao
+      ));
+    }
+
+    const nomeExibicao = String(ficha?.cliente_exibicao || '').trim();
+    if (nomeExibicao) return capitalizeFirstLetter(nomeExibicao);
+
+    const nomeBase = String(ficha?.cliente || '').trim().replace(/\s+/g, ' ');
+    const nomeAuxiliar = String(ficha?.cliente_auxiliar || ficha?.clienteAuxiliar || '').trim().replace(/\s+/g, ' ');
+    if (!nomeBase) return nomeAuxiliar;
+    if (!nomeAuxiliar) return capitalizeFirstLetter(nomeBase);
+    return capitalizeFirstLetter(`${nomeBase} (${nomeAuxiliar})`.replace(' )', ')'));
   }
 
   function calcularTotalItens(produtos) {
@@ -1393,6 +1413,13 @@
   }
 
   function obterMiniaturaFicha(ficha) {
+    const thumbSrc = String(ficha.thumbSrc || ficha.thumb_src || '').trim();
+    if (thumbSrc) return thumbSrc;
+
+    if (!('imagens_data' in (ficha || {})) && !('imagensData' in (ficha || {}))) {
+      return '';
+    }
+
     const imagens = extrairImagensFicha(ficha);
     if (!Array.isArray(imagens) || imagens.length === 0) return '';
 

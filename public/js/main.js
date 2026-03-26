@@ -3,6 +3,10 @@
 
   const CATALOG_URL = 'data/catalogo.json';
   const MAX_IMAGES = 4;
+  const IMAGE_UPLOAD_PENDING_MESSAGE = 'Aguarde o envio das imagens terminar para salvar a ficha.';
+  const IMAGE_UPLOAD_TOAST_ID = 'image-upload-progress';
+  const IMAGE_DELETE_TOAST_ID = 'image-delete-progress';
+  const PRINT_PREPARING_TOAST_ID = 'print-preparing-progress';
 
   let catalog = {
     tamanhos: [],
@@ -21,6 +25,59 @@
   let alertaLimiteProdutosFechado = false;
   let alertaProdutosMesmoTamanhoFechado = false;
   let fichaVisualizacaoDireta = null;
+
+  function readProductRowData(row) {
+    if (!row) {
+      return {
+        tamanho: '',
+        quantidade: '',
+        produto: '',
+        detalhesProduto: '',
+        temConteudo: false
+      };
+    }
+
+    const tamanho = String(row.querySelector('.tamanho')?.value || '').trim();
+    const quantidade = String(row.querySelector('.quantidade')?.value || '').trim();
+    const produto = String(row.querySelector('.produto')?.value || row.querySelector('.descricao')?.value || '').trim();
+    const detalhesProduto = String(row.querySelector('.detalhes-produto')?.value || '').trim();
+    const temConteudo = Boolean(tamanho || produto || detalhesProduto || (quantidade && quantidade !== '1'));
+
+    return { tamanho, quantidade, produto, detalhesProduto, temConteudo };
+  }
+
+  function collectProductsFromTable(selector = '#produtosTable tr') {
+    return Array.from(document.querySelectorAll(selector))
+      .map(readProductRowData)
+      .filter(item => item.temConteudo)
+      .map(({ tamanho, quantidade, produto, detalhesProduto }) => ({
+        tamanho,
+        quantidade,
+        produto,
+        detalhesProduto,
+        descricao: produto
+      }));
+  }
+
+  function findFirstInvalidProductRow(selector = '#produtosTable tr') {
+    const rows = Array.from(document.querySelectorAll(selector));
+    for (let index = 0; index < rows.length; index += 1) {
+      const dados = readProductRowData(rows[index]);
+      if (dados.produto) continue;
+      return {
+        index,
+        row: rows[index],
+        ...dados
+      };
+    }
+    return null;
+  }
+
+  window.fichaProductUtils = Object.freeze({
+    readProductRowData,
+    collectProductsFromTable,
+    findFirstInvalidProductRow
+  });
 
   function valorEhSim(valor) {
     if (valor === true || valor === 1) return true;
@@ -107,17 +164,45 @@
       .filter(Boolean);
   }
 
+  function extrairClienteLegado(cliente, clienteAuxiliar) {
+    const nomeOriginal = String(cliente || '').trim().replace(/\s+/g, ' ');
+    const auxiliarOriginal = String(clienteAuxiliar || '').trim().replace(/\s+/g, ' ');
+    if (auxiliarOriginal) return { cliente: nomeOriginal, clienteAuxiliar: auxiliarOriginal };
+
+    const legacyMatch = nomeOriginal.match(/^(.*)\(([^()]+)\)\s*$/);
+    if (!legacyMatch) return { cliente: nomeOriginal, clienteAuxiliar: "" };
+
+    const nomeBase = String(legacyMatch[1] || '').trim().replace(/\s+/g, ' ');
+    const nomeAux = String(legacyMatch[2] || '').trim().replace(/\s+/g, ' ');
+    if (!nomeBase || !nomeAux) return { cliente: nomeOriginal, clienteAuxiliar: "" };
+
+    return { cliente: nomeBase, clienteAuxiliar: nomeAux };
+  }
+
   function normalizarFichaVisualizacao(ficha) {
-    if (!ficha || typeof ficha !== 'object') return null;
+    if (!ficha || typeof ficha !== "object") return null;
 
     const imagens = normalizarImagensFicha(ficha);
-    const observacoesHtml = String(obterValorFicha(ficha, 'observacoesHtml', '') || '');
-    const observacoesPlainText = String(obterValorFicha(ficha, 'observacoesPlainText', '') || '');
-    const observacoes = String(obterValorFicha(ficha, 'observacoes', '') || observacoesHtml || observacoesPlainText || '');
+    const observacoesHtml = String(obterValorFicha(ficha, "observacoesHtml", "") || "");
+    const observacoesPlainText = String(obterValorFicha(ficha, "observacoesPlainText", "") || "");
+    const observacoes = String(obterValorFicha(ficha, "observacoes", "") || observacoesHtml || observacoesPlainText || "");
+    const clienteLegado = extrairClienteLegado(
+      obterValorFicha(ficha, 'cliente', ''),
+      obterValorFicha(ficha, 'clienteAuxiliar', obterValorFicha(ficha, 'cliente_auxiliar', ''))
+    );
+    const clienteExibicao = window.appUtils && typeof window.appUtils.formatClientDisplayName === 'function'
+      ? window.appUtils.formatClientDisplayName(
+        clienteLegado.cliente,
+        clienteLegado.clienteAuxiliar,
+        obterValorFicha(ficha, 'clienteExibicao', obterValorFicha(ficha, 'cliente_exibicao', ''))
+      )
+      : String(obterValorFicha(ficha, 'clienteExibicao', obterValorFicha(ficha, 'cliente_exibicao', '')) || '');
 
     return {
       id: obterValorFicha(ficha, 'id', ''),
-      cliente: String(obterValorFicha(ficha, 'cliente', '') || ''),
+      cliente: String(clienteLegado.cliente || ""),
+      clienteAuxiliar: String(clienteLegado.clienteAuxiliar || ""),
+      clienteExibicao: String(clienteExibicao || ''),
       vendedor: String(obterValorFicha(ficha, 'vendedor', '') || ''),
       dataInicio: String(obterValorFicha(ficha, 'dataInicio', '') || ''),
       numeroVenda: String(obterValorFicha(ficha, 'numeroVenda', '') || ''),
@@ -214,8 +299,7 @@
 
   async function uploadToCloudinary(base64Data) {
     if (!cloudinaryConfig) {
-      console.warn('Cloudinary não configurado, mantendo base64');
-      return { success: true, url: base64Data, isBase64: true };
+      throw new Error('Cloudinary não configurado. O upload de imagens está indisponível.');
     }
 
     try {
@@ -245,7 +329,7 @@
       };
     } catch (error) {
       console.error('[cloudinary] Erro no upload:', error);
-      return { success: true, url: base64Data, isBase64: true };
+      throw new Error('Falha ao enviar imagem para o Cloudinary.');
     }
   }
 
@@ -257,6 +341,7 @@
     await loadCloudinaryConfig();
     await loadCatalog();
     initDefaultDates();
+    initDatePickerInteractions();
     initEventoAlert();
     initCatalogInUI();
     initProductTable();
@@ -341,12 +426,24 @@
           .split(/([-/])/)
           .map(parte => {
             if (!parte || parte === '-' || parte === '/') return parte;
-            if (index > 0 && ['de', 'da', 'do', 'das', 'dos', 'e'].includes(parte)) return parte;
-            return parte.charAt(0).toUpperCase() + parte.slice(1);
+            if (index > 0 && ['de', 'da', 'do', 'das', 'dos', 'e', 'o'].includes(parte)) return parte;
+            return parte.replace(/^([^A-Za-zÀ-ÿ]*)([A-Za-zÀ-ÿ])/, (_, prefixo, letra) => prefixo + letra.toUpperCase());
           })
           .join('');
       })
       .join(' ');
+  }
+
+  function formatarNomeClienteExibicao(cliente, clienteAuxiliar) {
+    if (window.appUtils && typeof window.appUtils.formatClientDisplayName === 'function') {
+      return window.appUtils.formatClientDisplayName(cliente, clienteAuxiliar);
+    }
+
+    const nomeBase = String(cliente || '').trim().replace(/\s+/g, ' ');
+    const nomeAuxiliar = String(clienteAuxiliar || '').trim().replace(/\s+/g, ' ');
+    if (!nomeBase) return nomeAuxiliar;
+    if (!nomeAuxiliar) return nomeBase;
+    return `${nomeBase} (${nomeAuxiliar})`.replace(' )', ')');
   }
 
   function normalizarProdutoParaRegra(valor) {
@@ -359,7 +456,8 @@
   }
 
   function produtoEhRegata(valor) {
-    return normalizarProdutoParaRegra(valor).includes('regata');
+    const produtoNormalizado = normalizarProdutoParaRegra(valor);
+    return produtoNormalizado.includes('regata') || produtoNormalizado.includes('colete');
   }
 
   const PRODUTO_MATERIAL_HELANCA = normalizarProdutoParaRegra('Calça de Helanca');
@@ -613,6 +711,33 @@
     if (dataInicio && !dataInicio.value) {
       dataInicio.value = hojeStr;
     }
+  }
+
+  function initDatePickerInteractions() {
+    const dateInputs = Array.from(document.querySelectorAll('input[type="date"]'));
+    if (dateInputs.length === 0) return;
+
+    const isTouchDevice = window.matchMedia?.('(pointer: coarse)')?.matches
+      || navigator.maxTouchPoints > 0
+      || navigator.msMaxTouchPoints > 0;
+    if (!isTouchDevice) return;
+
+    dateInputs.forEach(input => {
+      if (input.dataset.datePickerEnhanced === 'true') return;
+      input.dataset.datePickerEnhanced = 'true';
+
+      const abrirCalendario = () => {
+        if (typeof input.showPicker !== 'function') return;
+        try {
+          input.showPicker();
+        } catch (_) {
+          // Ignora navegadores que bloqueiam o showPicker fora do gesto do usuario.
+        }
+      };
+
+      input.addEventListener('click', abrirCalendario);
+      input.addEventListener('focus', abrirCalendario);
+    });
   }
 
   function initEventoAlert() {
@@ -1651,6 +1776,8 @@
   // Múltiplas Imagens
 
   function initMultipleImages() {
+    let activeImageUploadCount = 0;
+    let activeImageDeleteCount = 0;
     const dropArea = document.getElementById('imageUpload');
     const fileInput = document.getElementById('fileInput');
     const container = document.getElementById('imagesContainer');
@@ -1676,40 +1803,78 @@
       imagens.forEach((img, index) => {
         const card = document.createElement('div');
         card.className = 'image-card';
-        card.draggable = true;
+        if (img.isPending) card.classList.add('is-uploading');
+        if (img.uploadError) card.classList.add('has-upload-error');
+        card.draggable = false;
         card.dataset.index = index;
 
+        const statusMarkup = img.isPending
+          ? `
+            <div class="image-upload-status" aria-live="polite">
+              <i class="fas fa-rotate fa-spin" aria-hidden="true"></i>
+              Enviando...
+            </div>
+          `
+          : img.uploadError
+            ? `
+              <div class="image-upload-status is-error" aria-live="polite">
+                <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                Falha no upload
+              </div>
+            `
+            : '';
+
         card.innerHTML = `
-          <div class="image-wrapper">
+          <div class="image-wrapper" draggable="true">
             <span class="image-number">${index + 1}</span>
             <img src="${img.src}" alt="Imagem ${index + 1}" draggable="false">
-            <button type="button" class="image-delete-btn" title="Remover imagem">
-              <i class="fas fa-times"></i>
+            <button type="button" class="image-delete-btn" title="Deletar layout">
+              <i class="fas fa-trash" aria-hidden="true"></i>
+              <span>Deletar layout</span>
             </button>
             <div class="image-drag-handle">
               <i class="fas fa-grip-horizontal"></i>
               Arrastar
             </div>
+            ${statusMarkup}
           </div>
           <div class="image-description">
-            <input type="text" placeholder="Descrição da imagem (opcional)" value="${img.descricao || ''}" data-index="${index}">
+            <input type="text" placeholder="Descrição da imagem (opcional)" value="${img.descricao || ''}" data-index="${index}" draggable="false" ${img.isPending ? 'disabled' : ''}>
           </div>
         `;
 
         container.appendChild(card);
 
-        card.querySelector('.image-delete-btn').addEventListener('click', () => {
-          imagens.splice(index, 1);
-          renderizarImagens();
-          atualizarContador();
+        card.querySelector('.image-delete-btn').addEventListener('click', async () => {
+          await removerImagem(index);
         });
 
-        card.querySelector('input').addEventListener('input', (e) => {
-          imagens[index].descricao = e.target.value;
+        const imageWrapper = card.querySelector('.image-wrapper');
+        const descricaoInput = card.querySelector('input');
+
+        card.querySelector('.image-description').addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+        });
+        card.querySelector('.image-description').addEventListener('dragstart', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
         });
 
-        card.addEventListener('dragstart', handleImageDragStart);
-        card.addEventListener('dragend', handleImageDragEnd);
+        descricaoInput.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+        });
+        descricaoInput.addEventListener('dragstart', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        });
+        descricaoInput.addEventListener('input', (e) => {
+          if (imagens[index]) {
+            imagens[index].descricao = e.target.value;
+          }
+        });
+
+        imageWrapper.addEventListener('dragstart', handleImageDragStart);
+        imageWrapper.addEventListener('dragend', handleImageDragEnd);
         card.addEventListener('dragover', handleImageDragOver);
         card.addEventListener('drop', handleImageDrop);
         card.addEventListener('dragleave', handleImageDragLeave);
@@ -1721,13 +1886,44 @@
     let draggedImageIndex = null;
 
     function handleImageDragStart(e) {
-      draggedImageIndex = parseInt(e.currentTarget.dataset.index);
-      e.currentTarget.classList.add('dragging');
+      if (e.target.closest('.image-delete-btn, .image-upload-status')) {
+        e.preventDefault();
+        return;
+      }
+      const card = e.currentTarget.closest('.image-card');
+      if (!card) {
+        e.preventDefault();
+        return;
+      }
+      draggedImageIndex = parseInt(card.dataset.index);
+      card.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
+
+      const wrapper = card.querySelector('.image-wrapper');
+      if (wrapper && typeof e.dataTransfer?.setDragImage === 'function') {
+        const dragPreview = wrapper.cloneNode(true);
+        dragPreview.style.position = 'fixed';
+        dragPreview.style.top = '-9999px';
+        dragPreview.style.left = '-9999px';
+        dragPreview.style.width = `${wrapper.offsetWidth}px`;
+        dragPreview.style.maxHeight = 'none';
+        dragPreview.style.opacity = '1';
+        dragPreview.style.transform = 'none';
+        dragPreview.style.pointerEvents = 'none';
+        dragPreview.style.borderRadius = '24px';
+        dragPreview.style.overflow = 'hidden';
+        dragPreview.style.boxShadow = 'var(--shadow-xl)';
+        document.body.appendChild(dragPreview);
+        e.dataTransfer.setDragImage(dragPreview, dragPreview.offsetWidth / 2, dragPreview.offsetHeight / 2);
+        setTimeout(() => {
+          dragPreview.remove();
+        }, 0);
+      }
     }
 
     function handleImageDragEnd(e) {
-      e.currentTarget.classList.remove('dragging');
+      const card = e.currentTarget.closest('.image-card');
+      if (card) card.classList.remove('dragging');
       document.querySelectorAll('.image-card').forEach(card => {
         card.classList.remove('drag-over');
       });
@@ -1762,25 +1958,222 @@
       }
     }
 
-    // CORREÇÃO: Adicionar imagem com upload para Cloudinary
-    async function adicionarImagem(src, descricao = '') {
+    function toastImagem(message, type = 'info') {
+      if (typeof window.mostrarToast === 'function') {
+        window.mostrarToast(message, type);
+        return;
+      }
+      alert(message);
+    }
+
+    function mostrarToastCarregando(message, id) {
+      if (window.toast && typeof window.toast.loading === 'function') {
+        window.toast.loading(message, { id });
+        return;
+      }
+      toastImagem(message, 'info');
+    }
+
+    function fecharToastCarregando(id) {
+      if (window.toast && typeof window.toast.dismiss === 'function') {
+        window.toast.dismiss(id);
+      }
+    }
+
+    function atualizarToastUpload() {
+      if (activeImageUploadCount > 0) {
+        const message = activeImageUploadCount === 1
+          ? 'Enviando imagem...'
+          : `Enviando ${activeImageUploadCount} imagens...`;
+        mostrarToastCarregando(message, IMAGE_UPLOAD_TOAST_ID);
+        return;
+      }
+
+      fecharToastCarregando(IMAGE_UPLOAD_TOAST_ID);
+    }
+
+    function atualizarToastDelete() {
+      if (activeImageDeleteCount > 0) {
+        const message = activeImageDeleteCount === 1
+          ? 'Deletando imagem...'
+          : `Deletando ${activeImageDeleteCount} imagens...`;
+        mostrarToastCarregando(message, IMAGE_DELETE_TOAST_ID);
+        return;
+      }
+
+      fecharToastCarregando(IMAGE_DELETE_TOAST_ID);
+    }
+
+    function iniciarUploadImagem() {
+      activeImageUploadCount += 1;
+      atualizarToastUpload();
+    }
+
+    function finalizarUploadImagem() {
+      activeImageUploadCount = Math.max(0, activeImageUploadCount - 1);
+      atualizarToastUpload();
+    }
+
+    function iniciarDeleteImagem() {
+      activeImageDeleteCount += 1;
+      atualizarToastDelete();
+    }
+
+    function finalizarDeleteImagem() {
+      activeImageDeleteCount = Math.max(0, activeImageDeleteCount - 1);
+      atualizarToastDelete();
+    }
+
+    async function removerImagem(index) {
+      const imagem = imagens[index];
+      if (!imagem) return;
+
+      if (imagem.isPending) {
+        toastImagem('Aguarde o envio da imagem terminar para remove-la.', 'warning');
+        return;
+      }
+
+      if (imagem.publicId && window.CloudinaryUpload && typeof window.CloudinaryUpload.deleteImage === 'function') {
+        iniciarDeleteImagem();
+
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const fichaIdAtual = params.get('editar');
+          const result = await window.CloudinaryUpload.deleteImage(imagem.publicId, {
+            excludeFichaId: fichaIdAtual || null,
+            silent: true
+          });
+
+          if (!result.success) {
+            throw new Error(result.error || 'Erro ao deletar imagem.');
+          }
+
+          if (result.shared) {
+            toastImagem('Imagem compartilhada: removida apenas desta ficha. A ficha original nao foi alterada.', 'warning');
+          } else if (result.notFound) {
+            toastImagem('Imagem removida desta ficha. O arquivo ja nao existia na nuvem.', 'warning');
+          } else {
+            toastImagem('Imagem removida com sucesso!', 'success');
+          }
+        } catch (error) {
+          toastImagem(error?.message || 'Erro ao remover imagem.', 'error');
+          return;
+        } finally {
+          finalizarDeleteImagem();
+        }
+      }
+
+      liberarPreviewImagem(imagem);
+      imagens.splice(index, 1);
+      renderizarImagens();
+      atualizarContador();
+    }
+
+    function liberarPreviewImagem(imagem) {
+      if (!imagem || !imagem.previewUrl) return;
+      URL.revokeObjectURL(imagem.previewUrl);
+      delete imagem.previewUrl;
+    }
+
+    function normalizarImagensPersistidas(lista) {
+      if (!Array.isArray(lista)) return [];
+
+      return lista
+        .map(item => {
+          if (typeof item === 'string') {
+            return {
+              src: item,
+              publicId: null,
+              descricao: '',
+              isPending: false,
+              uploadError: null
+            };
+          }
+
+          if (!item || typeof item !== 'object' || !item.src) return null;
+
+          return {
+            src: item.src,
+            publicId: item.publicId || null,
+            descricao: item.descricao || '',
+            isPending: false,
+            uploadError: null
+          };
+        })
+        .filter(Boolean);
+    }
+
+    async function enviarArquivoImagem(file) {
+      if (window.CloudinaryUpload && typeof window.CloudinaryUpload.uploadFile === 'function') {
+        const result = await window.CloudinaryUpload.uploadFile(file, { silent: true });
+        if (!result.success) {
+          throw new Error(result.error || 'Falha ao enviar imagem para o Cloudinary.');
+        }
+        return result;
+      }
+
+      const base64Data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = event => resolve(event.target?.result);
+        reader.onerror = () => reject(new Error('Falha ao ler o arquivo de imagem.'));
+        reader.readAsDataURL(file);
+      });
+
+      return uploadToCloudinary(base64Data);
+    }
+
+    async function adicionarImagem(file, descricao = '') {
       if (imagens.length >= MAX_IMAGES) {
-        alert(`Máximo de ${MAX_IMAGES} imagens permitido.`);
+        toastImagem(`Máximo de ${MAX_IMAGES} imagens permitido.`, 'warning');
         return false;
       }
 
-      // UPLOAD PARA CLOUDINARY
-      console.log('📤 Fazendo upload para Cloudinary...');
-      const uploadResult = await uploadToCloudinary(src);
-
-      imagens.push({
-        src: uploadResult.url,
-        publicId: uploadResult.publicId || null,
+      const previewUrl = URL.createObjectURL(file);
+      const imagemPendente = {
+        src: previewUrl,
+        previewUrl,
+        publicId: null,
         descricao,
-        isBase64: uploadResult.isBase64 || false
-      });
+        isPending: true,
+        uploadError: null
+      };
 
+      imagens.push(imagemPendente);
       renderizarImagens();
+      iniciarUploadImagem();
+
+      try {
+        const uploadResult = await enviarArquivoImagem(file);
+        imagemPendente.src = uploadResult.url;
+        imagemPendente.publicId = uploadResult.publicId || null;
+        imagemPendente.isPending = false;
+        imagemPendente.uploadError = null;
+        liberarPreviewImagem(imagemPendente);
+        renderizarImagens();
+      } catch (error) {
+        const message = error?.message || 'Falha ao enviar imagem para o Cloudinary.';
+        const indiceImagem = imagens.indexOf(imagemPendente);
+        imagemPendente.isPending = false;
+        imagemPendente.uploadError = message;
+        renderizarImagens();
+        toastImagem(message, 'error');
+
+        if (indiceImagem !== -1) {
+          window.setTimeout(() => {
+            const indiceAtual = imagens.indexOf(imagemPendente);
+            if (indiceAtual !== -1 && imagens[indiceAtual]?.uploadError === message) {
+              liberarPreviewImagem(imagens[indiceAtual]);
+              imagens.splice(indiceAtual, 1);
+              renderizarImagens();
+              atualizarContador();
+            }
+          }, 1800);
+        }
+        return false;
+      } finally {
+        finalizarUploadImagem();
+      }
+
       return true;
     }
 
@@ -1791,19 +2184,15 @@
         if (!file.type.startsWith('image/')) continue;
 
         if (imagens.length >= MAX_IMAGES) {
-          alert(`Máximo de ${MAX_IMAGES} imagens atingido.`);
+          toastImagem(`Máximo de ${MAX_IMAGES} imagens atingido.`, 'warning');
           return;
         }
 
-        const reader = new FileReader();
-        reader.onload = async e => {
-          await adicionarImagem(e.target.result);
-        };
-        reader.readAsDataURL(file);
+        await adicionarImagem(file);
       }
     }
 
-    dropArea.addEventListener('click', () => fileInput.click(), { once: true });
+    dropArea.addEventListener('click', () => fileInput.click());
 
     fileInput.addEventListener('change', () => {
       processarArquivos(fileInput.files);
@@ -1814,19 +2203,19 @@
       dropArea.addEventListener(name, e => {
         e.preventDefault();
         e.stopPropagation();
-      }, { once: true });
+      });
     });
 
     ['dragenter', 'dragover'].forEach(name => {
       dropArea.addEventListener(name, () => {
         dropArea.classList.add('image-upload--active');
-      }, { once: true });
+      });
     });
 
     ['dragleave', 'drop'].forEach(name => {
       dropArea.addEventListener(name, () => {
         dropArea.classList.remove('image-upload--active');
-      }, { once: true });
+      });
     });
 
     dropArea.addEventListener('drop', e => {
@@ -1835,6 +2224,15 @@
 
     // CORREÇÃO: Adicionar upload para Cloudinary ao colar imagem
     document.addEventListener('paste', async e => {
+      const target = e.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+
       const items = e.clipboardData?.items;
       if (!items) return;
 
@@ -1845,30 +2243,23 @@
           if (!blob) continue;
 
           if (imagens.length >= MAX_IMAGES) {
-            alert(`Máximo de ${MAX_IMAGES} imagens atingido.`);
+            toastImagem(`Máximo de ${MAX_IMAGES} imagens atingido.`, 'warning');
             return;
           }
 
-          const reader = new FileReader();
-          reader.onload = async ev => {
-            console.log('[imagens] Imagem colada, iniciando upload...');
-            await adicionarImagem(ev.target.result);
-          };
-          reader.readAsDataURL(blob);
+          await adicionarImagem(blob);
           break;
         }
       }
     });
 
-    if (!window.getImagens) {
-      window.getImagens = () => imagens;
-    }
-    if (!window.setImagens) {
-      window.setImagens = (novasImagens) => {
-        imagens = novasImagens || [];
-        renderizarImagens();
-      };
-    }
+    window.getImagens = () => imagens.filter(img => !img.isPending && !img.uploadError);
+    window.hasPendingImageUploads = () => imagens.some(img => img.isPending);
+    window.setImagens = (novasImagens) => {
+      imagens.forEach(liberarPreviewImagem);
+      imagens = normalizarImagensPersistidas(novasImagens);
+      renderizarImagens();
+    };
     window.adicionarImagem = adicionarImagem;
 
     atualizarContador();
@@ -1901,14 +2292,9 @@
     }
 
     const produtos = [];
-    document.querySelectorAll('#produtosTable tr').forEach(row => {
-      const tamanho = row.querySelector('.tamanho')?.value || '';
-      const quantidade = row.querySelector('.quantidade')?.value || '';
-      const produto = row.querySelector('.produto')?.value || row.querySelector('.descricao')?.value || '';
-      const detalhesProduto = row.querySelector('.detalhes-produto')?.value || '';
-      if (!tamanho && !produto && !detalhesProduto) return;
-      produtos.push({ tamanho, quantidade, produto, detalhesProduto, descricao: produto });
-    });
+    if (window.fichaProductUtils?.collectProductsFromTable) {
+      produtos.push(...window.fichaProductUtils.collectProductsFromTable());
+    }
 
     const arteVal = document.getElementById('arte')?.value || '';
 
@@ -1951,6 +2337,7 @@
 
     return {
       cliente: document.getElementById('cliente')?.value || '',
+      clienteAuxiliar: document.getElementById('clienteAuxiliar')?.value || '',
       vendedor: document.getElementById('vendedor')?.value || '',
       dataInicio: document.getElementById('dataInicio')?.value || '',
       numeroVenda: document.getElementById('numeroVenda')?.value || '',
@@ -1993,6 +2380,37 @@
   }
 
   function salvarFicha() {
+    if (typeof window.hasPendingImageUploads === 'function' && window.hasPendingImageUploads()) {
+      if (typeof mostrarToast === 'function') {
+        mostrarToast(IMAGE_UPLOAD_PENDING_MESSAGE, 'warning');
+      } else {
+        alert(IMAGE_UPLOAD_PENDING_MESSAGE);
+      }
+      return;
+    }
+
+    const invalidProductRow = window.fichaProductUtils?.findFirstInvalidProductRow?.();
+    if (invalidProductRow) {
+      if (typeof mostrarToast === 'function') {
+        mostrarToast(`Informe o produto na linha ${invalidProductRow.index + 1}.`, 'error');
+      } else {
+        alert(`Informe o produto na linha ${invalidProductRow.index + 1}.`);
+      }
+      invalidProductRow.row.querySelector('.produto')?.focus();
+      return;
+    }
+
+    const produtosValidos = window.fichaProductUtils?.collectProductsFromTable?.() || [];
+    if (produtosValidos.length === 0) {
+      if (typeof mostrarToast === 'function') {
+        mostrarToast('Adicione pelo menos um produto para salvar a ficha.', 'error');
+      } else {
+        alert('Adicione pelo menos um produto para salvar a ficha.');
+      }
+      document.querySelector('#produtosTable .produto')?.focus();
+      return;
+    }
+
     const ficha = coletarFicha();
 
     const dataStr = `data:text/json;charset=utf-8,${encodeURIComponent(
@@ -2059,6 +2477,7 @@
     };
 
     setVal('cliente', ficha.cliente);
+    setVal('clienteAuxiliar', ficha.clienteAuxiliar ?? ficha.cliente_auxiliar);
     setVal('vendedor', ficha.vendedor);
     setVal('dataInicio', ficha.dataInicio);
     setVal('numeroVenda', ficha.numeroVenda);
@@ -2182,92 +2601,21 @@
     });
   }
 
-  function injetarEstilosToastImpressao() {
-    if (document.getElementById('toast-impressao-styles')) return;
-
-    const style = document.createElement('style');
-    style.id = 'toast-impressao-styles';
-    style.textContent = `
-      .toast-impressao-preparo {
-        position: fixed;
-        bottom: 24px;
-        left: 50%;
-        z-index: 99999;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 14px;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.95);
-        color: #fff;
-        font-size: 13px;
-        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.35);
-        opacity: 0;
-        transform: translateX(-50%) translateY(100%);
-        transition: opacity 0.2s ease, transform 0.2s ease;
-        pointer-events: none;
-        max-width: 90vw;
-      }
-
-      .toast-impressao-preparo.show {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-
-      .toast-impressao-preparo i {
-        font-size: 14px;
-      }
-
-      @media (max-width: 480px) {
-        .toast-impressao-preparo {
-          left: 16px;
-          right: 16px;
-          bottom: 16px;
-          transform: translateX(0) translateY(100%);
-          max-width: none;
-          justify-content: center;
-        }
-
-        .toast-impressao-preparo.show {
-          transform: translateX(0) translateY(0);
-        }
-      }
-    `;
-
-    document.head.appendChild(style);
-  }
-
   function mostrarToastPreparandoImpressao(texto = 'Preparando impressão...') {
-    injetarEstilosToastImpressao();
-
-    let toast = document.getElementById('toast-impressao-preparo');
-    if (!toast) {
-      toast = document.createElement('div');
-      toast.id = 'toast-impressao-preparo';
-      toast.className = 'toast-impressao-preparo';
-      toast.innerHTML = `
-        <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
-        <span></span>
-      `;
-      document.body.appendChild(toast);
+    if (window.toast && typeof window.toast.loading === 'function') {
+      window.toast.loading(texto, { id: PRINT_PREPARING_TOAST_ID });
+      return;
     }
 
-    const textoEl = toast.querySelector('span');
-    if (textoEl) textoEl.textContent = texto;
-
-    requestAnimationFrame(() => toast.classList.add('show'));
+    if (typeof window.mostrarToast === 'function') {
+      window.mostrarToast(texto, 'info');
+    }
   }
 
   function esconderToastPreparandoImpressao() {
-    const toast = document.getElementById('toast-impressao-preparo');
-    if (!toast) return;
-
-    toast.classList.remove('show');
-    setTimeout(() => {
-      if (!toast.classList.contains('show')) {
-        toast.remove();
-      }
-    }, 220);
+    if (window.toast && typeof window.toast.dismiss === 'function') {
+      window.toast.dismiss(PRINT_PREPARING_TOAST_ID);
+    }
   }
 
   function initPrint() {
@@ -2608,7 +2956,7 @@
 
   function montarNomeArquivoFichaPdf() {
     const numeroVenda = slugNomeArquivo(document.getElementById('numeroVenda')?.value || '');
-    const cliente = slugNomeArquivo(document.getElementById('cliente')?.value || '');
+    const cliente = slugNomeArquivo(formatarNomeClienteExibicao(document.getElementById('cliente')?.value || '', document.getElementById('clienteAuxiliar')?.value || ''));
     const base = [numeroVenda, cliente].filter(Boolean).join('-') || 'ficha-tecnica';
     const data = new Date().toISOString().slice(0, 10);
     return `${base}-${data}.pdf`;
@@ -3240,7 +3588,7 @@
 
     setText('print-dataEmissao', dataEmissao);
     setText('print-numeroVenda', getValorCampo('numeroVenda'), '-');
-    setText('print-cliente', capitalizeFirstLetter(getValorCampo('cliente')), '-');
+    setText('print-cliente', capitalizeFirstLetter(formatarNomeClienteExibicao(getValorCampo('cliente'), getValorCampo('clienteAuxiliar'))), '-');
     setText('print-vendedor', capitalizeFirstLetter(getValorCampo('vendedor')), '-');
 
     setTextWithHighlight('print-dataInicio', formatarDataBrasil(getValorCampo('dataInicio')), isEvento, '-');
@@ -3444,7 +3792,7 @@
         const detalhesProduto = item.detalhes;
 
         const produtoFormatado = capitalizeFirstLetter(produto);
-        const detalhesFormatado = capitalizeFirstLetter(detalhesProduto);
+        const detalhesFormatado = String(detalhesProduto || '').trim();
         if (!tamanho && !quantidade && !produtoFormatado && !detalhesFormatado) return;
 
         const qtdNumero = parseInt(quantidade, 10);
@@ -3550,10 +3898,15 @@
     const mangaText = getSelectText('manga');
     setText('print-manga', mangaText, '-');
 
-    const acabamentoMangaText = getSelectText('acabamentoManga');
+    const viesValImpressao = getValorCampo('vies');
+    const acabamentoMangaText = isRegataImpressao
+      ? (viesValImpressao === 'sim' ? 'Sim' : '')
+      : getSelectText('acabamentoManga');
     setText('print-acabamentoManga', acabamentoMangaText, '-');
 
-    const acabamentoMangaVal = getValorCampo('acabamentoManga');
+    const acabamentoMangaVal = isRegataImpressao
+      ? (viesValImpressao === 'sim' ? 'vies' : '')
+      : getValorCampo('acabamentoManga');
     const temAcabamentoMangaExtra = isAcabamentoMangaComExtras(acabamentoMangaVal);
 
     const larguraMangaVal = getValorCampo('larguraManga');

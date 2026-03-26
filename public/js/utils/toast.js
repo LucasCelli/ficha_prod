@@ -6,14 +6,16 @@
     success: 'fa-check-circle',
     error: 'fa-exclamation-circle',
     warning: 'fa-exclamation-triangle',
-    info: 'fa-info-circle'
+    info: 'fa-info-circle',
+    loading: 'fa-rotate'
   };
 
   const BACKGROUNDS = {
     success: 'var(--toast-bg-success)',
     error: 'var(--toast-bg-error)',
     warning: 'var(--toast-bg-warning)',
-    info: 'var(--toast-bg-info)'
+    info: 'var(--toast-bg-info)',
+    loading: 'var(--toast-bg-info)'
   };
 
   function injectStyles() {
@@ -57,8 +59,21 @@
         flex-shrink: 0;
       }
 
+      .toast-global.toast-global--loading i {
+        animation: toastIconSpin 0.9s linear infinite;
+      }
+
       .toast-global span {
         line-height: 1.4;
+      }
+
+      @keyframes toastIconSpin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
       }
 
       @keyframes toastSlideUp {
@@ -137,6 +152,21 @@
     if (active) active.remove();
   }
 
+  function dismiss(id) {
+    const selector = id
+      ? `.toast-global[data-toast-id="${String(id)}"]`
+      : '.toast-global';
+    const toast = document.querySelector(selector);
+    if (!toast) return false;
+
+    toast.classList.remove('show');
+    toast.classList.add('hide');
+    setTimeout(() => {
+      if (toast.parentNode) toast.remove();
+    }, 300);
+    return true;
+  }
+
   function show(options = {}) {
     const message = String(options.message || '').trim();
     if (!message) return null;
@@ -151,6 +181,9 @@
 
     const toast = document.createElement('div');
     toast.className = 'toast-global';
+    if (type === 'loading') {
+      toast.classList.add('toast-global--loading');
+    }
     if (id) toast.dataset.toastId = id;
     toast.style.background = BACKGROUNDS[type] || BACKGROUNDS.info;
 
@@ -200,12 +233,18 @@
     return show({ ...options, message, type: 'info' });
   }
 
+  function loading(message, options = {}) {
+    return show({ ...options, message, type: 'loading', sticky: true });
+  }
+
   const toastApi = Object.freeze({
     show,
+    dismiss,
     success,
     error,
     warning,
-    info
+    info,
+    loading
   });
 
   window.toast = toastApi;

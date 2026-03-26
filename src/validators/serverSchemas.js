@@ -7,8 +7,16 @@ const KANBAN_STATUS_LIST = [
   'sublimando',
   'na_costura'
 ];
+const SUPPLY_STATUS_LIST = [
+  'tudo_ok',
+  'sem_tecido',
+  'sem_tinta',
+  'sem_papel',
+  'pendencias'
+];
 
 export const KANBAN_STATUS_VALUES = new Set(KANBAN_STATUS_LIST);
+export const SUPPLY_STATUS_VALUES = new Set(SUPPLY_STATUS_LIST);
 const FICHA_STATUS_LIST = ['pendente', 'entregue'];
 
 function isValidISODate(value) {
@@ -99,6 +107,35 @@ const requiredIsoDateSchema = z.preprocess(
     .refine(isValidISODate, 'Data inválida')
 );
 
+const fichaProdutoSchema = z.object({
+  tamanho: optionalTextSchema,
+  quantidade: z.preprocess(
+    value => {
+      if (value === undefined || value === null) return undefined;
+      return String(value).trim();
+    },
+    z.string().optional()
+  ),
+  produto: optionalTextSchema,
+  descricao: optionalTextSchema,
+  detalhesProduto: optionalTextSchema,
+  detalhes: optionalTextSchema
+}).passthrough().superRefine((item, ctx) => {
+  const tamanho = String(item.tamanho || '').trim();
+  const quantidade = String(item.quantidade || '').trim();
+  const produto = String(item.produto || item.descricao || '').trim();
+  const detalhes = String(item.detalhesProduto || item.detalhes || '').trim();
+  const temConteudo = Boolean(tamanho || produto || detalhes || (quantidade && quantidade !== '1'));
+
+  if (!temConteudo || produto) return;
+
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['produto'],
+    message: 'Produto é obrigatório quando a linha possui dados.'
+  });
+});
+
 export const positiveIdParamSchema = z.object({
   id: z.preprocess(parsePositiveInt, z.number().int().positive())
 });
@@ -134,6 +171,7 @@ export const fichaQuerySchema = z.object({
 
 export const fichaBodySchema = z.object({
   cliente: requiredTextSchema,
+  clienteAuxiliar: optionalTextSchema,
   vendedor: optionalTextSchema,
   dataInicio: optionalIsoDateSchema,
   numeroVenda: optionalTextSchema,
@@ -177,7 +215,7 @@ export const fichaBodySchema = z.object({
   observacoes: optionalTextSchema,
   imagemData: optionalTextSchema,
   imagensData: optionalTextSchema,
-  produtos: z.array(z.record(z.any())).optional(),
+  produtos: z.array(fichaProdutoSchema).optional(),
   comNomes: z.union([z.boolean(), z.number().int().min(0).max(3), z.string()]).optional(),
   com_nomes: z.union([z.boolean(), z.number().int().min(0).max(3), z.string()]).optional()
 }).passthrough();
@@ -202,6 +240,55 @@ export const kanbanOrderBodySchema = z.object({
   ),
   orderedIds: z.array(z.preprocess(parsePositiveInt, z.number().int().positive())).default([])
 });
+
+export const supplyStatusBodySchema = z.object({
+  supplyStatus: z.preprocess(
+    value => {
+      const text = toTrimmedStringOrUndefined(value);
+      return text ? text.toLowerCase() : undefined;
+    },
+    z.enum(SUPPLY_STATUS_LIST)
+  )
+});
+
+export const kanbanCardsQuerySchema = z.object({
+  cliente: optionalTextSchema,
+  onlyCurrentWeek: z.preprocess(parseBooleanOrUndefined, z.boolean().optional()),
+  tecido: optionalTextSchema,
+  personalizacao: optionalTextSchema,
+  supplyStatus: z.preprocess(
+    value => {
+      const text = toTrimmedStringOrUndefined(value);
+      return text ? text.toLowerCase() : undefined;
+    },
+    z.enum(SUPPLY_STATUS_LIST).optional()
+  )
+});
+
+export const kanbanManualCardBodySchema = z.object({
+  cliente: requiredTextSchema,
+  dataEntrega: requiredIsoDateSchema,
+  evento: z.preprocess(
+    toTrimmedStringOrUndefined,
+    z.enum(['sim', 'nao']).optional()
+  ),
+  arte: optionalTextSchema,
+  material: optionalTextSchema,
+  kanbanStatus: z.preprocess(
+    value => {
+      const text = toTrimmedStringOrUndefined(value);
+      return text ? text.toLowerCase() : undefined;
+    },
+    z.enum(KANBAN_STATUS_LIST).optional()
+  ),
+  supplyStatus: z.preprocess(
+    value => {
+      const text = toTrimmedStringOrUndefined(value);
+      return text ? text.toLowerCase() : undefined;
+    },
+    z.enum(SUPPLY_STATUS_LIST).optional()
+  )
+}).passthrough();
 
 export const clientesQuerySchema = z.object({
   termo: optionalTextSchema

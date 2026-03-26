@@ -615,7 +615,7 @@
       container.innerHTML = clientes.slice(0, 5).map((c, i) => `
         <div class="mini-ranking-item">
           <span class="mini-pos">${i + 1}º</span>
-          <span class="mini-name">${escapeHtml(c.cliente)}</span>
+          <span class="mini-name">${escapeHtml(formatarNomeClienteExibicao(c))}</span>
           <span class="mini-value">${c.total_pedidos || c.totalPedidos || 0} fichas</span>
         </div>
       `).join('');
@@ -1430,7 +1430,7 @@
     detalhes.forEach((item, index) => {
       const row = worksheet.addRow([
         item.id || '',
-        item.cliente || '',
+        formatarNomeClienteExibicao(item) || item.cliente || '',
         item.vendedor || '',
         item.material || '',
         item.quantidade || 0,
@@ -1529,6 +1529,25 @@
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  function formatarNomeClienteExibicao(item) {
+    if (window.appUtils && typeof window.appUtils.formatClientDisplayName === 'function') {
+      return window.appUtils.formatClientDisplayName(
+        item?.cliente,
+        item?.cliente_auxiliar || item?.clienteAuxiliar,
+        item?.cliente_exibicao || item?.clienteExibicao
+      );
+    }
+
+    const nomeExibicao = String(item?.cliente_exibicao || item?.clienteExibicao || '').trim();
+    if (nomeExibicao) return nomeExibicao;
+
+    const nomeBase = String(item?.cliente || '').trim().replace(/\s+/g, ' ');
+    const nomeAuxiliar = String(item?.cliente_auxiliar || item?.clienteAuxiliar || '').trim().replace(/\s+/g, ' ');
+    if (!nomeBase) return nomeAuxiliar;
+    if (!nomeAuxiliar) return nomeBase;
+    return `${nomeBase} (${nomeAuxiliar})`.replace(' )', ')');
   }
 
   function mostrarErro(mensagem) {
@@ -1680,9 +1699,17 @@
       }
 
       const rangeHeatmap = obterRangeUltimos365Dias();
+      const heatmapParams = new URLSearchParams({
+        ...rangeHeatmap,
+        resumido: '1'
+      });
+      const personalParams = new URLSearchParams({
+        ...rangePersonalizacoes,
+        resumido: '1'
+      });
       const [resHeatmap, resPersonal] = await Promise.all([
-        fetch(`${db.baseURL}/fichas?${new URLSearchParams(rangeHeatmap).toString()}`),
-        fetch(`${db.baseURL}/fichas?${new URLSearchParams(rangePersonalizacoes).toString()}`)
+        fetch(`${db.baseURL}/fichas?${heatmapParams.toString()}`),
+        fetch(`${db.baseURL}/fichas?${personalParams.toString()}`)
       ]);
       if (!resHeatmap.ok || !resPersonal.ok) throw new Error('Erro ao carregar fichas');
 
@@ -1874,6 +1901,13 @@
   function obterDataCriacaoFicha(ficha) {
     const raw = ficha?.data_criacao || ficha?.created_at || ficha?.data_inicio;
     if (!raw) return null;
+    if (typeof raw === 'string') {
+      const matchDateOnly = raw.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (matchDateOnly) {
+        const [, year, month, day] = matchDateOnly;
+        return new Date(Number(year), Number(month) - 1, Number(day));
+      }
+    }
     const data = new Date(raw);
     return Number.isNaN(data.getTime()) ? null : data;
   }
@@ -1910,5 +1944,3 @@
     });
   }
 })();
-
-
