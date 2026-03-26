@@ -187,6 +187,9 @@
     try {
       await db.init();
       await initClienteAutocomplete();
+      if (typeof window.ensureFichaAppInitialized === 'function') {
+        await window.ensureFichaAppInitialized();
+      }
       await verificarParametrosURL();
       if (!modoVisualizacao) {
         configurarBotoesAcao();

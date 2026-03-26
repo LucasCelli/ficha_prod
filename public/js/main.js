@@ -333,8 +333,29 @@
     }
   }
 
+  let appInitializationPromise = null;
+
+  function ensureAppInitialized() {
+    if (!appInitializationPromise) {
+      appInitializationPromise = initApp()
+        .then(() => {
+          window.fichaAppReady = true;
+        })
+        .catch(error => {
+          window.fichaAppReady = false;
+          throw error;
+        });
+    }
+
+    return appInitializationPromise;
+  }
+
+  window.ensureFichaAppInitialized = ensureAppInitialized;
+
   document.addEventListener('DOMContentLoaded', () => {
-    initApp();
+    ensureAppInitialized().catch(error => {
+      console.error('Falha ao inicializar app da ficha:', error);
+    });
   });
 
   async function initApp() {
