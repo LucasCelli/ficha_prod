@@ -1619,6 +1619,8 @@ body.preview-impressao #print-imagesContainer.images-one {
 
 body.preview-impressao #print-imagesContainer.images-three .print-image-item:nth-child(3) {
     grid-column: 1 / -1;
+    width: calc((100% - var(--space-10)) / 2);
+    justify-self: center;
 }
 
 body.preview-impressao #print-imagesContainer .print-image-item {
@@ -1847,6 +1849,8 @@ body.pdf-export-impressao #print-imagesContainer.images-three {
 
 body.pdf-export-impressao #print-imagesContainer.images-three .print-image-item:nth-child(3) {
     grid-column: 1 / -1;
+    width: calc((100% - var(--space-8)) / 2);
+    justify-self: center;
 }
 
 body.pdf-export-impressao #print-imagesContainer.compact-four {
@@ -2102,6 +2106,8 @@ body.pdf-export-impressao .print-images-container.compact-four .print-image-item
 
     #print-imagesContainer.images-three .print-image-item:nth-child(3) {
         grid-column: 1 / -1;
+        width: calc((100% - var(--space-8)) / 2);
+        justify-self: center;
     }
 
     #print-imagesContainer.compact-four {

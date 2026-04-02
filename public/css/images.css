@@ -296,6 +296,11 @@
     gap: 0;
 }
 
+.print-images-container.images-three .print-image-item:nth-child(3) {
+    flex-basis: 48%;
+    max-width: 48%;
+}
+
 .print-image-item {
     flex: 1 1 45%;
     max-width: 48%;
@@ -329,6 +334,11 @@
 .print-images-container.compact-four .print-image-description {
     margin-top: var(--space-4);
     font-size: 0.75rem;
+}
+
+.print-images-container.compact-four .print-image-item {
+    flex-basis: 48%;
+    max-width: 48%;
 }
 
 .print-images-container.compact-four .print-image-item img {
