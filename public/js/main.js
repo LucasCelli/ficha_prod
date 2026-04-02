@@ -3528,6 +3528,9 @@
     const usarFichaDireta = !!fichaDireta;
     const hoje = new Date();
     const dataEmissao = hoje.toLocaleDateString('pt-BR') + ' ' + hoje.toLocaleTimeString('pt-BR');
+    const fichaIdAtual = usarFichaDireta
+      ? String(fichaDireta.id || '').trim()
+      : String(paramsUrl.get('editar') || paramsUrl.get('visualizar') || '').trim();
 
     const setText = (id, val, fallback = '') => {
       try {
@@ -3608,6 +3611,11 @@
     const isEvento = valorEhSim(getValorCampo('evento'));
 
     setText('print-dataEmissao', dataEmissao);
+    setText('print-fichaId', fichaIdAtual);
+    const printFichaIdWrap = document.getElementById('print-fichaIdWrap');
+    if (printFichaIdWrap) {
+      printFichaIdWrap.style.display = fichaIdAtual ? 'inline' : 'none';
+    }
     setText('print-numeroVenda', getValorCampo('numeroVenda'), '-');
     setText('print-cliente', capitalizeFirstLetter(formatarNomeClienteExibicao(getValorCampo('cliente'), getValorCampo('clienteAuxiliar'))), '-');
     setText('print-vendedor', capitalizeFirstLetter(getValorCampo('vendedor')), '-');

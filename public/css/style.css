@@ -1637,6 +1637,10 @@ body.preview-impressao #print-imagesContainer .print-image-item img {
     object-fit: contain;
 }
 
+body.preview-impressao #print-imagesContainer.images-one .print-image-item img {
+    max-height: 80mm;
+}
+
 @media (max-width: 900px) {
     body.preview-impressao .print-two-cols {
         grid-template-columns: 1fr;
@@ -1879,7 +1883,7 @@ body.pdf-export-impressao .print-image-item img {
 }
 
 body.pdf-export-impressao .print-image-item.single img {
-    max-height: none;
+    max-height: 80mm;
 }
 
 body.pdf-export-impressao .print-images-container.images-two .print-image-item img {
