@@ -1638,6 +1638,11 @@ body.preview-impressao #print-imagesContainer .print-image-item img {
 }
 
 body.preview-impressao #print-imagesContainer.images-one .print-image-item img {
+    width: auto;
+    max-width: 100%;
+}
+
+body.preview-impressao #print-imagesContainer.images-one .print-image-item img {
     max-height: 80mm;
 }
 
@@ -1883,6 +1888,8 @@ body.pdf-export-impressao .print-image-item img {
 }
 
 body.pdf-export-impressao .print-image-item.single img {
+    width: auto;
+    max-width: 100%;
     max-height: 80mm;
 }
 

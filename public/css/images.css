@@ -378,6 +378,8 @@
     }
 
     .print-image-item.single img {
+        width: auto;
+        max-width: 100%;
         max-height: none;
     }
 
