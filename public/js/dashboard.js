@@ -1470,11 +1470,11 @@
   }
 
   function mostrarSucesso(mensagem) {
-    mostrarToast(mensagem, 'success');
+    window.toast.show({ message: mensagem, type: 'success' });
   }
 
   function mostrarErro(mensagem) {
-    mostrarToast(mensagem, 'error');
+    window.toast.show({ message: mensagem, type: 'error' });
   }
 
   function escapeHtmlAttr(value) {

@@ -752,7 +752,7 @@
       }
 
     } catch (error) {
-      mostrarToast('Erro ao duplicar ficha', 'error');
+      window.toast.show({ message: 'Erro ao duplicar ficha', type: 'error' });
     }
   }
 
@@ -764,7 +764,7 @@
     let dados = null;
     try {
       if (typeof window.hasPendingImageUploads === 'function' && window.hasPendingImageUploads()) {
-        mostrarToast('Aguarde o envio das imagens terminar para salvar a ficha.', 'warning');
+        window.toast.show({ message: 'Aguarde o envio das imagens terminar para salvar a ficha.', type: 'warning' });
         return;
       }
 
@@ -799,7 +799,7 @@
       }
 
       const acao = dados.id && dados.id === fichaAtualId ? 'atualizada' : 'salva';
-      mostrarToast(`Ficha ${acao} com sucesso!`, 'success');
+      window.toast.show({ message: `Ficha ${acao} com sucesso!`, type: 'success' });
 
       await initClienteAutocomplete();
 
@@ -818,7 +818,7 @@
       if (fallback.downloadOk) detalhes.push('JSON baixado automaticamente.');
       if (fallback.localOk) detalhes.push('Rascunho guardado localmente na Central.');
       const mensagemFinal = detalhes.length ? `${mensagemErro} ${detalhes.join(' ')}` : mensagemErro;
-      mostrarToast(mensagemFinal, 'warning');
+      window.toast.show({ message: mensagemFinal, type: 'warning' });
     } finally {
       salvamentoEmAndamento = false;
       atualizarEstadoBotoesSalvar(false);
@@ -853,7 +853,7 @@
       const valor = String(dados?.[campo.key] || '').trim();
       if (valor && !(campo.key === 'arte' && valor === '-')) continue;
 
-      mostrarToast(`Por favor, informe ${campo.label}`, 'error');
+      window.toast.show({ message: `Por favor, informe ${campo.label}`, type: 'error' });
       const input = document.getElementById(campo.id);
       if (input) input.focus();
       return false;
@@ -861,14 +861,14 @@
 
     const invalidProductRow = window.fichaProductUtils?.findFirstInvalidProductRow?.();
     if (invalidProductRow) {
-      mostrarToast(`Informe o produto na linha ${invalidProductRow.index + 1}.`, 'error');
+      window.toast.show({ message: `Informe o produto na linha ${invalidProductRow.index + 1}.`, type: 'error' });
       invalidProductRow.row.querySelector('.produto')?.focus();
       return false;
     }
 
     const produtosValidos = window.fichaProductUtils?.collectProductsFromTable?.() || [];
     if (produtosValidos.length === 0) {
-      mostrarToast('Adicione pelo menos um produto para salvar a ficha.', 'error');
+      window.toast.show({ message: 'Adicione pelo menos um produto para salvar a ficha.', type: 'error' });
       document.querySelector('#produtosTable .produto')?.focus();
       return false;
     }
@@ -1056,10 +1056,10 @@
         setTimeout(() => {
           preencherFormulario(rascunho);
           configurarBotoesAcao();
-          mostrarToast('Cópia carregada. Clique em salvar para persistir a nova ficha.', 'success');
+          window.toast.show({ message: 'Cópia carregada. Clique em salvar para persistir a nova ficha.', type: 'success' });
         }, 100);
       } else {
-        mostrarToast('Não foi possível carregar os dados para duplicação.', 'error');
+        window.toast.show({ message: 'Não foi possível carregar os dados para duplicação.', type: 'error' });
       }
 
       const novaUrl = new URL(window.location.href);
@@ -1078,10 +1078,10 @@
         setTimeout(() => {
           preencherFormulario(itemFallback.ficha);
           configurarBotoesAcao();
-          mostrarToast('Rascunho local carregado. Clique em salvar para enviar ao banco.', 'warning');
+          window.toast.show({ message: 'Rascunho local carregado. Clique em salvar para enviar ao banco.', type: 'warning' });
         }, 100);
       } else {
-        mostrarToast('Rascunho local não encontrado.', 'error');
+        window.toast.show({ message: 'Rascunho local não encontrado.', type: 'error' });
       }
 
       const novaUrl = new URL(window.location.href);
@@ -1101,7 +1101,7 @@
       const fichaBanco = await db.buscarFicha(id);
 
       if (!fichaBanco) {
-        mostrarToast('Ficha não encontrada', 'error');
+        window.toast.show({ message: 'Ficha não encontrada', type: 'error' });
         window.location.href = '/dashboard';
         return;
       }
@@ -1119,7 +1119,7 @@
       atualizarTituloEdicao(id, ficha.cliente, ficha.clienteAuxiliar ?? ficha.cliente_auxiliar);
 
     } catch (error) {
-      mostrarToast('Erro ao carregar ficha para edição', 'error');
+      window.toast.show({ message: 'Erro ao carregar ficha para edição', type: 'error' });
     }
   }
 
@@ -1128,7 +1128,7 @@
       const fichaBanco = await db.buscarFicha(id);
 
       if (!fichaBanco) {
-        mostrarToast('Ficha não encontrada', 'error');
+        window.toast.show({ message: 'Ficha não encontrada', type: 'error' });
         window.location.href = '/dashboard';
         return;
       }
@@ -1151,7 +1151,7 @@
       }
 
     } catch (error) {
-      mostrarToast('Erro ao carregar ficha para visualização', 'error');
+      window.toast.show({ message: 'Erro ao carregar ficha para visualização', type: 'error' });
     }
   }
 
@@ -1397,18 +1397,6 @@
 
       window.__preenchendoFicha = false;
     }, 150);
-  }
-
-  // Toast
-
-  function mostrarToast(mensagem, tipo = 'success') {
-    if (window.toast && typeof window.toast.show === 'function') {
-      window.toast.show({ message: mensagem, type: tipo });
-      return;
-    }
-    if (typeof window.mostrarToast === 'function' && window.mostrarToast !== mostrarToast) {
-      window.mostrarToast(mensagem, tipo);
-    }
   }
 
   window.dbIntegration = {

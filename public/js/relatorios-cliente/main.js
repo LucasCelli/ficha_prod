@@ -13,16 +13,6 @@ let botaoImprimirModal = null;
 let loadingModalVisualizacao = null;
 let timeoutLoadingModal = null;
 
-function toast(message, type = 'info') {
-  if (window.toast && typeof window.toast.show === 'function') {
-    window.toast.show({ message, type });
-    return;
-  }
-  if (typeof window.mostrarToast === 'function') {
-    window.mostrarToast(message, type);
-  }
-}
-
 function setButtonBusy(button, busy, busyLabel = 'Carregando...') {
   if (!button) return;
   if (!button.dataset.defaultHtml) button.dataset.defaultHtml = button.innerHTML;
@@ -110,7 +100,7 @@ async function loadClients({ reset = false } = {}) {
       selectedClientId: state.selectedClientId
     });
     setButtonBusy(document.getElementById('btnLoadMoreClientes'), false);
-    toast('Erro ao carregar clientes', 'error');
+    window.toast.show({ message: 'Erro ao carregar clientes', type: 'error' });
     return;
   }
   state.clientsLoading = false;
@@ -205,7 +195,7 @@ function bindDetailEvents() {
     const inicio = String(document.getElementById('periodoDataInicio')?.value || '').trim();
     const fim = String(document.getElementById('periodoDataFim')?.value || '').trim();
     if (!isValidRange(inicio, fim)) {
-      toast('Data inicial deve ser menor ou igual à data final', 'error');
+      window.toast.show({ message: 'Data inicial deve ser menor ou igual à data final', type: 'error' });
       return;
     }
 
@@ -265,9 +255,9 @@ function bindDetailEvents() {
     try {
       setExportBusy(true);
       await exportPdf(state.detail, buildPeriodoLabel(state.dataInicio, state.dataFim));
-      toast('PDF gerado com sucesso', 'success');
+      window.toast.show({ message: 'PDF gerado com sucesso', type: 'success' });
     } catch (error) {
-      toast(`Falha ao gerar PDF: ${error.message}`, 'error');
+      window.toast.show({ message: `Falha ao gerar PDF: ${error.message}`, type: 'error' });
     } finally {
       setExportBusy(false);
     }
@@ -278,9 +268,9 @@ function bindDetailEvents() {
     try {
       setExportBusy(true);
       await exportExcel(state.detail, buildPeriodoLabel(state.dataInicio, state.dataFim));
-      toast('Excel gerado com sucesso', 'success');
+      window.toast.show({ message: 'Excel gerado com sucesso', type: 'success' });
     } catch (error) {
-      toast(`Falha ao gerar Excel: ${error.message}`, 'error');
+      window.toast.show({ message: `Falha ao gerar Excel: ${error.message}`, type: 'error' });
     } finally {
       setExportBusy(false);
     }
@@ -434,7 +424,7 @@ async function init() {
       renderDetailEmpty();
     }
   } catch (error) {
-    toast('Erro ao inicializar relatório de clientes', 'error');
+    window.toast.show({ message: 'Erro ao inicializar relatório de clientes', type: 'error' });
   }
 }
 

@@ -25,7 +25,7 @@
       await carregarClientes();
       initEventListeners();
     } catch (error) {
-      mostrarToast('Erro ao conectar com o servidor', 'error');
+      window.toast.show({ message: 'Erro ao conectar com o servidor', type: 'error' });
     }
   }
 
@@ -75,7 +75,7 @@
       clientesCache = [];
       atualizarEstatisticas();
       aplicarFiltros();
-      mostrarToast('Erro ao carregar clientes', 'error');
+      window.toast.show({ message: 'Erro ao carregar clientes', type: 'error' });
     }
   }
 
@@ -347,7 +347,7 @@
     };
 
     if (!dados.nome) {
-      mostrarToast('Nome do cliente é obrigatório', 'error');
+      window.toast.show({ message: 'Nome do cliente é obrigatório', type: 'error' });
       return;
     }
 
@@ -363,12 +363,12 @@
         throw new Error(error.error || 'Erro ao atualizar');
       }
 
-      mostrarToast('Cliente atualizado com sucesso!', 'success');
+      window.toast.show({ message: 'Cliente atualizado com sucesso!', type: 'success' });
       fecharModalEdit();
       await carregarClientes();
 
     } catch (error) {
-      mostrarToast(error.message || 'Erro ao atualizar cliente', 'error');
+      window.toast.show({ message: error.message || 'Erro ao atualizar cliente', type: 'error' });
     }
   }
 
@@ -409,7 +409,7 @@
     const captchaInput = document.getElementById('deleteCaptchaInputCliente');
     const captchaDigitado = String(captchaInput?.value || '').trim();
     if (!captchaDeleteCliente || captchaDigitado !== captchaDeleteCliente) {
-      mostrarToast('Código de confirmação inválido para excluir o cliente', 'error');
+      window.toast.show({ message: 'Código de confirmação inválido para excluir o cliente', type: 'error' });
       return;
     }
 
@@ -434,7 +434,7 @@
         throw new Error(errorMsg);
       }
 
-      mostrarToast('Cliente excluído com sucesso!', 'success');
+      window.toast.show({ message: 'Cliente excluído com sucesso!', type: 'success' });
       exclusaoClienteEmAndamento = false;
       fecharModalDelete();
       await carregarClientes();
@@ -444,7 +444,7 @@
       atualizarEstadoConfirmarDeleteCliente();
       const msg = error.message || 'Erro ao excluir cliente';
       const msgLimpa = msg.includes('Unexpected token') ? 'Erro ao excluir cliente' : msg;
-      mostrarToast(msgLimpa, 'error');
+      window.toast.show({ message: msgLimpa, type: 'error' });
     }
   }
 
@@ -493,7 +493,7 @@
     const agora = Date.now();
     if (agora - ultimoToastCaptchaInvalidoCliente < 1200) return;
     ultimoToastCaptchaInvalidoCliente = agora;
-    mostrarToast('Código de confirmação incorreto', 'error');
+    window.toast.show({ message: 'Código de confirmação incorreto', type: 'error' });
   }
 
   // Ver Fichas

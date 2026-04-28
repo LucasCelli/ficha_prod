@@ -72,7 +72,7 @@
 
   async function processFiles(files) {
     if (imagens.length >= MAX_IMAGENS) {
-      toast('Máximo de ' + MAX_IMAGENS + ' imagens atingido', 'warning');
+      window.toast.show({ message: 'Máximo de ' + MAX_IMAGENS + ' imagens atingido', type: 'warning' });
       return;
     }
 
@@ -99,7 +99,7 @@
           throw new Error('Upload indisponível: Cloudinary não foi carregado.');
         }
       } catch (error) {
-        toast('Erro ao enviar imagem: ' + error.message, 'error');
+        window.toast.show({ message: 'Erro ao enviar imagem: ' + error.message, type: 'error' });
       }
     }
 
@@ -267,16 +267,6 @@
     container.querySelectorAll('.loading-placeholder').forEach(el => el.remove());
   }
 
-  function toast(mensagem, tipo = 'info') {
-    if (window.toast && typeof window.toast.show === 'function') {
-      window.toast.show({ message: mensagem, type: tipo });
-      return;
-    }
-    if (typeof window.mostrarToast === 'function') {
-      window.mostrarToast(mensagem, tipo);
-    }
-  }
-
   // API Pública
 
   window.getImagens = function() {
@@ -316,7 +306,7 @@
 
   window.adicionarImagem = function(imgData) {
     if (imagens.length >= MAX_IMAGENS) {
-      toast('Máximo de ' + MAX_IMAGENS + ' imagens atingido', 'warning');
+      window.toast.show({ message: 'Máximo de ' + MAX_IMAGENS + ' imagens atingido', type: 'warning' });
       return false;
     }
 

@@ -1378,57 +1378,21 @@
   }
 
   function exibirAlertaLimiteProdutos() {
-    let toast = document.getElementById('toast-limite-produtos');
-    if (toast) {
-      toast.style.display = 'flex';
-      return;
-    }
-
-    toast = document.createElement('div');
-    toast.id = 'toast-limite-produtos';
-    toast.className = 'toast-limite-produtos';
-    toast.innerHTML = `
-      <div class="toast-limite-produtos__content">
-        <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-        <span>Considere dividir essa ficha em duas partes para evitar erros de impressão.</span>
-      </div>
-      <button type="button" class="toast-limite-produtos__close" aria-label="Fechar alerta">×</button>
-    `;
-
-    const btnFechar = toast.querySelector('.toast-limite-produtos__close');
-    btnFechar?.addEventListener('click', () => {
-      toast.style.display = 'none';
-      alertaLimiteProdutosFechado = true;
+    alertaLimiteProdutosFechado = true;
+    window.toast.show({
+      id: 'toast-limite-produtos',
+      message: 'Considere dividir essa ficha em duas partes para evitar erros de impressão.',
+      type: 'warning'
     });
-
-    document.body.appendChild(toast);
   }
 
   function exibirAlertaProdutosMesmoTamanho() {
-    let toast = document.getElementById('toast-produtos-mesmo-tamanho');
-    if (toast) {
-      toast.style.display = 'flex';
-      return;
-    }
-
-    toast = document.createElement('div');
-    toast.id = 'toast-produtos-mesmo-tamanho';
-    toast.className = 'toast-limite-produtos';
-    toast.innerHTML = `
-      <div class="toast-limite-produtos__content">
-        <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-        <span>Há <strong>produtos</strong> iguais com o mesmo <strong>tamanho</strong> e <strong>descrição</strong>.</span>
-      </div>
-      <button type="button" class="toast-limite-produtos__close" aria-label="Fechar alerta">×</button>
-    `;
-
-    const btnFechar = toast.querySelector('.toast-limite-produtos__close');
-    btnFechar?.addEventListener('click', () => {
-      toast.style.display = 'none';
-      alertaProdutosMesmoTamanhoFechado = true;
+    alertaProdutosMesmoTamanhoFechado = true;
+    window.toast.show({
+      id: 'toast-produtos-mesmo-tamanho',
+      message: 'Há produtos iguais com o mesmo tamanho e descrição.',
+      type: 'warning'
     });
-
-    document.body.appendChild(toast);
   }
 
   function atualizarAlertaProdutosMesmoTamanho() {
@@ -1453,11 +1417,10 @@
     });
 
     const temConflito = chavesDuplicadas.size > 0;
-    const toast = document.getElementById('toast-produtos-mesmo-tamanho');
 
     if (!temConflito) {
       alertaProdutosMesmoTamanhoFechado = false;
-      if (toast) toast.style.display = 'none';
+      window.toast.dismiss('toast-produtos-mesmo-tamanho');
       return;
     }
 
@@ -1468,11 +1431,10 @@
   function atualizarAlertaLimiteProdutos() {
     const totalProdutos = document.querySelectorAll('#produtosTable tr').length;
     const passouLimite = totalProdutos > 20;
-    const toast = document.getElementById('toast-limite-produtos');
 
     if (!passouLimite) {
       alertaLimiteProdutosFechado = false;
-      if (toast) toast.style.display = 'none';
+      window.toast.dismiss('toast-limite-produtos');
       return;
     }
 
@@ -1979,26 +1941,12 @@
       }
     }
 
-    function toastImagem(message, type = 'info') {
-      if (typeof window.mostrarToast === 'function') {
-        window.mostrarToast(message, type);
-        return;
-      }
-      alert(message);
+    function exibirToastCarregando(message, id) {
+      window.toast.loading(message, { id });
     }
 
-    function mostrarToastCarregando(message, id) {
-      if (window.toast && typeof window.toast.loading === 'function') {
-        window.toast.loading(message, { id });
-        return;
-      }
-      toastImagem(message, 'info');
-    }
-
-    function fecharToastCarregando(id) {
-      if (window.toast && typeof window.toast.dismiss === 'function') {
-        window.toast.dismiss(id);
-      }
+    function ocultarToastCarregando(id) {
+      window.toast.dismiss(id);
     }
 
     function atualizarToastUpload() {
@@ -2006,11 +1954,11 @@
         const message = activeImageUploadCount === 1
           ? 'Enviando imagem...'
           : `Enviando ${activeImageUploadCount} imagens...`;
-        mostrarToastCarregando(message, IMAGE_UPLOAD_TOAST_ID);
+        exibirToastCarregando(message, IMAGE_UPLOAD_TOAST_ID);
         return;
       }
 
-      fecharToastCarregando(IMAGE_UPLOAD_TOAST_ID);
+      ocultarToastCarregando(IMAGE_UPLOAD_TOAST_ID);
     }
 
     function atualizarToastDelete() {
@@ -2018,11 +1966,11 @@
         const message = activeImageDeleteCount === 1
           ? 'Deletando imagem...'
           : `Deletando ${activeImageDeleteCount} imagens...`;
-        mostrarToastCarregando(message, IMAGE_DELETE_TOAST_ID);
+        exibirToastCarregando(message, IMAGE_DELETE_TOAST_ID);
         return;
       }
 
-      fecharToastCarregando(IMAGE_DELETE_TOAST_ID);
+      ocultarToastCarregando(IMAGE_DELETE_TOAST_ID);
     }
 
     function iniciarUploadImagem() {
@@ -2050,7 +1998,7 @@
       if (!imagem) return;
 
       if (imagem.isPending) {
-        toastImagem('Aguarde o envio da imagem terminar para removê-la.', 'warning');
+        window.toast.show({ message: 'Aguarde o envio da imagem terminar para removê-la.', type: 'warning' });
         return;
       }
 
@@ -2070,14 +2018,14 @@
           }
 
           if (result.shared) {
-            toastImagem('Imagem compartilhada: removida apenas desta ficha. A ficha original não foi alterada.', 'warning');
+            window.toast.show({ message: 'Imagem compartilhada: removida apenas desta ficha. A ficha original não foi alterada.', type: 'warning' });
           } else if (result.notFound) {
-            toastImagem('Imagem removida desta ficha. O arquivo já não existia na nuvem.', 'warning');
+            window.toast.show({ message: 'Imagem removida desta ficha. O arquivo já não existia na nuvem.', type: 'warning' });
           } else {
-            toastImagem('Imagem removida com sucesso!', 'success');
+            window.toast.show({ message: 'Imagem removida com sucesso!', type: 'success' });
           }
         } catch (error) {
-          toastImagem(error?.message || 'Erro ao remover imagem.', 'error');
+          window.toast.show({ message: error?.message || 'Erro ao remover imagem.', type: 'error' });
           return;
         } finally {
           finalizarDeleteImagem();
@@ -2145,7 +2093,7 @@
 
     async function adicionarImagem(file, descricao = '') {
       if (imagens.length >= MAX_IMAGES) {
-        toastImagem(`Máximo de ${MAX_IMAGES} imagens permitido.`, 'warning');
+        window.toast.show({ message: `Máximo de ${MAX_IMAGES} imagens permitido.`, type: 'warning' });
         return false;
       }
 
@@ -2177,7 +2125,7 @@
         imagemPendente.isPending = false;
         imagemPendente.uploadError = message;
         renderizarImagens();
-        toastImagem(message, 'error');
+        window.toast.show({ message, type: 'error' });
 
         if (indiceImagem !== -1) {
           window.setTimeout(() => {
@@ -2205,7 +2153,7 @@
         if (!file.type.startsWith('image/')) continue;
 
         if (imagens.length >= MAX_IMAGES) {
-          toastImagem(`Máximo de ${MAX_IMAGES} imagens atingido.`, 'warning');
+          window.toast.show({ message: `Máximo de ${MAX_IMAGES} imagens atingido.`, type: 'warning' });
           return;
         }
 
@@ -2264,7 +2212,7 @@
           if (!blob) continue;
 
           if (imagens.length >= MAX_IMAGES) {
-            toastImagem(`Máximo de ${MAX_IMAGES} imagens atingido.`, 'warning');
+            window.toast.show({ message: `Máximo de ${MAX_IMAGES} imagens atingido.`, type: 'warning' });
             return;
           }
 
@@ -2402,32 +2350,20 @@
 
   function salvarFicha() {
     if (typeof window.hasPendingImageUploads === 'function' && window.hasPendingImageUploads()) {
-      if (typeof mostrarToast === 'function') {
-        mostrarToast(IMAGE_UPLOAD_PENDING_MESSAGE, 'warning');
-      } else {
-        alert(IMAGE_UPLOAD_PENDING_MESSAGE);
-      }
+      window.toast.show({ message: IMAGE_UPLOAD_PENDING_MESSAGE, type: 'warning' });
       return;
     }
 
     const invalidProductRow = window.fichaProductUtils?.findFirstInvalidProductRow?.();
     if (invalidProductRow) {
-      if (typeof mostrarToast === 'function') {
-        mostrarToast(`Informe o produto na linha ${invalidProductRow.index + 1}.`, 'error');
-      } else {
-        alert(`Informe o produto na linha ${invalidProductRow.index + 1}.`);
-      }
+      window.toast.show({ message: `Informe o produto na linha ${invalidProductRow.index + 1}.`, type: 'error' });
       invalidProductRow.row.querySelector('.produto')?.focus();
       return;
     }
 
     const produtosValidos = window.fichaProductUtils?.collectProductsFromTable?.() || [];
     if (produtosValidos.length === 0) {
-      if (typeof mostrarToast === 'function') {
-        mostrarToast('Adicione pelo menos um produto para salvar a ficha.', 'error');
-      } else {
-        alert('Adicione pelo menos um produto para salvar a ficha.');
-      }
+      window.toast.show({ message: 'Adicione pelo menos um produto para salvar a ficha.', type: 'error' });
       document.querySelector('#produtosTable .produto')?.focus();
       return;
     }
@@ -2465,7 +2401,7 @@
             window.atualizarDataInicioDeTemplate();
           }
         } catch (err) {
-          alert('Erro ao ler arquivo JSON.');
+          window.toast.show({ message: 'Erro ao ler arquivo JSON.', type: 'error' });
         }
       };
       reader.readAsText(file, 'UTF-8');
@@ -2614,7 +2550,7 @@
 
   // Impressão
   function ocultarTodosToasts() {
-    const seletores = ['.toast-global', '#toast-limite-produtos', '#toast-produtos-mesmo-tamanho'];
+    const seletores = ['.toast-global'];
     seletores.forEach(seletor => {
       document.querySelectorAll(seletor).forEach(el => {
         el.style.display = 'none';
@@ -2622,21 +2558,12 @@
     });
   }
 
-  function mostrarToastPreparandoImpressao(texto = 'Preparando impressão...') {
-    if (window.toast && typeof window.toast.loading === 'function') {
-      window.toast.loading(texto, { id: PRINT_PREPARING_TOAST_ID });
-      return;
-    }
-
-    if (typeof window.mostrarToast === 'function') {
-      window.mostrarToast(texto, 'info');
-    }
+  function exibirToastPreparandoImpressao(texto = 'Preparando impressão...') {
+    window.toast.loading(texto, { id: PRINT_PREPARING_TOAST_ID });
   }
 
-  function esconderToastPreparandoImpressao() {
-    if (window.toast && typeof window.toast.dismiss === 'function') {
-      window.toast.dismiss(PRINT_PREPARING_TOAST_ID);
-    }
+  function ocultarToastPreparandoImpressao() {
+    window.toast.dismiss(PRINT_PREPARING_TOAST_ID);
   }
 
   function initPrint() {
@@ -4135,17 +4062,17 @@
         return;
       }
 
-      mostrarToastPreparandoImpressao('Preparando impressão...');
+      exibirToastPreparandoImpressao('Preparando impressão...');
       try {
         await gerarPdfImpressaoApi(printV, {
-          onPrintStart: () => esconderToastPreparandoImpressao()
+          onPrintStart: () => ocultarToastPreparandoImpressao()
         });
       } catch (erroPdf) {
         console.error('Falha ao gerar PDF via API, usando impressão nativa.', erroPdf);
         if (typeof window.mostrarErro === 'function') {
           window.mostrarErro('Falha ao gerar PDF. Abrindo impressão do navegador.');
         }
-        esconderToastPreparandoImpressao();
+        ocultarToastPreparandoImpressao();
         const tinhaClassePreview = document.body.classList.contains('preview-impressao');
         if (tinhaClassePreview) {
           document.body.classList.remove('preview-impressao');
@@ -4155,7 +4082,7 @@
           document.body.classList.add('preview-impressao');
         }
       }
-      esconderToastPreparandoImpressao();
+      ocultarToastPreparandoImpressao();
       if (manterVersaoImpressao) {
         document.body.classList.add('preview-impressao');
       }

@@ -983,7 +983,7 @@
 
       doc.save(`relatorio-${periodo.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.pdf`);
 
-      mostrarToast('PDF exportado com sucesso!', 'success');
+      window.toast.show({ message: 'PDF exportado com sucesso!', type: 'success' });
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       mostrarErro(error.message || 'Erro ao gerar PDF');
@@ -1056,7 +1056,7 @@
       link.download = nomeArquivo;
       link.click();
 
-      mostrarToast('Relatório exportado com sucesso!', 'success');
+      window.toast.show({ message: 'Relatório exportado com sucesso!', type: 'success' });
     } catch (error) {
       console.error('Erro ao exportar Excel:', error);
       mostrarErro('Erro ao gerar relatório: ' + error.message);
@@ -1551,17 +1551,7 @@
   }
 
   function mostrarErro(mensagem) {
-    mostrarToast(mensagem, 'error');
-  }
-
-  function mostrarToast(mensagem, tipo = 'info') {
-    if (window.toast && typeof window.toast.show === 'function') {
-      window.toast.show({ message: mensagem, type: tipo });
-      return;
-    }
-    if (typeof window.mostrarToast === 'function') {
-      window.mostrarToast(mensagem, tipo);
-    }
+    window.toast.show({ message: mensagem, type: 'error' });
   }
 
   function preencherDatalist(listId, values) {

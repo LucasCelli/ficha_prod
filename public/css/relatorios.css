@@ -1056,7 +1056,7 @@
 }
 
 /* ==================== AÇÕES ==================== */
-.card-body.actions {
+body.page-relatorios .card-body.actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-12);
@@ -1276,14 +1276,14 @@
     font-size: 0.82rem;
   }
 
-  .card-body.actions {
+  body.page-relatorios .card-body.actions {
     padding: var(--space-12);
     display: grid;
     grid-template-columns: 1fr;
     gap: var(--space-8);
   }
 
-  .card-body.actions .btn {
+  body.page-relatorios .card-body.actions .btn {
     width: 100%;
     justify-content: center;
   }
