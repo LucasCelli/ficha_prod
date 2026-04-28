@@ -1,4 +1,6 @@
-# SaaS Design Token System
+# Next SaaS Design Token System
+
+Este documento descreve o alvo do design system na migracao para Next.js. Os arquivos atuais em `public/` continuam servindo como referencia temporaria do legado, mas a implementacao nova deve viver em `src/styles`, `src/components/ui` e `src/features`.
 
 ## Primitive Token Table
 
@@ -51,16 +53,20 @@
 
 ## CSS Variable Definitions
 
-Source of truth:
-- `public/css/tokens/colors.css`
-- `public/css/tokens/typography.css`
-- `public/css/tokens/spacing.css`
-- `public/css/tokens/radius.css`
-- `public/css/tokens/shadows.css`
-- `public/css/tokens/z-index.css`
-- `public/css/tokens/motion.css`
+Next target source of truth:
+- `src/styles/tokens/colors.css`
+- `src/styles/tokens/typography.css`
+- `src/styles/tokens/spacing.css`
+- `src/styles/tokens/radius.css`
+- `src/styles/tokens/shadows.css`
+- `src/styles/tokens/z-index.css`
+- `src/styles/tokens/motion.css`
 
 Entrypoint:
+- `src/styles/globals.css` imports or defines the token entrypoint consumed by `src/app/layout.tsx`.
+
+Legacy reference while migration is incomplete:
+- `public/css/tokens/*`
 - `public/css/design-tokens.css`
 
 ## Light Theme
@@ -93,42 +99,50 @@ html[data-theme="dark"] {
 
 ## Component CSS Using Tokens
 
-- `public/css/components/button.css`
-- `public/css/components/form-controls.css`
-- `public/css/components/data-display.css`
-- `public/css/components/feedback.css`
-- `public/css/components/overlays.css`
-- `public/css/components/navigation.css`
-- `public/css/components/dashboard.css`
-- `public/css/components/index.css`
+- `src/components/ui/button.tsx`
+- `src/components/ui/form-control.tsx`
+- `src/components/ui/data-display.tsx`
+- `src/components/ui/toast.tsx`
+- `src/components/ui/modal.tsx`
+- `src/components/ui/navigation.tsx`
+- `src/components/ui/table.tsx`
+- `src/components/ui/badge.tsx`
 
-## Example HTML Using Components
+## Feature Modules Using Components
 
-- Runtime demo: `public/design-system.html`
+- `src/features/dashboard/*`
+- `src/features/clientes/*`
+- `src/features/pedidos/*`
+- `src/features/relatorios/*`
 
 ## Recommended Folder Structure
 
 ```text
-design-system/
-  README.md
-tokens/
-  colors
-  spacing
-  typography
-  radius
-  shadow
-  motion
-  z-index
-themes/
-  light
-  dark
-components/
-  button
-  input
-  card
-  modal
-  toast
-  table
-  sidebar
-  navbar
+design-system.md
+src/
+  app/
+  styles/
+    tokens/
+      colors.css
+      spacing.css
+      typography.css
+      radius.css
+      shadows.css
+      motion.css
+      z-index.css
+    globals.css
+  components/
+    ui/
+      button.tsx
+      input.tsx
+      card.tsx
+      modal.tsx
+      toast.tsx
+      table.tsx
+      navigation.tsx
+  features/
+    dashboard/
+    clientes/
+    pedidos/
+    relatorios/
 ```

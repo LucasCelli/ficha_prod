@@ -6,6 +6,7 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 
 - Migrar com seguranca, em etapas pequenas e verificaveis.
 - Criar telas e fluxos nativos em Next.js, sem embutir ou reaproveitar diretamente as paginas legadas.
+- Organizar a nova aplicacao por modulos em `src/features/*`, com rotas em `src/app/*` e UI compartilhada em `src/components/ui/*`.
 - Usar o sistema atual como referencia de comportamento, regras de negocio e comparacao visual.
 - Modelar dados no Supabase antes de implementar telas dependentes.
 - Validar paridade funcional antes de remover qualquer arquivo legado.
@@ -29,6 +30,8 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 - [ ] Fazer inventario dos estilos e tokens existentes.
 - [ ] Identificar fluxos criticos que precisam existir na nova versao.
 - [ ] Definir quais bugs do legado devem ser corrigidos antes da migracao e quais serao resolvidos apenas na nova versao.
+- [x] Centralizar arquivos Markdown na raiz do projeto.
+- [x] Atualizar `agents.md` com regras de Vercel, Next.js, Supabase e UI.
 
 ### Criterios de aceite
 
@@ -88,11 +91,12 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 - [ ] Configurar variaveis de ambiente para Supabase.
 - [ ] Criar cliente Supabase server-side e client-side conforme necessidade.
 - [ ] Definir estrutura inicial:
-  - [ ] `app/`.
-  - [ ] `components/`.
-  - [ ] `lib/`.
-  - [ ] `features/`.
-  - [ ] `styles/`.
+  - [ ] `src/app/`.
+  - [ ] `src/components/ui/`.
+  - [ ] `src/lib/`.
+  - [ ] `src/lib/supabase/`.
+  - [ ] `src/features/`.
+  - [ ] `src/styles/`.
 - [ ] Definir tokens/design system da nova versao.
 
 ### Criterios de aceite
@@ -304,9 +308,13 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 | 2026-04-27 | Next.js sera uma reconstrucao nativa, nao um wrapper do legado | Evitar carregar complexidade antiga para a arquitetura nova. |
 | 2026-04-27 | Supabase/Postgres sera o alvo de banco da nova versao | Melhor encaixe para relacoes, relatorios, auth, storage e evolucao operacional. |
 | 2026-04-27 | Arquivos legados so serao deletados no fim | Preservar referencia funcional ate a paridade ser validada. |
+| 2026-04-28 | O projeto seguira governanca Vercel/Next.js/Supabase no `agents.md` | Comecar a migracao com regras claras antes de scaffold e alteracoes estruturais. |
+| 2026-04-28 | Arquivos Markdown devem ficar na raiz do projeto | Evitar documentacao operacional dentro de pastas publicas ou de runtime. |
+| 2026-04-28 | A nova arquitetura sera modular em `src/features/*` | Separar regras de negocio por dominio e evitar reproduzir a organizacao HTML/CSS/JS do legado. |
 
 ## Registro de progresso
 
 | Data | Fase | Status | Notas |
 | --- | --- | --- | --- |
 | 2026-04-27 | Planejamento | Feito | Plano inicial criado para orientar a migracao segura para Next.js + Supabase. |
+| 2026-04-28 | Fase 0 | Em andamento | Governanca de migracao adicionada ao `agents.md` e Markdown centralizado na raiz. |
