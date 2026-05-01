@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:legacy": "node --watch server.js",
-    "build": "next build",
+    "build": "node scripts/build-next.mjs",
     "start": "next start",
     "start:legacy": "node server.js",
     "lint": "eslint .",
