@@ -234,3 +234,10 @@
 - Resultado: adicionado `global-error.tsx` minimo e autocontido para o App Router. O preview deploy falhou ao prerenderizar `/_global-error` com erro de `useContext`; a tela global agora nao depende do layout, `ToastProvider` ou primitivas client compartilhadas.
 - Decisao: manter o `error.tsx` de rota com os componentes do design system, mas deixar o erro global com HTML/body proprios, como rota de fallback extremo do Next.
 - Caveat: ainda e necessario republicar a branch de preview e confirmar o novo deploy Vercel.
+
+## 2026-05-01 - Isolamento adicional das telas de erro
+
+- Fase/modulo: preview de producao Vercel.
+- Arquivos alterados: `src/app/error.tsx`, `registro-migracao-next.md`.
+- Resultado: `error.tsx` tambem deixou de importar o barrel `@/components/ui`; a tela de erro de rota agora usa markup direto com as classes globais existentes. Isso reduz o grafo client carregado durante prerender de erro e evita puxar hooks/contextos por exports compartilhados.
+- Caveat: apos o commit, conferir se o erro ativo da Vercel esta no commit novo e nao no deploy antigo `2b93065`.
