@@ -226,3 +226,11 @@
 - Checks: `node --check scripts/check-production-readiness.mjs`, `npm run lint` e scan de mojibake nos arquivos tocados passaram.
 - Decisao: manter a validacao Vercel/producao aberta ate linkar o projeto com Vercel CLI ou conferir as mesmas variaveis/build/dominio pela Dashboard. A checagem local agora documenta exatamente o que falta.
 - Caveat: `npm run prod:check` falha de proposito enquanto o projeto nao estiver linkado a Vercel neste checkout; isso e bloqueio de ambiente, nao falha do app local.
+
+## 2026-05-01 - Correcao do preview deploy Vercel
+
+- Fase/modulo: preview de producao Vercel.
+- Arquivos alterados: `src/app/global-error.tsx`, `registro-migracao-next.md`.
+- Resultado: adicionado `global-error.tsx` minimo e autocontido para o App Router. O preview deploy falhou ao prerenderizar `/_global-error` com erro de `useContext`; a tela global agora nao depende do layout, `ToastProvider` ou primitivas client compartilhadas.
+- Decisao: manter o `error.tsx` de rota com os componentes do design system, mas deixar o erro global com HTML/body proprios, como rota de fallback extremo do Next.
+- Caveat: ainda e necessario republicar a branch de preview e confirmar o novo deploy Vercel.
