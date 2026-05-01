@@ -4,10 +4,10 @@ Objetivo: validar que a versao Next/Supabase pode substituir o legado nos fluxos
 
 ## Ambiente
 
-- [ ] Confirmar variaveis de producao na Vercel: Supabase URL, service role, Cloudinary e secrets de sessao.
+- [x] Confirmar variaveis de producao na Vercel: Supabase URL, service role, Cloudinary e secrets de sessao.
 - [x] Rodar auditoria local de prontidao de producao com `npm run prod:check`.
-- [ ] Linkar o workspace ao projeto Vercel ou validar o projeto direto pela Dashboard.
-- [ ] Rodar build de producao na Vercel sem warnings bloqueantes.
+- [x] Linkar o workspace ao projeto Vercel ou validar o projeto direto pela Dashboard.
+- [x] Rodar build de producao na Vercel sem warnings bloqueantes.
 - [ ] Confirmar que o dominio final aponta para a aplicacao Next correta.
 - [ ] Confirmar backup/export dos dados legados antes da janela de corte.
 

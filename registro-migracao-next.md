@@ -249,3 +249,21 @@
 - Resultado: `npm run build` agora chama um wrapper Node que define `NODE_ENV=production` somente para o processo do Next antes de executar `next build`. O log do deploy indicava `NODE_ENV` nao padrao na Vercel, diferenca que nao existia no build local normal e que pode causar inconsistencias no React/Next durante o prerender.
 - Validacao: `node --check scripts/build-next.mjs`, `npm run lint` e `npm run build` passaram. A simulacao local com `NODE_ENV=preview` deixou de emitir o warning do Next, confirmando que o wrapper normaliza o ambiente antes do build; nesta maquina ela ainda parou em `spawn EPERM`, limitacao local ja vista em builds com workers.
 - Decisao: manter a validacao Vercel/producao aberta ate republicar o preview e confirmar o deploy. Idealmente, remover tambem qualquer variavel `NODE_ENV` customizada no Dashboard da Vercel.
+
+## 2026-05-01 - Validacao Vercel de producao sem deploy
+
+- Fase/modulo: Fase 9, ambiente Vercel de producao.
+- Arquivos alterados: `.gitignore`, `eslint.config.mjs`, `scripts/check-production-readiness.mjs`, `CHECKLIST_HOMOLOGACAO_NEXT.md`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: Vercel CLI autenticado como `lucascelli`, workspace linkado explicitamente ao projeto existente `lucascellis-projects/fichaprimalhas` e `.vercel` adicionado ao `.gitignore`. O auditor `npm run prod:check` foi ajustado para aceitar `npx vercel --version` no Windows quando o binario global `vercel` nao existe.
+- Validacao: `npm run prod:check` passou como `ready-for-production-cutover`, com 191 clientes, 318 fichas, 1791 itens, 396 imagens, 213 catalogos, 2 usuarios, 1 superadmin ativo e 0 usuarios temporarios Codex. `npx vercel env ls` confirmou envs Supabase, Cloudinary e Turso no projeto. `npx vercel pull --yes --environment production` baixou settings/envs para `.vercel` ignorado, e `npx vercel build --prod` passou sem warnings bloqueantes. `eslint.config.mjs` passou a ignorar `.vercel/**` para nao lintar artefatos gerados pelo build.
+- Decisao: marcar a validacao Vercel/producao da Fase 9 como concluida localmente, sem publicar nova versao e sem alterar dominio. Fase 10 continua dependendo de congelar o legado, rodar migracao final de dados, confirmar backup/export, publicar e testar em producao.
+- Caveat: o projeto Vercel ainda lista variaveis legadas como `NODE_ENV`, `PORT`, `DB_PATH`, `RATE_LIMIT_*` e `LOG_LEVEL`; `NODE_ENV` customizado continua recomendado para remocao pela Dashboard antes do corte, embora o build wrapper ja force `production` no processo do Next.
+
+## 2026-05-01 - Correcao do framework Vercel
+
+- Fase/modulo: preview Vercel e roteamento de runtime.
+- Arquivos alterados: `vercel.json`, `registro-migracao-next.md`.
+- Resultado: o preview `dpl_JBvEPrN4oGiskCDCXAaPoBJHEHkj` ficou `READY`, mas `/login` retornou `FUNCTION_INVOCATION_FAILED`. Logs da Vercel mostraram `Cannot find module '@libsql/linux-x64-gnu'` vindo de `server.js`; a inspecao de `.vercel/output/functions/index.func/.vc-config.json` mostrou `framework: express` e `handler: server.js`, ou seja, o projeto Vercel ainda estava usando o preset legado em vez do Next App Router.
+- Ajuste: `vercel.json` agora define `"framework": "nextjs"`, sobrescrevendo o framework `express` salvo no Project Settings e evitando que o deploy use `server.js` como handler principal.
+- Caveat: o primeiro preview remoto depois do ajuste (`dpl_9CVReyGZPu8rbyGZXfsu7C5fCQ9U`) compilou como Next, mas a Vercel avisou que encontrou `.env` no pacote. `.vercelignore` passa a bloquear `.env`, `.env.*`, `.next`, `.vercel`, `node_modules`, logs e `tsconfig.tsbuildinfo` antes da proxima republicacao.
+- Validacao final: preview limpo `dpl_7W76QvxmaASAyEs3e7pvSSnzNwhn` publicado em `https://fichaprimalhas-jje6nwgma-lucascellis-projects.vercel.app`; build remoto usou Next.js/App Router sem aviso de `.env`, `vercel inspect` mostrou funcoes Next como `_not-found` e rotas API, `vercel curl /login` retornou HTML da tela de login e `vercel logs --level error --since 10m` nao encontrou erros. Checks finais: `node --check scripts/check-production-readiness.mjs`, `npm run lint`, `npm run prod:check`, `git diff --check` e scan de mojibake no diff passaram. A copia temporaria `C:\tmp\ficha_prod_vercel_preview`, que recebeu envs de preview durante o teste de symlink, foi removida.

@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { existsSync, readFileSync } from "node:fs";
+import { platform } from "node:os";
 import { spawnSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
 
@@ -14,6 +15,7 @@ const RUNTIME_ENV = [
 
 const CUTOVER_ENV = ["TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN"];
 const TABLES = ["clientes", "fichas", "ficha_itens", "ficha_imagens", "catalog_items", "app_users", "app_sessions"];
+const IS_WINDOWS = platform() === "win32";
 
 let hasBlocker = false;
 
@@ -67,11 +69,20 @@ function checkVercelLink() {
   }
 
   const vercelVersion = spawnSync("vercel", ["--version"], { encoding: "utf8" });
-  mark(vercelVersion.status === 0, "Vercel CLI available", vercelVersion.stdout?.trim() || vercelVersion.stderr?.trim());
+  const npxVercelVersion =
+    vercelVersion.status === 0
+      ? null
+      : IS_WINDOWS
+        ? spawnSync("cmd", ["/c", "npx", "vercel", "--version"], { encoding: "utf8" })
+        : spawnSync("npx", ["vercel", "--version"], { encoding: "utf8" });
+  const cliVersion = vercelVersion.status === 0 ? vercelVersion : npxVercelVersion;
+  const cliDetail = cliVersion?.stdout?.trim() || cliVersion?.stderr?.trim();
+  mark(Boolean(cliVersion && cliVersion.status === 0), "Vercel CLI available", cliDetail);
 
   if (existsSync("vercel.json")) {
     const vercelConfig = JSON.parse(readFileSync("vercel.json", "utf8"));
     mark(vercelConfig.cleanUrls === true, "vercel.json cleanUrls enabled");
+    mark(vercelConfig.framework === "nextjs", "vercel.json framework is Next.js");
     mark(!("rewrites" in vercelConfig), "vercel.json has no legacy rewrites");
     mark(!("headers" in vercelConfig), "vercel.json has no legacy headers");
   } else {

@@ -11,3 +11,5 @@ agents.md
 refactor-plan.md
 playwright.config.js
 tests/
+
+.vercel
