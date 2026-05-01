@@ -1,0 +1,153 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { requireAppSession } from "@/features/auth/session";
+import { getSupabaseConfigStatus } from "@/lib/supabase/env";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import type { ClienteFieldErrors, ClienteFormState } from "./form-state";
+import { clienteFormSchema, type ClienteFormValues } from "./schema";
+
+function getClienteFormInput(formData: FormData) {
+  return {
+    email: formData.get("email"),
+    nome: formData.get("nome"),
+    telefone: formData.get("telefone"),
+  };
+}
+
+function getClientePayload(values: ClienteFormValues) {
+  return {
+    email: values.email,
+    nome: values.nome,
+    telefone: values.telefone,
+  };
+}
+
+function normalizeClienteName(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function getValidationState(fieldErrors: ClienteFieldErrors): ClienteFormState {
+  return {
+    fieldErrors,
+    message: "Revise os campos destacados antes de salvar o cliente.",
+    status: "error",
+  };
+}
+
+export async function createClienteAction(_previousState: ClienteFormState, formData: FormData): Promise<ClienteFormState> {
+  await requireAppSession();
+
+  const parsed = clienteFormSchema.safeParse(getClienteFormInput(formData));
+
+  if (!parsed.success) {
+    return getValidationState(
+      parsed.error.issues.reduce<ClienteFieldErrors>((errors, issue) => {
+        const field = issue.path[0];
+        if (typeof field === "string") {
+          errors[field as keyof ClienteFieldErrors] = issue.message;
+        }
+        return errors;
+      }, {}),
+    );
+  }
+
+  if (!getSupabaseConfigStatus().hasServerConfig) {
+    return {
+      message: "Configure as variáveis de ambiente do Supabase para salvar clientes.",
+      status: "error",
+    };
+  }
+
+  const supabase = createServerSupabaseClient();
+  const nomeNormalizado = normalizeClienteName(parsed.data.nome);
+  const { data: existingCliente } = await supabase
+    .from("clientes")
+    .select("id")
+    .eq("nome_normalizado", nomeNormalizado)
+    .maybeSingle();
+
+  if (existingCliente) {
+    return getValidationState({
+      nome: "Já existe um cliente com esse nome.",
+    });
+  }
+
+  const { data: cliente, error } = await supabase
+    .from("clientes")
+    .insert(getClientePayload(parsed.data))
+    .select("id")
+    .single();
+
+  if (error) {
+    return {
+      message: error.message,
+      status: "error",
+    };
+  }
+
+  revalidatePath("/clientes");
+  redirect(`/clientes/${cliente.id}`);
+}
+
+export async function updateClienteAction(_previousState: ClienteFormState, formData: FormData): Promise<ClienteFormState> {
+  await requireAppSession();
+
+  const id = String(formData.get("id") ?? "").trim();
+  const parsed = clienteFormSchema.safeParse(getClienteFormInput(formData));
+
+  if (!id) {
+    return {
+      message: "Cliente inválido para edição.",
+      status: "error",
+    };
+  }
+
+  if (!parsed.success) {
+    return getValidationState(
+      parsed.error.issues.reduce<ClienteFieldErrors>((errors, issue) => {
+        const field = issue.path[0];
+        if (typeof field === "string") {
+          errors[field as keyof ClienteFieldErrors] = issue.message;
+        }
+        return errors;
+      }, {}),
+    );
+  }
+
+  if (!getSupabaseConfigStatus().hasServerConfig) {
+    return {
+      message: "Configure as variáveis de ambiente do Supabase para editar clientes.",
+      status: "error",
+    };
+  }
+
+  const supabase = createServerSupabaseClient();
+  const nomeNormalizado = normalizeClienteName(parsed.data.nome);
+  const { data: existingCliente } = await supabase
+    .from("clientes")
+    .select("id")
+    .eq("nome_normalizado", nomeNormalizado)
+    .neq("id", id)
+    .maybeSingle();
+
+  if (existingCliente) {
+    return getValidationState({
+      nome: "Já existe outro cliente com esse nome.",
+    });
+  }
+
+  const { error } = await supabase.from("clientes").update(getClientePayload(parsed.data)).eq("id", id);
+
+  if (error) {
+    return {
+      message: error.message,
+      status: "error",
+    };
+  }
+
+  revalidatePath("/clientes");
+  revalidatePath(`/clientes/${id}`);
+  redirect(`/clientes/${id}`);
+}

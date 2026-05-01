@@ -1,26 +1,47 @@
 {
   "name": "fichas-tecnicas",
   "version": "2.0.0",
-  "description": "Sistema de Fichas Técnicas com Turso",
+  "description": "Sistema de Fichas Técnicas em migração para Next.js e Supabase",
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
+    "dev": "next dev",
+    "dev:legacy": "node --watch server.js",
+    "build": "next build",
+    "start": "next start",
+    "start:legacy": "node server.js",
+    "lint": "eslint .",
+    "migrate:legacy": "node scripts/import-legacy-to-supabase.mjs",
+    "seed:auth-user": "node scripts/seed-auth-user.mjs",
+    "seed:catalogos": "node scripts/seed-catalog-items.mjs",
+    "prod:check": "node scripts/check-production-readiness.mjs",
+    "supabase:check": "node scripts/check-supabase-config.mjs",
+    "typecheck": "tsc --noEmit",
     "test:visual": "playwright test tests/visual",
     "test:visual:update": "playwright test tests/visual --update-snapshots"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",
+    "@supabase/supabase-js": "^2.105.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.18.2",
+    "lucide-react": "^1.11.0",
+    "next": "^16.2.4",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "zod": "^3.25.76"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.9.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2"
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.4",
+    "typescript": "^6.0.3"
   }
 }
