@@ -1,8 +1,16 @@
 import type { Metadata } from "next";
-import { FichasOverview } from "@/features/fichas/fichas-overview";
-import { FichaPreview } from "@/features/fichas/ficha-preview";
+import { Suspense } from "react";
 import { Modal } from "@/components/ui/modal";
+import { FichasOverview } from "@/features/fichas/fichas-overview";
 import {
+  FichaPrintPreviewContent,
+  FichaPrintPreviewError,
+  FichaPrintPreviewLoading,
+  FichaPrintPreviewShell,
+} from "@/features/fichas/ficha-print-preview-modal";
+import {
+  type FichaDetailResult,
+  getFichaById,
   listFichas,
   normalizeBooleanFilter,
   normalizeDateFilter,
@@ -21,7 +29,12 @@ type FichasPageProps = {
 
 export default async function FichasPage({ searchParams }: FichasPageProps) {
   const params = await searchParams;
-  const previewId = typeof params?.preview === "string" ? params.preview : null;
+  const printId =
+    typeof params?.print === "string"
+      ? params.print
+      : typeof params?.preview === "string"
+        ? params.preview
+        : null;
   const busca = normalizeTextFilter(params?.busca) ?? normalizeTextFilter(params?.cliente) ?? normalizeTextFilter(params?.arte);
 
   const filters = {
@@ -36,7 +49,7 @@ export default async function FichasPage({ searchParams }: FichasPageProps) {
 
   const searchParamsObj = new URLSearchParams();
   Object.entries(params || {}).forEach(([key, value]) => {
-    if (key !== "preview" && value !== undefined && value !== "undefined" && value !== "") {
+    if (key !== "preview" && key !== "print" && value !== undefined && value !== "undefined" && value !== "") {
       if (Array.isArray(value)) {
         value.forEach((v) => searchParamsObj.append(key, v));
       } else {
@@ -49,11 +62,25 @@ export default async function FichasPage({ searchParams }: FichasPageProps) {
   return (
     <>
       <FichasOverview filters={filters} result={result} />
-      {previewId && (
-        <Modal onCloseHref={onCloseHref} size="lg" title="Visualização da Ficha">
-          <FichaPreview id={previewId} />
+      {printId ? (
+        <Modal onCloseHref={onCloseHref} size="print" title="Prévia de impressão">
+          <FichaPrintPreviewShell printHref={`/fichas/${encodeURIComponent(printId)}/imprimir`}>
+            <Suspense fallback={<FichaPrintPreviewLoading />}>
+              <FichaPrintPreviewModalSlot printId={printId} />
+            </Suspense>
+          </FichaPrintPreviewShell>
         </Modal>
-      )}
+      ) : null}
     </>
   );
+}
+
+async function FichaPrintPreviewModalSlot({ printId }: { printId: string }) {
+  const printResult: FichaDetailResult = await getFichaById(printId);
+
+  if (printResult.kind !== "ok" || !printResult.ficha) {
+    return <FichaPrintPreviewError />;
+  }
+
+  return <FichaPrintPreviewContent ficha={printResult.ficha} />;
 }

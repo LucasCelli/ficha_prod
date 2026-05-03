@@ -23,6 +23,10 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 - Registrar decisoes, riscos e pendencias neste documento.
 - Registrar tambem como cada etapa foi feita e validada para facilitar continuidade em novas instancias.
 
+## Login para testes:
+- Usuário: fernanda
+- PIN: 0022
+
 ## Fase 0. Preparacao e congelamento relativo do legado
 
 **Objetivo:** entender o estado atual e definir uma base segura para comecar.
@@ -231,6 +235,76 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 - [x] PDFs gerados com layout consistente.
 - [ ] Dados conferem com consultas equivalentes.
 
+## Polimento pre-producao
+
+**Objetivo:** fechar paridade operacional fina antes de publicar a versao Next em producao.
+
+### Critico
+
+- [ ] Garantir que o formulario de criacao da ficha tenha o mesmo comportamento do formulario legado.
+- [x] Implementar drag/drop das multiplas imagens, persistindo a ordem visual em `ficha_imagens.ordem`.
+- [x] Implementar Ctrl+V como forma de adicionar imagem na ficha.
+- [x] Implementar botao de reordenamento automatico dos produtos da ficha.
+- [x] Implementar editor rico simples no campo observacoes.
+- [x] Implementar botao de auto-preenchimento de observacoes com regra inicial baseada nos campos da ficha.
+- [x] Confirmar puxada de dados dos catalogos/datalists nos campos de criacao e edicao das fichas.
+- [ ] Portar e validar as regras completas de auto-preenchimento de observacoes contra o legado.
+- [x] Implementar impressao individual da ficha com montagem propria baseada no legado, incluindo layout e dimensionamento de imagens.
+
+### Medio
+
+- [ ] Adicionar pagina de quadro de producao/Kanban no projeto Next.
+
+### Leve
+
+- [ ] Configurar exportacoes PDF finais com PDF personalizado.
+
+## Bibliotecas recomendadas para reduzir hardcode
+
+**Objetivo:** adotar bibliotecas pequenas e bem encaixadas nas frentes pendentes, removendo implementacoes manuais de URL state, datas, toasts, tabelas, Kanban, graficos e editor rico.
+
+### Ja confirmadas no novo stack
+
+- [x] `lucide-react`: icones padrao da nova UI.
+- [x] `zod`: schemas de validacao compartilhados entre formulario e Server Actions.
+- [x] `@hello-pangea/dnd`: drag/drop de produtos e imagens, com ordem persistida.
+- [x] `react-hook-form`: base estrutural do formulario de ficha, especialmente arrays dinamicos e campos condicionais.
+
+### Adotar antes do corte, se a frente correspondente for tocada
+
+- [ ] `nuqs`: substituir sincronizacao manual de filtros/search params em fichas, relatorios e exportacoes.
+- [ ] `date-fns`: centralizar formatacao e calculo de datas, incluindo atraso e periodos em `pt-BR`.
+- [ ] `sonner`: evoluir feedback assincromo com `toast.promise`, principalmente salvar ficha com imagens/upload.
+
+### Adotar na homologacao e listagens
+
+- [ ] `@tanstack/react-table`: substituir o table engine proprio quando sorting, filtros compostos e paginacao ficarem mais exigentes em fichas, clientes e catalogos.
+- [x] `react-day-picker`: iniciar troca de inputs simples de data por seletor visual; ja usado nas datas de inicio/entrega do formulario de ficha.
+
+### Adotar com Dashboard/Kanban
+
+- [ ] `@tanstack/react-query`: cache client-side, refetch e estados de dados vivos para dashboard e quadro de producao.
+- [ ] `react-resizable-panels`: paineis/colunas redimensionaveis no quadro de producao.
+- [ ] `recharts`: graficos do dashboard e relatorios visuais.
+- [ ] `zustand`: preferencias locais e estado interativo do Kanban quando `useState` local deixar de ser suficiente.
+
+### Adotar na paridade fina do editor
+
+- [ ] `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`: substituir o editor rico simples de observacoes quando for fechar a paridade fina com o legado.
+
+### Ordem sugerida
+
+1. `nuqs`, `date-fns`, `sonner`.
+2. `@tanstack/react-table`, `react-day-picker`.
+3. `@tanstack/react-query`, `recharts`, `react-resizable-panels`, `zustand`.
+4. `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`.
+
+### Decisao de uso
+
+- Nao instalar bibliotecas sem uma superficie de migracao no mesmo ciclo.
+- Cada adocao deve remover uma implementacao manual existente ou desbloquear uma frente registrada neste plano.
+- Ao instalar, registrar no plano e no registro qual hardcode foi removido, quais arquivos passaram a depender da biblioteca e quais checks rodaram.
+
 ## Fase 8. Migracao de dados
 
 **Objetivo:** levar os dados do sistema atual para o Supabase com rastreabilidade.
@@ -295,7 +369,7 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 
 - [ ] Congelar alteracoes no legado.
 - [ ] Rodar migracao final de dados.
-- [ ] Validar dados importados.
+- [x] Validar dados importados.
 - [ ] Configurar ambiente de producao.
 - [ ] Publicar nova versao.
 - [ ] Testar fluxos criticos em producao.
@@ -518,3 +592,32 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 | 2026-05-01 | Producao/Vercel | Ajustado | Preview Vercel `dpl_JBvEPrN4oGiskCDCXAaPoBJHEHkj` ficou `READY`, mas `/login` falhou porque o Project Settings ainda estava como `express` e o output usou `server.js`/`@libsql/client` do legado. `vercel.json` agora define `"framework": "nextjs"` para sobrescrever o preset legado e forcar deploy pelo App Router. Arquivos alterados: `vercel.json`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. |
 | 2026-05-01 | Producao/Vercel | Ajustado | Preview remoto Next `dpl_9CVReyGZPu8rbyGZXfsu7C5fCQ9U` compilou, mas avisou que `.env` foi detectado no pacote enviado. Criado `.vercelignore` para bloquear `.env`, `.env.*`, `.next`, `.vercel`, `node_modules`, logs e `tsconfig.tsbuildinfo` nos proximos deploys. Arquivos alterados: `.vercelignore`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. |
 | 2026-05-01 | Producao/Vercel | Feito preview | Preview limpo `dpl_7W76QvxmaASAyEs3e7pvSSnzNwhn` publicado em `https://fichaprimalhas-jje6nwgma-lucascellis-projects.vercel.app`. Build remoto compilou como Next/App Router sem aviso de `.env`; `vercel inspect` mostrou funcoes Next, `vercel curl /login` retornou a tela de login e `vercel logs --level error --since 10m` nao encontrou erros. `scripts/check-production-readiness.mjs` agora tambem valida `"framework": "nextjs"` no `vercel.json`. |
+| 2026-05-01 | Fase 10 | Em andamento | Pre-corte validado sem publicar producao: `npm run prod:check` retornou `ready-for-production-cutover`, `npm run supabase:check` retornou `ready`, preview Vercel limpo sem erros recentes e `npm run migrate:legacy` dry-run confirmou legado e Supabase empatados em 318 fichas, 1791 itens e 396 imagens. Criado `npm run backup:cutover`, gerando snapshot local em `data/backups/` com dados legados Turso e tabelas operacionais Supabase; pasta ignorada no Git para nao versionar dados de cliente. Caveat: congelamento do legado, deploy de producao e dominio continuam pendentes. |
+| 2026-05-01 | Fase 10 | Bloqueio de corte | `vercel inspect fichaprimalhas.vercel.app` confirmou que producao ainda aponta para o deployment Express legado `dpl_Gvpsn4Qg2dFxqFbHnqe86AozjfwF`; `vercel project inspect fichaprimalhas` ainda mostra Framework Preset `Express` no Project Settings. O `vercel.json` versionado deve sobrescrever o framework nos proximos deploys, mas nao foi feito `vercel --prod` porque ainda falta congelar o legado e confirmar credenciais finais/domino. |
+| 2026-05-01 | Polimento/Fichas | Em andamento | Formulario de ficha recebeu primeira fatia de paridade fina: drag/drop para reordenar produtos e imagens via `@hello-pangea/dnd`, botao `Ordenar por tamanho`, Ctrl+V/drop para adicionar imagens, editor rico simples em observacoes e botao `Auto-preencher`. O auto-preenchimento foi aproximado da regra legada com texto em caixa alta, separadores `/` e blocos de tecido, manga, gola, bolso, filete, faixa, personalizacao e nomes/numeros. A criacao e edicao ja recebiam catalogos/datalists por `listCatalogOptionsForFichaForm()`. Arquivos alterados: `package.json`, `package-lock.json`, `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`, `npm run lint` e `npm run build`. Caveat: falta validar visualmente com sessao autenticada e a impressao PDF fiel ao legado continua aberta. |
+| 2026-05-01 | Polimento/Fichas DnD | Ajustado | Drag/drop de produtos e imagens refinado para ficar mais fluido e legivel: `Droppable` agora expõe estado visual de destino, listas destacam a area ativa, cards arrastados recebem elevacao, imagens usam largura de 1/4 do painel em desktop com minimo responsivo, controles de imagem ficam em uma barra propria sem sobrepor badge e imagens novas entram com descricao vazia. Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`, `npm run lint` e `npm run build`. |
+| 2026-05-01 | Polimento/Fichas DnD | Ajustado | Card de imagem inteiro virou handle de arraste do `@hello-pangea/dnd`, preservando edicao do input e botao remover sem iniciar drag. A grade agora segue a regra visual por quantidade: 1 imagem ocupa 1/3 da largura, 2 ocupam 1/2 cada, 3 ocupam 1/3 cada e 4 ocupam 1/4 cada, com minimos responsivos. O input de descricao ganhou estilo do sistema e placeholder especifico. Validado com `npm run typecheck`, `npm run lint` e `npm run build`. |
+| 2026-05-01 | Polimento/Fichas DnD | Ajustado | Corrigido estouro visual durante arraste de imagens com largura maxima aplicada ao item em drag. Regra visual revisada: 1 imagem agora ocupa 1/2 da largura; 2 imagens ocupam 1/2 cada; 3 ocupam 1/3 cada; 4 ocupam 1/4 cada. Topo do card mostra `Imagem N`, badge `Pendente` fica no topo e o botao remover ganhou hover/focus vermelho. Validado com `npm run typecheck`, `npm run lint` e `npm run build`. |
+| 2026-05-01 | Polimento/Fichas DnD | Ajustado | Clone de arraste das imagens voltou a manter o mesmo formato do card em repouso: removido override manual de largura/preview durante drag e fixada a largura do card pela variavel `--image-card-width`, deixando o `@hello-pangea/dnd` preservar as dimensoes medidas. Validado com `npm run typecheck`, `npm run lint` e `npm run build`. |
+| 2026-05-01 | Polimento/Fichas DnD | Ajustado | Preview da imagem travado por quantidade com `--image-preview-height` e `background-size: contain`, impedindo que a imagem escale e aumente o card durante o arraste. Validado com `npm run typecheck`, `npm run lint` e `npm run build`. |
+| 2026-05-01 | Polimento/Fichas DnD | Ajustado | Largura do card de imagem tambem foi travada durante o arraste: `onDragStart` mede o card em pixels e aplica `width/minWidth/maxWidth` no item enquanto ele esta em drag, evitando que percentuais sejam recalculados contra o viewport. Validado com `npm run typecheck`, `npm run lint` e `npm run build`. |
+| 2026-05-01 | Polimento/Fichas DnD | Ajustado | Largura travada antes do primeiro frame de arraste: substituido `onDragStart` por medicao continua com `ResizeObserver`, armazenando a largura real de cada card e aplicando `width/minWidth/maxWidth` no clone durante drag. Validado com `npm run typecheck`, `npm run lint` e `npm run build`. |
+| 2026-05-01 | Polimento/Fichas DnD | Ajustado | Corrigida largura fina do clone: a largura nao e mais medida no card, e sim calculada pela largura da grade (`ResizeObserver`) e quantidade de imagens, aplicando o mesmo valor em pixels em repouso e durante drag. Validado com `npm run typecheck`, `npm run lint` e `npm run build`. |
+| 2026-05-01 | Polimento/Fichas DnD | Ajustado | Inicio do arraste estabilizado: handle de produto deixou de ser `<button>` dentro do formulario e virou handle nao-interativo com `role="button"`; handles/cards receberam `touch-action` e `user-select` adequados, e campos/botoes dentro do card de imagem param `pointerdown` para nao disputar com o sensor de drag. Validado com `npm run typecheck`, `npm run lint` e `npm run build`. |
+| 2026-05-02 | Polimento/Fichas Form | Ajustado estrutural | Instalados `react-hook-form` e `@hookform/resolvers`; `src/features/fichas/ficha-form.tsx` passou a usar `useForm`, `useWatch` e `useFieldArray` para produtos, imagens, observacoes e campos condicionais, mantendo Server Action e payload `itensJson`/`imagensJson` como contrato de persistencia. Reorders agora usam `move()` do field array. Arquivos alterados: `package.json`, `package-lock.json`, `src/features/fichas/ficha-form.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`, `npm run lint` e `npm run build`. Caveat: demais formularios ficam para etapa futura. |
+| 2026-05-02 | Planejamento/Bibliotecas | Planejado | Conteudo de `plugins-recomendados.md` incorporado ao plano como trilha de adocao para reduzir hardcode: `nuqs`, `date-fns` e `sonner` antes do corte quando as frentes forem tocadas; `@tanstack/react-table` e `react-day-picker` na homologacao/listagens; `@tanstack/react-query`, `recharts`, `react-resizable-panels` e `zustand` no Dashboard/Kanban; Tiptap na paridade fina do editor de observacoes. Decisao: nao instalar sem uso no mesmo ciclo; cada biblioteca deve substituir uma implementacao manual ou desbloquear item planejado. Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. |
+| 2026-05-02 | Polimento/Fichas UI | Ajustado | Instalado e iniciado uso de `react-day-picker` no formulario de ficha para datas de inicio/entrega, preservando envio `yyyy-mm-dd` para as Server Actions. Lista de produtos ficou mais parecida com tabela, destaque da secao ficou verde, destaque de imagens ficou cinza, botao `Ordenar por tamanho` foi movido para a direita acima de `Acoes` e o ordenamento automatico recebeu feedback visual. Arquivos alterados: `package.json`, `package-lock.json`, `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`, `npm run lint` e `npm run build`; checagem autenticada em `/fichas/nova` feita com usuario operador de teste. |
+| 2026-05-02 | Polimento/Fichas Produtos | Ajustado | Corrigido `CustomDatalist` dentro da tabela de produtos para nao ficar cortado pelo container; zebra/hover da tabela foram suavizados; botoes de copiar/remover receberam `Tooltip` compartilhado; hover/focus do remover agora usa danger/vermelho. Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com DevTools em `/fichas/nova`, `npm run typecheck` e `npm run lint`. |
+| 2026-05-02 | Polimento/Fichas Datalists | Ajustado | Criado loader `listFichaFormOptions()` para alimentar o formulario com referencias reais: catalogos de `catalog_items`, clientes de `clientes` e vendedores distintos de `fichas`. `Nome do Cliente` e `Vendedor` passaram a usar `CustomDatalist`; campos tecnicos nao caem mais no fallback generico quando as opcoes do Supabase foram carregadas. Arquivos alterados: `src/features/fichas/form-options.ts`, `src/app/fichas/nova/page.tsx`, `src/app/fichas/[id]/page.tsx`, `src/features/fichas/ficha-form.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com DevTools em `/fichas/nova`, `npm run typecheck`, `npm run lint` e `npm run build`. |
+| 2026-05-02 | Polimento/Fichas Observacoes | Ajustado | Campo `Cor da sublimacao` agora aparece somente quando `Personalizacao` e exatamente `sublimacao`. Auto-preenchimento de observacoes passou a rodar em tempo real, seguindo a regra legado rastreada em `public/js/main.js::initObservacoesAutoFill()`, com protecao para nao sobrescrever texto editado manualmente. Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com DevTools em `/fichas/nova`, `npm run typecheck`, `npm run lint` e `npm run build`. |
+| 2026-05-02 | Polimento/Fichas Impressao | Feito inicial | Botao individual de imprimir deixou de apontar para o PDF operacional e passou a abrir `/fichas/[id]/imprimir`. Criado modulo proprio `PrintFicha`, com montagem baseada em `public/ficha.html`, `public/js/main.js::gerarVersaoImpressao()` e classes/CSS de `public/css/style.css` para `#print-version`, produtos, especificacoes, observacoes e imagens. Arquivos alterados: `src/app/fichas/[id]/imprimir/page.tsx`, `src/features/fichas/print-ficha.tsx`, `src/features/fichas/print-on-load.tsx`, `src/features/fichas/print-page-actions.tsx`, `src/features/fichas/ficha-row-actions.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com DevTools em `/fichas/[id]/imprimir?autoprint=0`, `npm run typecheck`, `npm run lint` e `npm run build`. Caveat: PDF operacional `/fichas/pdf` continua separado para listagens. |
+| 2026-05-02 | Polimento/Fichas Impressao | Feito modal | Instalados `@radix-ui/react-dialog` e `@radix-ui/react-alert-dialog`; o `Modal` compartilhado passou para Radix Dialog e a exclusao de ficha passou a usar AlertDialog. A impressao da listagem agora abre `/fichas?print=<id>` em modal com iframe para `/fichas/[id]/imprimir?autoprint=0`, sem nova guia; a pagina de edicao ganhou botao `Imprimir ficha` com modal `?print=1`. A logica de cores da impressao foi alinhada ao legado de `public/js/main.js::gerarVersaoImpressao()`, colorindo por produto ou por descricao quando ha descricoes distintas e usando catalogo/token de cores mais amplo. Arquivos alterados: `package.json`, `package-lock.json`, `src/components/ui/*`, `src/app/fichas/*`, `src/features/fichas/*`, `src/styles/globals.css`, `src/styles/tokens/colors.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`, `npm run lint`, `npm run build` e Edge DevTools em `/fichas?print=<id>` e `/fichas/<id>?print=1`, sem erros de console e sem abrir nova aba. |
+| 2026-05-02 | Polimento/Fichas Impressao | Ajustado | Corrigido empilhamento/layout do modal apos a troca para Radix: como `Overlay` e `Content` sao irmaos no portal, o CSS deixou de centralizar pelo overlay e `.modal-content` passou a ser `position: fixed` centralizado com `z-index` acima de `.modal-overlay`. Validado com Edge DevTools em `/fichas/<id>?print=1`, `elementFromPoint` apontando para o frame/conteudo e screenshot nitido do modal; `npm run typecheck` e `npm run lint` passaram. |
+| 2026-05-02 | Polimento/Fichas Impressao | Ajustado fluxo | Revisada a separacao entre preview e impressao: a acao de preview/visualizar da listagem agora abre a previa de impressao em modal (`/fichas?print=<id>`), enquanto a acao Imprimir navega direto para `/fichas/[id]/imprimir`, sem modal e sem nova guia. Na edicao, o botao `Imprimir ficha` tambem aponta direto para `/fichas/[id]/imprimir`; o modal `?print=1` foi removido dessa pagina. Validado com Edge DevTools na listagem e na edicao; `npm run typecheck`, `npm run lint` e `npm run build` passaram. |
+| 2026-05-02 | Polimento/Fichas Impressao | Ajustado preview | A previa de impressao em modal agora carrega `/fichas/[id]/imprimir?autoprint=0&embed=1`, com layout embed sem `AppShell` e `PrintFicha` em modo documento: sem sidebar, sem toolbar, sem botoes e sem auto-print. O modal contem apenas o iframe da ficha imprimivel e o botao X do proprio modal. Validado com Edge DevTools: iframe sem `.app-frame`, `.app-sidebar`, `.print-page-toolbar`, `#normal-version`, links ou botoes; `#print-version` presente. `npm run typecheck`, `npm run lint` e `npm run build` passaram. |
+| 2026-05-02 | Polimento/Fichas Impressao | Simplificado | Fluxo simplificado conforme decisao final: `PrintFicha` voltou a ser componente puro da ficha imprimivel, sem `PrintOnLoad`, shell, toolbar, botoes ou iframe. A rota `/fichas/[id]/imprimir` renderiza `PrintOnLoad` + `PrintFicha`. O modal de previa em `/fichas?print=<id>` busca a ficha no servidor e renderiza o mesmo `PrintFicha` diretamente dentro do modal. Removidos `FichaPrintDialog`, `print-page-actions`, parametro `embed=1` e o header `x-ficha-print-embed`. Validado com Edge DevTools: modal sem iframe e com `#print-version`; rota `/imprimir?autoprint=0` com `#print-version`, sem toolbar e sem botoes dentro da ficha. `npm run typecheck`, `npm run lint` e `npm run build` passaram. |
+| 2026-05-02 | Polimento/Fichas Impressao | Ajustado experiencia | A previa voltou a ter moldura de modal com header, container visual, botao de imprimir e estado de loading via `Suspense`, mantendo `PrintFicha` puro dentro do corpo. O botao Imprimir da listagem e da edicao deixou de navegar para `/imprimir`; agora dispara a rota tecnica em iframe oculto e preserva a pagina atual. A animacao do modal foi trocada para scale central (`modalScaleIn`) e overlay sem deslocamento. Arquivos alterados: `src/app/fichas/page.tsx`, `src/components/ui/modal.tsx`, `src/features/fichas/ficha-print-preview-modal.tsx`, `src/features/fichas/print-trigger-button.tsx`, `src/features/fichas/ficha-row-actions.tsx`, `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`, `npm run lint`, `npm run build` e Edge DevTools: modal com header/container e `#print-version`, sem iframe na previa; botoes de imprimir criam apenas `iframe.print-trigger-frame`, disparam `print()` e mantem a URL em `/fichas` ou `/fichas/[id]`. |
+| 2026-05-02 | Polimento/Fichas Impressao | Refinado modal | Removida a troca de modal entre loading e conteudo: `/fichas?print=<id>` agora renderiza um unico `Modal` fixo com `FichaPrintPreviewShell`, e apenas o corpo alterna entre loading, erro e `PrintFicha`. A moldura ficou com altura fixa, header estavel e rolagem no corpo. Criado token `--color-print-paper` para manter o fundo da ficha imprimivel branco tambem na previa/tema escuro. Arquivos alterados: `src/app/fichas/page.tsx`, `src/features/fichas/ficha-print-preview-modal.tsx`, `src/styles/globals.css`, `src/styles/tokens/colors.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`, `npm run lint`, `npm run build` e Edge DevTools: `modalCount=1`, `headerCount=1`, `bodyCount=1`, `iframeCount=0`, `paperBackground=rgb(255, 255, 255)`. |
+| 2026-05-02 | Polimento/Fichas Impressao | Ajustado nova ficha | O formulario em `/fichas/nova` voltou a exibir o botao `Imprimir ficha` na area de acoes. Como a ficha ainda nao possui `id`, o controle fica desabilitado com `aria-label`/`title` orientando a salvar antes da impressao, enquanto a edicao continua usando `PrintTriggerButton`. Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`, `npm run lint` e Edge DevTools em `/fichas/nova`: botao presente, desabilitado, ao lado de `Salvar ficha`. |
+| 2026-05-02 | Polimento/Fichas Impressao | Liberado rascunho | A impressao de ficha nao salva foi liberada em `/fichas/nova`: o botao `Imprimir ficha` agora monta uma `FichaDetail` temporaria a partir do estado atual do formulario, renderiza `PrintFicha` em `draft-print-root` via portal e chama `window.print()` sem Supabase, sem rota `/imprimir` e sem mudar a URL. Imagens locais pendentes usam `previewUrl`; fichas sem id saem como `Ficha #rascunho`. Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`, `npm run lint`, `npm run build` e Edge DevTools em `/fichas/nova`: botao habilitado, `draft-print-root` com `#print-version`, `window.print()` chamado e URL preservada. |
+| 2026-05-03 | Fichas/Paginacao | Corrigido | Bug: abrir preview da listagem voltava para pagina 1. Causa: `getFichaPaginationParams()` em `fichas-overview.tsx` nao incluia `page`, entao o param sumia ao montar o href do preview e ao fechar o modal o sistema voltava para pagina 1. Corrigido adicionando `page: filters.page && filters.page > 1 ? String(filters.page) : undefined` no objeto retornado pela funcao, preservando a pagina corrente nos hrefs de preview, impressao e returnTo. Arquivo alterado: `src/features/fichas/fichas-overview.tsx`. |

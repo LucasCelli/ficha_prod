@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge, Card } from "@/components/ui";
-import { listCatalogOptionsForFichaForm } from "@/features/catalogos/data";
 import { FichaForm } from "@/features/fichas/ficha-form";
+import { listFichaFormOptions } from "@/features/fichas/form-options";
 
 export const metadata: Metadata = {
   title: "Nova ficha | Fichas Técnicas",
 };
 
 export default async function NovaFichaPage() {
-  const catalogOptions = await listCatalogOptionsForFichaForm();
+  const formOptions = await listFichaFormOptions();
 
   return (
     <section className="ficha-create" aria-labelledby="nova-ficha-title">
@@ -24,7 +24,7 @@ export default async function NovaFichaPage() {
       </header>
 
       <Card className="ficha-create__card">
-        <FichaForm catalogOptions={catalogOptions} />
+        <FichaForm {...formOptions} />
       </Card>
 
       <Link className="ui-button ui-button--ghost" href="/fichas">

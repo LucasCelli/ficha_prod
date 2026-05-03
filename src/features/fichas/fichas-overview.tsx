@@ -266,6 +266,7 @@ function getFichaPaginationParams(filters: FichaFilters) {
     dataFim: filters.dataFim,
     dataInicio: filters.dataInicio,
     evento: filters.evento === true ? "true" : undefined,
+    page: filters.page && filters.page > 1 ? String(filters.page) : undefined,
     status: filters.status,
   };
 }
@@ -302,8 +303,9 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
       searchParams.set(k, String(v));
     }
   });
-  searchParams.set("preview", ficha.id);
+  searchParams.set("print", ficha.id);
   const href = `/fichas?${searchParams.toString()}`;
+  const printHref = `/fichas/${encodeURIComponent(ficha.id)}/imprimir`;
 
   return (
     <tr>
@@ -347,6 +349,7 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
         <FichaRowActions
           fichaId={ficha.id}
           fichaLabel={ficha.cliente_nome_snapshot}
+          printHref={printHref}
           previewHref={href}
           returnTo={getReturnTo(currentFilters)}
           status={ficha.status}

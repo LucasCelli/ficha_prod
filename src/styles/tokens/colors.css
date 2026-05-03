@@ -12,6 +12,7 @@
   --color-muted: #5f6b7a;
   --color-border: #dce3ed;
   --color-border-subtle: #e8edf5;
+  --color-print-paper: #ffffff;
 
   /* Primary */
   --color-primary: #1677ff;
@@ -41,6 +42,46 @@
   --shadow-inset-subtle: inset 0 1px 2px rgba(0, 0, 0, 0.02);
   --shadow-text-soft: 0 2px 10px rgba(0, 0, 0, 0.1);
   --color-overlay: rgba(0, 0, 0, 0.4);
+
+  --print-product-black: #000000;
+  --print-product-white: #999999;
+  --print-product-royal: #2f5da8;
+  --print-product-navy: #1f3a63;
+  --print-product-turquoise: #2d8c94;
+  --print-product-sky: #7fb7d9;
+  --print-product-petroleum: #2c5f6d;
+  --print-product-gray-melange: #8b8f94;
+  --print-product-charcoal: #5d636a;
+  --print-product-gray: #7a8087;
+  --print-product-green: #1f6b43;
+  --print-product-moss: #5d6b3a;
+  --print-product-lime: #8aaa3a;
+  --print-product-jade: #3f8b73;
+  --print-product-light-green: #8dbb8a;
+  --print-product-canary: #d6b22e;
+  --print-product-yellow: #b58a1f;
+  --print-product-pink: #b44b7a;
+  --print-product-baby-pink: #d8a8bd;
+  --print-product-purple: #6a568a;
+  --print-product-lilac: #9a88b8;
+  --print-product-red: #a54a4a;
+  --print-product-burgundy: #6c3942;
+  --print-product-marsala: #7a4a4e;
+  --print-product-beige: #b7a98d;
+  --print-product-khaki: #9a8f65;
+  --print-product-royal-melange: #6c7ea0;
+  --print-product-navy-melange: #5a677d;
+  --print-product-charcoal-melange: #697079;
+  --print-product-jeans: #4c6c8a;
+  --print-product-ultramarine: #3e5fa0;
+  --print-product-cobalt: #3c5e96;
+  --print-product-salmon: #c98d7a;
+  --print-product-fallback-1: #4c6a8a;
+  --print-product-fallback-2: #8a6a4c;
+  --print-product-fallback-3: #4c7a6e;
+  --print-product-fallback-4: #6e5e8a;
+  --print-product-fallback-5: #8a5e66;
+  --print-product-fallback-6: #5e7a8a;
 }
 
 html[data-theme="dark"] {
@@ -57,6 +98,7 @@ html[data-theme="dark"] {
   --color-muted: #8592a6;
   --color-border: #2a3550;
   --color-border-subtle: #1e2944;
+  --color-print-paper: #ffffff;
 
   /* Primary */
   --color-primary: #4096ff;
@@ -86,4 +128,44 @@ html[data-theme="dark"] {
   --shadow-inset-subtle: inset 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-text-soft: 0 2px 10px rgba(0, 0, 0, 0.3);
   --color-overlay: rgba(0, 0, 0, 0.65);
+
+  --print-product-black: #000000;
+  --print-product-white: #999999;
+  --print-product-royal: #2f5da8;
+  --print-product-navy: #1f3a63;
+  --print-product-turquoise: #2d8c94;
+  --print-product-sky: #7fb7d9;
+  --print-product-petroleum: #2c5f6d;
+  --print-product-gray-melange: #8b8f94;
+  --print-product-charcoal: #5d636a;
+  --print-product-gray: #7a8087;
+  --print-product-green: #1f6b43;
+  --print-product-moss: #5d6b3a;
+  --print-product-lime: #8aaa3a;
+  --print-product-jade: #3f8b73;
+  --print-product-light-green: #8dbb8a;
+  --print-product-canary: #d6b22e;
+  --print-product-yellow: #b58a1f;
+  --print-product-pink: #b44b7a;
+  --print-product-baby-pink: #d8a8bd;
+  --print-product-purple: #6a568a;
+  --print-product-lilac: #9a88b8;
+  --print-product-red: #a54a4a;
+  --print-product-burgundy: #6c3942;
+  --print-product-marsala: #7a4a4e;
+  --print-product-beige: #b7a98d;
+  --print-product-khaki: #9a8f65;
+  --print-product-royal-melange: #6c7ea0;
+  --print-product-navy-melange: #5a677d;
+  --print-product-charcoal-melange: #697079;
+  --print-product-jeans: #4c6c8a;
+  --print-product-ultramarine: #3e5fa0;
+  --print-product-cobalt: #3c5e96;
+  --print-product-salmon: #c98d7a;
+  --print-product-fallback-1: #4c6a8a;
+  --print-product-fallback-2: #8a6a4c;
+  --print-product-fallback-3: #4c7a6e;
+  --print-product-fallback-4: #6e5e8a;
+  --print-product-fallback-5: #8a5e66;
+  --print-product-fallback-6: #5e7a8a;
 }

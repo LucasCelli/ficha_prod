@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, Card, EmptyState } from "@/components/ui";
-import { listCatalogOptionsForFichaForm } from "@/features/catalogos/data";
 import { FichaForm } from "@/features/fichas/ficha-form";
 import { FichaStatusActions } from "@/features/fichas/ficha-status-actions";
 import { getFichaById } from "@/features/fichas/data";
+import { listFichaFormOptions } from "@/features/fichas/form-options";
 
 type FichaPageProps = {
   params: Promise<{
@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: FichaPageProps): Promise<Meta
 
 export default async function FichaPage({ params }: FichaPageProps) {
   const { id } = await params;
-  const [result, catalogOptions] = await Promise.all([getFichaById(id), listCatalogOptionsForFichaForm()]);
+  const [result, formOptions] = await Promise.all([getFichaById(id), listFichaFormOptions()]);
 
   if (result.kind === "not-found") {
     notFound();
@@ -83,7 +83,7 @@ export default async function FichaPage({ params }: FichaPageProps) {
       </header>
 
       <Card className="ficha-create__card">
-        <FichaForm catalogOptions={catalogOptions} ficha={ficha} mode="edit" />
+        <FichaForm {...formOptions} ficha={ficha} mode="edit" />
       </Card>
 
       <Card className="ficha-create__card">

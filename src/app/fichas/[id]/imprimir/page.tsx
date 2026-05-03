@@ -1,0 +1,78 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { EmptyState } from "@/components/ui";
+import { getFichaById } from "@/features/fichas/data";
+import { PrintFicha } from "@/features/fichas/print-ficha";
+import { PrintOnLoad } from "@/features/fichas/print-on-load";
+import { getCurrentSession } from "@/features/auth/session";
+
+type PrintFichaPageProps = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
+export async function generateMetadata({ params }: PrintFichaPageProps): Promise<Metadata> {
+  const { id } = await params;
+  const result = await getFichaById(id);
+
+  if (result.kind !== "ok") {
+    return {
+      title: "Imprimir ficha | Fichas Técnicas",
+    };
+  }
+
+  return {
+    title: `Imprimir ${result.ficha.cliente_nome_snapshot} | Fichas Técnicas`,
+  };
+}
+
+export default async function PrintFichaPage({ params }: PrintFichaPageProps) {
+  const { id } = await params;
+  const result = await getFichaById(id);
+  const session = await getCurrentSession();
+
+  if (result.kind === "not-found") {
+    notFound();
+  }
+
+  if (result.kind === "not-configured") {
+    return (
+      <EmptyState
+        actions={
+          <Link className="ui-button ui-button--secondary" href="/fichas">
+            Voltar para fichas
+          </Link>
+        }
+        title="Supabase ainda não configurado"
+        description="A impressão individual precisa carregar a ficha no Supabase."
+      />
+    );
+  }
+
+  if (result.kind === "error") {
+    return (
+      <EmptyState
+        actions={
+          <Link className="ui-button ui-button--secondary" href="/fichas">
+            Voltar para fichas
+          </Link>
+        }
+        title="Não foi possível carregar a ficha"
+        description={`A consulta ao Supabase falhou: ${result.message}`}
+      />
+    );
+  }
+
+  if (!result.ficha) {
+    notFound();
+  }
+
+  return (
+    <>
+      <PrintOnLoad />
+      <PrintFicha ficha={result.ficha} printedBy={session?.user.displayName.split(" ")[0]} />
+    </>
+  );
+}

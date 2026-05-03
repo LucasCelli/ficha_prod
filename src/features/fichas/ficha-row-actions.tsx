@@ -4,14 +4,16 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { CheckCircle2, Eye, MoreHorizontal, Pencil, Printer, Trash2 } from "lucide-react";
-import { FloatingMenu, FloatingMenuButton, FloatingMenuLink, Modal, Tooltip, useToast } from "@/components/ui";
+import { AlertDialog, FloatingMenu, FloatingMenuButton, FloatingMenuLink, Tooltip, useToast } from "@/components/ui";
 import { deleteFichaAction, markFichaEntregueFormAction } from "./actions";
 import type { FichaStatus } from "./data";
 import { getInitialFichaDeleteActionState } from "./form-state";
+import { PrintTriggerButton } from "./print-trigger-button";
 
 type FichaRowActionsProps = {
   fichaId: string;
   fichaLabel: string;
+  printHref: string;
   previewHref: string;
   returnTo: string;
   status: FichaStatus;
@@ -21,13 +23,12 @@ function createConfirmationCode() {
   return Math.random().toString(36).slice(2, 6).toUpperCase();
 }
 
-export function FichaRowActions({ fichaId, fichaLabel, previewHref, returnTo, status }: FichaRowActionsProps) {
+export function FichaRowActions({ fichaId, fichaLabel, previewHref, printHref, returnTo, status }: FichaRowActionsProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmationCode, setConfirmationCode] = useState(() => createConfirmationCode());
   const [deleteState, deleteFormAction] = useActionState(deleteFichaAction, getInitialFichaDeleteActionState());
   const { show } = useToast();
   const editHref = `/fichas/${fichaId}`;
-  const printHref = `/fichas/pdf?id=${encodeURIComponent(fichaId)}`;
 
   useEffect(() => {
     if (deleteState.status === "error" && deleteState.message) {
@@ -47,22 +48,16 @@ export function FichaRowActions({ fichaId, fichaLabel, previewHref, returnTo, st
   return (
     <>
       <div className="ficha-row-actions" aria-label={`Ações da ficha ${fichaLabel}`}>
-        <Tooltip label="Visualizar ficha">
-          <Link aria-label={`Visualizar ficha ${fichaLabel}`} className="icon-action" href={previewHref} prefetch={false} scroll={false}>
+        <Tooltip label="Prévia de impressão">
+          <Link aria-label={`Abrir prévia de impressão da ficha ${fichaLabel}`} className="icon-action" href={previewHref} prefetch={false} scroll={false}>
             <Eye aria-hidden="true" size={17} />
           </Link>
         </Tooltip>
 
         <Tooltip label="Imprimir ficha">
-          <Link
-            aria-label={`Imprimir ficha ${fichaLabel}`}
-            className="icon-action"
-            href={printHref}
-            target="_blank"
-            rel="noreferrer"
-          >
+          <PrintTriggerButton className="icon-action" href={printHref} label={`Imprimir ficha ${fichaLabel}`}>
             <Printer aria-hidden="true" size={17} />
-          </Link>
+          </PrintTriggerButton>
         </Tooltip>
 
         <Tooltip label="Editar ficha">
@@ -89,12 +84,12 @@ export function FichaRowActions({ fichaId, fichaLabel, previewHref, returnTo, st
         <FloatingMenu label={`Mais ações da ficha ${fichaLabel}`} trigger={<MoreHorizontal aria-hidden="true" size={18} />}>
           <FloatingMenuLink href={previewHref} prefetch={false} scroll={false}>
             <Eye aria-hidden="true" size={16} />
-            Visualizar
+            Prévia de impressão
           </FloatingMenuLink>
-          <FloatingMenuLink href={printHref} target="_blank" rel="noreferrer">
+          <PrintTriggerButton className="floating-menu__item" href={printHref} label={`Imprimir ficha ${fichaLabel}`} role="menuitem">
             <Printer aria-hidden="true" size={16} />
             Imprimir
-          </FloatingMenuLink>
+          </PrintTriggerButton>
           <FloatingMenuLink href={editHref}>
             <Pencil aria-hidden="true" size={16} />
             Editar
@@ -141,7 +136,7 @@ function DeleteFichaDialog({
   const canDelete = useMemo(() => typedCode.trim().toUpperCase() === confirmationCode, [confirmationCode, typedCode]);
 
   return (
-    <Modal onClose={onClose} size="sm" title="Remover ficha">
+    <AlertDialog onClose={onClose} size="sm" title="Remover ficha">
       <section className="confirm-dialog" aria-describedby="delete-ficha-description">
         <header className="confirm-dialog__header">
           <div>
@@ -173,7 +168,7 @@ function DeleteFichaDialog({
               maxLength={4}
               name="confirmationInput"
               onChange={(event) => setTypedCode(event.target.value)}
-              placeholder="Digite o código…"
+              placeholder="Digite o código..."
               value={typedCode}
             />
           </label>
@@ -186,7 +181,7 @@ function DeleteFichaDialog({
           </div>
         </form>
       </section>
-    </Modal>
+    </AlertDialog>
   );
 }
 

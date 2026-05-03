@@ -1,5 +1,6 @@
 export { AppShell } from "./app-shell";
 export { AppNavigation } from "./app-navigation";
+export { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogDescription } from "./alert-dialog";
 export { Badge } from "./badge";
 export { Button } from "./button";
 export { Card } from "./card";

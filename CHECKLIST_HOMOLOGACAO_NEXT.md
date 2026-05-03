@@ -9,7 +9,7 @@ Objetivo: validar que a versao Next/Supabase pode substituir o legado nos fluxos
 - [x] Linkar o workspace ao projeto Vercel ou validar o projeto direto pela Dashboard.
 - [x] Rodar build de producao na Vercel sem warnings bloqueantes.
 - [ ] Confirmar que o dominio final aponta para a aplicacao Next correta.
-- [ ] Confirmar backup/export dos dados legados antes da janela de corte.
+- [x] Confirmar backup/export dos dados legados antes da janela de corte.
 
 ## Autenticacao e perfis
 

@@ -267,3 +267,169 @@
 - Ajuste: `vercel.json` agora define `"framework": "nextjs"`, sobrescrevendo o framework `express` salvo no Project Settings e evitando que o deploy use `server.js` como handler principal.
 - Caveat: o primeiro preview remoto depois do ajuste (`dpl_9CVReyGZPu8rbyGZXfsu7C5fCQ9U`) compilou como Next, mas a Vercel avisou que encontrou `.env` no pacote. `.vercelignore` passa a bloquear `.env`, `.env.*`, `.next`, `.vercel`, `node_modules`, logs e `tsconfig.tsbuildinfo` antes da proxima republicacao.
 - Validacao final: preview limpo `dpl_7W76QvxmaASAyEs3e7pvSSnzNwhn` publicado em `https://fichaprimalhas-jje6nwgma-lucascellis-projects.vercel.app`; build remoto usou Next.js/App Router sem aviso de `.env`, `vercel inspect` mostrou funcoes Next como `_not-found` e rotas API, `vercel curl /login` retornou HTML da tela de login e `vercel logs --level error --since 10m` nao encontrou erros. Checks finais: `node --check scripts/check-production-readiness.mjs`, `npm run lint`, `npm run prod:check`, `git diff --check` e scan de mojibake no diff passaram. A copia temporaria `C:\tmp\ficha_prod_vercel_preview`, que recebeu envs de preview durante o teste de symlink, foi removida.
+
+## 2026-05-01 - Pre-corte de dados e backup local
+
+- Fase/modulo: Fase 10, pre-corte de dados.
+- Arquivos alterados: `.gitignore`, `package.json`, `scripts/export-cutover-snapshot.mjs`, `CHECKLIST_HOMOLOGACAO_NEXT.md`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: criado `npm run backup:cutover` para gerar snapshot local em `data/backups/`, ignorado no Git. O snapshot exporta fichas legadas do Turso, tabelas operacionais do Supabase e resumo seguro de usuarios sem PIN/hash.
+- Validacao: `npm run prod:check` passou como `ready-for-production-cutover`; `npm run supabase:check` retornou `ready`; `npm run migrate:legacy` em dry-run encontrou 318 fichas, 1791 produtos mapeaveis e 396 imagens Cloudinary mapeaveis, iguais as contagens atuais do Supabase. `npm run backup:cutover` gerou `data\backups\cutover-snapshot-2026-05-01T14-27-12-654Z.json` com 318 fichas legadas, 191 clientes, 318 fichas Supabase, 1791 itens, 396 imagens, 213 catalogos e 2 usuarios no resumo.
+- Decisao: marcar backup/export e validacao de dados como concluidos para o pre-corte. Nao marcar migracao final nem publicacao porque o legado ainda nao foi congelado e o dominio de producao ainda nao foi trocado.
+- Caveat: os usuarios ativos encontrados sao `nhx` como superadmin e `fernanda` como operadora; manter `Criar credenciais finais de producao` aberto ate confirmacao explicita de que esses acessos sao finais.
+- Gate de producao: `vercel inspect fichaprimalhas.vercel.app` confirmou que o dominio de producao ainda aponta para `dpl_Gvpsn4Qg2dFxqFbHnqe86AozjfwF`, criado em 2026-05-01 00:25, com build Express/funcao `index`. `vercel project inspect fichaprimalhas` ainda mostra Framework Preset `Express` no Project Settings; o `vercel.json` versionado com `"framework": "nextjs"` deve sobrescrever isso no proximo deploy, mas a publicacao de producao ficou bloqueada ate congelamento/ok explicito.
+
+## 2026-05-01 - Polimento do formulario de fichas
+
+- Fase/modulo: polimento pre-producao, formulario de criacao/edicao de fichas.
+- Arquivos alterados: `package.json`, `package-lock.json`, `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: adicionado `@hello-pangea/dnd` como base compartilhavel para drag/drop. O formulario Next agora permite reordenar produtos e imagens com `DragDropContext`/`Droppable`/`Draggable`, adicionar imagens por selecao, drop ou Ctrl+V, ordenar produtos automaticamente por tamanho, editar observacoes com toolbar simples e gerar auto-preenchimento aproximado da regra legada com texto em caixa alta, separadores `/` e blocos de tecido, manga, gola, bolso, filete, faixa, personalizacao e nomes/numeros.
+- Confirmacao de paridade ja existente: criacao e edicao carregam os mesmos catalogos/datalists via `listCatalogOptionsForFichaForm()`, preservando produtos, tamanhos, tecidos, cores, mangas, acabamentos, golas e bolsos ativos.
+- Validacao: `npm run typecheck`, `npm run lint` e `npm run build` passaram. Abertura local de `/fichas/nova` redirecionou para `/login`, confirmando a protecao da rota; validacao visual autenticada ainda depende de PIN/sessao. `npm install @hello-pangea/dnd` reportou 4 vulnerabilidades no grafo atual; nao foi rodado `npm audit fix` automatico para evitar upgrades fora de escopo.
+- Decisao: registrar o polimento como checklist proprio no plano principal para separar itens ja implementados das pendencias criticas restantes.
+- Caveat: ainda falta validar visualmente a regra de auto-preenchimento com sessao autenticada e reconstruir a impressao/PDF individual fiel ao legado antes de considerar a paridade critica fechada.
+
+### Ajuste de fluidez do drag/drop
+
+- Ajuste: produtos e imagens agora usam o snapshot do `Droppable` para destacar a area de destino durante o arraste, e os cards arrastados recebem elevacao visual.
+- Ajuste: a grade de imagens passou a dimensionar cada card como 1/4 da largura disponivel em desktop, com minimo responsivo para nao esmagar em telas pequenas.
+- Ajuste: botoes de reordenar/remover imagem foram movidos para uma barra propria no card; a badge `Pendente` deixou de ficar sobreposta ao handle de drag/drop.
+- Ajuste: novas imagens adicionadas por selecao, drop ou Ctrl+V entram com a descricao vazia; o nome do arquivo fica apenas como fallback interno no upload.
+- Ajuste: o card inteiro da imagem passou a ser o handle de drag/drop, economizando espaco; o input de descricao e o botao remover param a propagacao para nao iniciar arraste durante edicao/remocao.
+- Ajuste: a grade de imagens agora segue a regra de largura por quantidade: 1 imagem com 1/3 da largura total, 2 imagens com 1/2 cada, 3 imagens com 1/3 cada e 4 imagens com 1/4 cada, mantendo minimos responsivos.
+- Ajuste: o input de descricao recebeu estilo do sistema, foco visivel e placeholder especifico (`Ex: frente, costas, detalhe do bordado`), deixando de parecer input generico.
+- Ajuste: corrigido estouro visual durante o arraste com largura maxima aplicada ao item em drag; 1 imagem passou para 1/2 da largura total.
+- Ajuste: topo do card agora mostra `Imagem N`, a badge `Pendente` fica no topo e o botao remover recebeu hover/focus vermelho.
+- Ajuste: clone de arraste das imagens voltou a manter o mesmo formato do card em repouso; removido override manual de largura/preview durante drag e fixada a largura do card pela variavel `--image-card-width`, deixando o `@hello-pangea/dnd` preservar as dimensoes medidas.
+- Ajuste: preview da imagem travado por quantidade com `--image-preview-height` e `background-size: contain`, impedindo que a imagem escale e aumente o card durante o arraste.
+- Ajuste: largura do card de imagem tambem foi travada durante o arraste; `onDragStart` mede o card em pixels e aplica `width/minWidth/maxWidth` no item enquanto ele esta em drag, evitando que percentuais sejam recalculados contra o viewport.
+- Ajuste: medicao de largura passou de `onDragStart` para `ResizeObserver`, guardando a largura real de cada card antes do primeiro frame de arraste e aplicando `width/minWidth/maxWidth` no clone.
+- Ajuste: corrigida largura fina do clone; a largura agora e calculada pela largura da grade e quantidade de imagens, nao pelo card potencialmente deformado, e aplicada em pixels tanto em repouso quanto durante drag.
+- Ajuste: inicio do arraste estabilizado; handle de produto deixou de ser `<button>` dentro do formulario e virou handle nao-interativo com `role="button"`, handles/cards receberam `touch-action` e `user-select` adequados, e campos/botoes dentro do card de imagem param `pointerdown` para nao disputar com o sensor de drag.
+- Validacao: `npm run typecheck`, `npm run lint` e `npm run build` passaram.
+
+## 2026-05-02 - React Hook Form no formulario de fichas
+
+- Fase/modulo: polimento pre-producao, formulario de criacao/edicao de fichas.
+- Arquivos alterados: `package.json`, `package-lock.json`, `src/features/fichas/ficha-form.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: instalados `react-hook-form` e `@hookform/resolvers`. O `FichaForm` agora usa `useForm`, `useWatch` e `useFieldArray` como fonte central para produtos, imagens, observacoes e campos condicionais de ficha.
+- Resultado: operacoes dinamicas de produtos/imagens migraram para field arrays: adicionar, duplicar, remover, ordenar por tamanho, reordenar por drag/drop e substituir imagens apos upload usam `append`, `remove`, `move`, `replace` e `update`.
+- Decisao: manter por enquanto a Server Action e os hidden payloads `itensJson`/`imagensJson` como contrato final, reduzindo risco nesta troca estrutural.
+- Validacao: `npm run typecheck`, `npm run lint` e `npm run build` passaram.
+- Caveat: `npm install react-hook-form @hookform/resolvers` manteve 4 vulnerabilidades reportadas no grafo atual; nao foi rodado `npm audit fix` automatico para evitar upgrades fora de escopo. Demais formularios ficam para ponto futuro.
+
+## 2026-05-02 - Planejamento de bibliotecas recomendadas
+
+- Fase/modulo: planejamento de polimento e reducao de hardcode.
+- Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: `plugins-recomendados.md` foi incorporado ao plano principal como trilha de adocao por frente: URL state/filtros, datas, toasts async, tabelas, date range picker, dashboard/Kanban, graficos, estado local e editor rico.
+- Decisao: nao instalar todas as bibliotecas em lote. Cada pacote entra junto da implementacao que remove hardcode real ou fecha uma pendencia do plano.
+- Ordem registrada: `nuqs`, `date-fns` e `sonner`; depois `@tanstack/react-table` e `react-day-picker`; depois `@tanstack/react-query`, `recharts`, `react-resizable-panels` e `zustand`; por fim Tiptap para a paridade fina das observacoes.
+- Validacao: edicao documental; sem build necessario.
+
+## 2026-05-02 - Refinamento visual do formulario de ficha
+
+- Fase/modulo: polimento pre-producao, formulario de criacao/edicao de fichas.
+- Arquivos alterados: `package.json`, `package-lock.json`, `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: instalado `react-day-picker` e criado `DatePickerField` para `dataInicio` e `dataEntrega`, mantendo o valor enviado como `yyyy-mm-dd` para nao alterar o contrato das Server Actions.
+- Resultado: a secao de produtos deixou de usar destaque warning/alaranjado e passou para verde/success. A area de imagens passou a usar destaque cinza. A lista de produtos foi reestilizada como tabela compacta, com cabecalho, linhas alternadas, bordas contidas e hover sutil.
+- Resultado: o botao `Ordenar por tamanho` saiu do rodape e foi para a direita acima da coluna `Acoes`; ao ordenar, a lista recebe flash visual e um status curto `Produtos ordenados`.
+- Validacao: `npm run typecheck`, `npm run lint` e `npm run build` passaram. Login local com operador de teste abriu `http://localhost:3000/fichas/nova`; DevTools confirmou formulario autenticado, produtos com destaque verde, imagens com destaque cinza, date picker abrindo e feedback `Produtos ordenados` ao usar o botao de ordenacao.
+- Caveat: `npm install react-day-picker` manteve as 4 vulnerabilidades ja reportadas no grafo atual; nao foi rodado `npm audit fix` automatico para evitar upgrades fora de escopo.
+
+### Ajuste da tabela de produtos
+
+- Ajuste: o `CustomDatalist` de produtos deixou de ficar preso/cortado dentro da tabela. A lista de produtos agora permite overflow visivel e eleva a celula/linha focada para o menu ficar selecionavel.
+- Ajuste: zebra e hover da tabela foram suavizados; as linhas pares nao usam mais o fundo secundario forte e o hover deixou de pintar a linha de verde.
+- Ajuste: botoes de copiar/remover produto usam o `Tooltip` compartilhado. O botao remover recebeu classe propria e hover/focus em danger/vermelho.
+- Validacao: DevTools em `/fichas/nova` confirmou o menu de produto abrindo para fora da tabela e o hover danger do remover. `npm run typecheck` e `npm run lint` passaram.
+
+### Ajuste das origens dos datalists
+
+- Ajuste: criado `src/features/fichas/form-options.ts` para centralizar as referencias do formulario. O loader combina catalogos de `catalog_items`, clientes de `clientes` e vendedores distintos de `fichas`.
+- Ajuste: `Nome do Cliente` e `Vendedor` trocaram input/datalist nativo por `CustomDatalist`. O vendedor nao usa mais lista hardcoded.
+- Ajuste: `getOptions()` do `FichaForm` nao usa mais `FALLBACK_CATALOG_OPTIONS` quando a pagina passou um mapa de catalogos, mesmo que algum kind esteja vazio. Assim campos tecnicos vazios indicam catalogo ausente em vez de mostrar sugestoes genericas.
+- Validacao: DevTools em `/fichas/nova` confirmou sugestoes reais para cliente (`clientes`), vendedor (`fichas.vendedor`) e produto (`catalog_items`). `npm run typecheck`, `npm run lint` e `npm run build` passaram.
+
+### Ajuste de observacoes em tempo real
+
+- Ajuste: `Cor da sublimacao` passou a ser condicional e aparece somente quando `Personalizacao` e exatamente `sublimacao`.
+- Ajuste: o auto-preenchimento de `Observacoes` agora roda em tempo real ao alterar produto, material, acabamentos, personalizacao e nomes/numeros.
+- Origem legado: a regra foi rastreada em `public/js/main.js`, funcao `initObservacoesAutoFill()`, incluindo o padrao de `ultimoTextoAuto` e bloqueio quando o usuario edita manualmente.
+- Decisao: manter a protecao de texto manual no Next; o botao `Auto-preencher` continua como acao forcada para regenerar o texto.
+- Validacao: DevTools em `/fichas/nova` confirmou que o campo de cor aparece com `sublimacao`, some ao trocar para `bordado` e as observacoes recalculam de `PERSONALIZADO EM SUBLIMACAO` para `PERSONALIZADO EM BORDADO` sem recarregar. `npm run typecheck`, `npm run lint` e `npm run build` passaram.
+
+### Impressao individual da ficha
+
+- Ajuste: o botao individual de imprimir na listagem deixou de abrir `/fichas/pdf?id=...` e passou a abrir `/fichas/[id]/imprimir`, separando impressao individual do PDF operacional de listagem.
+- Ajuste: criada a rota `src/app/fichas/[id]/imprimir/page.tsx` e os modulos `PrintFicha`, `PrintOnLoad` e `PrintPageActions`.
+- Origem legado: estrutura copiada conceitualmente de `public/ficha.html` (`#print-version`, `print-card`, `print-two-cols`, `print-table`, `print-imagesContainer`), montagem baseada em `public/js/main.js::gerarVersaoImpressao()` e estilos baseados no trecho de impressao de `public/css/style.css`.
+- Resultado: a ficha impressa agora e montada a partir dos dados da ficha carregados do Supabase, com dados do pedido, produtos, totais, especificacoes tecnicas, observacoes ricas e imagens ordenadas.
+- Comportamento: a rota dispara `window.print()` automaticamente; `?autoprint=0` fica como parametro interno de validacao para inspecionar o layout sem abrir o dialogo de impressao.
+- Validacao: DevTools confirmou `/fichas/[id]/imprimir?autoprint=0` com `#print-version`, 5 secoes, linhas de produto e imagem renderizada. `npm run typecheck`, `npm run lint` e `npm run build` passaram.
+
+## 2026-05-02 - Impressao em modal e cores do legado
+
+- Fase/modulo: polimento pre-producao, impressao individual de fichas.
+- Arquivos alterados: `package.json`, `package-lock.json`, `src/components/ui/modal.tsx`, `src/components/ui/alert-dialog.tsx`, `src/components/ui/index.ts`, `src/app/fichas/page.tsx`, `src/app/fichas/[id]/page.tsx`, `src/features/fichas/ficha-form.tsx`, `src/features/fichas/ficha-print-dialog.tsx`, `src/features/fichas/ficha-row-actions.tsx`, `src/features/fichas/fichas-overview.tsx`, `src/features/fichas/print-ficha.tsx`, `src/styles/globals.css`, `src/styles/tokens/colors.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: instalados `@radix-ui/react-dialog` e `@radix-ui/react-alert-dialog`; o modal compartilhado usa Radix Dialog e a confirmacao de exclusao usa AlertDialog.
+- Resultado: a impressao da listagem nao abre mais nova guia. O link gera `/fichas?print=<id>` e renderiza um modal com iframe para `/fichas/[id]/imprimir?autoprint=0`. A edicao ganhou botao `Imprimir ficha`, que abre o mesmo modal com `?print=1`.
+- Resultado: a logica de cores da tabela impressa foi alinhada ao legado em `public/js/main.js::gerarVersaoImpressao()`: quando ha mais de um produto ou mais de uma descricao, aplica cores; quando descricoes distintas existem, a descricao vira referencia de cor e a coluna de detalhes tambem recebe a cor. O catalogo de cores foi ampliado e movido para tokens de impressao.
+- Decisao: manter `/fichas/[id]/imprimir` como rota formal e usar o modal apenas como camada de preview/acao, evitando abrir aba e preservando URL recuperavel.
+- Validacao: `npm run typecheck`, `npm run lint` e `npm run build` passaram. Edge DevTools confirmou `/fichas?print=7f8ed7ad-1378-4099-a084-9e54752fcf3e` com um modal, iframe para `/imprimir?autoprint=0`, `#print-version` carregado, nenhum erro de console e somente uma aba aberta. Em `/fichas/7f8ed7ad-1378-4099-a084-9e54752fcf3e?print=1`, o botao de edicao abriu o mesmo modal sem erros.
+- Caveat: `npm install @radix-ui/react-dialog @radix-ui/react-alert-dialog` manteve as 4 vulnerabilidades ja reportadas no grafo atual; nao foi rodado `npm audit fix` automatico para evitar upgrades fora de escopo.
+
+### Ajuste de empilhamento do modal
+
+- Ajuste: apos a troca para Radix, `Overlay` e `Content` deixaram de ter relacao pai/filho. O CSS antigo tentava centralizar o modal pelo overlay, o que deixou o backdrop/blur competindo com o conteudo. `.modal-overlay` agora e apenas a camada fixa de fundo, e `.modal-content` virou `position: fixed` centralizado, com `z-index` acima do overlay.
+- Validacao: Edge DevTools em `/fichas/7f8ed7ad-1378-4099-a084-9e54752fcf3e?print=1` confirmou `overlayZ=50`, `contentZ=51`, `contentPosition=fixed`, `elementFromPoint` no frame da impressao e screenshot nitido do modal. `npm run typecheck` e `npm run lint` passaram.
+
+### Ajuste do fluxo preview/imprimir
+
+- Ajuste: a acao de preview/visualizar da listagem passou a abrir a previa de impressao em modal por `/fichas?print=<id>`.
+- Ajuste: a acao `Imprimir` deixou de abrir modal; agora vai direto para `/fichas/[id]/imprimir`, rota que dispara a impressao automaticamente e nao abre nova guia.
+- Ajuste: o botao `Imprimir ficha` da pagina de edicao tambem aponta direto para `/fichas/[id]/imprimir`; o modal `?print=1` foi removido dessa tela.
+- Validacao: Edge DevTools confirmou na listagem que `Visualizar` gera `/fichas?print=<id>` com modal/iframe de previa, enquanto `Imprimir` gera `/fichas/<id>/imprimir`, sem modal e com `#print-version` renderizado. Na edicao, o botao aponta para `/imprimir` e nao existe mais link `print=1`. `npm run typecheck`, `npm run lint` e `npm run build` passaram.
+
+### Ajuste da previa limpa
+
+- Ajuste: a previa no modal deixou de carregar a pagina completa de impressao. O iframe agora usa `/fichas/[id]/imprimir?autoprint=0&embed=1`.
+- Ajuste: `proxy.ts` sinaliza `x-ficha-print-embed=1` para essa URL, e `src/app/layout.tsx` nao envolve esse modo com `AppShell`.
+- Ajuste: `PrintFicha` ganhou modo `document`, que renderiza somente a ficha imprimivel (`#print-version`), sem `PrintOnLoad`, sem toolbar `#normal-version`, sem botao `Voltar` e sem botao `Imprimir`.
+- Ajuste: `FichaPrintDialog` ficou apenas com o iframe da ficha; sem cabecalho ou botao de imprimir dentro do modal.
+- Validacao: Edge DevTools confirmou no iframe `hasAppShell=false`, ausencia de `.app-frame`, `.app-sidebar`, `.print-page-toolbar`, `#normal-version`, links e botoes, com `#print-version` presente e screenshot limpo da ficha. `npm run typecheck`, `npm run lint` e `npm run build` passaram.
+
+### Simplificacao final do fluxo
+
+- Ajuste: removido o desvio por iframe/embed. `PrintFicha` voltou a ser o componente puro da ficha imprimivel, sem `PrintOnLoad`, sem modo, sem toolbar, sem shell, sem links e sem botoes.
+- Ajuste: `/fichas/[id]/imprimir` agora compoe `PrintOnLoad` + `PrintFicha`, mantendo a impressao direta nessa rota.
+- Ajuste: o modal de previa em `/fichas?print=<id>` busca a ficha no servidor e renderiza o mesmo `PrintFicha` diretamente dentro do modal.
+- Remocao: apagados `src/features/fichas/ficha-print-dialog.tsx` e `src/features/fichas/print-page-actions.tsx`; removidos `embed=1`, `x-ficha-print-embed` e a excecao correspondente em `src/app/layout.tsx`.
+- Validacao: Edge DevTools confirmou previa sem iframe, com `#print-version` direto dentro do modal; rota `/fichas/[id]/imprimir?autoprint=0` com `#print-version`, sem toolbar e sem botoes dentro de `.ficha-print-page`. `npm run typecheck`, `npm run lint` e `npm run build` passaram.
+
+### Ajuste da experiencia de impressao
+
+- Ajuste: a previa em modal voltou a ter camada visual propria (`FichaPrintPreviewModal`), com header, container, botao de imprimir e estado de loading (`FichaPrintPreviewLoading`) enquanto a ficha e carregada.
+- Ajuste: `PrintFicha` continua puro e e renderizado somente dentro do corpo da previa; o header e os botoes pertencem ao modal, nao ao componente imprimivel.
+- Ajuste: os botoes `Imprimir` da listagem e `Imprimir ficha` da edicao foram trocados para `PrintTriggerButton`, que cria um `iframe.print-trigger-frame` oculto para carregar `/fichas/[id]/imprimir` e disparar `window.print()` sem alterar a URL atual nem abrir modal.
+- Ajuste: o modal deixou de usar animacao de subida e agora abre com scale a partir do centro (`modalScaleIn`); o overlay ganhou `modalOverlayIn`, sem deslocamento.
+- Validacao: `npm run typecheck`, `npm run lint` e `npm run build` passaram. Edge DevTools confirmou `/fichas?print=7f8ed7ad-1378-4099-a084-9e54752fcf3e` com header/container de preview, `#print-version` no corpo, nenhum iframe dentro da previa e animacao `modalScaleIn`. Na listagem e na edicao, clicar em imprimir manteve a URL em `/fichas` ou `/fichas/[id]`, criou somente `iframe.print-trigger-frame` com `/imprimir?_print=...` e disparou `print()` no iframe.
+
+### Refinamento do modal de previa
+
+- Ajuste: removida a sensacao de dois modais. O `Modal` agora fica fora do `Suspense`, com tamanho fixo e header estavel em `FichaPrintPreviewShell`; somente o corpo alterna entre loading, erro e conteudo.
+- Ajuste: o loading deixou de renderizar outro header/modal e passou a ocupar o corpo fixo da previa.
+- Ajuste: a ficha imprimivel recebeu fundo branco por token `--color-print-paper`, aplicado em `.ficha-print-page` e `.print-container` dentro da previa.
+- Validacao: `npm run typecheck`, `npm run lint` e `npm run build` passaram. Edge DevTools confirmou um unico `.modal-content`, um unico header, um unico corpo com rolagem, nenhum iframe dentro da previa e `paperBackground=rgb(255, 255, 255)`.
+
+### Botao de impressao na nova ficha
+
+- Ajuste: `/fichas/nova` voltou a mostrar `Imprimir ficha` na area de acoes do formulario.
+- Decisao: como a ficha nova ainda nao tem `id` persistido, o botao fica desabilitado com `aria-label` e `title` informando que a impressao e liberada apos salvar; em edicao, o mesmo ponto continua acionando `PrintTriggerButton`.
+- Validacao: `npm run typecheck` e `npm run lint` passaram. Edge DevTools confirmou em `/fichas/nova` o botao `Imprimir ficha` presente, desabilitado, ao lado de `Salvar ficha`.
+
+### Impressao de rascunho nao salvo
+
+- Ajuste: a decisao anterior foi substituida. Em `/fichas/nova`, `Imprimir ficha` agora fica habilitado e imprime um rascunho local.
+- Implementacao: `FichaForm` monta uma `FichaDetail` temporaria com os valores atuais do formulario, itens, observacoes e imagens locais (`previewUrl` quando ainda nao foram enviadas), renderiza `PrintFicha` em `draft-print-root` via portal e chama `window.print()`.
+- Decisao: rascunhos sem registro no Supabase usam `Ficha #rascunho`; a impressao nao chama rota `/fichas/[id]/imprimir`, nao grava dados e nao altera a URL atual.
+- Validacao: `npm run typecheck`, `npm run lint` e `npm run build` passaram. Edge DevTools confirmou em `/fichas/nova` que o botao esta habilitado, cria `draft-print-root` com `#print-version`, chama `window.print()` e permanece em `/fichas/nova`.
