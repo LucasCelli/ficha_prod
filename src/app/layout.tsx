@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { Toaster } from "sonner";
 import { AppShell, ToastProvider } from "@/components/ui";
 import { getCurrentSession } from "@/features/auth/session";
 import "@/styles/globals.css";
@@ -54,6 +55,7 @@ export default async function RootLayout({
         <ToastProvider>
           {isLoginRoute ? children : <AppShell session={session} title="Aplicacao Fichas Tecnicas">{children}</AppShell>}
         </ToastProvider>
+        <Toaster position="bottom-center" />
       </body>
     </html>
   );
