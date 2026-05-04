@@ -6,6 +6,7 @@ const PRINT_RENDER_SCALE = 1.6;
 const PRINT_PAGE_MARGIN_MM = 6;
 const PRINT_FRAME_CLEANUP_MS = 60_000;
 const PRINT_FRAME_LOAD_TIMEOUT_MS = 15_000;
+const PRINT_FRAME_PRINT_DELAY_MS = 500;
 
 type ManagedStyle = Pick<CSSStyleDeclaration, "height" | "margin" | "maxHeight" | "minHeight" | "overflow" | "padding" | "width">;
 
@@ -16,12 +17,7 @@ type ManagedFrame = {
 
 export async function printElementToPdf(element: HTMLElement) {
   const blobUrl = await renderElementToPdfUrl(element);
-
-  try {
-    await openPdfInPrintFrame(blobUrl);
-  } finally {
-    URL.revokeObjectURL(blobUrl);
-  }
+  await openPdfInPrintFrame(blobUrl);
 }
 
 async function renderElementToPdfUrl(element: HTMLElement) {
@@ -119,11 +115,18 @@ function waitForLayout() {
   });
 }
 
+function waitForPrintFrameReady() {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, PRINT_FRAME_PRINT_DELAY_MS);
+  });
+}
+
 async function openPdfInPrintFrame(blobUrl: string) {
   const { dispose, iframe } = createPrintFrame();
 
   try {
     await waitForFrameLoad(iframe, blobUrl);
+    await waitForPrintFrameReady();
 
     const frameWindow = iframe.contentWindow;
     if (!frameWindow) {
@@ -133,7 +136,10 @@ async function openPdfInPrintFrame(blobUrl: string) {
     frameWindow.focus();
     frameWindow.print();
   } finally {
-    window.setTimeout(dispose, PRINT_FRAME_CLEANUP_MS);
+    window.setTimeout(() => {
+      dispose();
+      URL.revokeObjectURL(blobUrl);
+    }, PRINT_FRAME_CLEANUP_MS);
   }
 }
 

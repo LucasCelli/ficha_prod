@@ -324,10 +324,26 @@ function shouldLetServerValidateBeforeUpload(formData: FormData) {
   }
 }
 
+function serializeImageItems(images: ImageFormItem[]) {
+  return JSON.stringify(
+    images
+      .filter((image) => image.publicId && image.secureUrl)
+      .map((image) => ({
+        altText: image.altText.trim(),
+        bytes: image.bytes,
+        height: image.height,
+        publicId: image.publicId,
+        secureUrl: image.secureUrl,
+        width: image.width,
+      })),
+  );
+}
+
 export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "create", vendedorOptions = [] }: FichaFormProps) {
   const action = mode === "edit" ? updateFichaAction : createFichaAction;
   const [state, formAction] = useActionState(action, getInitialFichaFormState());
   const formRef = useRef<HTMLFormElement>(null);
+  const imagensJsonInputRef = useRef<HTMLInputElement>(null);
   const imageGridRef = useRef<HTMLDivElement | null>(null);
   const imagensRef = useRef<ImageFormItem[]>([]);
   const lastToastMessageRef = useRef<string | null>(null);
@@ -629,6 +645,9 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
       flushSync(() => {
         replaceImageItems(uploadedImages);
       });
+      if (imagensJsonInputRef.current) {
+        imagensJsonInputRef.current.value = serializeImageItems(uploadedImages);
+      }
       submitAfterUploadRef.current = true;
       formRef.current?.requestSubmit();
     } catch (error) {
@@ -1050,18 +1069,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
       }))
       .filter((item) => item.produto || item.tamanho || item.quantidade || item.detalhesProduto),
   );
-  const serializedImages = JSON.stringify(
-    imagens
-      .filter((image) => image.publicId && image.secureUrl)
-      .map((image) => ({
-        altText: image.altText.trim(),
-        bytes: image.bytes,
-        height: image.height,
-        publicId: image.publicId,
-        secureUrl: image.secureUrl,
-        width: image.width,
-      })),
-  );
+  const serializedImages = serializeImageItems(imagens);
   const lockedImageCardWidth = imageGridWidth ? getImageCardWidthFromGrid(imageGridWidth, imagens.length) : null;
 
   useEffect(() => {
@@ -1079,7 +1087,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
       onSubmit={handleSubmit}
     >
       {ficha ? <input name="id" type="hidden" value={ficha.id} /> : null}
-      <input name="imagensJson" type="hidden" value={serializedImages} />
+      <input ref={imagensJsonInputRef} name="imagensJson" type="hidden" value={serializedImages} />
       <input name="itensJson" type="hidden" value={serializedItems} />
       {state.message ? (
         <div className="form-banner" role="alert">
