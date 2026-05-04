@@ -12,6 +12,5 @@ export { Modal } from "./modal";
 export { ModuleOverview } from "./module-overview";
 export { Pagination } from "./pagination";
 export { StatusPanel } from "./status-panel";
-export { ToastProvider, useToast } from "./toast-provider";
 export { Tooltip } from "./tooltip";
 export { ThemeToggle } from "./theme-toggle";

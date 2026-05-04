@@ -1,13 +1,12 @@
 "use client";
 
-import { LoaderCircle, Printer } from "lucide-react";
-import type { ReactNode } from "react";
+import { Printer } from "lucide-react";
+import type { MouseEvent, ReactNode } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 import type { FichaDetail } from "./data";
 import { PrintFicha } from "./print-ficha";
+import { printElementToPdf } from "./print-pdf";
 import { PrintTriggerButton } from "./print-trigger-button";
 
 type FichaPrintPreviewShellProps = {
@@ -19,115 +18,38 @@ type FichaPrintPreviewContentProps = {
   ficha: FichaDetail;
 };
 
+const PREVIEW_PRINT_TOAST_ID = "ficha-print-preview";
+
 export function FichaPrintPreviewShell({ children, printHref }: FichaPrintPreviewShellProps) {
   const [isPrinting, setIsPrinting] = useState(false);
 
-  async function handlePrint(event: React.MouseEvent<HTMLButtonElement>) {
+  async function handlePrint(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
+
     const element = document.getElementById("print-version");
-    if (!element) return;
+    if (!element) {
+      toast.error("Falha ao imprimir", {
+        description: "A prévia de impressão não foi encontrada.",
+      });
+      return;
+    }
 
     setIsPrinting(true);
-    // Safety timeout to reset loading state
-    const safetyTimeout = setTimeout(() => setIsPrinting(false), 10000);
+    toast.loading("Impressão", {
+      description: "Montando o PDF da ficha.",
+      duration: Infinity,
+      id: PREVIEW_PRINT_TOAST_ID,
+    });
+
     try {
-      const originalWidth = element.style.width;
-      const originalMargin = element.style.margin;
-      const originalPadding = element.style.padding;
-      const originalHeight = element.style.height;
-      const originalMinHeight = element.style.minHeight;
-      const originalMaxHeight = element.style.maxHeight;
-      const originalOverflow = element.style.overflow;
-
-      element.style.margin = '0 auto';
-      element.style.padding = '0';
-      element.style.height = 'auto';
-      element.style.minHeight = '0';
-      element.style.maxHeight = 'none';
-      element.style.overflow = 'visible';
-
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Set width to A4 width in px to maximize width
-      element.style.width = '794px';
-
-      const toastId = toast.loading("Carregando Impressão");
-
-        const canvas = await html2canvas(element, {
-          scale: 1.6,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-        });
-
-
-
-        const imgData = canvas.toDataURL("image/jpeg", 0.9);
-
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-        compress: true
-      });
-
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const contentWidth = pageWidth - (6 * 2);
-      const contentHeight = pageHeight - (6 * 2);
-
-      const pxToMm = 25.4 / 96;
-      let renderWidth = canvas.width * pxToMm;
-      let renderHeight = canvas.height * pxToMm;
-      const fitScale = Math.min(contentWidth / renderWidth, contentHeight / renderHeight, 1);
-      renderWidth *= fitScale;
-      renderHeight *= fitScale;
-
-        const offsetX = (pageWidth - renderWidth) / 2;
-        const offsetY = 6; // Always place at top
-
-        if (renderWidth > 0 && renderHeight > 0) {
-          pdf.addImage(imgData, "JPEG", offsetX, offsetY, renderWidth, renderHeight, undefined, 'FAST');
-        } else {
-          pdf.text("Ficha em branco ou sem conteúdo para imprimir", 10, 20);
-        }
-
-        const blob = pdf.output('blob');
-        const blobUrl = URL.createObjectURL(blob);
-
-        const iframe = document.createElement('iframe');
-        iframe.setAttribute('aria-hidden', 'true');
-        iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:1px;height:1px;border:0;opacity:0.01;';
-
-        iframe.addEventListener('load', () => {
-          setTimeout(() => {
-            try {
-              const frameWindow = iframe.contentWindow;
-              if (frameWindow) {
-                frameWindow.focus();
-                frameWindow.print();
-                toast.dismiss(toastId);
-                // Remove after time — do not use afterprint
-                setTimeout(() => {
-                  iframe.remove();
-                  URL.revokeObjectURL(blobUrl);
-                }, 300000); // 5 minutes
-              }
-            } catch (error) {
-              console.error('Print failed:', error);
-              toast.dismiss(toastId);
-              iframe.remove();
-              URL.revokeObjectURL(blobUrl);
-            }
-          }, 500);
-        }, { once: true });
-
-        document.body.appendChild(iframe);
-        iframe.src = blobUrl;
+      await printElementToPdf(element);
     } catch (error) {
       console.error("Error generating PDF:", error);
+      toast.error("Falha ao imprimir", {
+        description: "Não foi possível gerar o PDF desta ficha.",
+      });
     } finally {
-      clearTimeout(safetyTimeout);
+      toast.dismiss(PREVIEW_PRINT_TOAST_ID);
       setIsPrinting(false);
     }
   }
@@ -167,7 +89,7 @@ export function FichaPrintPreviewLoading() {
   return (
     <div className="ficha-print-preview__body ficha-print-preview__body--loading" role="status" aria-live="polite">
       <div className="ficha-print-preview__loading">
-        <LoaderCircle aria-hidden="true" size={18} />
+        <span className="button-spinner button-spinner--contrast" aria-hidden="true" />
         Carregando prévia
       </div>
       <div className="ficha-print-preview__skeleton" aria-hidden="true" />

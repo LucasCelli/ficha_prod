@@ -4,7 +4,8 @@ import type { FormEvent } from "react";
 import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, Save } from "lucide-react";
-import { Button, useToast } from "@/components/ui";
+import { toast } from "sonner";
+import { Button } from "@/components/ui";
 import { saveOperadorAction } from "./actions";
 import { getInitialUsuarioFormState } from "./form-state";
 import type { Operador } from "./types";
@@ -16,19 +17,17 @@ type UsuarioFormProps = {
 export function UsuarioForm({ operador }: UsuarioFormProps) {
   const [state, formAction] = useActionState(saveOperadorAction, getInitialUsuarioFormState());
   const [showPin, setShowPin] = useState(false);
-  const { show } = useToast();
   const lastToastRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!state.message || lastToastRef.current === state.message) return;
 
-    show({
-      message: state.message,
-      title: state.status === "success" ? "Operador salvo" : "Pendência no operador",
-      type: state.status === "success" ? "success" : "error",
-    });
+    const title = state.status === "success" ? "Operador salvo" : "Pendência no operador";
+    const description = state.message === title ? undefined : state.message;
+    const toastFn = state.status === "success" ? toast.success : toast.error;
+    toastFn(title, { description });
     lastToastRef.current = state.message;
-  }, [show, state]);
+  }, [state]);
 
   function handlePinInput(event: FormEvent<HTMLInputElement>) {
     const input = event.currentTarget;

@@ -11,6 +11,7 @@ export type FichaListItem = Pick<
   Database["public"]["Tables"]["fichas"]["Row"],
   | "id"
   | "cliente_nome_snapshot"
+  | "data_inicio"
   | "data_entrega"
   | "status"
   | "kanban_status"
@@ -93,7 +94,7 @@ export async function listFichas(filters: FichaFilters = {}): Promise<FichaListR
     let query = supabase
       .from("fichas")
       .select(
-        "id, cliente_nome_snapshot, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, ficha_imagens(url)",
+        "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, ficha_imagens(url)",
         { count: "exact" },
       )
       .order("created_at", { ascending: false })
@@ -175,7 +176,7 @@ export async function listFichasForOperationalPdf(filters: FichaFilters = {}): P
     let query = supabase
       .from("fichas")
       .select(
-        "id, cliente_nome_snapshot, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento",
+        "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento",
         { count: "exact" },
       )
       .order("created_at", { ascending: false })

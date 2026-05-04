@@ -3,7 +3,8 @@
 import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { Save } from "lucide-react";
-import { Button, useToast } from "@/components/ui";
+import { toast } from "sonner";
+import { Button } from "@/components/ui";
 import type { ClienteDetail } from "./data";
 import { createClienteAction, updateClienteAction } from "./actions";
 import { getInitialClienteFormState } from "./form-state";
@@ -16,7 +17,6 @@ type ClienteFormProps = {
 export function ClienteForm({ cliente, mode = "create" }: ClienteFormProps) {
   const action = mode === "edit" ? updateClienteAction : createClienteAction;
   const [state, formAction] = useActionState(action, getInitialClienteFormState());
-  const { show } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
   const lastToastMessageRef = useRef<string | null>(null);
 
@@ -26,11 +26,9 @@ export function ClienteForm({ cliente, mode = "create" }: ClienteFormProps) {
     if (state.message && lastToastMessageRef.current !== state.message) {
       const message = state.message;
       window.setTimeout(() => {
-        show({
+        toast.error("Pendência no cliente", {
+          description: message,
           id: "cliente-form-error",
-          message,
-          title: "Pendência no cliente",
-          type: "error",
         });
       }, 0);
       lastToastMessageRef.current = message;
@@ -38,7 +36,7 @@ export function ClienteForm({ cliente, mode = "create" }: ClienteFormProps) {
 
     const firstInvalid = formRef.current?.querySelector<HTMLElement>("[aria-invalid='true']");
     firstInvalid?.focus();
-  }, [show, state]);
+  }, [state]);
 
   return (
     <form ref={formRef} className="cliente-form" action={formAction} noValidate>

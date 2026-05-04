@@ -228,7 +228,7 @@ function PrintField({
 }) {
   const formattedValue = formatValue(value);
   const lowerValue = String(formattedValue).trim().toLowerCase();
-  
+
   if (!forceShow && (!lowerValue || lowerValue === "-" || lowerValue === "não" || lowerValue === "nao" || lowerValue === "nenhum" || lowerValue === "sem bolso")) {
     return null;
   }
@@ -284,7 +284,7 @@ function buildProductRows(ficha: FichaDetail): PrintProductRow[] {
     if (shouldApplyColors) {
       const reference = useDetailsColor ? item.rawColorReference : item.produto;
       const key = normalizeKey(reference);
-      
+
       if (key && colorMap.has(key)) {
         colorClass = colorMap.get(key)!;
       } else {

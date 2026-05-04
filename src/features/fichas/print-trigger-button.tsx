@@ -4,6 +4,10 @@ import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+const FRAME_CLEANUP_MS = 60_000;
+const PRINT_JOB_SIGNAL = "ficha:print-dialog-opened";
+const PRINT_SIGNAL_TIMEOUT_MS = 45_000;
+
 type PrintTriggerButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   children: ReactNode;
   href: string;
@@ -23,33 +27,83 @@ export function PrintTriggerButton({ children, className, disabled, href, label,
 
     const separator = href.includes("?") ? "&" : "?";
     const frame = document.createElement("iframe");
+    const printJobId = `print-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const toastId = `${href}:print`;
+    let cleanupJob: (() => void) | null = null;
 
     setIsPrinting(true);
-    const toastId = toast.loading("Carregando Impressão");
     frame.className = "print-trigger-frame";
     frame.title = label;
+    frame.setAttribute("aria-hidden", "true");
+
+    toast.loading("Impressão", {
+      description: "Carregando a ficha para impressão.",
+      duration: Infinity,
+      id: toastId,
+    });
+
+    function finish() {
+      toast.dismiss(toastId);
+      setIsPrinting(false);
+      cleanupJob?.();
+      cleanupJob = null;
+    }
+
+    cleanupJob = watchPrintSignal(printJobId, finish);
+
     frame.onload = () => {
-      window.setTimeout(() => setIsPrinting(false), 1200);
-      window.setTimeout(() => toast.dismiss(toastId), 5000); // Dismiss toast after 5 seconds
-      window.setTimeout(() => frame.remove(), 300000); // Remove iframe after 5 minutes
+      window.setTimeout(() => frame.remove(), FRAME_CLEANUP_MS);
     };
+
+    frame.onerror = () => {
+      finish();
+      frame.remove();
+      toast.error("Falha ao imprimir", {
+        description: "Não foi possível abrir a impressão desta ficha.",
+      });
+    };
+
     document.body.appendChild(frame);
-    frame.src = `${href}${separator}_print=${Date.now()}`;
+    frame.src = `${href}${separator}_print=${Date.now()}&_printJob=${encodeURIComponent(printJobId)}`;
   }
 
   return (
-    <>
-      <button
-        aria-disabled={isDisabled}
-        aria-label={label}
-        className={className}
-        disabled={isDisabled}
-        onClick={handleClick}
-        type={type}
-        {...props}
-      >
-        {children}
-      </button>
-    </>
+    <button
+      aria-disabled={isDisabled}
+      aria-label={label}
+      className={className}
+      disabled={isDisabled}
+      onClick={handleClick}
+      type={type}
+      {...props}
+    >
+      {children}
+    </button>
   );
+}
+
+function watchPrintSignal(printJobId: string, onReady: () => void) {
+  const timeoutId = window.setTimeout(() => {
+    onReady();
+  }, PRINT_SIGNAL_TIMEOUT_MS);
+
+  function handleMessage(event: MessageEvent) {
+    const data = event.data;
+    if (!data || typeof data !== "object") {
+      return;
+    }
+
+    if (data.type !== PRINT_JOB_SIGNAL || data.printJobId !== printJobId) {
+      return;
+    }
+
+    onReady();
+  }
+
+  window.addEventListener("message", handleMessage);
+
+  return () => {
+    window.clearTimeout(timeoutId);
+    window.removeEventListener("message", handleMessage);
+  };
 }

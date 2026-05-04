@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { CheckCircle2, Eye, MoreHorizontal, Pencil, Printer, Trash2 } from "lucide-react";
-import { AlertDialog, FloatingMenu, FloatingMenuButton, FloatingMenuLink, Tooltip, useToast } from "@/components/ui";
+import { toast } from "sonner";
+import { AlertDialog, FloatingMenu, FloatingMenuButton, FloatingMenuLink, Tooltip } from "@/components/ui";
 import { deleteFichaAction, markFichaEntregueFormAction } from "./actions";
 import type { FichaStatus } from "./data";
 import { getInitialFichaDeleteActionState } from "./form-state";
@@ -27,18 +28,15 @@ export function FichaRowActions({ fichaId, fichaLabel, previewHref, printHref, r
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmationCode, setConfirmationCode] = useState(() => createConfirmationCode());
   const [deleteState, deleteFormAction] = useActionState(deleteFichaAction, getInitialFichaDeleteActionState());
-  const { show } = useToast();
   const editHref = `/fichas/${fichaId}`;
 
   useEffect(() => {
     if (deleteState.status === "error" && deleteState.message) {
-      show({
-        message: deleteState.message,
-        title: "Não foi possível excluir",
-        type: "error",
+      toast.error("Não foi possível excluir", {
+        description: deleteState.message,
       });
     }
-  }, [deleteState.message, deleteState.status, show]);
+  }, [deleteState.message, deleteState.status]);
 
   function openDeleteModal() {
     setConfirmationCode(createConfirmationCode());

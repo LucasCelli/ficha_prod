@@ -3,7 +3,8 @@
 import { useActionState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Save } from "lucide-react";
-import { Button, useToast } from "@/components/ui";
+import { toast } from "sonner";
+import { Button } from "@/components/ui";
 import { saveCatalogItemAction } from "./actions";
 import { getInitialCatalogoFormState } from "./form-state";
 import type { CatalogItem, CatalogKind } from "./types";
@@ -23,19 +24,17 @@ function getMetadataText(item: CatalogItem | undefined, key: string) {
 
 export function CatalogoForm({ item, selectedKind }: CatalogoFormProps) {
   const [state, formAction] = useActionState(saveCatalogItemAction, getInitialCatalogoFormState());
-  const { show } = useToast();
   const lastToastRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!state.message || lastToastRef.current === state.message) return;
 
-    show({
-      message: state.message,
-      title: state.status === "success" ? "Catálogo atualizado" : "Pendência no catálogo",
-      type: state.status === "success" ? "success" : "error",
-    });
+    const title = state.status === "success" ? "Catálogo atualizado" : "Pendência no catálogo";
+    const description = state.message === title ? undefined : state.message;
+    const toastFn = state.status === "success" ? toast.success : toast.error;
+    toastFn(title, { description });
     lastToastRef.current = state.message;
-  }, [show, state]);
+  }, [state]);
 
   return (
     <form action={formAction} className="catalog-form">

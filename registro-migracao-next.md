@@ -433,3 +433,78 @@
 - Implementacao: `FichaForm` monta uma `FichaDetail` temporaria com os valores atuais do formulario, itens, observacoes e imagens locais (`previewUrl` quando ainda nao foram enviadas), renderiza `PrintFicha` em `draft-print-root` via portal e chama `window.print()`.
 - Decisao: rascunhos sem registro no Supabase usam `Ficha #rascunho`; a impressao nao chama rota `/fichas/[id]/imprimir`, nao grava dados e nao altera a URL atual.
 - Validacao: `npm run typecheck`, `npm run lint` e `npm run build` passaram. Edge DevTools confirmou em `/fichas/nova` que o botao esta habilitado, cria `draft-print-root` com `#print-version`, chama `window.print()` e permanece em `/fichas/nova`.
+
+### Limpeza estrutural de impressao e notificacoes
+
+- Ajuste: removida a duplicacao entre `print-on-load.tsx` e `ficha-print-preview-modal.tsx`. Os dois fluxos agora reutilizam `src/features/fichas/print-pdf.ts` para preparar `#print-version`, rasterizar com `html2canvas`, montar o PDF com `jsPDF`, abrir o blob em iframe tecnico e disparar `print()` com timeout e cleanup centralizados.
+- Ajuste: `PrintTriggerButton` deixou de importar `sonner` direto e voltou a conversar com a camada da aplicacao (`useToast`), mantendo loading/erro consistentes e cleanup mais curto do iframe oculto.
+- Ajuste: `ToastProvider` teve o contrato corrigido para `ToastId = string | number` e parou de concatenar titulo+mensagem manualmente; agora usa `title` como corpo principal do Sonner e `message` como `description` quando houver ambos.
+- Limpeza: removido de `src/styles/globals.css` o CSS morto do toast customizado antigo (`.toast-region`, `.toast__*`, `@keyframes toast-timer`, `@keyframes slideUp`), que nao era mais usado desde a troca efetiva para Sonner.
+- Decisao: manter Sonner como engine visual, mas impedir novo acoplamento direto das features a ele; o contrato do sistema fica centralizado em `src/lib/toast.ts` + `ToastProvider`.
+
+### Remocao da fachada de toast no Next
+
+- Ajuste: consolidada a intencao final do modulo. O App Router deixou de usar a API customizada de toast e passou a consumir `toast` diretamente de `sonner`.
+- Implementacao: `src/app/layout.tsx` removeu o wrapper `ToastProvider`; formularios e acoes client-side em `clientes`, `catalogos`, `usuarios` e `fichas` trocaram `useToast()` por `toast.success/error/info/warning/loading`.
+- Limpeza: removidos `src/components/ui/toast-provider.tsx` e `src/lib/toast.ts`, alem da reexportacao correspondente em `src/components/ui/index.ts`.
+- Decisao: o shim legado `window.toast` continua restrito a `public/` enquanto o legado existir; no codigo Next a fonte unica de notificacao agora e Sonner direto, sem camada intermediaria.
+
+### PDF customizado semanal
+
+- Ajuste: `/fichas/pdf` agora reconhece automaticamente os recortes dos atalhos `Esta semana` e `Proxima semana` e, nesses casos, gera um PDF operacional proprio em A4 paisagem.
+- Implementacao: a rota passou a buscar tambem as fichas `atrasado` com os mesmos filtros de busca/evento, posicionando esse bloco primeiro no PDF. O restante entra em um segundo bloco de `Entrega programada para a proxima semana`.
+- Refinamento: o modo semanal agora varia titulo, secoes internas, resumo e nome do arquivo conforme o recorte seja da semana atual ou da semana seguinte.
+- Layout: cada bloco e separado por tipo de personalizacao, com visual compacto e legivel: cabecalho forte, cards-resumo, cabecalhos de secao, grade com `Cliente`, `Vendedor`, `Inicio`, `Entrega` e `Status`, badge colorida de status e uma caixa vazia ao lado para anotacao manual no impresso.
+- Dados: `FichaListItem` e as consultas usadas por listagens/PDF passaram a carregar `data_inicio`, permitindo mostrar `Inicio` no documento e manter compatibilidade com o historico do cliente.
+- Compatibilidade: fora dos recortes exatos de semana atual ou semana seguinte, o PDF operacional antigo continua como fallback para nao mudar silenciosamente os demais cenarios.
+- Validacao: `npm run typecheck`, `npx eslint src/app/fichas/pdf/route.ts src/features/fichas/operational-pdf.ts src/features/fichas/data.ts src/features/clientes/data.ts` e `npm run build` passaram.
+
+### Toast de impressao e barras de loading
+
+- Ajuste: o toast `Impressao` da listagem nao fecha mais no carregamento inicial do `iframe`, que acontecia antes do prompt real. Agora `PrintTriggerButton` injeta um `printJobId` na rota `/imprimir` e espera um `postMessage` de volta quando `PrintOnLoad` efetivamente dispara `print()`.
+- Comportamento: quando o prompt de impressao abre, o toast e fechado naquele momento; se o sinal nao vier, fica apenas um timeout de seguranca mais longo para nao deixar a UI travada indefinidamente.
+- Ajuste visual: os loaders que usavam spinner passaram a usar barras animadas, inclusive no `app/loading`, nos estados pending de botoes e no loading da previa de impressao.
+- Validacao: `npm run typecheck` passou; o lint dirigido dos arquivos TS/TSX tocados passou e `globals.css` ficou fora do lint por falta de configuracao CSS nessa chamada.
+
+### Loader do Sonner e transicao entre paginas
+
+- Ajuste: o `Toaster` do App Router agora injeta um indicador proprio para `loading`, trocando o spinner padrao do Sonner por uma barra animada compacta.
+- Implementacao: criado `src/components/ui/loading-bar.tsx` como primitivo visual reutilizavel; `src/app/layout.tsx` passou a registralo em `icons.loading`.
+- Ajuste visual: `src/app/loading.tsx` foi remodelado para um painel de transicao com gradiente leve, copy curta, barra animada e skeleton lines, seguindo a linguagem do placeholder legado em vez de um loading solto no meio da tela.
+- Estilos: `src/styles/globals.css` recebeu a base compartilhada `.loading-bar` e novas classes `app-loading__*` responsivas.
+- Higiene: o texto quebrado `Carregandoâ€¦` foi removido junto com a reescrita do arquivo, mantendo o trecho em UTF-8 limpo.
+- Validacao: `npm run typecheck` passou.
+
+### PDF semanal com menos tinta
+
+- Ajuste: o modo semanal de `/fichas/pdf` foi refinado para impressao economica, sem depender de grandes blocos chapados.
+- Implementacao: em `src/features/fichas/operational-pdf.ts`, o cabecalho principal, cards de resumo e cabecalhos de secao passaram de fundos preenchidos para caixas brancas com borda e pequenos acentos lineares.
+- Ajuste: o bloco de atrasados deixou de usar fundo vermelho, tanto nas secoes quanto nas linhas da tabela; a prioridade continua sinalizada por texto e badge.
+- Ajuste: as badges de status agora usam apenas borda colorida e texto colorido, preservando legibilidade em impressoras simples.
+- Ajuste: a coluna `Cliente` foi alargada, redistribuindo espaco de `Vendedor` e `Status` para reduzir truncamento de nomes.
+- Validacao: `npm run typecheck` e `npx eslint src/features/fichas/operational-pdf.ts` passaram.
+
+### Loading minimalista
+
+- Ajuste: o visual de loading foi simplificado de novo, agora na direcao final pedida: sem gradientes, sem cartao, sem textos auxiliares e sem skeletons.
+- Implementacao: `src/app/loading.tsx` ficou reduzido a uma unica barra azul primaria centralizada usando `LoadingBar`.
+- Ajuste: `LoadingBar` deixou de aceitar `tone` e passou a ser um componente mais seco, sempre com preenchimento azul sobre trilha neutra.
+- Ajuste: no Sonner, o toast de `loading` nao usa mais a barra como icone lateral; `src/app/layout.tsx` passou a marcar esse tipo com a classe `toast-loading-minimal`.
+- Estilos: `src/styles/globals.css` agora desenha a faixa inferior do toast via `::before`/`::after`, escondendo o spinner/icone do loading e animando o preenchimento horizontal da esquerda para a direita.
+- Validacao: `npm run typecheck` e `npx eslint src/app/layout.tsx src/app/loading.tsx src/components/ui/loading-bar.tsx` passaram.
+
+### Correcao de quebra do PDF e faixa do toast
+
+- Ajuste: o PDF semanal deixou de reservar pagina inteira por grupo. `src/features/fichas/operational-pdf.ts` agora quebra grupos longos por linhas, repetindo apenas cabecalho de grupo/tabela quando precisa continuar em outra pagina.
+- Resultado: o espaco branco excessivo entre paginas foi reduzido e o fluxo do documento ficou mais compacto.
+- Ajuste: as linhas decorativas azuis do cabecalho, cards de resumo e cabecalho de secao foram removidas; elas estavam cruzando texto e tambem gerando artefatos visuais no fim da pagina.
+- Ajuste: a faixa inferior do toast de loading trocou a animacao baseada em `scaleX` por preenchimento linear via `clip-path`, evitando o salto visual no ultimo ciclo.
+- Validacao: `npm run typecheck` e `npx eslint src/features/fichas/operational-pdf.ts src/app/layout.tsx src/app/loading.tsx src/components/ui/loading-bar.tsx` passaram. `globals.css` continua fora do lint dirigido dessa chamada.
+
+### Acentuacao e padrao pt-BR nos PDFs
+
+- Ajuste: os geradores de PDF foram higienizados para UTF-8 limpo, removendo mojibake e rotulos inconsistentes.
+- Implementacao: `src/features/fichas/operational-pdf.ts` foi regravado com textos corretos como `Produção`, `próxima`, `continuação`, `Personalizações`, `Início`, `Não foi possível` e `Relatório operacional de fichas`.
+- Implementacao: `src/features/fichas/print-pdf.ts` teve as mensagens internas de fallback/erro normalizadas para `conteúdo`, `impressão` e `Janela de impressão indisponível`.
+- Implementacao: `src/features/fichas/print-ficha.tsx` teve o documento imprimível alinhado ao pt-BR correto, incluindo `Ficha Técnica`, `Data de Emissão`, `Especificações Técnicas`, `Observações`, `Personalização`, `Não`, `Nº Venda`, `números` e demais rótulos visíveis.
+- Validacao: `npm run typecheck`, `npx eslint src/features/fichas/operational-pdf.ts src/features/fichas/print-pdf.ts src/features/fichas/print-ficha.tsx` e uma varredura `rg` nos arquivos de PDF passaram sem restos de texto quebrado.

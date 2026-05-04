@@ -6,6 +6,7 @@ import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-p
 import { DayPicker } from "react-day-picker";
 import { ptBR } from "react-day-picker/locale";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { toast } from "sonner";
 import {
   Bold,
   CalendarDays,
@@ -27,7 +28,7 @@ import {
   UserRound,
   Wand2,
 } from "lucide-react";
-import { Button, CustomDatalist, Tooltip, type CustomDatalistOption, useToast } from "@/components/ui";
+import { Button, CustomDatalist, Tooltip, type CustomDatalistOption } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
 import { createFichaAction, updateFichaAction } from "./actions";
 import type { FichaDetail } from "./data";
@@ -326,7 +327,6 @@ function shouldLetServerValidateBeforeUpload(formData: FormData) {
 export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "create", vendedorOptions = [] }: FichaFormProps) {
   const action = mode === "edit" ? updateFichaAction : createFichaAction;
   const [state, formAction] = useActionState(action, getInitialFichaFormState());
-  const { show } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
   const imageGridRef = useRef<HTMLDivElement | null>(null);
   const imagensRef = useRef<ImageFormItem[]>([]);
@@ -530,28 +530,22 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
     const filesToAdd = selectedFiles.slice(0, availableSlots);
 
     if (selectedFiles.length === 0) {
-      show({
-        message: "Selecione arquivos de imagem para adicionar.",
-        title: "Imagem inválida",
-        type: "warning",
+      toast.warning("Imagem inválida", {
+        description: "Selecione arquivos de imagem para adicionar.",
       });
       return;
     }
 
     if (availableSlots <= 0) {
-      show({
-        message: "A ficha aceita no máximo 4 imagens.",
-        title: "Limite atingido",
-        type: "warning",
+      toast.warning("Limite atingido", {
+        description: "A ficha aceita no máximo 4 imagens.",
       });
       return;
     }
 
     if (selectedFiles.length > filesToAdd.length) {
-      show({
-        message: "Apenas as primeiras imagens dentro do limite serão adicionadas.",
-        title: "Limite de imagens",
-        type: "info",
+      toast.info("Limite de imagens", {
+        description: "Apenas as primeiras imagens dentro do limite serão adicionadas.",
       });
     }
 
@@ -563,7 +557,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
     }));
 
     appendImageItem(localImages);
-  }, [appendImageItem, imagens.length, show]);
+  }, [appendImageItem, imagens.length]);
 
   function handleImageSelection(files: FileList | null) {
     handleImageFiles(Array.from(files ?? []));
@@ -589,10 +583,8 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
     }
 
     if (image.persisted) {
-      show({
-        message: "A imagem será removida da ficha ao salvar as alterações.",
-        title: "Imagem removida da ficha",
-        type: "info",
+      toast.info("Imagem removida da ficha", {
+        description: "A imagem será removida da ficha ao salvar as alterações.",
       });
       return;
     }
@@ -607,10 +599,8 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
         method: "DELETE",
       });
     } catch {
-      show({
-        message: "A referência foi removida, mas não foi possível excluir o arquivo agora.",
-        title: "Imagem removida",
-        type: "warning",
+      toast.warning("Imagem removida", {
+        description: "A referência foi removida, mas não foi possível excluir o arquivo agora.",
       });
     }
   }
@@ -642,10 +632,8 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
       submitAfterUploadRef.current = true;
       formRef.current?.requestSubmit();
     } catch (error) {
-      show({
-        message: error instanceof Error ? error.message : "Falha ao enviar imagens.",
-        title: "Erro no upload",
-        type: "error",
+      toast.error("Erro no upload", {
+        description: error instanceof Error ? error.message : "Falha ao enviar imagens.",
       });
     } finally {
       setIsUploadingImage(false);
@@ -658,11 +646,9 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
     if (state.message && lastToastMessageRef.current !== state.message) {
       const message = state.message;
       window.setTimeout(() => {
-        show({
+        toast.error("Pendência na ficha", {
+          description: message,
           id: "ficha-form-error",
-          message,
-          title: "Pendência na ficha",
-          type: "error",
         });
       }, 0);
       lastToastMessageRef.current = message;
@@ -670,7 +656,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
 
     const firstInvalid = formRef.current?.querySelector<HTMLElement>("[aria-invalid='true'], [data-invalid='true']");
     firstInvalid?.focus();
-  }, [show, state]);
+  }, [state]);
 
   useEffect(() => {
     imagensRef.current = imagens;
@@ -1013,10 +999,8 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
 
     if (!nextObservacoes) {
       if (options.notifyEmpty) {
-        show({
-          message: "Preencha pelo menos um produto antes de auto-preencher as observações.",
-          title: "Observações",
-          type: "warning",
+        toast.warning("Observações", {
+          description: "Preencha pelo menos um produto antes de auto-preencher as observações.",
         });
       } else if (!currentText || currentText === lastText) {
         setGeneratedObservacoes("");

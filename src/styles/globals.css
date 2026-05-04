@@ -323,24 +323,97 @@ a {
   display: grid;
   min-height: min(520px, calc(100vh - 80px));
   place-items: center;
-  align-content: center;
-  gap: 14px;
-  color: var(--color-muted);
-  font-size: 0.9375rem;
-  font-weight: 800;
+  padding: 24px;
 }
 
-.app-loading p {
-  margin: 0;
+.app-loading__bar {
+  width: min(180px, calc(100vw - 80px));
 }
 
-.app-loading__spinner {
-  width: 42px;
-  height: 42px;
-  border: 3px solid var(--color-border);
-  border-block-start-color: var(--color-primary);
+.loading-bar {
+  --loading-bar-bg: var(--color-border-soft);
+  --loading-bar-fill: var(--color-primary);
+  position: relative;
+  display: inline-flex;
+  width: 132px;
+  height: 8px;
+  overflow: hidden;
   border-radius: 999px;
-  animation: spinner-rotate 750ms linear infinite;
+  background: var(--loading-bar-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-border) 72%, transparent);
+}
+
+.loading-bar__beam {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border-radius: inherit;
+  background: var(--loading-bar-fill);
+  animation: loading-bar-progress 1.2s linear infinite;
+}
+
+@keyframes loading-bar-progress {
+  0% {
+    clip-path: inset(0 100% 0 0 round 999px);
+  }
+
+  85% {
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+
+  100% {
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+}
+
+.loading-bar--sm {
+  width: 30px;
+  height: 7px;
+}
+
+.loading-bar--md {
+  width: 132px;
+  height: 8px;
+}
+
+.loading-bar--lg {
+  width: 180px;
+  height: 4px;
+}
+
+.toast-loading-minimal {
+  position: relative;
+  overflow: hidden;
+  gap: 0;
+  padding-block-end: 14px;
+}
+
+.toast-loading-minimal [data-icon],
+.toast-loading-minimal .sonner-loader {
+  display: none !important;
+}
+
+.toast-loading-minimal [data-content] {
+  width: 100%;
+}
+
+.toast-loading-minimal::after,
+.toast-loading-minimal::before {
+  position: absolute;
+  inset-inline: 12px;
+  inset-block-end: 6px;
+  height: 3px;
+  border-radius: 999px;
+  content: "";
+}
+
+.toast-loading-minimal::after {
+  background: var(--color-border-soft);
+}
+
+.toast-loading-minimal::before {
+  background: var(--color-primary);
+  animation: loading-bar-progress 1.2s linear infinite;
 }
 
 .app-header {
@@ -841,102 +914,6 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.toast-region {
-  position: fixed;
-  inset-block-end: 20px;
-  inset-inline: 50%;
-  z-index: 900;
-  display: grid;
-  width: min(420px, calc(100vw - 40px));
-  gap: 10px;
-  transform: translateX(-50%);
-}
-
-.toast {
-  position: relative;
-  overflow: hidden;
-  display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: start;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
-  background: var(--color-surface-elevated);
-  box-shadow: var(--shadow-lg);
-  color: var(--color-text);
-  padding: 14px;
-  animation: slideUp 250ms ease;
-  --toast-accent: var(--color-info);
-}
-
-.toast__marker {
-  width: 8px;
-  height: 100%;
-  min-height: 44px;
-  border-radius: 999px;
-  background: var(--toast-accent);
-}
-
-.toast--success .toast__marker {
-  --toast-accent: var(--color-success);
-}
-
-.toast--warning .toast__marker {
-  --toast-accent: var(--color-warning);
-}
-
-.toast--error .toast__marker {
-  --toast-accent: var(--color-danger);
-}
-
-.toast__content {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-}
-
-.toast__title {
-  margin: 0;
-  font-weight: 800;
-  line-height: 1.3;
-}
-
-.toast__message {
-  margin: 0;
-  color: var(--color-muted);
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-}
-
-.toast__dismiss {
-  display: inline-grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface-2);
-  color: var(--color-text);
-  padding: 0;
-  cursor: pointer;
-}
-
-.toast__dismiss:hover,
-.toast__dismiss:focus-visible {
-  border-color: var(--color-primary);
-}
-
-.toast__timer {
-  position: absolute;
-  inset-block-end: 0;
-  inset-inline-start: 0;
-  width: 100%;
-  height: 3px;
-  background: var(--toast-accent);
-  transform-origin: left center;
-  animation: toast-timer var(--toast-duration) linear forwards;
 }
 
 .ui-table-wrap {
@@ -3153,32 +3130,41 @@ html[data-theme="dark"] .field select {
 }
 
 .button-spinner {
+  position: relative;
+  display: inline-block;
   width: 18px;
-  height: 18px;
-  border: 2px solid var(--color-primary-contrast);
-  border-block-start-color: transparent;
+  height: 10px;
+  overflow: hidden;
   border-radius: 999px;
-  animation: spinner-rotate 700ms linear infinite;
+  background: color-mix(in srgb, var(--color-primary-contrast) 28%, transparent);
 }
 
 .button-spinner--contrast {
-  border-color: var(--color-primary);
-  border-block-start-color: transparent;
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 
-@keyframes toast-timer {
-  from {
-    transform: scaleX(1);
-  }
-
-  to {
-    transform: scaleX(0);
-  }
+.button-spinner::after {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -55%;
+  width: 55%;
+  border-radius: inherit;
+  background: var(--color-primary-contrast);
+  animation: loading-bar-slide 820ms ease-in-out infinite;
+  content: "";
 }
 
-@keyframes spinner-rotate {
-  to {
-    transform: rotate(360deg);
+.button-spinner--contrast::after {
+  background: var(--color-primary);
+}
+
+@keyframes loading-bar-slide {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(260%);
   }
 }
 
@@ -3186,18 +3172,6 @@ html[data-theme="dark"] .field select {
   from {
     opacity: 0;
     transform: translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
   }
 
   to {
@@ -4131,10 +4105,6 @@ html[data-theme="dark"] .field select {
   font-weight: var(--font-weight-bold);
 }
 
-.ficha-print-preview__loading svg {
-  animation: spinner-rotate 750ms linear infinite;
-}
-
 .ficha-print-preview__body {
   display: grid;
   place-items: start center;
@@ -4774,6 +4744,10 @@ html[data-theme="dark"] .field select {
 @media (max-width: 640px) {
   .app-shell {
     padding: 20px;
+  }
+
+  .app-loading {
+    padding: 12px;
   }
 
   .app-progress {
