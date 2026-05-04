@@ -1,22 +1,26 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FileText } from "lucide-react";
 import type { FichaFilters } from "./data";
 
 type FichasFilterToolbarProps = {
+  canExportPdf: boolean;
   filters: FichaFilters;
   pdfHref: string;
 };
 
 const SEARCH_DEBOUNCE_MS = 450;
+const PDF_EXPORT_TIMEOUT_MS = 12_000;
 
-export function FichasFilterToolbar({ filters, pdfHref }: FichasFilterToolbarProps) {
+export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFilterToolbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const exportTimeoutRef = useRef<number | null>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [searchValue, setSearchValue] = useState(filters.busca ?? "");
 
   useEffect(() => {
@@ -27,15 +31,47 @@ export function FichasFilterToolbar({ filters, pdfHref }: FichasFilterToolbarPro
     return () => window.clearTimeout(timeoutId);
   }, [pathname, router, searchParams, searchValue, startTransition]);
 
+  useEffect(() => {
+    return () => {
+      if (exportTimeoutRef.current) {
+        window.clearTimeout(exportTimeoutRef.current);
+        exportTimeoutRef.current = null;
+      }
+    };
+  }, [pdfHref]);
+
+  function handleExportPdf() {
+    if (!canExportPdf || isExportingPdf) {
+      return;
+    }
+
+    if (exportTimeoutRef.current) {
+      window.clearTimeout(exportTimeoutRef.current);
+    }
+
+    setIsExportingPdf(true);
+    exportTimeoutRef.current = window.setTimeout(() => {
+      setIsExportingPdf(false);
+      exportTimeoutRef.current = null;
+    }, PDF_EXPORT_TIMEOUT_MS);
+
+    window.location.assign(pdfHref);
+  }
+
   return (
-    <form className="fichas-toolbar" action="/fichas" aria-busy={isPending}>
+    <form
+      className="fichas-toolbar"
+      action="/fichas"
+      aria-busy={isPending}
+      onSubmit={(event) => event.preventDefault()}
+    >
       <div className="field fichas-toolbar__search">
         <label htmlFor="busca">Busca</label>
         <input
           id="busca"
           name="busca"
           onChange={(event) => setSearchValue(event.target.value)}
-          placeholder="Cliente, alias, vendedor ou personalização…"
+          placeholder="Cliente, alias, tecido, personalização, venda ou vendedor…"
           value={searchValue}
         />
       </div>
@@ -99,10 +135,16 @@ export function FichasFilterToolbar({ filters, pdfHref }: FichasFilterToolbarPro
           </>
         ) : null}
       </div>
-      <a className="ui-button ui-button--secondary" href={pdfHref}>
-        <FileText aria-hidden="true" size={18} />
-        Exportar PDF
-      </a>
+      <button
+        aria-disabled={!canExportPdf || isExportingPdf}
+        className="ui-button ui-button--secondary"
+        disabled={!canExportPdf || isExportingPdf}
+        onClick={handleExportPdf}
+        type="button"
+      >
+        {isExportingPdf ? <span className="button-spinner" aria-hidden="true" /> : <FileText aria-hidden="true" size={18} />}
+        {isExportingPdf ? "Exportando" : "Exportar PDF"}
+      </button>
     </form>
   );
 }

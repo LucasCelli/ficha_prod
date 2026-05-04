@@ -508,3 +508,103 @@
 - Implementacao: `src/features/fichas/print-pdf.ts` teve as mensagens internas de fallback/erro normalizadas para `conteúdo`, `impressão` e `Janela de impressão indisponível`.
 - Implementacao: `src/features/fichas/print-ficha.tsx` teve o documento imprimível alinhado ao pt-BR correto, incluindo `Ficha Técnica`, `Data de Emissão`, `Especificações Técnicas`, `Observações`, `Personalização`, `Não`, `Nº Venda`, `números` e demais rótulos visíveis.
 - Validacao: `npm run typecheck`, `npx eslint src/features/fichas/operational-pdf.ts src/features/fichas/print-pdf.ts src/features/fichas/print-ficha.tsx` e uma varredura `rg` nos arquivos de PDF passaram sem restos de texto quebrado.
+### Fichas: busca ampliada e filtros preservados
+
+- Ajuste: a busca da listagem em `/fichas` passou a considerar tambem `material`, `arte`, `cliente_auxiliar`, `numero_venda` e `vendedor`, alem de continuar cobrindo o nome principal.
+- Implementacao: `src/features/fichas/data.ts` deixou de montar um `or(...ilike...)` por coluna e passou a consultar `busca_normalizada` com texto normalizado sem acentos e sem separadores, reaproveitando a mesma regra na listagem e no PDF operacional.
+- Implementacao: criada a migration `supabase/migrations/202605040001_fichas_busca_normalizada.sql`, que habilita `unaccent`/`pg_trgm`, define `public.normalize_search_text(...)` e adiciona a coluna gerada `busca_normalizada` em `public.fichas`.
+- Ajuste: `src/features/fichas/fichas-filter-toolbar.tsx` agora bloqueia o submit GET nativo do formulario, evitando que Enter na busca descarte os filtros de data/status/evento ja presentes na URL.
+- Ajuste: `src/features/fichas/fichas-overview.tsx` passou a preservar `busca` e `evento` ao aplicar os atalhos de periodo (`Todas`, `Esta semana`, `Proxima semana`, `Atrasadas`), mantendo a combinacao de filtros em vez de resetar a pesquisa.
+- Caveat: a busca sem acentos depende de aplicar a migration nova no banco antes do deploy.
+
+### Fichas busca: compatibilidade sem migration aplicada
+
+- Diagnostico: em ambiente com schema antigo, a pesquisa passou a falhar com `column fichas.busca_normalizada does not exist`.
+- Implementacao: `src/features/fichas/data.ts` agora executa a busca nova por `busca_normalizada` como caminho principal, mas detecta esse erro especifico e refaz automaticamente a mesma consulta usando o filtro legado por colunas.
+- Cobertura do fallback: `cliente_nome_snapshot`, `cliente_auxiliar`, `material`, `arte`, `numero_venda` e `vendedor`.
+- Resultado: a listagem e o PDF operacional voltam a pesquisar sem quebrar a tela mesmo antes da migration nova entrar no banco.
+- Caveat: a compatibilidade restaura a busca funcional, mas a tolerancia a acentos/underscores continua dependendo da migration `supabase/migrations/202605040001_fichas_busca_normalizada.sql`.
+- Validacao: `npx eslint src/features/fichas/data.ts` e `npm run typecheck` passaram.
+
+### Fichas busca: variante acentuada no fallback legado
+
+- Diagnostico: nomes como `Jhonê Émanuel` ainda nao apareciam ao pesquisar `jhone` quando a app caia no fallback legado sem `busca_normalizada`.
+- Implementacao: `src/features/fichas/data.ts` passou a expandir o termo pesquisado em variantes acentuadas controladas antes de montar o `or(...ilike...)` do fallback.
+- Exemplo coberto: `jhone` agora gera combinacoes como `jhonê`, permitindo encontrar registros com acento mesmo antes da migration do banco.
+- Escopo: a heuristica cobre variantes comuns de `a`, `c`, `e`, `i`, `o` e `u`, com limite de expansao para nao explodir a query.
+- Validacao: `npx eslint src/features/fichas/data.ts` e `npm run typecheck` passaram.
+
+### Fichas busca: migration compatível com Postgres
+
+- Diagnostico: ao rodar `supabase db push` / SQL Editor, a migration original falhava com `ERROR: 42P17: generation expression is not immutable`.
+- Causa: a versão inicial usava `busca_normalizada` como coluna `generated always as (...) stored`, mas a expressão dependia de `unaccent(...)`, que não atende o requisito de imutabilidade dessa feature.
+- Implementacao: `supabase/migrations/202605040001_fichas_busca_normalizada.sql` foi reescrita para usar:
+- coluna normal `busca_normalizada`
+- função `public.normalize_search_text(...)` marcada como `stable`
+- trigger `public.sync_fichas_busca_normalizada()` em `before insert or update`
+- `update` de backfill para popular/atualizar os registros existentes
+- indice GIN `gin_trgm_ops` preservado
+- Resultado: a migration fica executável no Supabase/Postgres sem depender de generated column incompatível com `unaccent`.
+
+### Fichas busca: teste forçado no caminho da migration
+
+- Ajuste: o fallback legado de busca foi removido de `src/features/fichas/data.ts`.
+- Resultado: `/fichas` e `/fichas/pdf` agora usam exclusivamente `busca_normalizada` via `ilike`, sem voltar silenciosamente para `or(...ilike...)` por colunas.
+- Motivo: garantir que os testes atuais realmente validem a migration aplicada e o caminho indexado novo, em vez de passar por compatibilidade antiga.
+- Efeito esperado: se houver qualquer problema futuro em `busca_normalizada`, a tela volta a acusar erro diretamente, o que é desejado enquanto estamos fechando esta validação.
+- Validacao: `npx eslint src/features/fichas/data.ts` e `npm run typecheck` passaram.
+
+### Fichas atrasadas: CTA unico de entrega
+
+- Ajuste: na rota `/fichas?status=atrasado`, a coluna de acoes deixa de mostrar preview, imprimir, editar e entregar em icones separados.
+- Implementacao: `src/features/fichas/ficha-row-actions.tsx` ganhou a variante `fullDeliverButton`, que reaproveita `markFichaEntregueFormAction` e renderiza um botao verde completo com spinner/estado pending.
+- Implementacao: `src/features/fichas/fichas-overview.tsx` ativa essa variante apenas quando o filtro atual e exatamente `status === "atrasado"`.
+- Estilo: `src/styles/globals.css` passou a ter `ficha-row-actions--deliver-only` e `ficha-row-actions__deliver-button`, fixando a largura em `162px` para ocupar a mesma faixa dos quatro botoes padrao (`4 x 36px` com `3` gaps de `6px`).
+- Validacao: `npx eslint src/features/fichas/ficha-row-actions.tsx src/features/fichas/fichas-overview.tsx` e `npm run typecheck` passaram.
+
+### Fichas atrasadas: CTA com menu preservado e visual claro
+
+- Ajuste: a variante de atrasadas foi refinada para manter o ultimo slot como botao de menu de contexto, em vez de substituir toda a coluna por um unico CTA.
+- Implementacao: `src/features/fichas/ficha-row-actions.tsx` continua renderizando o formulario largo de entrega com `162px`, mas agora deixa o `FloatingMenu` ao lado no quinto espaco, preservando preview, imprimir, editar e deletar dentro do menu.
+- Estilo: `src/styles/globals.css` trocou o estado padrao do CTA para fundo verde claro (`var(--color-success-bg)`), texto e borda verdes, seguindo a referencia visual aprovada.
+- Hover: o CTA agora inverte para fundo verde solido com texto claro no hover/focus, diferenciando nitidamente do estado padrao sem perder a hierarquia visual.
+- Validacao: `npx eslint src/features/fichas/ficha-row-actions.tsx` e `npm run typecheck` passaram.
+
+### Fichas observacoes: cursor reiniciando no contentEditable
+
+- Diagnostico: o texto invertido em `Observações` nao era mais um problema de direcao RTL; o print com `teste -> etset` confirmou que o cursor estava voltando para o inicio a cada tecla.
+- Causa real: `src/features/fichas/ficha-form.tsx` renderizava o editor com `dangerouslySetInnerHTML={{ __html: observacoes }}` em toda atualizacao de estado, entao o React reescrevia o DOM do `contentEditable` continuamente durante a digitacao.
+- Implementacao: removido o `dangerouslySetInnerHTML` do bloco editavel e adicionada sincronizacao por `useEffect`, que so reaplica `innerHTML` quando o valor externo realmente diverge do DOM atual.
+- Resultado esperado: a digitacao manual permanece com o cursor na posicao correta, enquanto auto-preenchimento e carga inicial continuam conseguindo injetar HTML no editor.
+- Validacao: `npx eslint src/features/fichas/ficha-form.tsx` e `npm run typecheck` passaram.
+
+### UX loading: spinner e barra, skeleton nunca
+
+- Diretriz consolidada: spinner para itens sendo carregados e botoes em estado pending; barra de carregamento para toasts e transicao entre paginas; skeleton proibido no Next atual.
+- Diagnostico: ainda existia um skeleton visual na previa de impressao em `src/features/fichas/ficha-print-preview-modal.tsx`, com CSS em `src/styles/globals.css`.
+- Implementacao: removido o bloco `ficha-print-preview__skeleton` e mantido apenas o estado textual com `button-spinner button-spinner--contrast`.
+- Verificacao: `rg -n "skeleton" src` ficou sem resultados, confirmando que nao restou skeleton loader no App Router atual.
+- Validacao: `npx eslint src/features/fichas/ficha-print-preview-modal.tsx` e `npm run typecheck` passaram.
+
+### Fichas PDF: exportacao coerente com resultado
+
+- Ajuste: o botao `Exportar PDF` em `/fichas` agora respeita o resultado da listagem atual.
+- Regra: se `result.kind !== "ok"` ou `result.total === 0`, o botao fica desabilitado para evitar exportacao sem dados.
+- Comportamento de loading: ao clicar com resultados validos, o botao troca para `Exportando`, mostra `button-spinner` e dispara a rota de download do PDF.
+- Implementacao: `src/features/fichas/fichas-overview.tsx` passou a informar `canExportPdf`, e `src/features/fichas/fichas-filter-toolbar.tsx` passou a controlar o estado local de exportacao com timeout de seguranca.
+- Validacao: `npx eslint src/features/fichas/fichas-filter-toolbar.tsx src/features/fichas/fichas-overview.tsx` e `npm run typecheck` passaram.
+
+### Fichas PDF: operacional com o mesmo padrao visual dos semanais
+
+- Ajuste: o PDF padrao de Fichas operacional deixou de sair pelo placeholder textual e passou a reutilizar o mesmo esqueleto visual dos modos Esta semana e Proxima semana.
+- Implementacao: src/features/fichas/operational-pdf.ts agora monta cabecalho, cards de resumo e secoes paginadas por data de entrega, com grupos internos por personalizacao e o mesmo miolo tabular compacto ja usado nos PDFs semanais.
+- Regra visual: quando uma data agrupada contem fichas atrasadas, a secao inteira assume o tom de alerta para priorizar leitura operacional.
+- Caveat: o fallback textual antigo ficou no arquivo apenas como residuo interno sem uso, porque o trecho legado ainda merece uma limpeza dedicada de encoding antes de ser removido por completo.
+- Validacao: `npx eslint src/features/fichas/operational-pdf.ts` e `npm run typecheck` passaram.
+
+### Fichas PDF: limpeza UTF-8 final no operacional
+
+- Ajuste: `src/features/fichas/operational-pdf.ts` foi limpo em UTF-8 de ponta a ponta para eliminar os ultimos textos quebrados no caminho operacional.
+- Implementacao: textos como `Relatorio Operacional de Fichas`, `Visao operacional`, `Personalizacao` e o separador `·` foram normalizados, e o fallback textual antigo foi removido junto de `buildOperationalLines`, `createSimpleTextPdf` e helpers associados.
+- Resultado: o arquivo ficou com um unico caminho ativo para gerar o PDF operacional, sem residuos de placeholder nem mojibake remanescente.
+- Validacao: `rg -n "Ã|Â|â|NÃ|PrÃ|Ãƒ|Ã‚" src/features/fichas/operational-pdf.ts` sem resultados, `npx eslint src/features/fichas/operational-pdf.ts` e `npm run typecheck` passaram.

@@ -91,50 +91,18 @@ export async function listFichas(filters: FichaFilters = {}): Promise<FichaListR
 
   try {
     const supabase = createServerSupabaseClient();
-    let query = supabase
-      .from("fichas")
-      .select(
-        "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, ficha_imagens(url)",
-        { count: "exact" },
-      )
-      .order("created_at", { ascending: false })
-      .order("data_entrega", { ascending: false })
-      .range(getOffset(filters.page, FICHAS_PAGE_SIZE), getOffset(filters.page, FICHAS_PAGE_SIZE) + FICHAS_PAGE_SIZE - 1);
-
-    if (filters.status === "atrasado") {
-      query = applyOverdueFilter(query);
-    } else if (filters.status) {
-      query = query.eq("status", filters.status);
-    }
-
-    if (filters.id) {
-      query = query.eq("id", filters.id);
-    }
-
-    if (filters.busca) {
-      const pattern = getSafeSearchPattern(filters.busca);
-      query = query.or(
-        [
-          `cliente_nome_snapshot.ilike.${pattern}`,
-          `cliente_auxiliar.ilike.${pattern}`,
-          `numero_venda.ilike.${pattern}`,
-          `vendedor.ilike.${pattern}`,
-          `arte.ilike.${pattern}`,
-        ].join(","),
-      );
-    }
-
-    if (typeof filters.evento === "boolean") {
-      query = query.eq("evento", filters.evento);
-    }
-
-    if (filters.dataInicio) {
-      query = query.gte("data_entrega", filters.dataInicio);
-    }
-
-    if (filters.dataFim) {
-      query = query.lte("data_entrega", filters.dataFim);
-    }
+    const query = applyFichaFilters(
+      supabase
+        .from("fichas")
+        .select(
+          "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, ficha_imagens(url)",
+          { count: "exact" },
+        )
+        .order("created_at", { ascending: false })
+        .order("data_entrega", { ascending: false })
+        .range(getOffset(filters.page, FICHAS_PAGE_SIZE), getOffset(filters.page, FICHAS_PAGE_SIZE) + FICHAS_PAGE_SIZE - 1),
+      filters,
+    );
 
     const { data, error, count } = await query;
 
@@ -173,50 +141,18 @@ export async function listFichasForOperationalPdf(filters: FichaFilters = {}): P
 
   try {
     const supabase = createServerSupabaseClient();
-    let query = supabase
-      .from("fichas")
-      .select(
-        "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento",
-        { count: "exact" },
-      )
-      .order("created_at", { ascending: false })
-      .order("data_entrega", { ascending: false })
-      .limit(FICHAS_PDF_LIMIT);
-
-    if (filters.status === "atrasado") {
-      query = applyOverdueFilter(query);
-    } else if (filters.status) {
-      query = query.eq("status", filters.status);
-    }
-
-    if (filters.id) {
-      query = query.eq("id", filters.id);
-    }
-
-    if (filters.busca) {
-      const pattern = getSafeSearchPattern(filters.busca);
-      query = query.or(
-        [
-          `cliente_nome_snapshot.ilike.${pattern}`,
-          `cliente_auxiliar.ilike.${pattern}`,
-          `numero_venda.ilike.${pattern}`,
-          `vendedor.ilike.${pattern}`,
-          `arte.ilike.${pattern}`,
-        ].join(","),
-      );
-    }
-
-    if (typeof filters.evento === "boolean") {
-      query = query.eq("evento", filters.evento);
-    }
-
-    if (filters.dataInicio) {
-      query = query.gte("data_entrega", filters.dataInicio);
-    }
-
-    if (filters.dataFim) {
-      query = query.lte("data_entrega", filters.dataFim);
-    }
+    const query = applyFichaFilters(
+      supabase
+        .from("fichas")
+        .select(
+          "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento",
+          { count: "exact" },
+        )
+        .order("created_at", { ascending: false })
+        .order("data_entrega", { ascending: false })
+        .limit(FICHAS_PDF_LIMIT),
+      filters,
+    );
 
     const { data, error, count } = await query;
 
@@ -344,18 +280,63 @@ export function normalizeBooleanFilter(value: string | string[] | undefined) {
 }
 
 function getSafeSearchPattern(value: string) {
-  const cleanValue = value.replace(/[%,()]/g, " ").replace(/\s+/g, " ").trim();
+  const cleanValue = normalizeSearchText(value).replace(/\s+/g, " ").trim();
   return `%${cleanValue}%`;
 }
 
-function getOffset(page: number | undefined, pageSize: number) {
-  return ((page ?? 1) - 1) * pageSize;
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .toLowerCase()
+    .trim();
 }
 
-function applyOverdueFilter<T extends { neq: (column: string, value: string) => T; lt: (column: string, value: string) => T }>(
-  query: T,
-) {
-  return query.neq("status", "entregue").lt("data_entrega", getBusinessTodayInput());
+function applyFichaFilters<T extends FichaQuery>(query: T, filters: FichaFilters) {
+  let nextQuery = query;
+
+  if (filters.status === "atrasado") {
+    nextQuery = nextQuery.neq("status", "entregue").lt("data_entrega", getBusinessTodayInput()) as T;
+  } else if (filters.status) {
+    nextQuery = nextQuery.eq("status", filters.status) as T;
+  }
+
+  if (filters.id) {
+    nextQuery = nextQuery.eq("id", filters.id) as T;
+  }
+
+  if (filters.busca) {
+    nextQuery = nextQuery.ilike("busca_normalizada", getSafeSearchPattern(filters.busca)) as T;
+  }
+
+  if (typeof filters.evento === "boolean") {
+    nextQuery = nextQuery.eq("evento", filters.evento) as T;
+  }
+
+  if (filters.dataInicio) {
+    nextQuery = nextQuery.gte("data_entrega", filters.dataInicio) as T;
+  }
+
+  if (filters.dataFim) {
+    nextQuery = nextQuery.lte("data_entrega", filters.dataFim) as T;
+  }
+
+  return nextQuery;
+}
+
+type FichaQuery = {
+  eq: (column: string, value: string | boolean) => FichaQuery;
+  gte: (column: string, value: string) => FichaQuery;
+  ilike: (column: string, pattern: string) => FichaQuery;
+  lte: (column: string, value: string) => FichaQuery;
+  lt: (column: string, value: string) => FichaQuery;
+  neq: (column: string, value: string) => FichaQuery;
+  or: (filters: string) => FichaQuery;
+};
+
+function getOffset(page: number | undefined, pageSize: number) {
+  return ((page ?? 1) - 1) * pageSize;
 }
 
 export function isFichaOverdue(ficha: FichaOverdueCandidate) {

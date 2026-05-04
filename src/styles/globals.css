@@ -2269,6 +2269,9 @@ a {
   padding: 12px;
   color: var(--color-text);
   line-height: 1.55;
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: plaintext;
 }
 
 .rich-editor__surface[data-empty="true"]::before {
@@ -3886,6 +3889,52 @@ html[data-theme="dark"] .field select {
   display: inline-flex;
 }
 
+.ficha-row-actions--deliver-only {
+  width: auto;
+}
+
+.ficha-row-actions__deliver-form {
+  width: 162px;
+}
+
+.ficha-row-actions__deliver-button {
+  display: inline-flex;
+  width: 100%;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-sm);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  padding: 0 12px;
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--easing-standard), border-color var(--duration-fast) var(--easing-standard), color var(--duration-fast) var(--easing-standard), transform var(--duration-fast) var(--easing-standard), box-shadow var(--duration-fast) var(--easing-standard);
+}
+
+.ficha-row-actions__deliver-button:hover,
+.ficha-row-actions__deliver-button:focus-visible {
+  border-color: var(--color-success);
+  background: var(--color-success);
+  color: var(--color-primary-contrast);
+  box-shadow: var(--shadow-xs);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.ficha-row-actions__deliver-button:disabled,
+.ficha-row-actions__deliver-button[aria-disabled="true"] {
+  cursor: wait;
+  opacity: 0.8;
+  transform: none;
+  box-shadow: none;
+}
+
 .floating-menu {
   position: relative;
   display: inline-flex;
@@ -4130,20 +4179,6 @@ html[data-theme="dark"] .field select {
 .ficha-print-preview__body--loading {
   align-content: center;
   gap: var(--space-18);
-}
-
-.ficha-print-preview__skeleton {
-  width: min(198mm, 100%);
-  min-height: 62vh;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background:
-    linear-gradient(90deg, transparent, var(--color-surface-3), transparent) 0 0 / 220px 100% no-repeat,
-    linear-gradient(var(--color-surface), var(--color-surface)) 24px 24px / calc(100% - 48px) 64px no-repeat,
-    linear-gradient(var(--color-surface), var(--color-surface)) 24px 112px / calc(100% - 48px) 140px no-repeat,
-    linear-gradient(var(--color-surface), var(--color-surface)) 24px 276px / calc(65% - 32px) 220px no-repeat,
-    linear-gradient(var(--color-surface), var(--color-surface)) calc(65% + 8px) 276px / calc(35% - 32px) 220px no-repeat;
-  animation: fichaPreviewSkeleton 1100ms var(--easing-standard) infinite;
 }
 
 .ficha-print-preview__body--empty {

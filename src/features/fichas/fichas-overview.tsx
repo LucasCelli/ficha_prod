@@ -73,7 +73,7 @@ export function FichasOverview({ filters, result }: FichasOverviewProps) {
               key={shortcut.label}
               aria-current={matchesShortcut(filters, shortcut.filters) ? "page" : undefined}
               className="quick-filter"
-              href={hrefForFilters(shortcut.filters)}
+              href={hrefForFilters(filters, shortcut.filters)}
             >
               <Icon aria-hidden="true" size={18} />
               <span>{shortcut.label}</span>
@@ -82,7 +82,12 @@ export function FichasOverview({ filters, result }: FichasOverviewProps) {
         })}
       </nav>
 
-      <FichasFilterToolbar key={getFilterToolbarKey(filters)} filters={filters} pdfHref={hrefForPdf(filters)} />
+      <FichasFilterToolbar
+        key={getFilterToolbarKey(filters)}
+        canExportPdf={result.kind === "ok" && result.total > 0}
+        filters={filters}
+        pdfHref={hrefForPdf(filters)}
+      />
 
       {renderFichasContent(result, filters)}
     </section>
@@ -134,12 +139,14 @@ function buildOperationalShortcuts(today: Date): OperationalShortcut[] {
   ];
 }
 
-function hrefForFilters(filters: ShortcutFilters) {
+function hrefForFilters(currentFilters: FichaFilters, shortcutFilters: ShortcutFilters) {
   const params = new URLSearchParams();
 
-  if (filters.status) params.set("status", filters.status);
-  if (filters.dataInicio) params.set("dataInicio", filters.dataInicio);
-  if (filters.dataFim) params.set("dataFim", filters.dataFim);
+  if (currentFilters.busca) params.set("busca", currentFilters.busca);
+  if (currentFilters.evento === true) params.set("evento", "true");
+  if (shortcutFilters.status) params.set("status", shortcutFilters.status);
+  if (shortcutFilters.dataInicio) params.set("dataInicio", shortcutFilters.dataInicio);
+  if (shortcutFilters.dataFim) params.set("dataFim", shortcutFilters.dataFim);
 
   const query = params.toString();
   return query ? `/fichas?${query}` : "/fichas";
@@ -165,12 +172,14 @@ function getFilterToolbarKey(filters: FichaFilters) {
 }
 
 function matchesShortcut(current: FichaFilters, shortcut: ShortcutFilters) {
+  if (!shortcut.status && !shortcut.dataInicio && !shortcut.dataFim) {
+    return !current.status && !current.dataInicio && !current.dataFim;
+  }
+
   return (
     (current.status ?? "") === (shortcut.status ?? "") &&
     (current.dataInicio ?? "") === (shortcut.dataInicio ?? "") &&
-    (current.dataFim ?? "") === (shortcut.dataFim ?? "") &&
-    current.evento !== true &&
-    !current.busca
+    (current.dataFim ?? "") === (shortcut.dataFim ?? "")
   );
 }
 
@@ -349,6 +358,7 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
         <FichaRowActions
           fichaId={ficha.id}
           fichaLabel={ficha.cliente_nome_snapshot}
+          fullDeliverButton={currentFilters.status === "atrasado"}
           printHref={printHref}
           previewHref={href}
           returnTo={getReturnTo(currentFilters)}

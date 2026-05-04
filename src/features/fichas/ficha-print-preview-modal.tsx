@@ -92,7 +92,6 @@ export function FichaPrintPreviewLoading() {
         <span className="button-spinner button-spinner--contrast" aria-hidden="true" />
         Carregando prévia
       </div>
-      <div className="ficha-print-preview__skeleton" aria-hidden="true" />
     </div>
   );
 }

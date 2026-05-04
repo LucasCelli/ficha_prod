@@ -32,6 +32,12 @@ type PdfGroup = {
   rows: PdfRow[];
 };
 
+type PdfSummaryItem = {
+  label: string;
+  tone: SectionTone;
+  value: number;
+};
+
 type BadgeTone = "danger" | "neutral" | "success" | "warning";
 type SectionTone = "danger" | "info";
 
@@ -254,12 +260,16 @@ function drawPageHeader(doc: jsPDF, content: { filters: string; subtitle: string
 }
 
 function drawSummaryStrip(doc: jsPDF, overdueRows: FichaListItem[], weeklyRows: FichaListItem[], sections: PdfSection[], weeklyLabel: string) {
-  const summaryItems = [
+  const summaryItems: PdfSummaryItem[] = [
     { label: "Atrasados", tone: "danger" as const, value: overdueRows.length },
     { label: weeklyLabel, tone: "info" as const, value: weeklyRows.length },
     { label: "Personalizações", tone: "info" as const, value: sections.reduce((total, section) => total + section.groups.length, 0) },
   ];
 
+  drawMetricStrip(doc, summaryItems);
+}
+
+function drawMetricStrip(doc: jsPDF, summaryItems: PdfSummaryItem[]) {
   const gap = 10;
   const totalWidth = PAGE.width - PAGE.marginHorizontal * 2;
   const cardWidth = (totalWidth - gap * (summaryItems.length - 1)) / summaryItems.length;
@@ -482,55 +492,47 @@ function getStatusTone(status: FichaStatus): BadgeTone {
 }
 
 function generateDefaultOperationalPdf(result: FichaListResult, filters: FichaFilters) {
-  const lines = buildOperationalLines(result, filters);
-  return createSimpleTextPdf(lines);
-}
-
-function buildOperationalLines(result: FichaListResult, filters: FichaFilters) {
-  const lines = [
-    "Relatório operacional de fichas",
-    `Gerado em ${formatDateTime(new Date())}`,
-    `Filtros: ${formatFilters(filters)}`,
-    "",
-  ];
+  const doc = new jsPDF({
+    format: "a4",
+    orientation: "portrait",
+    unit: "pt",
+  });
 
   if (result.kind === "not-configured") {
-    lines.push("Supabase ainda não configurado.", "Configure as variáveis de ambiente para carregar dados reais.");
-    return lines;
+    return renderFallbackPdf(doc, "Relatório Operacional de Fichas", "Supabase ainda não configurado.");
   }
 
   if (result.kind === "error") {
-    lines.push("Falha ao consultar fichas.", result.message);
-    return lines;
+    return renderFallbackPdf(doc, "Relatório Operacional de Fichas", result.message);
   }
 
-  if (result.fichas.length === 0) {
-    lines.push("Nenhuma ficha encontrada para os filtros atuais.");
-    return lines;
+  const sections = buildDefaultOperationalSections(result.fichas);
+
+  drawPageHeader(doc, {
+    filters: formatFilters(filters),
+    subtitle: "Visão operacional agrupada por data de entrega e personalização, mantendo a mesma leitura compacta dos recortes semanais.",
+    title: "Relatório Operacional de Fichas",
+  });
+
+  drawMetricStrip(doc, buildDefaultOperationalSummaryItems(result.fichas, sections));
+
+  let cursorY = 172;
+
+  if (sections.length === 0) {
+    drawEmptyState(doc, cursorY, "Nenhuma ficha encontrada para os filtros atuais.");
+    return Buffer.from(doc.output("arraybuffer"));
   }
 
-  lines.push(`Total encontrado: ${formatNumber(result.total)}`);
-  lines.push("");
+  for (const section of sections) {
+    cursorY = ensureSectionSpace(doc, cursorY, 46);
+    cursorY = drawSectionHeader(doc, cursorY, section);
 
-  for (const group of groupByDateAndPersonalizacao(result.fichas)) {
-    lines.push(group.dateLabel);
-
-    for (const personalizationGroup of group.groups) {
-      lines.push(`  ${personalizationGroup.label} - ${formatNumber(personalizationGroup.fichas.length)} ficha(s)`);
-
-      for (const ficha of personalizationGroup.fichas) {
-        const venda = ficha.numero_venda ? `Venda ${ficha.numero_venda}` : "Sem venda";
-        const vendedor = ficha.vendedor ?? "Sem vendedor";
-        const inicio = ficha.data_inicio ? ` | Início ${formatShortDate(ficha.data_inicio)}` : "";
-        const evento = ficha.evento ? " | Evento" : "";
-        lines.push(`    ${ficha.cliente_nome_snapshot} | ${venda} | ${STATUS_LABELS[ficha.status]} | ${vendedor}${inicio}${evento}`);
-      }
+    for (const group of section.groups) {
+      cursorY = drawPaginatedGroup(doc, cursorY, group, section.tone);
     }
-
-    lines.push("");
   }
 
-  return lines;
+  return Buffer.from(doc.output("arraybuffer"));
 }
 
 function groupByDateAndPersonalizacao(fichas: FichaListItem[]) {
@@ -557,30 +559,32 @@ function groupByDateAndPersonalizacao(fichas: FichaListItem[]) {
   }));
 }
 
-function createSimpleTextPdf(lines: string[]) {
-  const pages = paginateLines(lines, 46);
-  const objects: string[] = [];
-  const pageObjectIds: number[] = [];
-
-  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
-  objects.push("");
-
-  for (const pageLines of pages) {
-    const content = buildPageContent(pageLines);
-    const contentObjectId = objects.length + 2;
-    const pageObjectId = objects.length + 3;
-
-    objects.push(`<< /Length ${Buffer.byteLength(content, "binary")} >>\nstream\n${content}\nendstream`);
-    objects.push(
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObjectId} 0 R >>`,
+function buildDefaultOperationalSections(fichas: FichaListItem[]) {
+  return groupByDateAndPersonalizacao(fichas).map((group) => {
+    const overdueCount = group.groups.reduce(
+      (total, personalizationGroup) => total + personalizationGroup.fichas.filter((ficha) => isFichaOverdue(ficha)).length,
+      0,
     );
-    pageObjectIds.push(pageObjectId);
-  }
+    const rowCount = group.groups.reduce((total, personalizationGroup) => total + personalizationGroup.fichas.length, 0);
+    const summaryParts = [
+      `${formatNumber(group.groups.length)} personalização(ões)`,
+      `${formatNumber(rowCount)} ficha(s)`,
+    ];
 
-  objects[1] = `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageObjectIds.length} >>`;
-  objects.splice(2, 0, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+    if (overdueCount > 0) {
+      summaryParts.push(`${formatNumber(overdueCount)} atrasada(s)`);
+    }
 
-  return assemblePdf(objects);
+    return {
+      groups: group.groups.map((personalizationGroup) => ({
+        label: personalizationGroup.label,
+        rows: personalizationGroup.fichas.map(toPdfRow).sort((a, b) => comparePdfRows(a, b, "upcoming")),
+      })),
+      summary: summaryParts.join(" · "),
+      title: group.dateLabel,
+      tone: overdueCount > 0 ? "danger" : "info",
+    } satisfies PdfSection;
+  });
 }
 
 function renderFallbackPdf(doc: jsPDF, title: string, message: string) {
@@ -593,55 +597,12 @@ function renderFallbackPdf(doc: jsPDF, title: string, message: string) {
   return Buffer.from(doc.output("arraybuffer"));
 }
 
-function paginateLines(lines: string[], perPage: number) {
-  const pages: string[][] = [];
-
-  for (let index = 0; index < lines.length; index += perPage) {
-    pages.push(lines.slice(index, index + perPage));
-  }
-
-  return pages.length ? pages : [[""]];
-}
-
-function buildPageContent(lines: string[]) {
-  const content = ["BT", "/F1 10 Tf", "14 TL", "50 800 Td"];
-
-  lines.forEach((line, index) => {
-    if (index > 0) content.push("T*");
-    content.push(`(${escapePdfText(line)}) Tj`);
-  });
-
-  content.push("ET");
-  return content.join("\n");
-}
-
-function assemblePdf(objects: string[]) {
-  const offsets: number[] = [0];
-  let body = "";
-
-  objects.forEach((object, index) => {
-    offsets.push(Buffer.byteLength("%PDF-1.4\n", "binary") + Buffer.byteLength(body, "binary"));
-    body += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  });
-
-  const xrefOffset = Buffer.byteLength("%PDF-1.4\n", "binary") + Buffer.byteLength(body, "binary");
-  const xref = [
-    "xref",
-    `0 ${objects.length + 1}`,
-    "0000000000 65535 f ",
-    ...offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n `),
-    "trailer",
-    `<< /Size ${objects.length + 1} /Root 1 0 R >>`,
-    "startxref",
-    String(xrefOffset),
-    "%%EOF",
-  ].join("\n");
-
-  return Buffer.from(`%PDF-1.4\n${body}${xref}`, "binary");
-}
-
-function escapePdfText(value: string) {
-  return sanitizePdfText(value).replace(/[^\x20-\x7E]/g, "").replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+function buildDefaultOperationalSummaryItems(fichas: FichaListItem[], sections: PdfSection[]): PdfSummaryItem[] {
+  return [
+    { label: "Fichas", tone: "info", value: fichas.length },
+    { label: "Datas", tone: "info", value: sections.length },
+    { label: "Personalizações", tone: "info", value: sections.reduce((total, section) => total + section.groups.length, 0) },
+  ];
 }
 
 function sanitizePdfText(value: string) {

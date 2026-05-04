@@ -14,6 +14,7 @@ import { PrintTriggerButton } from "./print-trigger-button";
 type FichaRowActionsProps = {
   fichaId: string;
   fichaLabel: string;
+  fullDeliverButton?: boolean;
   printHref: string;
   previewHref: string;
   returnTo: string;
@@ -24,7 +25,15 @@ function createConfirmationCode() {
   return Math.random().toString(36).slice(2, 6).toUpperCase();
 }
 
-export function FichaRowActions({ fichaId, fichaLabel, previewHref, printHref, returnTo, status }: FichaRowActionsProps) {
+export function FichaRowActions({
+  fichaId,
+  fichaLabel,
+  fullDeliverButton = false,
+  previewHref,
+  printHref,
+  returnTo,
+  status,
+}: FichaRowActionsProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmationCode, setConfirmationCode] = useState(() => createConfirmationCode());
   const [deleteState, deleteFormAction] = useActionState(deleteFichaAction, getInitialFichaDeleteActionState());
@@ -41,6 +50,49 @@ export function FichaRowActions({ fichaId, fichaLabel, previewHref, printHref, r
   function openDeleteModal() {
     setConfirmationCode(createConfirmationCode());
     setDeleteOpen(true);
+  }
+
+  if (fullDeliverButton) {
+    return (
+      <>
+        <div className="ficha-row-actions ficha-row-actions--deliver-only" aria-label={`Ações da ficha ${fichaLabel}`}>
+        <form action={markFichaEntregueFormAction} className="ficha-row-actions__deliver-form">
+          <input name="id" type="hidden" value={fichaId} />
+          <input name="returnTo" type="hidden" value={returnTo} />
+          <FullDeliverSubmitButton fichaLabel={fichaLabel} />
+        </form>
+          <FloatingMenu label={`Mais ações da ficha ${fichaLabel}`} trigger={<MoreHorizontal aria-hidden="true" size={18} />}>
+            <FloatingMenuLink href={previewHref} prefetch={false} scroll={false}>
+              <Eye aria-hidden="true" size={16} />
+              Prévia de impressão
+            </FloatingMenuLink>
+            <PrintTriggerButton className="floating-menu__item" href={printHref} label={`Imprimir ficha ${fichaLabel}`} role="menuitem">
+              <Printer aria-hidden="true" size={16} />
+              Imprimir
+            </PrintTriggerButton>
+            <FloatingMenuLink href={editHref}>
+              <Pencil aria-hidden="true" size={16} />
+              Editar
+            </FloatingMenuLink>
+            <FloatingMenuButton danger onClick={openDeleteModal}>
+              <Trash2 aria-hidden="true" size={16} />
+              Deletar
+            </FloatingMenuButton>
+          </FloatingMenu>
+        </div>
+
+        {deleteOpen ? (
+          <DeleteFichaDialog
+            confirmationCode={confirmationCode}
+            fichaId={fichaId}
+            fichaLabel={fichaLabel}
+            formAction={deleteFormAction}
+            onClose={() => setDeleteOpen(false)}
+            returnTo={returnTo}
+          />
+        ) : null}
+      </>
+    );
   }
 
   return (
@@ -191,6 +243,22 @@ function DeleteSubmitButton({ disabled }: { disabled: boolean }) {
     <button aria-disabled={isDisabled} className="ui-button ui-button--danger" disabled={isDisabled} type="submit">
       {pending ? <span className="button-spinner" aria-hidden="true" /> : <Trash2 aria-hidden="true" size={16} />}
       Remover ficha
+    </button>
+  );
+}
+
+function FullDeliverSubmitButton({ fichaLabel }: { fichaLabel: string }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      aria-label={`Marcar ficha ${fichaLabel} como entregue`}
+      className="ficha-row-actions__deliver-button"
+      disabled={pending}
+      type="submit"
+    >
+      {pending ? <span className="button-spinner button-spinner--contrast" aria-hidden="true" /> : <CheckCircle2 aria-hidden="true" size={16} />}
+      Marcar como entregue
     </button>
   );
 }

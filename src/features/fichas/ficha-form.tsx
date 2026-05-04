@@ -1076,6 +1076,12 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
     updateObservacoesAutofill();
   });
 
+  useEffect(() => {
+    if (!observacoesEditorRef.current) return;
+    if (observacoesEditorRef.current.innerHTML === observacoes) return;
+    observacoesEditorRef.current.innerHTML = observacoes;
+  }, [observacoes]);
+
   return (
     <form
       ref={formRef}
@@ -1796,7 +1802,8 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                 className="rich-editor__surface"
                 contentEditable
                 data-empty={getPlainTextFromHtml(observacoes) ? "false" : "true"}
-                dangerouslySetInnerHTML={{ __html: observacoes }}
+                dir="ltr"
+                lang="pt-BR"
                 onInput={handleObservacoesInput}
                 onPaste={handleObservacoesPaste}
                 ref={observacoesEditorRef}
