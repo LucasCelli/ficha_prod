@@ -608,3 +608,129 @@
 - Implementacao: textos como `Relatorio Operacional de Fichas`, `Visao operacional`, `Personalizacao` e o separador `·` foram normalizados, e o fallback textual antigo foi removido junto de `buildOperationalLines`, `createSimpleTextPdf` e helpers associados.
 - Resultado: o arquivo ficou com um unico caminho ativo para gerar o PDF operacional, sem residuos de placeholder nem mojibake remanescente.
 - Validacao: `rg -n "Ã|Â|â|NÃ|PrÃ|Ãƒ|Ã‚" src/features/fichas/operational-pdf.ts` sem resultados, `npx eslint src/features/fichas/operational-pdf.ts` e `npm run typecheck` passaram.
+
+### UX loading: botoes padronizados com spinner
+
+- Ajuste: os botoes de acao foram normalizados para usar sempre o mesmo `button-spinner` e trocar o rotulo para refletir a acao em andamento.
+- Implementacao: `login-form`, `cliente-form`, `catalogo-form`, `usuario-form`, `ficha-form`, `ficha-status-actions` e `ficha-row-actions` agora exibem estados como `Entrando...`, `Salvando...`, `Removendo...` e `Marcando...` junto do spinner comum, sem recorrer a barras de carregamento dentro de botoes.
+- Regra duravel: registrada em `AGENTS.md` e consolidada assim - spinner para itens sendo carregados e botoes em estado de carregamento; barra de carregamento para toasts e transicao entre paginas; skeleton nunca.
+- Validacao: `npx eslint src/features/auth/login-form.tsx src/features/clientes/cliente-form.tsx src/features/fichas/ficha-form.tsx src/features/fichas/ficha-status-actions.tsx src/features/fichas/ficha-row-actions.tsx src/features/catalogos/catalogo-form.tsx src/features/usuarios/usuario-form.tsx` e `npm run typecheck` passaram.
+
+### UX confirmacoes: radix no lugar de confirm nativo
+
+- Diagnostico: o `AlertDialog` do Radix ja estava instalado e sendo usado no Next atual, mas ainda restava um `window.confirm` no fluxo de auto-preenchimento de observacoes em `src/features/fichas/ficha-form.tsx`.
+- Implementacao: a confirmacao para substituir observacoes digitadas manualmente foi migrada para um `AlertDialog` com o mesmo padrao visual de `confirm-dialog` ja usado no app.
+- Resultado: no App Router atual nao sobrou `window.confirm`; as confirmacoes migradas agora seguem o mesmo comportamento visual e acessivel do restante da interface.
+- Validacao: `rg -n "window\\.confirm|confirm\\(" src/features src/components src/app` sem resultados, `npx eslint src/features/fichas/ficha-form.tsx` e `npm run typecheck` passaram.
+
+### Fichas entregues: reverter para pendente com confirmacao
+
+- Ajuste: na listagem filtrada de fichas entregues, o botao verde desabilitado de status foi trocado por um botao laranja de reversao para pendente.
+- Implementacao: `src/features/fichas/ficha-row-actions.tsx` agora renderiza um `icon-action--warning` quando `status === "entregue"` e abre um `AlertDialog` antes de submeter a reversao. No backend, `src/features/fichas/actions.ts` ganhou `revertFichaToPendenteAction`, que volta `status` para `pendente`, limpa `delivered_at` e revalida `/fichas`, `/relatorios` e a rota de detalhe.
+- UI: `src/styles/globals.css` passou a ter as variantes `icon-action--warning` e `ui-button--warning` para manter o CTA laranja consistente com o restante do sistema.
+- Validacao: `npx eslint src/features/fichas/actions.ts src/features/fichas/ficha-row-actions.tsx` e `npm run typecheck` passaram.
+
+### UX loading: spinner dos botoes com cor visivel
+
+- Diagnostico: o `button-spinner` ainda estava preso a `--color-primary` / `--color-primary-contrast`, entao podia desaparecer em botoes com outras cores ou em estados claros.
+- Implementacao: `src/styles/globals.css` foi ajustado para usar `currentColor` tanto na trilha quanto no feixe animado do spinner, inclusive na variante `button-spinner--contrast`.
+- Resultado: o spinner agora herda a mesma cor visivel do texto/icone do botao, mantendo contraste coerente em botoes primarios, secundarios, success, warning e danger.
+- Validacao: `rg -n "button-spinner|currentColor" src/styles/globals.css` confirmou a troca, e `npm run typecheck` passou.
+
+### UX tooltip: regra para descricoes de hover
+
+- Regra duravel: quando a intencao for descrever ou explicar uma acao/controle da interface, nao usar o atributo HTML nativo `title=""`; usar o componente `Tooltip`.
+- Registro: a regra foi adicionada em `AGENTS.md` e `agents.md` para orientar proximas implementacoes.
+- Observacao: a varredura `rg -n 'title=' src/app src/features src/components` mostrou que os `title=` atuais no Next sao majoritariamente props semanticas de componentes como `EmptyState`, `Modal` e `AlertDialog`, nao dicas nativas de hover.
+
+### Fichas busca: input sem perder foco durante a digitacao
+
+- Diagnostico: o campo de busca da listagem podia perder foco no meio da digitacao porque `FichasFilterToolbar` estava recebendo uma `key` baseada nos filtros, o que permitia remount do componente inteiro durante as atualizacoes por query string.
+- Implementacao: em `src/features/fichas/fichas-overview.tsx`, a `key` artificial da toolbar foi removida. Em `src/features/fichas/fichas-filter-toolbar.tsx`, a busca passou a usar um draft local apenas enquanto o input esta focado, preservando o texto digitado durante os refreshes da listagem e voltando a espelhar a URL quando sai de edicao.
+- Resultado: a listagem continua atualizando conforme a pesquisa, mas o input deixa de derrubar o foco e interromper a digitacao no meio do fluxo.
+- Validacao: `npx eslint src/features/fichas/fichas-filter-toolbar.tsx src/features/fichas/fichas-overview.tsx` e `npm run typecheck` passaram.
+
+### Fichas PDF: exportar apenas a pagina atual da listagem
+
+- Diagnostico: o `PDF operacional` ainda consultava ate 500 fichas filtradas na rota `/fichas/pdf`, entao em estado puro acabava exportando o sistema inteiro em vez de refletir apenas o que estava na tela.
+- Implementacao: `src/features/fichas/data.ts` passou a paginar `listFichasForOperationalPdf(...)` com o mesmo `FICHAS_PAGE_SIZE` da listagem. `src/features/fichas/fichas-overview.tsx` passou a incluir `page` no `pdfHref`. `src/app/fichas/pdf/route.ts` agora le `page`, usa esse recorte real da listagem e monta o `Content-Disposition` com nome derivado do estado atual da tela: busca, status, evento, intervalo, pagina e atalhos semanais quando aplicavel.
+- Ajuste de comportamento: o modo semanal continua reaproveitando o layout especializado, mas sem acrescentar um bloco extra de atrasadas que nao esteja na tela atual.
+- Resultado: o PDF operacional agora espelha a pagina atual da listagem em vez do conjunto inteiro filtrado.
+- Validacao: `npx eslint src/app/fichas/pdf/route.ts src/features/fichas/data.ts src/features/fichas/fichas-overview.tsx` e `npm run typecheck` passaram.
+### Plugins recomendados: instalacao concluida e plano de adocao
+
+- Status: os pacotes que faltavam em `plugins-recomendados.md` foram instalados com sucesso: `@tanstack/react-table`, `nuqs`, `date-fns`, `@tanstack/react-query`, `react-resizable-panels`, `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `recharts` e `zustand`.
+- Confirmacao: `sonner` e `react-day-picker` ja estavam presentes, entao a rodada completou o conjunto recomendado em vez de duplicar instalacoes.
+- Planejamento registrado: `plugins-recomendados.md` agora traz um plano por ondas para substituir partes manuais por plugins, com prioridade para `nuqs` nos filtros/URL state, `date-fns` + `react-day-picker` em datas, `@tanstack/react-table` no `DataTable` compartilhado e `Tiptap` no editor de observacoes.
+- Validacao: `npm run typecheck` passou apos a instalacao.
+- Caveat: o `npm audit` ainda reporta 4 vulnerabilidades; nenhuma feature foi migrada nesta rodada, apenas a base foi instalada e o plano foi amarrado.
+### Consolidacao dos docs da raiz
+
+- Ajuste: a documentacao da raiz foi reduzida para os arquivos realmente ativos no ciclo atual do projeto.
+- Mantidos: `README.md`, `AGENTS.md`, `plano-migracao-next-supabase.md` e `registro-migracao-next.md`.
+- Consolidacao: o conteudo operacional de `CHECKLIST_HOMOLOGACAO_NEXT.md` foi absorvido pelo plano principal, especialmente na Fase 9 de homologacao; a trilha de `plugins-recomendados.md` tambem passou a viver no plano principal, na secao de bibliotecas/adocao.
+- README: `README.md` foi reescrito para refletir a arquitetura atual Next.js + Supabase, os comandos principais e o mapa curto de documentacao.
+- Resultado: a raiz deixa de ter docs paralelos para checklist e plugins, reduzindo redundancia e diminuindo o custo de manutencao.
+- Caveat: o historico antigo no plano e no registro ainda menciona os nomes removidos porque esses arquivos existiam quando aquelas etapas aconteceram.
+### AGENTS.md reescrito para o estado atual
+
+- Problema: o `AGENTS.md` antigo ainda refletia parte do desenho inicial da migracao e chegou a orientar errado em pontos ja consolidados, como API de toast, superfices ativas e papel de rotas antigas.
+- Reescrita: o arquivo foi substituido integralmente para descrever o produto atual em operacao, incluindo stack real, docs vivos da raiz, ownership por pasta, gate de auth em `src/app/layout.tsx`, centralidade de `/fichas`, funcao real de `/relatorios`, restricao de `/catalogos` e `/usuarios` a `superadmin`, e o status do legado como referencia funcional apenas.
+- UI: tambem ficaram explicitas as regras duraveis ja adotadas no app atual, como `sonner` direto no Next, `AlertDialog` no lugar de `window.confirm`, `Tooltip` no lugar de `title=""`, spinner para botoes/itens, barra para loading de toast/transicao e `skeleton` nunca.
+- Bibliotecas: o novo texto separa o que ja e baseline (`sonner`, `react-hook-form`, `zod`, `@hello-pangea/dnd`, `react-day-picker`, Radix Dialog/AlertDialog) do que esta apenas instalado e ainda em adocao gradual (`nuqs`, `date-fns`, `@tanstack/react-table`, `@tanstack/react-query`, `recharts`, `zustand`, `react-resizable-panels`, `@tiptap/react`).
+- Validacao: revisao cruzada com `README.md`, `package.json`, `src/app/layout.tsx`, `src/components/ui/index.ts`, rotas reais em `src/app/*` e uso corrente de `sonner`, `react-day-picker`, `AlertDialog`, `DataTable` e `contentEditable` nas features.
+- Caveat: o arquivo foi regravado em ASCII intencionalmente para reduzir risco de encoding quebrado no fluxo atual do repositorio.
+
+### Plano principal auditado e atualizado
+
+- Problema: o `plano-migracao-next-supabase.md` ainda mantinha varios checkboxes desmarcados ou wording antigo em fases ja executadas, o que estava escondendo as pendencias realmente relevantes para a proxima etapa.
+- Ajuste: o plano foi revisado contra evidencias objetivas do proprio `registro-migracao-next.md`, sem marcar nada por suposicao.
+- Itens consolidados: bootstrap do Next dentro do repo atual, conexao Supabase em desenvolvimento, estrategia de importacao/migracao, criterios de aceite de Fichas, Clientes e Relatorios, export/backup e validacoes da Fase 8, alem da configuracao de ambiente de producao ja validada localmente.
+- Reenquadramento: a antiga Fase 6 deixou de pressupor uma rota `/dashboard` dedicada e passou a refletir a realidade atual, em que indicadores e atalhos foram absorvidos por `/fichas`, `/relatorios` e pela home. O item de Kanban virou reavaliacao pos-corte, em vez de parecer pendencia imediata.
+- Pendencias que ficaram abertas de proposito: janela final de migracao, congelamento do legado, publicacao em producao, testes reais em producao, monitoramento inicial e a paridade fina ainda nao fechada do formulario/auto-preenchimento de observacoes.
+- Resultado: o plano agora aponta melhor para o que ainda importa, em vez de misturar trabalho concluido com trabalho futuro.
+
+### Importacao de JSON legado como rascunho
+
+- Entrega: `/fichas/nova` agora aceita importacao de JSON legado apenas para `superadmin`, preenchendo o formulario atual como rascunho local sem criar registro intermediario e sem gravar nada no banco antes do clique em `Salvar ficha`.
+- Parser: `src/features/fichas/legacy-import.ts` faz deteccao de ficha unica ou backup com exatamente 1 ficha, normaliza chaves em camelCase/snake_case, reaproveita a prioridade `observacoesHtml -> observacoes -> observacoesPlainText` e preserva `comNomes` pelo valor explicito ou pela mesma heuristica textual do legado.
+- Estado inicial: `src/features/fichas/ficha-form-seed.ts` consolidou o seed do formulario para aceitar tanto ficha do banco quanto rascunho importado, permitindo remount limpo do `FichaForm` apos a importacao sem converter o formulario inteiro para controlado.
+- Imagens: a importacao separa imagens em tres grupos. URLs remotas com `publicId` entram como salvaveis; URLs HTTP(S) sem `publicId` entram apenas como preview com aviso; `data:`/`blob:`/estruturas invalidas sao descartadas com warning explicito.
+- Seguranca de persistencia: `src/features/fichas/ficha-form.tsx` passou a bloquear o submit quando ainda existem imagens importadas apenas como rascunho, evitando perda silenciosa no `imagensJson`, que continua aceitando apenas imagens com `publicId` + `secureUrl`.
+- UX: se o formulario ja tiver conteudo, a importacao pede confirmacao antes de sobrescrever o rascunho atual. Depois da carga, um toast resume o resultado e um banner lista avisos de conversao parcial.
+- Auditoria de paridade: `src/features/fichas/legacy-import-audit.ts` registra a matriz interna com `1:1 confirmado`, `coberto com adaptacao` e `ainda pendente`. A unica pendencia funcional mantida de proposito e a validacao fina do auto-preenchimento de observacoes contra exemplos reais do legado.
+- Validacao: `npm run typecheck` passou.
+
+### Spinner do botao salvar ficha
+
+- Diagnostico: o botao `Salvar ficha` estava usando o markup correto de loading (`<span className="button-spinner" />`), mas o estilo global de `button-spinner` ainda era uma barra horizontal, o que conflita com a regra do projeto de usar spinner para botoes e barra apenas para toast/transicao.
+- Ajuste: `src/styles/globals.css` foi corrigido para que `button-spinner` volte a ser circular, com borda girando e cor herdada de `currentColor`.
+- Resultado: o loading do `Salvar ficha` volta a parecer spinner de botao, sem afetar a barra de loading dos toasts.
+- Validacao: `npm run typecheck` passou.
+
+### Toast de sucesso ao salvar ficha + galeria centralizada
+
+- Feedback de salvamento: como o fluxo de `createFichaAction` e `updateFichaAction` termina em redirect para `/fichas`, o sucesso real foi implementado no pós-redirect. `src/features/fichas/actions.ts` agora envia `saved=created` ou `saved=updated`, e `src/features/fichas/ficha-save-toast.tsx` mostra um `toast.success` uma unica vez e limpa o param da URL com `router.replace(..., { scroll: false })`.
+- Integracao: `src/features/fichas/fichas-overview.tsx` passou a renderizar `FichaSaveToast` no topo da superficie de listagem, mantendo o feedback visivel logo apos salvar sem depender de estado local do formulario.
+- Galeria: `src/styles/globals.css` ajustou `image-upload-grid` para `justify-content: center`, centralizando os cards quando houver 1, 2 ou 3 imagens no formulario.
+- Resultado: salvar ficha agora devolve confirmacao visual clara, e a secao de imagens deixa de parecer desalinhada quando a grade nao esta cheia.
+- Validacao: `npm run typecheck` passou.
+
+### Importacao legado: valores crus agora viram rotulos canonicos
+
+- Problema observado: alguns JSONs legados traziam valores em minusculo ou em codigo interno de select, como `padre_ziper`, `redonda`, `punho_ribana` e ids de material como `dry_fit`. Isso fazia a importacao hidratar a ficha com textos crus que nao batiam com o catalogo visivel do sistema novo.
+- Ajuste no parser: `src/features/fichas/legacy-import.ts` passou a importar `public/data/catalogo.json` e montar lookups canonicos para produtos, materiais, mangas, cores, larguras, locais de filete/faixa e faixas refletivas. Alem disso, ganhou uma tabela de aliases explicitos dos selects antigos para `gola`, `acabamentoGola` e `acabamentoManga`.
+- Exemplo pratico: `padre_ziper` agora entra como `Gola Padre com Zíper`; `redonda` vira `Gola Redonda`; `punho_ribana` vira `Punho de Ribana`; `dry_fit` vira `Dry Fit`; cores em minusculo passam a usar a grafia canonica do catalogo quando houver correspondencia.
+- Render imprimivel: `src/features/fichas/print-ficha.tsx` tambem foi endurecido para reconhecer `polo` e `social` por comparacao normalizada, nao apenas por igualdade exata do valor cru legado. Isso evita inconsistencias quando a ficha importada ja foi canonicalizada para rótulo.
+- Resultado: a importacao passa a preencher a UI com os mesmos textos que o usuario espera ver no formulario novo e reduz o risco de regras condicionais ou montagem visual falharem por conta de valores internos do legado.
+- Validacao: `npm run typecheck` e `eslint` dirigido em `src/features/fichas/legacy-import.ts` e `src/features/fichas/print-ficha.tsx` passaram.
+
+### Catalogos: aliases oficiais e limpeza de redundancias preparados
+
+- Diagnostico arquitetural: a camada de compatibilidade no parser era util, mas incompleta como fonte de verdade. O ponto correto para amarrar legado e Next e o proprio `catalog_items`, porque e dele que `/catalogos` e o formulario novo devem passar a depender.
+- Parser alinhado ao banco: `src/features/fichas/legacy-import.ts` foi ajustado para aceitar `catalogOptions` do banco durante a importacao e priorizar os aliases oficiais carregados de `/catalogos`. O fallback em `public/data/catalogo.json` continua so para nao quebrar importacao antes da limpeza completa do banco.
+- Seed refeito: `scripts/seed-catalog-items.mjs` deixou de criar listas simplificadas e redundantes como `Redonda`, `V`, `Padre`, `Raglan`, `Regata`, `Barra simples` e `Gola pronta`. Agora ele gera apenas os valores canônicos e registra aliases legados oficiais, como `padre_ziper`, `v_polo`, `punho_ribana`, `ribana_molde` e ids de tecidos como `dry_fit`.
+- Migration real: foi criada `supabase/migrations/202605050002_catalog_items_canonical_cleanup.sql` para limpar as redundâncias já existentes nas families `manga`, `gola`, `acabamento_manga`, `acabamento_gola` e `bolso`, inserir os canônicos que faltavam e anexar `legacyId` dos tecidos ao array `aliases`.
+- Checagem do seed: o dry-run de `node scripts/seed-catalog-items.mjs` retornou um catálogo consolidado com 219 itens: `produto 65`, `tamanho 45`, `tecido 35`, `cor 40`, `manga 6`, `gola 8`, `acabamento_manga 6`, `acabamento_gola 5` e `bolso 9`.
+- Estado desta rodada: preparei a migration e o seed canônico, mas nao apliquei no banco ainda. Isso foi intencional para nao alterar dados remotos sem executar a rodada de migrate/seed no ambiente alvo.
+- Validacao local: `npm run typecheck`, `eslint` dirigido e o dry-run do seed passaram.

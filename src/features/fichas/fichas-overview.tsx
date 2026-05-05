@@ -5,6 +5,7 @@ import { Badge, DataTable, EmptyState, Pagination } from "@/components/ui";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { FichasFilterToolbar } from "./fichas-filter-toolbar";
 import { FichaRowActions } from "./ficha-row-actions";
+import { FichaSaveToast } from "./ficha-save-toast";
 import {
   FICHAS_PAGE_SIZE,
   getFichaOverdueDays,
@@ -46,6 +47,7 @@ export function FichasOverview({ filters, result }: FichasOverviewProps) {
 
   return (
     <section className="fichas-view" aria-labelledby="fichas-title">
+      <FichaSaveToast />
       <header className="fichas-view__header">
         <div className="page-heading">
           <div className="page-heading__copy">
@@ -83,7 +85,6 @@ export function FichasOverview({ filters, result }: FichasOverviewProps) {
       </nav>
 
       <FichasFilterToolbar
-        key={getFilterToolbarKey(filters)}
         canExportPdf={result.kind === "ok" && result.total > 0}
         filters={filters}
         pdfHref={hrefForPdf(filters)}
@@ -160,15 +161,10 @@ function hrefForPdf(filters: FichaFilters) {
   if (filters.status) params.set("status", filters.status);
   if (filters.dataInicio) params.set("dataInicio", filters.dataInicio);
   if (filters.dataFim) params.set("dataFim", filters.dataFim);
+  if (filters.page && filters.page > 1) params.set("page", String(filters.page));
 
   const query = params.toString();
   return query ? `/fichas/pdf?${query}` : "/fichas/pdf";
-}
-
-function getFilterToolbarKey(filters: FichaFilters) {
-  return [filters.busca, filters.status, filters.evento === true ? "evento" : "", filters.dataInicio, filters.dataFim]
-    .filter(Boolean)
-    .join("|");
 }
 
 function matchesShortcut(current: FichaFilters, shortcut: ShortcutFilters) {

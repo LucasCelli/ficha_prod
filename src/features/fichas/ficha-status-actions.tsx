@@ -58,7 +58,7 @@ function StatusSubmitButton({ disabled }: { disabled: boolean }) {
   return (
     <Button aria-disabled={isDisabled} disabled={isDisabled} type="submit" variant="secondary">
       {pending ? <span className="button-spinner button-spinner--contrast" aria-hidden="true" /> : <CheckCircle2 aria-hidden="true" size={18} />}
-      Marcar como entregue
+      {pending ? "Marcando entrega..." : "Marcar como entregue"}
     </Button>
   );
 }

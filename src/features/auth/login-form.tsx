@@ -65,7 +65,7 @@ export function LoginForm({ next }: LoginFormProps) {
       ) : null}
 
       <Button disabled={isPending} type="submit">
-        <LogIn aria-hidden="true" size={18} />
+        {isPending ? <span className="button-spinner" aria-hidden="true" /> : <LogIn aria-hidden="true" size={18} />}
         {isPending ? "Entrando..." : "Entrar"}
       </Button>
     </form>

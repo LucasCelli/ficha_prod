@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync, useFormStatus } from "react-dom";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import { DayPicker } from "react-day-picker";
@@ -28,59 +28,33 @@ import {
   UserRound,
   Wand2,
 } from "lucide-react";
-import { Button, CustomDatalist, Tooltip, type CustomDatalistOption } from "@/components/ui";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  Button,
+  CustomDatalist,
+  Tooltip,
+  type CustomDatalistOption,
+} from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
 import { createFichaAction, updateFichaAction } from "./actions";
 import type { FichaDetail } from "./data";
+import type { FichaFormClientValues, FichaFormInitialData, ImageFormItem, ProductFormItem } from "./ficha-form-seed";
+import { createEmptyProductItem, mapFichaToInitialData } from "./ficha-form-seed";
 import { getInitialFichaFormState } from "./form-state";
+import type { LegacyFichaImportWarning } from "./legacy-import";
+import { mapLegacyDraftToFichaFormInitialData, parseLegacyFichaJson } from "./legacy-import";
 import { PrintFicha } from "./print-ficha";
 import { PrintTriggerButton } from "./print-trigger-button";
 
 type FichaFormProps = {
+  canImportLegacyJson?: boolean;
   catalogOptions?: CatalogOptionsByKind;
   clienteOptions?: CustomDatalistOption[];
   ficha?: FichaDetail;
   mode?: "create" | "edit";
   vendedorOptions?: CustomDatalistOption[];
-};
-
-type ProductFormItem = {
-  detalhesProduto: string;
-  id: string;
-  produto: string;
-  quantidade: string;
-  tamanho: string;
-};
-
-type ImageFormItem = {
-  altText: string;
-  bytes?: number;
-  file?: File;
-  height?: number;
-  id: string;
-  persisted?: boolean;
-  previewUrl?: string;
-  publicId?: string;
-  secureUrl?: string;
-  width?: number;
-};
-
-type FichaFormClientValues = {
-  acabamentoGola: string;
-  acabamentoManga: string;
-  aberturaLateral: string;
-  arte: string;
-  comNomes: string;
-  composicao: string;
-  faixa: string;
-  filete: string;
-  gola: string;
-  imagens: ImageFormItem[];
-  itens: ProductFormItem[];
-  material: string;
-  observacoes: string;
-  reforcoGola: string;
-  viesRegata: string;
 };
 
 const SIZE_ORDER = new Map(
@@ -149,46 +123,13 @@ function findOptionByName(options: CustomDatalistOption[], name: string): Custom
     ?? options.find((option) => normalizeProductForRule(option.label).includes(normalizedName));
 }
 
-function createEmptyProductItem(id = "item-0"): ProductFormItem {
-  return {
-    detalhesProduto: "",
-    id,
-    produto: "",
-    quantidade: "1",
-    tamanho: "",
-  };
+function getInitialProductItems(initialData: FichaFormInitialData): ProductFormItem[] {
+  if (!initialData.itens.length) return [createEmptyProductItem()];
+  return initialData.itens;
 }
 
-function getInitialProductItems(ficha?: FichaDetail): ProductFormItem[] {
-  if (!ficha?.itens?.length) return [createEmptyProductItem()];
-
-  return ficha.itens.map((item) => ({
-    detalhesProduto: item.detalhes_produto ?? item.detalhes ?? "",
-    id: item.id,
-    produto: item.produto ?? item.descricao ?? "",
-    quantidade: String(item.quantidade ?? 1),
-    tamanho: item.tamanho ?? "",
-  }));
-}
-
-function getInitialImageItems(ficha?: FichaDetail): ImageFormItem[] {
-  if (!ficha?.imagens?.length) return [];
-
-  return ficha.imagens.map((image) => {
-    const dados = image.dados && typeof image.dados === "object" && !Array.isArray(image.dados) ? image.dados : {};
-    const publicId = "publicId" in dados && typeof dados.publicId === "string" ? dados.publicId : image.storage_path ?? image.id;
-
-    return {
-      altText: image.alt_text ?? "",
-      bytes: image.bytes ?? undefined,
-      height: image.height ?? undefined,
-      id: image.id,
-      persisted: true,
-      publicId,
-      secureUrl: image.url,
-      width: image.width ?? undefined,
-    };
-  });
+function getInitialImageItems(initialData: FichaFormInitialData): ImageFormItem[] {
+  return initialData.imagens;
 }
 
 function getCloudinaryImagePath(publicId: string) {
@@ -339,19 +280,64 @@ function serializeImageItems(images: ImageFormItem[]) {
   );
 }
 
-export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "create", vendedorOptions = [] }: FichaFormProps) {
+type ImportedLegacyState = {
+  fileName: string;
+  importedAt: number;
+  initialData: FichaFormInitialData;
+  warnings: LegacyFichaImportWarning[];
+};
+
+type PendingLegacyImport = ImportedLegacyState;
+
+export function FichaForm(props: FichaFormProps) {
+  const { ficha, mode = "create" } = props;
+  const [importedLegacyState, setImportedLegacyState] = useState<ImportedLegacyState | null>(null);
+  const renderKey = `${mode}-${ficha?.id ?? "new"}-${importedLegacyState?.importedAt ?? 0}`;
+
+  return (
+    <FichaFormInner
+      key={renderKey}
+      {...props}
+      importedLegacyState={importedLegacyState}
+      onApplyImportedLegacyState={setImportedLegacyState}
+    />
+  );
+}
+
+type FichaFormInnerProps = FichaFormProps & {
+  importedLegacyState: ImportedLegacyState | null;
+  onApplyImportedLegacyState: (state: ImportedLegacyState) => void;
+};
+
+function FichaFormInner({
+  canImportLegacyJson = false,
+  catalogOptions,
+  clienteOptions = [],
+  ficha,
+  importedLegacyState,
+  mode = "create",
+  onApplyImportedLegacyState,
+  vendedorOptions = [],
+}: FichaFormInnerProps) {
+  const initialData = useMemo(
+    () => importedLegacyState?.initialData ?? mapFichaToInitialData(ficha),
+    [ficha, importedLegacyState],
+  );
   const action = mode === "edit" ? updateFichaAction : createFichaAction;
   const [state, formAction] = useActionState(action, getInitialFichaFormState());
   const formRef = useRef<HTMLFormElement>(null);
+  const legacyImportInputRef = useRef<HTMLInputElement>(null);
   const imagensJsonInputRef = useRef<HTMLInputElement>(null);
   const imageGridRef = useRef<HTMLDivElement | null>(null);
   const imagensRef = useRef<ImageFormItem[]>([]);
   const lastToastMessageRef = useRef<string | null>(null);
+  const lastImportedLegacyToastRef = useRef<number | null>(null);
   const lastObservacoesAutofillRef = useRef("");
   const observacoesEditorRef = useRef<HTMLDivElement>(null);
-  const observacoesAutoBlockedRef = useRef(Boolean(ficha?.observacoes?.trim()));
+  const observacoesAutoBlockedRef = useRef(Boolean(initialData.observacoes.trim()));
   const applyingObservacoesAutoRef = useRef(false);
   const applyingObservacoesAutoTimerRef = useRef<number | null>(null);
+  const [pendingLegacyImport, setPendingLegacyImport] = useState<PendingLegacyImport | null>(null);
   const submitAfterUploadRef = useRef(false);
   const sortFeedbackTimerRef = useRef<number | null>(null);
   const autoGolaRef = useRef(false);
@@ -359,21 +345,21 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
   const autoComposicaoRef = useRef(false);
   const fichaForm = useForm<FichaFormClientValues>({
     defaultValues: {
-      acabamentoGola: ficha?.acabamento_gola ?? "",
-      acabamentoManga: ficha?.acabamento_manga ?? "",
-      aberturaLateral: ficha?.abertura_lateral ?? "nao",
-      arte: ficha?.arte ?? "",
-      comNomes: ficha?.com_nomes?.toString() ?? "",
-      composicao: ficha?.composicao ?? "",
-      faixa: ficha?.faixa ?? "nao",
-      filete: ficha?.filete ?? "nao",
-      gola: ficha?.gola ?? "",
-      imagens: getInitialImageItems(ficha),
-      itens: getInitialProductItems(ficha),
-      material: ficha?.material ?? "",
-      observacoes: ficha?.observacoes ?? "",
-      reforcoGola: ficha?.reforco_gola ?? "nao",
-      viesRegata: ficha?.acabamento_manga === "vies" ? "sim" : "",
+      acabamentoGola: initialData.acabamentoGola,
+      acabamentoManga: initialData.acabamentoManga,
+      aberturaLateral: initialData.aberturaLateral,
+      arte: initialData.arte,
+      comNomes: initialData.comNomes,
+      composicao: initialData.composicao,
+      faixa: initialData.faixa,
+      filete: initialData.filete,
+      gola: initialData.gola,
+      imagens: getInitialImageItems(initialData),
+      itens: getInitialProductItems(initialData),
+      material: initialData.material,
+      observacoes: initialData.observacoes,
+      reforcoGola: initialData.reforcoGola,
+      viesRegata: initialData.acabamentoManga === "vies" ? "sim" : "",
     },
   });
   const { control, getValues, setValue } = fichaForm;
@@ -422,6 +408,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
   const [imageGridWidth, setImageGridWidth] = useState(0);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [draftPrintFicha, setDraftPrintFicha] = useState<FichaDetail | null>(null);
+  const [observacoesConfirmationValue, setObservacoesConfirmationValue] = useState<string | null>(null);
   const [sortFeedbackVisible, setSortFeedbackVisible] = useState(false);
   const productOptions = getOptions(catalogOptions, "produto");
   const sizeOptions = getOptions(catalogOptions, "tamanho");
@@ -621,9 +608,94 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
     }
   }
 
+  function hasMeaningfulDraft() {
+    const form = formRef.current;
+    if (!form) return false;
+
+    const formData = new FormData(form);
+    const textFields = [
+      "cliente",
+      "clienteAuxiliar",
+      "vendedor",
+      "dataInicio",
+      "dataEntrega",
+      "numeroVenda",
+      "material",
+      "composicao",
+      "corMaterial",
+      "manga",
+      "larguraManga",
+      "corAcabamentoManga",
+      "gola",
+      "corGola",
+      "larguraGola",
+      "corBotao",
+      "observacoes",
+    ];
+
+    if (textFields.some((field) => String(formData.get(field) ?? "").trim())) return true;
+    if (Boolean(formData.get("evento"))) return true;
+    if (itens.some((item) => item.produto.trim() || item.tamanho.trim() || item.detalhesProduto.trim())) return true;
+    return imagens.length > 0;
+  }
+
+  function applyParsedLegacyImport(nextImport: ImportedLegacyState) {
+    onApplyImportedLegacyState(nextImport);
+  }
+
+  function confirmPendingLegacyImport() {
+    if (!pendingLegacyImport) return;
+    applyParsedLegacyImport(pendingLegacyImport);
+    setPendingLegacyImport(null);
+  }
+
+  function cancelPendingLegacyImport() {
+    setPendingLegacyImport(null);
+  }
+
+  async function handleLegacyImportSelection(fileList: FileList | null) {
+    const file = fileList?.[0];
+    if (!file) return;
+
+    try {
+      const rawText = await file.text();
+      const parsedJson = JSON.parse(rawText) as unknown;
+      const parsedImport = parseLegacyFichaJson(parsedJson, catalogOptions);
+      const nextImport: ImportedLegacyState = {
+        fileName: file.name,
+        importedAt: Date.now(),
+        initialData: mapLegacyDraftToFichaFormInitialData(parsedImport.draft),
+        warnings: parsedImport.warnings,
+      };
+
+      if (hasMeaningfulDraft()) {
+        setPendingLegacyImport(nextImport);
+      } else {
+        applyParsedLegacyImport(nextImport);
+      }
+    } catch (error) {
+      toast.error("Importação legado inválida", {
+        description: error instanceof Error ? error.message : "Não foi possível ler este JSON legado.",
+      });
+    } finally {
+      if (legacyImportInputRef.current) {
+        legacyImportInputRef.current.value = "";
+      }
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     if (submitAfterUploadRef.current) {
       submitAfterUploadRef.current = false;
+      return;
+    }
+
+    const hasBlockedImportedImages = imagens.some((image) => image.saveBlocked);
+    if (hasBlockedImportedImages) {
+      event.preventDefault();
+      toast.error("Revise as imagens importadas", {
+        description: "Remova ou substitua as imagens importadas apenas como rascunho antes de salvar a ficha.",
+      });
       return;
     }
 
@@ -676,6 +748,20 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
     const firstInvalid = formRef.current?.querySelector<HTMLElement>("[aria-invalid='true'], [data-invalid='true']");
     firstInvalid?.focus();
   }, [state]);
+
+  useEffect(() => {
+    if (!importedLegacyState) return;
+    if (lastImportedLegacyToastRef.current === importedLegacyState.importedAt) return;
+
+    const warningCount = importedLegacyState.warnings.length;
+    const imageCount = importedLegacyState.initialData.imagens.length;
+    toast.success("JSON legado importado como rascunho", {
+      description: warningCount > 0
+        ? `${importedLegacyState.fileName}: ${imageCount} imagem(ns) aproveitada(s) e ${warningCount} aviso(s) de conversão parcial.`
+        : `${importedLegacyState.fileName}: rascunho preenchido sem gravar nada no banco.`,
+    });
+    lastImportedLegacyToastRef.current = importedLegacyState.importedAt;
+  }, [importedLegacyState]);
 
   useEffect(() => {
     imagensRef.current = imagens;
@@ -1032,7 +1118,8 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
       return;
     }
 
-    if (options.requireConfirmation && isManualText && !window.confirm("Substituir as observações preenchidas manualmente?")) {
+    if (options.requireConfirmation && isManualText) {
+      setObservacoesConfirmationValue(nextObservacoes);
       return;
     }
 
@@ -1047,6 +1134,17 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
 
   function autofillObservacoes() {
     updateObservacoesAutofill({ force: true, notifyEmpty: true, requireConfirmation: true });
+  }
+
+  function closeObservacoesConfirmation() {
+    setObservacoesConfirmationValue(null);
+  }
+
+  function confirmObservacoesAutofill() {
+    if (!observacoesConfirmationValue) return;
+    observacoesAutoBlockedRef.current = false;
+    setGeneratedObservacoes(observacoesConfirmationValue);
+    setObservacoesConfirmationValue(null);
   }
 
   function handleFormRealtimeObservacoes(event: React.FormEvent<HTMLFormElement>) {
@@ -1083,21 +1181,55 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
   }, [observacoes]);
 
   return (
-    <form
-      ref={formRef}
-      className="ficha-form"
-      action={formAction}
-      noValidate
-      onInput={handleFormRealtimeObservacoes}
-      onChange={handleFormRealtimeObservacoes}
-      onSubmit={handleSubmit}
-    >
+    <>
+      <form
+        ref={formRef}
+        className="ficha-form"
+        action={formAction}
+        noValidate
+        onInput={handleFormRealtimeObservacoes}
+        onChange={handleFormRealtimeObservacoes}
+        onSubmit={handleSubmit}
+      >
       {ficha ? <input name="id" type="hidden" value={ficha.id} /> : null}
       <input ref={imagensJsonInputRef} name="imagensJson" type="hidden" value={serializedImages} />
       <input name="itensJson" type="hidden" value={serializedItems} />
       {state.message ? (
         <div className="form-banner" role="alert">
           {state.message}
+        </div>
+      ) : null}
+      {canImportLegacyJson && mode === "create" ? (
+        <div className="form-banner form-banner--soft">
+          <div className="legacy-import-toolbar">
+            <div>
+              <strong>Importar JSON legado</strong>
+              <p>Disponível apenas para superadmin. O arquivo preenche este rascunho e nada é salvo até clicar em salvar ficha.</p>
+            </div>
+            <Button onClick={() => legacyImportInputRef.current?.click()} type="button" variant="secondary">
+              <Upload aria-hidden="true" size={18} />
+              Importar JSON legado
+            </Button>
+            <input
+              ref={legacyImportInputRef}
+              accept=".json,application/json"
+              hidden
+              onChange={(event) => {
+                void handleLegacyImportSelection(event.currentTarget.files);
+              }}
+              type="file"
+            />
+          </div>
+        </div>
+      ) : null}
+      {importedLegacyState?.warnings.length ? (
+        <div className="form-banner" role="status">
+          <strong>Importação parcial do legado</strong>
+          <ul className="legacy-import-warning-list">
+            {importedLegacyState.warnings.map((warning, index) => (
+              <li key={`${warning.code}-${index}`}>{warning.message}</li>
+            ))}
+          </ul>
         </div>
       ) : null}
 
@@ -1114,7 +1246,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
               name="cliente"
               aria-describedby={state.fieldErrors?.cliente ? "cliente-error" : undefined}
               aria-invalid={Boolean(state.fieldErrors?.cliente)}
-              defaultValue={ficha?.cliente_nome_snapshot}
+              defaultValue={initialData.cliente || undefined}
               options={clienteOptions}
               placeholder="Nome do cliente…"
             />
@@ -1126,7 +1258,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
               name="clienteAuxiliar"
               aria-describedby={state.fieldErrors?.clienteAuxiliar ? "clienteAuxiliar-error" : undefined}
               aria-invalid={Boolean(state.fieldErrors?.clienteAuxiliar)}
-              defaultValue={ficha?.cliente_auxiliar ?? undefined}
+              defaultValue={initialData.clienteAuxiliar || undefined}
               placeholder="Local, detalhe, cor…"
             />
           </Field>
@@ -1137,7 +1269,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
               name="vendedor"
               aria-describedby={state.fieldErrors?.vendedor ? "vendedor-error" : undefined}
               aria-invalid={Boolean(state.fieldErrors?.vendedor)}
-              defaultValue={ficha?.vendedor ?? undefined}
+              defaultValue={initialData.vendedor || undefined}
               options={vendedorOptions}
               placeholder="Digite o vendedor…"
             />
@@ -1149,7 +1281,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
               name="dataInicio"
               aria-describedby={state.fieldErrors?.dataInicio ? "dataInicio-error" : undefined}
               aria-invalid={Boolean(state.fieldErrors?.dataInicio)}
-              initialValue={ficha?.data_inicio}
+              initialValue={initialData.dataInicio}
             />
           </Field>
 
@@ -1159,7 +1291,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
               name="dataEntrega"
               aria-describedby={state.fieldErrors?.dataEntrega ? "dataEntrega-error" : undefined}
               aria-invalid={Boolean(state.fieldErrors?.dataEntrega)}
-              initialValue={ficha?.data_entrega}
+              initialValue={initialData.dataEntrega}
               required
             />
           </Field>
@@ -1170,14 +1302,14 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
               name="numeroVenda"
               aria-describedby={state.fieldErrors?.numeroVenda ? "numeroVenda-error" : undefined}
               aria-invalid={Boolean(state.fieldErrors?.numeroVenda)}
-              defaultValue={ficha?.numero_venda ?? undefined}
+              defaultValue={initialData.numeroVenda || undefined}
               inputMode="numeric"
               placeholder="Número da venda…"
             />
           </Field>
 
           <label className="checkbox-field checkbox-field--aligned">
-            <input defaultChecked={ficha?.evento} name="evento" type="checkbox" />
+            <input defaultChecked={initialData.evento} name="evento" type="checkbox" />
             <span>Pedido para evento?</span>
           </label>
         </fieldset>
@@ -1352,7 +1484,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
               name="corMaterial"
               aria-describedby={state.fieldErrors?.corMaterial ? "corMaterial-error" : undefined}
               aria-invalid={Boolean(state.fieldErrors?.corMaterial)}
-              defaultValue={ficha?.cor_material ?? undefined}
+              defaultValue={initialData.corMaterial || undefined}
               options={colorOptions}
               placeholder="Azul, branco, preto…"
             />
@@ -1382,7 +1514,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                   name="manga"
                   aria-describedby={state.fieldErrors?.manga ? "manga-error" : undefined}
                   aria-invalid={Boolean(state.fieldErrors?.manga)}
-                  defaultValue={ficha?.manga ?? undefined}
+                  defaultValue={initialData.manga || undefined}
                   options={mangaOptions}
                   placeholder="-"
                 />
@@ -1409,7 +1541,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                   name="larguraManga"
                   aria-describedby={state.fieldErrors?.larguraManga ? "larguraManga-error" : undefined}
                   aria-invalid={Boolean(state.fieldErrors?.larguraManga)}
-                  defaultValue={ficha?.largura_manga ?? undefined}
+                  defaultValue={initialData.larguraManga || undefined}
                   placeholder="Ex: 3,5…"
                 />
               </Field>
@@ -1419,7 +1551,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                   name="corAcabamentoManga"
                   aria-describedby={state.fieldErrors?.corAcabamentoManga ? "corAcabamentoManga-error" : undefined}
                   aria-invalid={Boolean(state.fieldErrors?.corAcabamentoManga)}
-                  defaultValue={ficha?.cor_acabamento_manga ?? undefined}
+                  defaultValue={initialData.corAcabamentoManga || undefined}
                   options={colorOptions}
                   placeholder="Cor ou combinação…"
                 />
@@ -1452,7 +1584,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                 name="corGola"
                 aria-describedby={state.fieldErrors?.corGola ? "corGola-error" : undefined}
                 aria-invalid={Boolean(state.fieldErrors?.corGola)}
-                defaultValue={ficha?.cor_gola ?? undefined}
+                defaultValue={initialData.corGola || undefined}
                 options={colorOptions}
                 placeholder="Cor ou combinação…"
               />
@@ -1479,7 +1611,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                 name="larguraGola"
                 aria-describedby={state.fieldErrors?.larguraGola ? "larguraGola-error" : undefined}
                 aria-invalid={Boolean(state.fieldErrors?.larguraGola)}
-                defaultValue={ficha?.largura_gola ?? undefined}
+                defaultValue={initialData.larguraGola || undefined}
                 placeholder="Ex: 2,5…"
               />
             </Field>
@@ -1506,7 +1638,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                 name="corReforco"
                 aria-describedby={state.fieldErrors?.corReforco ? "corReforco-error" : undefined}
                 aria-invalid={Boolean(state.fieldErrors?.corReforco)}
-                defaultValue={ficha?.cor_reforco ?? undefined}
+                defaultValue={initialData.corReforco || undefined}
                 options={colorOptions}
                 placeholder="Cor do reforço…"
               />
@@ -1520,7 +1652,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                   name="corPeitilhoInterno"
                   aria-describedby={state.fieldErrors?.corPeitilhoInterno ? "corPeitilhoInterno-error" : undefined}
                   aria-invalid={Boolean(state.fieldErrors?.corPeitilhoInterno)}
-                  defaultValue={ficha?.cor_peitilho_interno ?? undefined}
+                  defaultValue={initialData.corPeitilhoInterno || undefined}
                   options={colorOptions}
                   placeholder="Cor interna…"
                 />
@@ -1531,7 +1663,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                   name="corPeitilhoExterno"
                   aria-describedby={state.fieldErrors?.corPeitilhoExterno ? "corPeitilhoExterno-error" : undefined}
                   aria-invalid={Boolean(state.fieldErrors?.corPeitilhoExterno)}
-                  defaultValue={ficha?.cor_peitilho_externo ?? undefined}
+                  defaultValue={initialData.corPeitilhoExterno || undefined}
                   options={colorOptions}
                   placeholder="Cor externa…"
                 />
@@ -1545,7 +1677,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                 name="corBotao"
                 aria-describedby={state.fieldErrors?.corBotao ? "corBotao-error" : undefined}
                 aria-invalid={Boolean(state.fieldErrors?.corBotao)}
-                defaultValue={ficha?.cor_botao ?? undefined}
+                defaultValue={initialData.corBotao || undefined}
                 options={colorOptions}
                 placeholder="Branco, perolado…"
               />
@@ -1559,7 +1691,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                   name="corPeDeGolaInterno"
                   aria-describedby={state.fieldErrors?.corPeDeGolaInterno ? "corPeDeGolaInterno-error" : undefined}
                   aria-invalid={Boolean(state.fieldErrors?.corPeDeGolaInterno)}
-                  defaultValue={ficha?.cor_pe_de_gola_interno ?? undefined}
+                  defaultValue={initialData.corPeDeGolaInterno || undefined}
                   options={colorOptions}
                   placeholder="Cor interna…"
                 />
@@ -1570,7 +1702,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                   name="corPeDeGolaExterno"
                   aria-describedby={state.fieldErrors?.corPeDeGolaExterno ? "corPeDeGolaExterno-error" : undefined}
                   aria-invalid={Boolean(state.fieldErrors?.corPeDeGolaExterno)}
-                  defaultValue={ficha?.cor_pe_de_gola_externo ?? undefined}
+                  defaultValue={initialData.corPeDeGolaExterno || undefined}
                   options={colorOptions}
                   placeholder="Cor externa…"
                 />
@@ -1599,7 +1731,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                 name="corAberturaLateral"
                 aria-describedby={state.fieldErrors?.corAberturaLateral ? "corAberturaLateral-error" : undefined}
                 aria-invalid={Boolean(state.fieldErrors?.corAberturaLateral)}
-                defaultValue={ficha?.cor_abertura_lateral ?? undefined}
+                defaultValue={initialData.corAberturaLateral || undefined}
                 options={colorOptions}
                 placeholder="Cor da abertura…"
               />
@@ -1615,7 +1747,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
               name="bolso"
               aria-describedby={state.fieldErrors?.bolso ? "bolso-error" : undefined}
               aria-invalid={Boolean(state.fieldErrors?.bolso)}
-              defaultValue={ficha?.bolso ?? undefined}
+              defaultValue={initialData.bolso || undefined}
               options={bolsoOptions}
               placeholder="-"
             />
@@ -1641,7 +1773,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                   name="fileteLocal"
                   aria-describedby={state.fieldErrors?.fileteLocal ? "fileteLocal-error" : undefined}
                   aria-invalid={Boolean(state.fieldErrors?.fileteLocal)}
-                  defaultValue={ficha?.filete_local ?? undefined}
+                  defaultValue={initialData.fileteLocal || undefined}
                   placeholder="Manga, lateral…"
                 />
               </Field>
@@ -1651,7 +1783,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                   name="fileteCor"
                   aria-describedby={state.fieldErrors?.fileteCor ? "fileteCor-error" : undefined}
                   aria-invalid={Boolean(state.fieldErrors?.fileteCor)}
-                  defaultValue={ficha?.filete_cor ?? undefined}
+                  defaultValue={initialData.fileteCor || undefined}
                   options={colorOptions}
                   placeholder="Cor do filete…"
                 />
@@ -1679,7 +1811,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                   name="faixaLocal"
                   aria-describedby={state.fieldErrors?.faixaLocal ? "faixaLocal-error" : undefined}
                   aria-invalid={Boolean(state.fieldErrors?.faixaLocal)}
-                  defaultValue={ficha?.faixa_local ?? undefined}
+                  defaultValue={initialData.faixaLocal || undefined}
                   placeholder="Manga, costas…"
                 />
               </Field>
@@ -1689,7 +1821,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                   name="faixaCor"
                   aria-describedby={state.fieldErrors?.faixaCor ? "faixaCor-error" : undefined}
                   aria-invalid={Boolean(state.fieldErrors?.faixaCor)}
-                  defaultValue={ficha?.faixa_cor ?? undefined}
+                  defaultValue={initialData.faixaCor || undefined}
                   options={colorOptions}
                   placeholder="Prata, verde…"
                 />
@@ -1745,7 +1877,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                 name="corSublimacao"
                 aria-describedby={state.fieldErrors?.corSublimacao ? "corSublimacao-error" : undefined}
                 aria-invalid={Boolean(state.fieldErrors?.corSublimacao)}
-                defaultValue={ficha?.cor_sublimacao ?? undefined}
+                defaultValue={initialData.corSublimacao || undefined}
                 options={colorOptions}
                 placeholder="Cor principal…"
               />
@@ -1874,7 +2006,15 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                         <GripVertical aria-hidden="true" size={15} />
                         Imagem {index + 1}
                       </span>
-                      {image.file ? <span className="image-upload-card__badge">Pendente</span> : <span aria-hidden="true" />}
+                      {image.file ? (
+                        <span className="image-upload-card__badge">Pendente</span>
+                      ) : image.saveBlocked ? (
+                        <span className="image-upload-card__badge">Rascunho</span>
+                      ) : image.importMode === "legacy-saveable" ? (
+                        <span className="image-upload-card__badge">Importada</span>
+                      ) : (
+                        <span aria-hidden="true" />
+                      )}
                       <button
                         aria-label="Remover imagem"
                         className="image-upload-card__remove"
@@ -1910,6 +2050,7 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
                         value={image.altText}
                       />
                     </label>
+                    {image.importWarning ? <p className="image-upload-card__warning">{image.importWarning}</p> : null}
                   </article>
                     )}
                   </Draggable>
@@ -1965,8 +2106,69 @@ export function FichaForm({ catalogOptions, clienteOptions = [], ficha, mode = "
         )}
         <SubmitButton isUploading={isUploadingImage} label={mode === "edit" ? "Salvar alterações" : "Salvar ficha"} />
       </div>
-      {draftPrintFicha ? <DraftPrintLayer ficha={draftPrintFicha} onPrinted={() => setDraftPrintFicha(null)} /> : null}
-    </form>
+        {draftPrintFicha ? <DraftPrintLayer ficha={draftPrintFicha} onPrinted={() => setDraftPrintFicha(null)} /> : null}
+      </form>
+
+      {observacoesConfirmationValue ? (
+        <AlertDialog onClose={closeObservacoesConfirmation} size="sm" title="Substituir observações">
+          <section className="confirm-dialog" aria-describedby="observacoes-autofill-description">
+            <header className="confirm-dialog__header">
+              <div>
+                <span className="confirm-dialog__eyebrow">Confirmação necessária</span>
+                <h2 id="observacoes-autofill-title">Substituir observações</h2>
+              </div>
+            </header>
+
+            <p id="observacoes-autofill-description">
+              As observações foram editadas manualmente. Deseja substituir o conteúdo atual pelo texto preenchido automaticamente?
+            </p>
+
+            <div className="confirm-dialog__actions">
+              <AlertDialogCancel asChild>
+                <button className="ui-button ui-button--ghost" type="button">
+                  Manter observações atuais
+                </button>
+              </AlertDialogCancel>
+              <AlertDialogAction asChild>
+                <button className="ui-button ui-button--primary" onClick={confirmObservacoesAutofill} type="button">
+                  Substituir observações
+                </button>
+              </AlertDialogAction>
+            </div>
+          </section>
+        </AlertDialog>
+      ) : null}
+      {pendingLegacyImport ? (
+        <AlertDialog onClose={cancelPendingLegacyImport} size="sm" title="Substituir rascunho atual">
+          <section className="confirm-dialog" aria-describedby="legacy-import-overwrite-description">
+            <header className="confirm-dialog__header">
+              <div>
+                <span className="confirm-dialog__eyebrow">Confirmação necessária</span>
+                <h2 id="legacy-import-overwrite-title">Substituir rascunho atual</h2>
+              </div>
+            </header>
+
+            <p id="legacy-import-overwrite-description">
+              O formulário já possui dados preenchidos. Deseja descartar o rascunho atual e carregar o conteúdo de
+              <strong> {pendingLegacyImport.fileName}</strong>?
+            </p>
+
+            <div className="confirm-dialog__actions">
+              <AlertDialogCancel asChild>
+                <button className="ui-button ui-button--ghost" type="button">
+                  Manter rascunho atual
+                </button>
+              </AlertDialogCancel>
+              <AlertDialogAction asChild>
+                <button className="ui-button ui-button--primary" onClick={confirmPendingLegacyImport} type="button">
+                  Substituir pelo JSON legado
+                </button>
+              </AlertDialogAction>
+            </div>
+          </section>
+        </AlertDialog>
+      ) : null}
+    </>
   );
 }
 
@@ -2179,11 +2381,16 @@ function Field({ children, error, full = false, label, name, required = false }:
 function SubmitButton({ isUploading, label }: { isUploading: boolean; label: string }) {
   const { pending } = useFormStatus();
   const isPending = pending || isUploading;
+  const pendingLabel = isUploading
+    ? "Enviando imagens..."
+    : label === "Salvar alterações"
+      ? "Salvando alterações..."
+      : "Salvando ficha...";
 
   return (
     <Button aria-disabled={isPending} disabled={isPending} type="submit">
       {isPending ? <span className="button-spinner" aria-hidden="true" /> : <Save aria-hidden="true" size={18} />}
-      {label}
+      {isPending ? pendingLabel : label}
     </Button>
   );
 }

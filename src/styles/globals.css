@@ -724,6 +724,18 @@ a {
   color: var(--color-danger);
 }
 
+.ui-button--warning {
+  border-color: var(--color-warning);
+  background: var(--color-warning);
+  color: var(--color-primary-contrast);
+}
+
+.ui-button--warning:hover {
+  border-color: var(--color-warning);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
 .ui-tooltip {
   position: relative;
   display: inline-flex;
@@ -2325,6 +2337,7 @@ a {
 
 .image-upload-grid {
   display: flex;
+  justify-content: center;
   gap: 14px;
   max-width: 100%;
   overflow-x: auto;
@@ -2514,6 +2527,14 @@ a {
   white-space: nowrap;
 }
 
+.image-upload-card__warning {
+  margin: 0;
+  color: var(--color-warning);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .image-upload-button {
   display: inline-flex;
   min-height: 44px;
@@ -2554,6 +2575,35 @@ a {
   color: var(--color-danger);
   padding: 12px 14px;
   font-weight: 700;
+}
+
+.form-banner--soft {
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.legacy-import-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+
+.legacy-import-toolbar p {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.legacy-import-warning-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.legacy-import-warning-list li + li {
+  margin-top: 6px;
 }
 
 .checkbox-field {
@@ -3133,41 +3183,24 @@ html[data-theme="dark"] .field select {
 }
 
 .button-spinner {
-  position: relative;
   display: inline-block;
   width: 18px;
-  height: 10px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-primary-contrast) 28%, transparent);
+  height: 18px;
+  box-sizing: border-box;
+  border: 2px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: button-spinner-rotate 720ms linear infinite;
 }
 
 .button-spinner--contrast {
-  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  border-color: color-mix(in srgb, currentColor 18%, transparent);
+  border-top-color: currentColor;
 }
 
-.button-spinner::after {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: -55%;
-  width: 55%;
-  border-radius: inherit;
-  background: var(--color-primary-contrast);
-  animation: loading-bar-slide 820ms ease-in-out infinite;
-  content: "";
-}
-
-.button-spinner--contrast::after {
-  background: var(--color-primary);
-}
-
-@keyframes loading-bar-slide {
-  0% {
-    transform: translateX(0);
-  }
-
-  100% {
-    transform: translateX(260%);
+@keyframes button-spinner-rotate {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -4039,6 +4072,19 @@ html[data-theme="dark"] .field select {
   border-color: var(--color-danger);
   background: var(--color-danger-bg);
   color: var(--color-danger);
+}
+
+.icon-action--warning {
+  border-color: var(--color-warning);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.icon-action--warning:hover,
+.icon-action--warning:focus-visible {
+  border-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning-bg) 50%, var(--color-surface));
+  color: var(--color-warning);
 }
 
 .confirm-dialog {

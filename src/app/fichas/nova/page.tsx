@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge, Card } from "@/components/ui";
+import { getCurrentSession } from "@/features/auth/session";
 import { FichaForm } from "@/features/fichas/ficha-form";
 import { listFichaFormOptions } from "@/features/fichas/form-options";
 
@@ -9,6 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function NovaFichaPage() {
+  const session = await getCurrentSession();
   const formOptions = await listFichaFormOptions();
 
   return (
@@ -24,7 +26,7 @@ export default async function NovaFichaPage() {
       </header>
 
       <Card className="ficha-create__card">
-        <FichaForm {...formOptions} />
+        <FichaForm {...formOptions} canImportLegacyJson={session?.user.role === "superadmin"} />
       </Card>
 
       <Link className="ui-button ui-button--ghost" href="/fichas">

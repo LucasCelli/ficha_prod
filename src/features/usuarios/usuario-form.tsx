@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useFormStatus } from "react-dom";
 import { Eye, EyeOff, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui";
@@ -105,10 +106,7 @@ export function UsuarioForm({ operador }: UsuarioFormProps) {
       </label>
 
       <div className="usuario-form__actions">
-        <Button type="submit">
-          <Save aria-hidden="true" size={18} />
-          {operador ? "Salvar alterações" : "Cadastrar operador"}
-        </Button>
+        <SubmitButton isEdit={Boolean(operador)} />
         {operador ? (
           <Link className="ui-button ui-button--secondary" href="/usuarios">
             Cancelar
@@ -116,5 +114,18 @@ export function UsuarioForm({ operador }: UsuarioFormProps) {
         ) : null}
       </div>
     </form>
+  );
+}
+
+function SubmitButton({ isEdit }: { isEdit: boolean }) {
+  const { pending } = useFormStatus();
+  const idleLabel = isEdit ? "Salvar alterações" : "Cadastrar operador";
+  const pendingLabel = isEdit ? "Salvando alterações..." : "Cadastrando operador...";
+
+  return (
+    <Button aria-disabled={pending} disabled={pending} type="submit">
+      {pending ? <span className="button-spinner" aria-hidden="true" /> : <Save aria-hidden="true" size={18} />}
+      {pending ? pendingLabel : idleLabel}
+    </Button>
   );
 }

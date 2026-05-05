@@ -123,11 +123,12 @@ function Field({ children, error, label, name, required = false }: FieldProps) {
 
 function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
+  const pendingLabel = label === "Salvar alterações" ? "Salvando alterações..." : "Salvando cliente...";
 
   return (
     <Button aria-disabled={pending} disabled={pending} type="submit">
       {pending ? <span className="button-spinner" aria-hidden="true" /> : <Save aria-hidden="true" size={18} />}
-      {label}
+      {pending ? pendingLabel : label}
     </Button>
   );
 }

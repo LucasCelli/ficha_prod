@@ -21,15 +21,22 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
   const [isPending, startTransition] = useTransition();
   const exportTimeoutRef = useRef<number | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const [searchValue, setSearchValue] = useState(filters.busca ?? "");
+  const externalSearchValue = filters.busca ?? "";
+  const [isEditingSearch, setIsEditingSearch] = useState(false);
+  const [searchDraftValue, setSearchDraftValue] = useState(externalSearchValue);
+  const searchValue = isEditingSearch ? searchDraftValue : externalSearchValue;
 
   useEffect(() => {
+    if (!isEditingSearch) {
+      return;
+    }
+
     const timeoutId = window.setTimeout(() => {
       updateFilter(searchParams, pathname, router, startTransition, "busca", searchValue);
     }, SEARCH_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [pathname, router, searchParams, searchValue, startTransition]);
+  }, [isEditingSearch, pathname, router, searchParams, searchValue, startTransition]);
 
   useEffect(() => {
     return () => {
@@ -70,7 +77,12 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
         <input
           id="busca"
           name="busca"
-          onChange={(event) => setSearchValue(event.target.value)}
+          onBlur={() => setIsEditingSearch(false)}
+          onChange={(event) => setSearchDraftValue(event.target.value)}
+          onFocus={() => {
+            setSearchDraftValue(externalSearchValue);
+            setIsEditingSearch(true);
+          }}
           placeholder="Cliente, alias, tecido, personalização, venda ou vendedor…"
           value={searchValue}
         />

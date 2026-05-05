@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { CheckCircle2, Eye, MoreHorizontal, Pencil, Printer, Trash2 } from "lucide-react";
+import { CheckCircle2, Eye, MoreHorizontal, Pencil, Printer, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, FloatingMenu, FloatingMenuButton, FloatingMenuLink, Tooltip } from "@/components/ui";
-import { deleteFichaAction, markFichaEntregueFormAction } from "./actions";
+import { deleteFichaAction, markFichaEntregueFormAction, revertFichaToPendenteAction } from "./actions";
 import type { FichaStatus } from "./data";
-import { getInitialFichaDeleteActionState } from "./form-state";
+import { getInitialFichaDeleteActionState, getInitialFichaStatusActionState } from "./form-state";
 import { PrintTriggerButton } from "./print-trigger-button";
 
 type FichaRowActionsProps = {
@@ -35,8 +35,10 @@ export function FichaRowActions({
   status,
 }: FichaRowActionsProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [revertOpen, setRevertOpen] = useState(false);
   const [confirmationCode, setConfirmationCode] = useState(() => createConfirmationCode());
   const [deleteState, deleteFormAction] = useActionState(deleteFichaAction, getInitialFichaDeleteActionState());
+  const [revertState, revertFormAction] = useActionState(revertFichaToPendenteAction, getInitialFichaStatusActionState());
   const editHref = `/fichas/${fichaId}`;
 
   useEffect(() => {
@@ -47,9 +49,21 @@ export function FichaRowActions({
     }
   }, [deleteState.message, deleteState.status]);
 
+  useEffect(() => {
+    if (revertState.status === "error" && revertState.message) {
+      toast.error("Não foi possível reverter", {
+        description: revertState.message,
+      });
+    }
+  }, [revertState.message, revertState.status]);
+
   function openDeleteModal() {
     setConfirmationCode(createConfirmationCode());
     setDeleteOpen(true);
+  }
+
+  function openRevertModal() {
+    setRevertOpen(true);
   }
 
   if (fullDeliverButton) {
@@ -116,20 +130,32 @@ export function FichaRowActions({
           </Link>
         </Tooltip>
 
-        <form action={markFichaEntregueFormAction}>
-          <input name="id" type="hidden" value={fichaId} />
-          <input name="returnTo" type="hidden" value={returnTo} />
-          <Tooltip label={status === "pendente" ? "Marcar como entregue" : "Ficha já entregue"}>
+        {status === "entregue" ? (
+          <Tooltip label="Reverter para pendente">
             <button
-              aria-label={`Marcar ficha ${fichaLabel} como entregue`}
-              className="icon-action icon-action--success"
-              disabled={status !== "pendente"}
-              type="submit"
+              aria-label={`Reverter ficha ${fichaLabel} para pendente`}
+              className="icon-action icon-action--warning"
+              onClick={openRevertModal}
+              type="button"
             >
-              <CheckCircle2 aria-hidden="true" size={17} />
+              <RotateCcw aria-hidden="true" size={17} />
             </button>
           </Tooltip>
-        </form>
+        ) : (
+          <form action={markFichaEntregueFormAction}>
+            <input name="id" type="hidden" value={fichaId} />
+            <input name="returnTo" type="hidden" value={returnTo} />
+            <Tooltip label="Marcar como entregue">
+              <button
+                aria-label={`Marcar ficha ${fichaLabel} como entregue`}
+                className="icon-action icon-action--success"
+                type="submit"
+              >
+                <CheckCircle2 aria-hidden="true" size={17} />
+              </button>
+            </Tooltip>
+          </form>
+        )}
 
         <FloatingMenu label={`Mais ações da ficha ${fichaLabel}`} trigger={<MoreHorizontal aria-hidden="true" size={18} />}>
           <FloatingMenuLink href={previewHref} prefetch={false} scroll={false}>
@@ -161,12 +187,30 @@ export function FichaRowActions({
           returnTo={returnTo}
         />
       ) : null}
+
+      {revertOpen ? (
+        <RevertFichaDialog
+          fichaId={fichaId}
+          fichaLabel={fichaLabel}
+          formAction={revertFormAction}
+          onClose={() => setRevertOpen(false)}
+          returnTo={returnTo}
+        />
+      ) : null}
     </>
   );
 }
 
 type DeleteFichaDialogProps = {
   confirmationCode: string;
+  fichaId: string;
+  fichaLabel: string;
+  formAction: (payload: FormData) => void;
+  onClose: () => void;
+  returnTo: string;
+};
+
+type RevertFichaDialogProps = {
   fichaId: string;
   fichaLabel: string;
   formAction: (payload: FormData) => void;
@@ -235,6 +279,37 @@ function DeleteFichaDialog({
   );
 }
 
+function RevertFichaDialog({ fichaId, fichaLabel, formAction, onClose, returnTo }: RevertFichaDialogProps) {
+  return (
+    <AlertDialog onClose={onClose} size="sm" title="Reverter para pendente">
+      <section className="confirm-dialog" aria-describedby="revert-ficha-description">
+        <header className="confirm-dialog__header">
+          <div>
+            <span className="confirm-dialog__eyebrow">Confirmação necessária</span>
+            <h2 id="revert-ficha-title">Reverter para pendente</h2>
+          </div>
+        </header>
+
+        <p id="revert-ficha-description">
+          A ficha de <strong>{fichaLabel}</strong> voltará para o status pendente e sairá da lista de entregues.
+        </p>
+
+        <form action={formAction} className="confirm-dialog__form">
+          <input name="id" type="hidden" value={fichaId} />
+          <input name="returnTo" type="hidden" value={returnTo} />
+
+          <div className="confirm-dialog__actions">
+            <button className="ui-button ui-button--ghost" onClick={onClose} type="button">
+              Cancelar
+            </button>
+            <RevertSubmitButton />
+          </div>
+        </form>
+      </section>
+    </AlertDialog>
+  );
+}
+
 function DeleteSubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   const isDisabled = disabled || pending;
@@ -242,7 +317,7 @@ function DeleteSubmitButton({ disabled }: { disabled: boolean }) {
   return (
     <button aria-disabled={isDisabled} className="ui-button ui-button--danger" disabled={isDisabled} type="submit">
       {pending ? <span className="button-spinner" aria-hidden="true" /> : <Trash2 aria-hidden="true" size={16} />}
-      Remover ficha
+      {pending ? "Removendo..." : "Remover ficha"}
     </button>
   );
 }
@@ -258,7 +333,18 @@ function FullDeliverSubmitButton({ fichaLabel }: { fichaLabel: string }) {
       type="submit"
     >
       {pending ? <span className="button-spinner button-spinner--contrast" aria-hidden="true" /> : <CheckCircle2 aria-hidden="true" size={16} />}
-      Marcar como entregue
+      {pending ? "Marcando..." : "Marcar como entregue"}
+    </button>
+  );
+}
+
+function RevertSubmitButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button aria-disabled={pending} className="ui-button ui-button--warning" disabled={pending} type="submit">
+      {pending ? <span className="button-spinner" aria-hidden="true" /> : <RotateCcw aria-hidden="true" size={16} />}
+      {pending ? "Revertendo..." : "Reverter para pendente"}
     </button>
   );
 }

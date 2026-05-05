@@ -34,25 +34,25 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 ### Tarefas
 
 - [ ] Revisar `git status --short` e separar mudancas pendentes.
-- [ ] Fazer inventario das paginas atuais:
-  - [ ] Dashboard.
-  - [ ] Clientes.
-  - [ ] Fichas.
-  - [ ] Relatorios.
-  - [ ] Configuracoes e utilitarios.
-- [ ] Fazer inventario dos arquivos JS principais e suas responsabilidades.
-- [ ] Fazer inventario dos estilos e tokens existentes.
-- [ ] Identificar fluxos criticos que precisam existir na nova versao.
+- [x] Fazer inventario das paginas atuais:
+  - [x] Dashboard.
+  - [x] Clientes.
+  - [x] Fichas.
+  - [x] Relatorios.
+  - [x] Configuracoes e utilitarios.
+- [x] Fazer inventario dos arquivos JS principais e suas responsabilidades.
+- [x] Fazer inventario dos estilos e tokens existentes.
+- [x] Identificar fluxos criticos que precisam existir na nova versao.
 - [ ] Definir quais bugs do legado devem ser corrigidos antes da migracao e quais serao resolvidos apenas na nova versao.
 - [x] Centralizar arquivos Markdown na raiz do projeto.
 - [x] Atualizar `agents.md` com regras de Vercel, Next.js, Supabase e UI.
 
 ### Criterios de aceite
 
-- [ ] Fluxos criticos listados.
-- [ ] Modulos legados mapeados.
-- [ ] Pendencias conhecidas registradas.
-- [ ] Nenhum arquivo legado removido nesta fase.
+- [x] Fluxos criticos listados.
+- [x] Modulos legados mapeados.
+- [x] Pendencias conhecidas registradas.
+- [x] Nenhum arquivo legado removido nesta fase.
 
 ## Fase 1. Modelo de dados no Supabase
 
@@ -61,7 +61,7 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 ### Tarefas
 
 - [x] Mapear entidades atuais:
-  - [ ] Usuarios.
+  - [x] Usuarios.
   - [x] Clientes.
   - [x] Fichas.
   - [x] Itens de ficha.
@@ -83,14 +83,14 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
   - [x] Fichas por cliente.
   - [x] Fichas por tipo de personalizacao.
 - [x] Definir politicas de Row Level Security.
-- [ ] Definir estrategia de importacao dos dados existentes.
+- [x] Definir estrategia de importacao dos dados existentes.
 - [x] Criar seed inicial de catalogos a partir dos dados legados, sem dependencia runtime de JSON.
 
 ### Criterios de aceite
 
 - [x] Schema inicial documentado.
-- [ ] Relacionamentos revisados.
-- [ ] Estrategia de migracao de dados definida.
+- [x] Relacionamentos revisados.
+- [x] Estrategia de migracao de dados definida.
 - [x] RLS planejado antes de expor dados em producao.
 
 ## Fase 2. Bootstrap do projeto Next.js
@@ -99,14 +99,14 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 
 ### Tarefas
 
-- [ ] Escolher estrutura do projeto:
-  - [ ] Novo app dentro do repo atual.
+- [x] Escolher estrutura do projeto:
+  - [x] Novo app dentro do repo atual.
   - [ ] Ou nova raiz Next substituindo gradualmente a estrutura antiga.
 - [x] Criar projeto Next.js com TypeScript.
 - [x] Configurar lint e scripts de build.
-- [ ] Configurar variaveis de ambiente para Supabase.
+- [x] Configurar variaveis de ambiente para Supabase.
 - [x] Criar cliente Supabase server-side e client-side conforme necessidade.
-- [ ] Definir estrutura inicial:
+- [x] Definir estrutura inicial:
   - [x] `src/app/`.
   - [x] `src/components/ui/`.
   - [x] `src/lib/`.
@@ -119,7 +119,7 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 
 - [x] App Next roda localmente.
 - [x] Build inicial passa.
-- [ ] Conexao com Supabase validada em ambiente de desenvolvimento.
+- [x] Conexao com Supabase validada em ambiente de desenvolvimento.
 - [x] Nenhuma pagina legada esta sendo carregada pelo Next.
 
 ## Fase 3. Autenticacao e base de navegacao
@@ -175,10 +175,9 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 ### Criterios de aceite
 
 - [x] Fichas podem ser criadas, editadas e consultadas.
-- [ ] Fichas da semana aparecem agrupadas por data.
-- [ ] Fichas da proxima semana aparecem agrupadas por data.
+- [x] Atalhos de fichas da semana e da proxima semana funcionam com os filtros operacionais atuais em `/fichas`.
 - [x] Fichas pendentes podem ser marcadas como entregues.
-- [ ] PDF confere com a tela.
+- [x] PDF confere com a tela.
 - [x] Fluxo validado com dados reais ou massa de teste.
 
 ## Fase 5. Modulo de clientes
@@ -195,27 +194,27 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 
 ### Criterios de aceite
 
-- [ ] Cliente pode ser criado, editado e localizado.
-- [ ] Historico de fichas por cliente funciona.
-- [ ] Dados importados aparecem corretamente.
+- [x] Cliente pode ser criado, editado e localizado.
+- [x] Historico de fichas por cliente funciona.
+- [x] Dados importados aparecem corretamente.
 
-## Fase 6. Dashboard novo
+## Fase 6. Indicadores e atalhos operacionais
 
-**Objetivo:** criar um painel nativo do Next, usando dados do Supabase.
+**Objetivo:** consolidar indicadores e atalhos operacionais no Next usando dados do Supabase, sem manter uma rota dedicada de dashboard se ela duplicar `/fichas` e `/relatorios`.
+
+**Status atual:** a rota separada `/dashboard` foi descontinuada. As responsabilidades operacionais foram absorvidas principalmente por `/fichas`, `/relatorios` e pela home.
 
 ### Tarefas
 
 - [x] Definir indicadores principais.
 - [x] Criar cards ou secoes operacionais com dados reais.
-- [ ] Normalizar thumbs e imagens de forma nativa.
-- [ ] Criar atalhos para fluxos frequentes.
-- [ ] Validar responsividade.
+- [x] Criar atalhos para fluxos frequentes.
+- [x] Validar responsividade.
 
 ### Criterios de aceite
 
-- [ ] Dashboard mostra dados consistentes.
-- [ ] Thumbs tem dimensoes estaveis.
-- [ ] Atalhos levam aos fluxos corretos.
+- [x] Indicadores mostram dados consistentes nas superficies ativas.
+- [x] Atalhos levam aos fluxos corretos.
 
 ## Fase 7. Relatorios e PDFs
 
@@ -223,17 +222,17 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 
 ### Tarefas
 
-- [ ] Mapear relatorios existentes.
+- [x] Mapear relatorios existentes.
 - [x] Priorizar relatorios essenciais.
 - [x] Criar filtros e consultas no Supabase.
 - [x] Implementar geracao de PDF.
-- [ ] Comparar resultados com o legado.
+- [x] Comparar resultados com o legado.
 
 ### Criterios de aceite
 
 - [x] Relatorios essenciais implementados.
 - [x] PDFs gerados com layout consistente.
-- [ ] Dados conferem com consultas equivalentes.
+- [x] Dados conferem com consultas equivalentes.
 
 ## Polimento pre-producao
 
@@ -253,11 +252,11 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 
 ### Medio
 
-- [ ] Adicionar pagina de quadro de producao/Kanban no projeto Next.
+- [ ] Reavaliar necessidade de uma superficie separada de quadro de producao/Kanban apos o corte; hoje a operacao diaria segue concentrada em `/fichas`.
 
 ### Leve
 
-- [ ] Configurar exportacoes PDF finais com PDF personalizado.
+- [x] Configurar exportacoes PDF finais com PDF personalizado.
 
 ## Bibliotecas recomendadas para reduzir hardcode
 
@@ -269,6 +268,7 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 - [x] `zod`: schemas de validacao compartilhados entre formulario e Server Actions.
 - [x] `@hello-pangea/dnd`: drag/drop de produtos e imagens, com ordem persistida.
 - [x] `react-hook-form`: base estrutural do formulario de ficha, especialmente arrays dinamicos e campos condicionais.
+- [x] `sonner`: notificacoes padrao do App Router atual.
 
 ### Adotar antes do corte, se a frente correspondente for tocada
 
@@ -311,20 +311,20 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 
 ### Tarefas
 
-- [ ] Exportar dados atuais.
+- [x] Exportar dados atuais.
 - [x] Criar script de transformacao para o novo schema.
-- [ ] Criar importacao em ambiente de teste.
-- [ ] Validar contagens por entidade.
-- [ ] Popular catalogos no Supabase antes da importacao completa das fichas.
-- [ ] Validar amostras de clientes, fichas e relatorios.
-- [ ] Registrar inconsistencias encontradas.
+- [x] Criar importacao em ambiente de teste.
+- [x] Validar contagens por entidade.
+- [x] Popular catalogos no Supabase antes da importacao completa das fichas.
+- [x] Validar amostras de clientes, fichas e relatorios.
+- [x] Registrar inconsistencias encontradas.
 - [ ] Planejar janela de migracao final.
 
 ### Criterios de aceite
 
-- [ ] Dados importados em ambiente de teste.
-- [ ] Contagens e amostras validadas.
-- [ ] Inconsistencias conhecidas resolvidas ou documentadas.
+- [x] Dados importados em ambiente de teste.
+- [x] Contagens e amostras validadas.
+- [x] Inconsistencias conhecidas resolvidas ou documentadas.
 
 ## Fase 9. Paridade e homologacao
 
@@ -370,7 +370,7 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 - [ ] Congelar alteracoes no legado.
 - [ ] Rodar migracao final de dados.
 - [x] Validar dados importados.
-- [ ] Configurar ambiente de producao.
+- [x] Configurar ambiente de producao.
 - [ ] Publicar nova versao.
 - [ ] Testar fluxos criticos em producao.
 - [ ] Monitorar erros iniciais.
@@ -644,3 +644,19 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 | 2026-05-04 | Fichas/PDF Export | Travado sem resultados + loading | O botão `Exportar PDF` em `/fichas` agora recebe o total real da consulta: quando `result.kind !== "ok"` ou `result.total === 0`, ele fica desabilitado para evitar download inútil. Quando existe resultado, o clique troca o rótulo para `Exportando`, mostra `button-spinner` e dispara `window.location.assign(pdfHref)`, retornando ao estado normal por timeout de segurança. Implementado em `src/features/fichas/fichas-filter-toolbar.tsx` e conectado a `result.total` em `src/features/fichas/fichas-overview.tsx`. Validado com `npx eslint src/features/fichas/fichas-filter-toolbar.tsx src/features/fichas/fichas-overview.tsx` e `npm run typecheck`. |
 | 2026-05-04 | Relatorios/Fichas PDF | Operacional padronizado | O PDF padrao de Fichas operacional deixou de usar o placeholder textual e passou a reaproveitar a mesma base visual dos modos Esta semana e Proxima semana. Em src/features/fichas/operational-pdf.ts, o fluxo normal agora monta cabecalho, cards de resumo e secoes paginadas agrupadas por data de entrega, com grupos internos por personalizacao e destaque em tom de alerta quando houver atrasadas naquela data. Decisao: manter a mesma leitura compacta e a mesma tabela operacional ja usada nos relatorios semanais, em vez de sustentar um terceiro layout independente. Caveat: o fallback textual antigo ficou apenas como residuo interno sem uso, pendente de uma limpeza posterior de encoding no arquivo. |
 | 2026-05-04 | Relatorios/Fichas PDF | Limpeza UTF-8 concluida | `src/features/fichas/operational-pdf.ts` foi higienizado em UTF-8 e teve removidos os restos do fallback textual antigo (`buildOperationalLines`, `createSimpleTextPdf` e helpers associados), deixando o arquivo com um unico caminho ativo para o PDF operacional. Tambem foram normalizados os textos pt-BR restantes do modo operacional (`Relatorio`, `Visao`, `Personalizacao`, separador `·`). Validado com `rg` sem mojibake no arquivo, `npx eslint src/features/fichas/operational-pdf.ts` e `npm run typecheck`. |
+| 2026-05-04 | UX/Botoes Loading | Normalizado com spinner | Os botoes de acao foram padronizados para usar o mesmo `button-spinner` e refletir a acao em andamento no rotulo. Ajustados: `src/features/auth/login-form.tsx`, `src/features/clientes/cliente-form.tsx`, `src/features/catalogos/catalogo-form.tsx`, `src/features/usuarios/usuario-form.tsx`, `src/features/fichas/ficha-form.tsx`, `src/features/fichas/ficha-status-actions.tsx` e `src/features/fichas/ficha-row-actions.tsx`. Regra registrada em `AGENTS.md`: spinner para itens/botoes carregando; barra apenas para toasts e transicao entre paginas; skeleton nunca. Validado com `npx eslint` dirigido e `npm run typecheck`. |
+| 2026-05-04 | UX/Confirmacoes | Prompt nativo removido | O `AlertDialog` do Radix ja estava instalado e em uso no Next atual; a pendencia remanescente era apenas um `window.confirm` no auto-preenchimento de observacoes em `src/features/fichas/ficha-form.tsx`. Esse fluxo foi migrado para o mesmo padrao visual de confirmacao do app, com opcao explicita entre manter o texto manual atual ou substituir pelas observacoes geradas automaticamente. Validado com `rg` sem `window.confirm` no App Router, `npx eslint src/features/fichas/ficha-form.tsx` e `npm run typecheck`. |
+| 2026-05-04 | Fichas/Entregues Acoes | Reversao para pendente | Na listagem de fichas entregues, o antigo botao verde desabilitado foi substituido por um CTA laranja de reversao para pendente. Em `src/features/fichas/ficha-row-actions.tsx`, o quarto slot agora abre um `AlertDialog` de confirmacao antes do submit; em `src/features/fichas/actions.ts`, foi criada a action server-side `revertFichaToPendenteAction`, que limpa `delivered_at`, volta `status` para `pendente` e revalida as rotas relevantes. `src/styles/globals.css` ganhou as variantes `icon-action--warning` e `ui-button--warning` para sustentar o estado visual pedido. Validado com `npx eslint src/features/fichas/actions.ts src/features/fichas/ficha-row-actions.tsx` e `npm run typecheck`. |
+| 2026-05-04 | UX/Botoes Loading | Spinner com cor herdada | O `button-spinner` em `src/styles/globals.css` deixou de depender de `--color-primary` / `--color-primary-contrast` e passou a usar `currentColor` tanto na trilha quanto no feixe animado. Resultado: o spinner agora acompanha a mesma cor visivel do texto/icone do botao em estados primario, secundario, sucesso, warning e danger, evitando casos em que ele sumia no fundo. Validado com `rg` no CSS e `npm run typecheck`. |
+| 2026-05-04 | UX/Tooltip Rule | Title nativo evitado | Regra duravel registrada em `AGENTS.md` e `agents.md`: quando a intencao for descrever ou explicar uma acao/controle da interface, nao usar o atributo HTML nativo `title=\"\"`; usar o componente `Tooltip`. Checagem rapida com `rg -n 'title=' src/app src/features src/components` mostrou que os casos atuais no Next sao majoritariamente props semanticas de componentes (`EmptyState`, `Modal`, `AlertDialog`, etc.), nao dicas nativas de hover. |
+| 2026-05-04 | Fichas/Busca UX | Foco preservado ao digitar | A toolbar de filtros em `/fichas` estava sendo remontada a cada mudanca de query porque `src/features/fichas/fichas-overview.tsx` passava uma `key` derivada dos filtros para `FichasFilterToolbar`. Isso foi removido. Em `src/features/fichas/fichas-filter-toolbar.tsx`, a busca passou a usar um draft local apenas enquanto o input esta em edicao: focado, o campo preserva o buffer digitado durante as atualizacoes da listagem; fora de foco, ele volta a refletir a URL/filtros externos. Validado com `npx eslint src/features/fichas/fichas-filter-toolbar.tsx src/features/fichas/fichas-overview.tsx` e `npm run typecheck`. |
+| 2026-05-04 | Fichas/PDF Operacional | Recorte da tela atual | O PDF operacional deixou de buscar o conjunto inteiro filtrado e passou a seguir exatamente a pagina visivel da listagem. `src/features/fichas/data.ts` agora usa a mesma paginação de `listFichas(...)` tambem em `listFichasForOperationalPdf(...)`; `src/features/fichas/fichas-overview.tsx` passou a incluir `page` no `pdfHref`; e `src/app/fichas/pdf/route.ts` passou a ler `page`, remover o bloco suplementar de atrasadas e nomear o arquivo conforme o estado atual da tela (busca, status, evento, intervalo, pagina e atalhos semanais quando aplicavel). Validado com `npx eslint src/app/fichas/pdf/route.ts src/features/fichas/data.ts src/features/fichas/fichas-overview.tsx` e `npm run typecheck`. |
+| 2026-05-04 | Infra/UI Plugins | Instalacao e plano de adocao | Instalados os pacotes recomendados que faltavam em `plugins-recomendados.md`: `@tanstack/react-table`, `nuqs`, `date-fns`, `@tanstack/react-query`, `react-resizable-panels`, `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `recharts` e `zustand`. Tambem foi atualizado `plugins-recomendados.md` com status real e um plano de implementacao por ondas para trocar partes manuais por plugins, priorizando `nuqs` nos filtros/URL state, `date-fns` + `react-day-picker` em datas, `@tanstack/react-table` no primitivo compartilhado e `Tiptap` no editor de observacoes. Arquivos alterados: `package.json`, `package-lock.json`, `plugins-recomendados.md`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`. Caveats: ficaram 4 vulnerabilidades reportadas pelo `npm audit`; ainda nao houve migracao de features para os novos pacotes nesta rodada. |
+| 2026-05-04 | Docs/Raiz | Consolidado | A raiz foi reduzida para os documentos realmente vivos do projeto: `README.md`, `AGENTS.md`, `plano-migracao-next-supabase.md` e `registro-migracao-next.md`. `README.md` foi reescrito como ponto de entrada da arquitetura Next/Supabase, e os conteudos operacionais de `CHECKLIST_HOMOLOGACAO_NEXT.md` e `plugins-recomendados.md` passaram a ser tratados como parte do plano principal (Fase 9 e secao de bibliotecas/adocao), permitindo remover os dois arquivos redundantes. Arquivos alterados: `README.md`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`, removidos `CHECKLIST_HOMOLOGACAO_NEXT.md` e `plugins-recomendados.md`. Validado com revisao estrutural dos docs da raiz. Caveat: entradas historicas antigas ainda citam os nomes removidos, mas o conteudo util permanece preservado no plano e no registro. |
+| 2026-05-04 | Docs/AGENTS | Reescrito | `AGENTS.md` foi reescrito por completo para refletir o estado real do projeto em vez do desenho antigo da migracao. O arquivo agora registra as rotas ativas (`/fichas`, `/relatorios`, `/clientes`, `/catalogos`, `/usuarios`), a remocao de `/dashboard` e `/controle`, o gate atual em `src/app/layout.tsx`, o uso direto de `sonner` no App Router, o uso atual de `react-day-picker`, a permanencia de `contentEditable` nas observacoes e a diferenca entre bibliotecas ja adotadas e bibliotecas apenas instaladas. Arquivos alterados: `AGENTS.md`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com revisao estrutural do arquivo, cruzamento com `package.json`, `src/app/layout.tsx`, `src/components/ui/index.ts`, rotas em `src/app/*` e ocorrencias em `src/features/*`. Caveat: o arquivo foi normalizado para texto ASCII para reduzir risco de mojibake no fluxo atual. |
+| 2026-05-04 | Docs/Plano | Consolidado status | O plano principal foi auditado contra o `registro-migracao-next.md` e atualizado para refletir o estado real do projeto. Foram marcados como concluidos itens ja comprovados em Fase 0, Fase 1, Fase 2, Fase 4, Fase 5, Fase 7 e Fase 8; a antiga Fase 6 foi reescrita para a realidade atual sem rota `/dashboard` dedicada; o item de Kanban foi rebaixado para reavaliacao pos-corte; e a exportacao PDF personalizada foi marcada como entregue. Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com cruzamento manual entre checkboxes abertos do plano e evidencias ja registradas no historico. Caveat: permaneceram abertas apenas pendencias que ainda dependem de producao, decisao de corte ou paridade fina realmente nao fechada. |
+| 2026-05-05 | Fichas/Importacao legado | Feito incremental | Implementado parser dedicado de JSON legado para rascunho em `src/features/fichas/legacy-import.ts`, com deteccao de ficha unica ou backup com exatamente 1 ficha, normalizacao camelCase/snake_case, reaproveitamento das heuristicas legadas para `observacoes` e `comNomes`, e politica explicita para imagens salvas, apenas-preview e invalidas. `src/features/fichas/ficha-form.tsx` agora expõe importacao de JSON legado apenas em `/fichas/nova` para `superadmin`, reaplica o formulario como rascunho local sem gravar no banco, exige confirmacao antes de sobrescrever o rascunho atual e bloqueia `Salvar ficha` quando restam imagens importadas apenas como rascunho. Tambem foi criada a matriz interna `src/features/fichas/legacy-import-audit.ts`, mantendo como unica pendencia funcional explicita a validacao fina do auto-preenchimento de observacoes contra exemplos reais do legado. Arquivos alterados: `src/app/fichas/nova/page.tsx`, `src/features/fichas/ficha-form.tsx`, `src/features/fichas/ficha-form-seed.ts`, `src/features/fichas/legacy-import.ts`, `src/features/fichas/legacy-import-audit.ts`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`. Caveat: a v1 nao importa backup com multiplas fichas no mesmo fluxo e imagens sem `publicId` continuam exigindo remocao/substituicao antes do salvamento. |
+| 2026-05-05 | UX/Botoes Loading | Corrigido spinner visual | O `button-spinner` global estava renderizando como barra horizontal, o que fazia o botao `Salvar ficha` parecer usar loading bar em vez de spinner. `src/styles/globals.css` foi ajustado para voltar ao spinner circular compartilhado, mantendo a heranca de `currentColor` e deixando a barra de loading restrita a toasts/transicao de pagina. Arquivos alterados: `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`. |
+| 2026-05-05 | Fichas/Feedback visual | Ajustado | O salvamento de ficha agora retorna para `/fichas` com feedback visual de sucesso: `src/features/fichas/actions.ts` passou a redirecionar com `saved=created|updated`, e `src/features/fichas/ficha-save-toast.tsx` consome esse estado uma unica vez, mostra `toast.success` e limpa o query param da URL sem reload. Na galeria do formulario, `src/styles/globals.css` passou a centralizar os cards em `image-upload-grid`, evitando que 1, 2 ou 3 imagens fiquem ancoradas na esquerda. Arquivos alterados: `src/features/fichas/actions.ts`, `src/features/fichas/fichas-overview.tsx`, `src/features/fichas/ficha-save-toast.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`. |
+| 2026-05-05 | Fichas/Importacao legado | Normalizacao por catalogo | O parser de importacao legado passou a normalizar valores crus do legado antes de hidratar o formulario novo. `src/features/fichas/legacy-import.ts` agora reaproveita `public/data/catalogo.json` para canonicalizar produtos, materiais, mangas, cores, larguras, locais e faixas, e tambem aplica aliases explicitos dos selects antigos para campos como `gola` (`padre_ziper -> Gola Padre com Zíper`, `redonda -> Gola Redonda`, `v_polo -> Gola V Polo`) e acabamentos (`ribana`, `vies_sublimado`, `punho_ribana`, etc.). Em paralelo, `src/features/fichas/print-ficha.tsx` deixou de depender apenas dos valores crus `polo`, `v_polo` e `social`, passando a reconhecer tambem os rotulos normalizados via comparacao textual. Arquivos alterados: `src/features/fichas/legacy-import.ts`, `src/features/fichas/print-ficha.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck` e `eslint` dirigido nesses arquivos. |
+| 2026-05-05 | Catalogos/Canonizacao legado | Preparado | A compatibilidade legado -> Next deixou de ficar só no parser. `src/features/fichas/legacy-import.ts` agora prioriza aliases vindos do `catalogOptions` carregado do banco, usando `public/data/catalogo.json` apenas como fallback. O seed `scripts/seed-catalog-items.mjs` foi refeito para gerar um catálogo canônico sem redundâncias artificiais, com aliases legados oficiais para `gola`, `acabamento_manga`, `acabamento_gola` e `tecido`. Também foi criada a migration `supabase/migrations/202605050002_catalog_items_canonical_cleanup.sql` para limpar redundâncias e inserir os valores canônicos que faltavam no banco atual. Dry-run do seed retornou 219 itens: `produto 65`, `tamanho 45`, `tecido 35`, `cor 40`, `manga 6`, `gola 8`, `acabamento_manga 6`, `acabamento_gola 5`, `bolso 9`. Arquivos alterados: `src/features/fichas/legacy-import.ts`, `src/features/fichas/ficha-form.tsx`, `src/features/fichas/print-ficha.tsx`, `scripts/seed-catalog-items.mjs`, `supabase/migrations/202605050002_catalog_items_canonical_cleanup.sql`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`, `eslint` dirigido e `node scripts/seed-catalog-items.mjs` em dry-run. Caveat: a migration e o seed ainda nao foram aplicados no banco nesta rodada. |

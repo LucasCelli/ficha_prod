@@ -196,7 +196,7 @@ export async function createFichaAction(_previousState: FichaFormState, formData
   }
 
   revalidatePath("/fichas");
-  redirect("/fichas");
+  redirect("/fichas?saved=created");
 }
 
 async function rollbackCreatedFicha(id: string) {
@@ -307,7 +307,7 @@ export async function updateFichaAction(_previousState: FichaFormState, formData
 
   revalidatePath("/fichas");
   revalidatePath(`/fichas/${id}`);
-  redirect("/fichas");
+  redirect("/fichas?saved=updated");
 }
 
 export async function markFichaEntregueAction(
@@ -356,6 +356,54 @@ export async function markFichaEntregueAction(
 
 export async function markFichaEntregueFormAction(formData: FormData): Promise<void> {
   await markFichaEntregueAction({ status: "idle" }, formData);
+}
+
+export async function revertFichaToPendenteAction(
+  _previousState: FichaStatusActionState,
+  formData: FormData,
+): Promise<FichaStatusActionState> {
+  await requireAppSession();
+
+  const id = String(formData.get("id") ?? "").trim();
+  const returnTo = getSafeReturnPath(formData.get("returnTo"));
+
+  if (!id) {
+    return {
+      message: "Ficha inválida para reversão.",
+      status: "error",
+    };
+  }
+
+  if (!getSupabaseConfigStatus().hasServerConfig) {
+    return {
+      message: "Configure as variáveis de ambiente do Supabase para reverter fichas para pendente.",
+      status: "error",
+    };
+  }
+
+  const { error } = await createServerSupabaseClient()
+    .from("fichas")
+    .update({
+      delivered_at: null,
+      status: "pendente",
+    })
+    .eq("id", id);
+
+  if (error) {
+    return {
+      message: error.message,
+      status: "error",
+    };
+  }
+
+  revalidatePath("/fichas");
+  revalidatePath("/relatorios");
+  revalidatePath(`/fichas/${id}`);
+  redirect(returnTo ?? "/fichas");
+}
+
+export async function revertFichaToPendenteFormAction(formData: FormData): Promise<void> {
+  await revertFichaToPendenteAction({ status: "idle" }, formData);
 }
 
 export async function deleteFichaAction(

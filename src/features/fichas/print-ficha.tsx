@@ -55,8 +55,9 @@ export function PrintFicha({ ficha, printedBy }: PrintFichaProps) {
   const idText = printedBy ? `Ficha #${shortId} por ${printedBy}` : `Ficha #${shortId}`;
   const isEvento = Boolean(ficha.evento);
   const isRegata = ficha.itens.length > 0 && ficha.itens.every((item) => isRegataProduct(item.produto ?? ""));
-  const isPolo = ficha.gola === "polo" || ficha.gola === "v_polo";
-  const isSocial = ficha.gola === "social";
+  const normalizedGola = normalizeKey(ficha.gola ?? "");
+  const isPolo = normalizedGola.includes("polo");
+  const isSocial = normalizedGola.includes("social");
   const hasMangaExtra = hasAcabamentoMangaExtra(ficha.acabamento_manga);
   const hasReforco = Boolean(ficha.gola && !isSocial && ficha.reforco_gola === "sim");
   const hasAbertura = Boolean(isPolo && ficha.abertura_lateral === "sim");

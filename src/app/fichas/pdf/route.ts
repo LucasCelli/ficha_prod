@@ -4,6 +4,7 @@ import {
   normalizeBooleanFilter,
   normalizeDateFilter,
   normalizeFichaStatus,
+  normalizePageFilter,
   normalizeTextFilter,
 } from "@/features/fichas/data";
 import { generateOperationalFichasPdf } from "@/features/fichas/operational-pdf";
@@ -20,43 +21,48 @@ export async function GET(request: NextRequest) {
     dataInicio: normalizeDateFilter(request.nextUrl.searchParams.get("dataInicio") ?? undefined),
     evento: normalizeBooleanFilter(request.nextUrl.searchParams.get("evento") ?? undefined),
     id: normalizeTextFilter(request.nextUrl.searchParams.get("id") ?? undefined),
+    page: normalizePageFilter(request.nextUrl.searchParams.get("page") ?? undefined),
     status: normalizeFichaStatus(request.nextUrl.searchParams.get("status") ?? undefined),
   };
   const result = await listFichasForOperationalPdf(filters);
   const weeklyMode = resolveWeeklyPdfMode(filters.dataInicio, filters.dataFim, filters.id, filters.status);
-  const overdueResult = weeklyMode
-    ? await listFichasForOperationalPdf({
-        busca: filters.busca,
-        evento: filters.evento,
-        status: "atrasado",
-      })
-    : undefined;
   const pdf = generateOperationalFichasPdf(result, filters, {
     weeklyMode,
-    overdueResult,
   });
 
   return new Response(pdf, {
     headers: {
       "Cache-Control": "no-store",
-      "Content-Disposition": `attachment; filename="${buildFileName(filters.dataInicio, filters.dataFim, weeklyMode)}"`,
+      "Content-Disposition": `attachment; filename="${buildFileName(filters, weeklyMode)}"`,
       "Content-Type": "application/pdf",
     },
   });
 }
 
-function buildFileName(dataInicio?: string, dataFim?: string, weeklyMode?: WeeklyPdfMode) {
-  const prefix =
-    weeklyMode === "current-week"
-      ? "esta_semana"
-      : weeklyMode === "next-week"
-        ? "proxima_semana"
-        : "fichas_operacional";
-  const range = [dataInicio, dataFim]
-    .filter((value): value is string => Boolean(value))
-    .map(formatFileDate)
-    .join("_");
-  return range ? `${prefix}_${range}.pdf` : `${prefix}.pdf`;
+function buildFileName(
+  filters: {
+    busca?: string;
+    dataFim?: string;
+    dataInicio?: string;
+    evento?: boolean;
+    page?: number;
+    status?: string;
+  },
+  weeklyMode?: WeeklyPdfMode,
+) {
+  const parts = [
+    "fichas",
+    "operacional",
+    weeklyMode === "current-week" ? "esta-semana" : weeklyMode === "next-week" ? "proxima-semana" : "",
+    filters.status ? sanitizeFileSegment(filters.status) : "",
+    filters.evento === true ? "evento" : "",
+    filters.busca ? sanitizeFileSegment(filters.busca) : "",
+    filters.dataInicio ? formatFileDate(filters.dataInicio) : "",
+    filters.dataFim ? formatFileDate(filters.dataFim) : "",
+    filters.page && filters.page > 1 ? `pagina-${filters.page}` : "",
+  ].filter(Boolean);
+
+  return `${parts.join("_")}.pdf`;
 }
 
 function resolveWeeklyPdfMode(dataInicio?: string, dataFim?: string, id?: string, status?: string) {
@@ -114,4 +120,14 @@ function formatDateInput(date: Date) {
 function formatFileDate(value: string) {
   const [year, month, day] = value.split("-");
   return `${day}-${month}-${year.slice(-2)}`;
+}
+
+function sanitizeFileSegment(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
 }

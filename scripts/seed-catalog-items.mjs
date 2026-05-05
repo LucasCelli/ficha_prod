@@ -11,7 +11,7 @@ function requiredEnv(name) {
   const value = process.env[name];
 
   if (!value) {
-    throw new Error(`Variável de ambiente obrigatória ausente: ${name}`);
+    throw new Error(`Variavel de ambiente obrigatoria ausente: ${name}`);
   }
 
   return value;
@@ -36,6 +36,16 @@ function uniqueByKindSlug(items) {
   });
 }
 
+function dedupeStrings(values) {
+  const seen = new Set();
+  return values.filter((value) => {
+    const key = slugify(value);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function createItem(kind, name, index, extra = {}) {
   return {
     active: true,
@@ -54,39 +64,101 @@ function loadLegacyCatalog() {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
+function getCanonicalBolsos() {
+  return [
+    "Sem bolso",
+    "Bolso no Peito",
+    "2 Bolsos na Frente",
+    "2 Bolsos Traseiros",
+    "1 Bolso Traseiro",
+    "2 Bolsos na Frente e 2 Atras",
+    "2 Bolsos na Frente e 1 Atras",
+    "Bolsos na Frente Embutidos",
+    "Bolsos na Frente Externos",
+  ];
+}
+
+function getCanonicalGolas() {
+  return [
+    { aliases: ["redonda"], name: "Gola Redonda" },
+    { aliases: ["v"], name: "Gola V" },
+    { aliases: ["polo"], name: "Gola Polo" },
+    { aliases: ["social"], name: "Gola Social" },
+    { aliases: ["padre_ziper", "padre"], name: "Gola Padre com Ziper" },
+    { aliases: ["padre_esportiva"], name: "Gola Padre Esportiva" },
+    { aliases: ["v_polo"], name: "Gola V Polo" },
+    { aliases: ["canoa"], name: "Gola Canoa" },
+  ];
+}
+
+function getCanonicalAcabamentosManga() {
+  return [
+    { aliases: ["barra"], name: "Barra" },
+    { aliases: ["punho"], name: "Punho" },
+    { aliases: ["punho_ribana"], name: "Punho de Ribana" },
+    { aliases: ["punho_vies_sublimado"], name: "Punho Sublimado" },
+    { aliases: ["vies"], name: "Vies" },
+    { aliases: ["vies_sublimado"], name: "Vies Sublimado" },
+  ];
+}
+
+function getCanonicalAcabamentosGola() {
+  return [
+    { aliases: ["ribana"], name: "Ribana" },
+    { aliases: ["vies"], name: "Vies" },
+    { aliases: ["vies_sublimado"], name: "Vies Sublimado" },
+    { aliases: ["ribana_sublimada"], name: "Ribana Sublimada" },
+    { aliases: ["ribana_molde"], name: "Ribana em Molde" },
+  ];
+}
+
 function buildCatalogItems() {
   const legacy = loadLegacyCatalog();
   const items = [];
 
-  (legacy.produtos ?? []).forEach((name, index) => items.push(createItem("produto", name, index)));
-  (legacy.tamanhos ?? []).forEach((name, index) => items.push(createItem("tamanho", name, index)));
-  (legacy.cores ?? []).forEach((name, index) => items.push(createItem("cor", name, index)));
-  (legacy.coresBotao ?? []).forEach((name, index) =>
-    items.push(createItem("cor", name, index + 1000, { aliases: ["botão"] })),
-  );
-  (legacy.mangas ?? []).forEach((name, index) => items.push(createItem("manga", name, index)));
-  (legacy.materiais ?? []).forEach((material, index) =>
+  (legacy.produtos ?? []).forEach((name, index) => {
+    items.push(createItem("produto", name, index));
+  });
+
+  (legacy.tamanhos ?? []).forEach((name, index) => {
+    items.push(createItem("tamanho", name, index));
+  });
+
+  dedupeStrings([...(legacy.cores ?? []), ...(legacy.coresBotao ?? [])]).forEach((name, index) => {
+    items.push(createItem("cor", name, index));
+  });
+
+  (legacy.mangas ?? []).forEach((name, index) => {
+    items.push(createItem("manga", name, index));
+  });
+
+  (legacy.materiais ?? []).forEach((material, index) => {
     items.push(
       createItem("tecido", material.nome, index, {
+        aliases: [material.id],
         metadata: {
           composition: material.composicao,
           legacyId: material.id,
         },
       }),
-    ),
-  );
+    );
+  });
 
-  ["Sem bolso", "Bolso comum", "Bolso chapado", "Bolso com lapela", "Bolso embutido"].forEach((name, index) =>
-    items.push(createItem("bolso", name, index)),
-  );
-  ["Curta", "Longa", "Raglan", "Regata", "3/4"].forEach((name, index) => items.push(createItem("manga", name, index + 100)));
-  ["Punho", "Viés", "Barra simples", "Punho ribana", "Viés sublimado"].forEach((name, index) =>
-    items.push(createItem("acabamento_manga", name, index)),
-  );
-  ["Redonda", "V", "Polo", "Social", "Padre"].forEach((name, index) => items.push(createItem("gola", name, index)));
-  ["Ribana", "Viés", "Polo", "Social", "Gola pronta"].forEach((name, index) =>
-    items.push(createItem("acabamento_gola", name, index)),
-  );
+  getCanonicalBolsos().forEach((name, index) => {
+    items.push(createItem("bolso", name, index));
+  });
+
+  getCanonicalAcabamentosManga().forEach((item, index) => {
+    items.push(createItem("acabamento_manga", item.name, index, { aliases: item.aliases }));
+  });
+
+  getCanonicalGolas().forEach((item, index) => {
+    items.push(createItem("gola", item.name, index, { aliases: item.aliases }));
+  });
+
+  getCanonicalAcabamentosGola().forEach((item, index) => {
+    items.push(createItem("acabamento_gola", item.name, index, { aliases: item.aliases }));
+  });
 
   return uniqueByKindSlug(items);
 }
@@ -118,10 +190,10 @@ async function main() {
 
   if (error) throw error;
 
-  console.log("[catalog-seed] Catálogos importados com sucesso.");
+  console.log("[catalog-seed] Catalogos importados com sucesso.");
 }
 
 main().catch((error) => {
-  console.error("[catalog-seed] Falha ao importar catálogos:", error);
+  console.error("[catalog-seed] Falha ao importar catalogos:", error);
   process.exitCode = 1;
 });

@@ -77,7 +77,6 @@ export type FichaDetailResult =
     };
 
 export const FICHAS_PAGE_SIZE = 25;
-const FICHAS_PDF_LIMIT = 500;
 const BUSINESS_TIME_ZONE = "America/Cuiaba";
 
 export async function listFichas(filters: FichaFilters = {}): Promise<FichaListResult> {
@@ -150,7 +149,7 @@ export async function listFichasForOperationalPdf(filters: FichaFilters = {}): P
         )
         .order("created_at", { ascending: false })
         .order("data_entrega", { ascending: false })
-        .limit(FICHAS_PDF_LIMIT),
+        .range(getOffset(filters.page, FICHAS_PAGE_SIZE), getOffset(filters.page, FICHAS_PAGE_SIZE) + FICHAS_PAGE_SIZE - 1),
       filters,
     );
 

@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useFormStatus } from "react-dom";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui";
@@ -93,10 +94,7 @@ export function CatalogoForm({ item, selectedKind }: CatalogoFormProps) {
       </div>
 
       <div className="catalog-form__actions">
-        <Button type="submit">
-          <Save aria-hidden="true" size={18} />
-          {item ? "Salvar alterações" : "Adicionar item"}
-        </Button>
+        <SubmitButton isEdit={Boolean(item)} />
         {item ? (
           <Link className="ui-button ui-button--secondary" href={`/catalogos?tipo=${selectedKind}`}>
             Cancelar
@@ -104,5 +102,18 @@ export function CatalogoForm({ item, selectedKind }: CatalogoFormProps) {
         ) : null}
       </div>
     </form>
+  );
+}
+
+function SubmitButton({ isEdit }: { isEdit: boolean }) {
+  const { pending } = useFormStatus();
+  const idleLabel = isEdit ? "Salvar alterações" : "Adicionar item";
+  const pendingLabel = isEdit ? "Salvando alterações..." : "Adicionando item...";
+
+  return (
+    <Button aria-disabled={pending} disabled={pending} type="submit">
+      {pending ? <span className="button-spinner" aria-hidden="true" /> : <Save aria-hidden="true" size={18} />}
+      {pending ? pendingLabel : idleLabel}
+    </Button>
   );
 }
