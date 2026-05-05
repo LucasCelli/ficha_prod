@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAppSession } from "@/features/auth/session";
+import { resolveDefaultKanbanColumnId } from "@/features/quadro-producao/data";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FichaDeleteActionState, FichaFormState, FichaStatusActionState, FieldErrors } from "./form-state";
@@ -144,6 +145,7 @@ export async function createFichaAction(_previousState: FichaFormState, formData
 
   const supabase = createServerSupabaseClient();
   const clienteId = await resolveClienteId(parsed.data.cliente, parsed.data.dataEntrega, "create");
+  const defaultKanbanColumnId = await resolveDefaultKanbanColumnId("pendente");
   const { data: fichaCriada, error } = await supabase
     .from("fichas")
     .insert({
@@ -155,6 +157,10 @@ export async function createFichaAction(_previousState: FichaFormState, formData
       data_inicio: parsed.data.dataInicio,
       data_entrega: parsed.data.dataEntrega,
       evento: parsed.data.evento,
+      kanban_column_id: defaultKanbanColumnId ?? undefined,
+      kanban_ordem: 0,
+      kanban_status: "pendente",
+      kanban_status_updated_at: new Date().toISOString(),
       numero_venda: parsed.data.numeroVenda,
       observacoes: parsed.data.observacoes,
       vendedor: parsed.data.vendedor,

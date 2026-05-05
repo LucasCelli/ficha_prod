@@ -19,6 +19,11 @@ export const mainNavigation: readonly NavigationItem[] = [
     description: "Centro operacional",
   },
   {
+    href: "/quadro-producao",
+    label: "Quadro de Producao",
+    description: "Kanban de operacao",
+  },
+  {
     href: "/clientes",
     label: "Clientes",
     description: "Cadastro e historico",

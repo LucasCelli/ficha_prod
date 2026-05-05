@@ -22,6 +22,7 @@ export type FichaListItem = Pick<
   | "evento"
 > & {
   ficha_imagens?: { url: string }[];
+  kanban_column?: { name: string; slug: string } | null;
 };
 
 export type FichaOverdueCandidate = Pick<Database["public"]["Tables"]["fichas"]["Row"], "data_entrega" | "status">;
@@ -94,7 +95,7 @@ export async function listFichas(filters: FichaFilters = {}): Promise<FichaListR
       supabase
         .from("fichas")
         .select(
-          "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, ficha_imagens(url)",
+          "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, ficha_imagens(url), kanban_column:kanban_columns(name,slug)",
           { count: "exact" },
         )
         .order("created_at", { ascending: false })
@@ -144,7 +145,7 @@ export async function listFichasForOperationalPdf(filters: FichaFilters = {}): P
       supabase
         .from("fichas")
         .select(
-          "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento",
+          "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, kanban_column:kanban_columns(name,slug)",
           { count: "exact" },
         )
         .order("created_at", { ascending: false })

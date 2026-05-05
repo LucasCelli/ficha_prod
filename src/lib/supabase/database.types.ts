@@ -90,6 +90,30 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["catalog_items"]["Insert"]>;
         Relationships: [];
       };
+      kanban_columns: {
+        Row: {
+          id: string;
+          slug: string;
+          name: string;
+          order_index: number;
+          is_system: boolean;
+          color_token: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          name: string;
+          order_index: number;
+          is_system?: boolean;
+          color_token?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["kanban_columns"]["Insert"]>;
+        Relationships: [];
+      };
       clientes: {
         Row: {
           id: string;
@@ -141,6 +165,10 @@ export type Database = {
           evento: boolean;
           status: Database["public"]["Enums"]["ficha_status"];
           kanban_status: Database["public"]["Enums"]["kanban_status"];
+          kanban_column_id: string;
+          kanban_ordem: number;
+          is_manual_card: boolean;
+          kanban_status_updated_at: string;
           insumo_status: Database["public"]["Enums"]["insumo_status"];
           material: string | null;
           composicao: string | null;
@@ -192,6 +220,10 @@ export type Database = {
           evento?: boolean;
           status?: Database["public"]["Enums"]["ficha_status"];
           kanban_status?: Database["public"]["Enums"]["kanban_status"];
+          kanban_column_id?: string;
+          kanban_ordem?: number;
+          is_manual_card?: boolean;
+          kanban_status_updated_at?: string;
           insumo_status?: Database["public"]["Enums"]["insumo_status"];
           material?: string | null;
           composicao?: string | null;
@@ -237,6 +269,13 @@ export type Database = {
             columns: ["cliente_id"];
             isOneToOne: false;
             referencedRelation: "clientes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fichas_kanban_column_id_fkey";
+            columns: ["kanban_column_id"];
+            isOneToOne: false;
+            referencedRelation: "kanban_columns";
             referencedColumns: ["id"];
           },
         ];
@@ -352,7 +391,28 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      move_kanban_card: {
+        Args: {
+          p_ficha_id: string;
+          p_kanban_column_id: string;
+          p_target_index?: number;
+        };
+        Returns: undefined;
+      };
+      reorder_kanban_columns: {
+        Args: {
+          p_column_ids: string[];
+        };
+        Returns: undefined;
+      };
+      sort_kanban_cards_by_delivery_date: {
+        Args: {
+          p_kanban_column_id: string;
+        };
+        Returns: undefined;
+      };
+    };
     Enums: {
       app_user_role: "superadmin" | "operador";
       catalog_item_kind:

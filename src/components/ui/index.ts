@@ -4,6 +4,7 @@ export { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogDescripti
 export { Badge } from "./badge";
 export { Button } from "./button";
 export { Card } from "./card";
+export { AppClientProviders } from "./app-client-providers";
 export { CustomDatalist, type CustomDatalistOption } from "./custom-datalist";
 export { DataTable } from "./data-table";
 export { EmptyState } from "./empty-state";

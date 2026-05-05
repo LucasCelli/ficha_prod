@@ -346,7 +346,7 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
       <td>
         <span className="ui-table__primary">
           <strong>{normalizePersonalizacaoLabel(ficha.arte)}</strong>
-          <span className="ui-table__muted">{normalizePersonalizacaoLabel(ficha.kanban_status)}</span>
+          <span className="ui-table__muted">{ficha.kanban_column?.name ?? normalizePersonalizacaoLabel(ficha.kanban_status)}</span>
         </span>
       </td>
       <td>{ficha.vendedor ?? "Sem responsável"}</td>

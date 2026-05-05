@@ -9,6 +9,7 @@ import {
   UserCog,
   Database,
   BarChart3,
+  Columns3,
 } from "lucide-react";
 import { mainNavigation } from "@/lib/navigation";
 import type { AppUserRole } from "@/features/auth/types";
@@ -16,6 +17,7 @@ import type { AppUserRole } from "@/features/auth/types";
 const iconMap: Record<string, typeof Home> = {
   "/": Home,
   "/fichas": FileText,
+  "/quadro-producao": Columns3,
   "/clientes": Users,
   "/catalogos": Database,
   "/usuarios": UserCog,

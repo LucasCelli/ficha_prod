@@ -140,7 +140,7 @@ function FichaHistoryRow({ ficha }: { ficha: FichaListItem }) {
           <Link className="ui-table__link" href={`/fichas/${ficha.id}`}>
             {formatPersonalizacao(ficha.arte)}
           </Link>
-          <span className="ui-table__muted">{ficha.kanban_status.replaceAll("_", " ")}</span>
+          <span className="ui-table__muted">{ficha.kanban_column?.name ?? ficha.kanban_status.replaceAll("_", " ")}</span>
         </span>
       </td>
       <td>{ficha.numero_venda ?? "Sem venda"}</td>
