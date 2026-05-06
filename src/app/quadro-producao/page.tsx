@@ -15,5 +15,5 @@ export default async function QuadroProducaoPage({ searchParams }: QuadroProduca
   const filters = await loadQuadroProducaoSearchParams((await searchParams) ?? {});
   const result = await getQuadroProducaoSnapshot(filters);
 
-  return <QuadroProducaoClient initialResult={result} />;
+  return <QuadroProducaoClient initialFilters={filters} initialResult={result} />;
 }

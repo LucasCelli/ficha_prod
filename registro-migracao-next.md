@@ -1,5 +1,76 @@
 # Registro da migracao Next
 
+## 2026-05-06 - Quadro de produção: persistência de ordem e filtros
+
+- Fase/modulo: quadro de produção / correção do drag and drop e filtros.
+- Arquivos alterados: `supabase/migrations/202605060001_fix_kanban_move_dense_order.sql`, `src/app/quadro-producao/page.tsx`, `src/features/quadro-producao/quadro-producao-client.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Diagnóstico: a API de filtros respondia corretamente quando chamada direto, mas o cliente reaplicava `initialData` para chaves filtradas novas, exibindo o snapshot sem filtro durante a troca. No movimento dos cards, a RPC recebia o índice denso da UI e comparava contra `kanban_ordem`; como a coluna já tinha buracos de ordenação, o card podia voltar para a posição anterior depois do refresh/refetch.
+- Implementação: o cliente agora recebe `initialFilters`, só usa `initialData` quando a query atual bate com esses filtros iniciais e mantém `placeholderData: keepPreviousData` nas trocas. A mutation de mover card deixou de invalidar/refazer o board imediatamente após o drop e o aviso visual por coluna foi removido para evitar flash/layout shift.
+- Correção posterior: quando o ponteiro soltava sobre o próprio shadow, o alvo da coluna tratava o drop como fim da lista. `KanbanColumnList` agora guarda o último shadow ativo e usa esse card/edge como fallback de destino, preservando a posição visual indicada. A busca também passou a usar debounce de 350ms antes de gravar `busca` na URL, reduzindo as chamadas repetidas por caractere.
+- Banco/migração: criada a migration `202605060001_fix_kanban_move_dense_order.sql`, redefinindo `move_kanban_card(...)` para recalcular a ordem por ranking denso, inserir o card no índice solicitado e normalizar os cartões pendentes existentes por coluna.
+- Validação: `npm run typecheck`, eslint dirigido em `src/features/quadro-producao/quadro-producao-client.tsx` e `src/app/quadro-producao/page.tsx`, `npm run build` e `npm run supabase:check` passaram. No Edge DevTools em `http://localhost:3000/quadro-producao`, a busca por `zzzzzz-nao-existe` atualizou a URL, zerou os cards e mostrou `0 em aberto`; limpar filtros restaurou os 82 cards.
+- Caveat: a migration foi versionada, mas não aplicada por CLI local porque esta máquina não tem `supabase` CLI nem `psql` no PATH. Aplicar essa migration no banco alvo é necessário para a persistência sobreviver a refresh.
+
+## 2026-05-06 - Quadro de produção: cards e colunas alinhados ao legado
+
+- Fase/modulo: quadro de produção / refinamento visual e ações rápidas.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `src/features/quadro-producao/config.ts`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: os filtros e botões do quadro passaram a seguir o mesmo comportamento visual de hover/focus dos campos e botões compartilhados do app. As colunas perderam o fundo próprio e ficaram com superfície transparente, borda discreta e acento colorido apenas no topo.
+- Colunas: o contador de cards ficou no topo à direita e os ícones utilitários da coluna foram movidos para uma linha abaixo do título, reduzindo a disputa visual no header.
+- Cards: o nome do cliente virou a primeira informação, venda/manual foi removido do resumo, personalização/material/evento viraram chips, a data de entrega foi para o rodapé do card e o status da ficha virou um select compacto em formato de chip com `Tudo OK`, `Sem tecido`, `Sem tinta`, `Sem papel` e `Pendências`.
+- Ações: o olho abre o detalhe e, no hover/focus, mostra a miniatura da primeira imagem da ficha em um preview flutuante. O antigo check de entrega saiu do card; no lugar, o botão com seta move o card para a próxima coluna.
+- Validação: `npm run typecheck`, eslint dirigido em `src/features/quadro-producao/quadro-producao-client.tsx` e `src/features/quadro-producao/config.ts`, `npm run build` e `npm run supabase:check` passaram. No Edge DevTools em `http://localhost:3000/quadro-producao`, a inspeção confirmou 82 cards, colunas com fundo transparente e borda superior de 3px, header separado em título/contador + ações, título do card como primeira informação, chips/status-chip renderizados, venda ausente do resumo e entrega no rodapé.
+
+## 2026-05-05 - DnD Pragmatic com shadow de encaixe
+
+- Fase/modulo: fichas e quadro de produção / refinamento de drag and drop.
+- Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Correção: a primeira tentativa de pré-ordenar a lista durante o drag foi descartada por ser frágil. O comportamento foi refeito no padrão de shadow: o estado real da lista não muda durante o arraste; cada alvo renderiza apenas um placeholder visual no ponto de encaixe.
+- Fichas: produtos e imagens agora medem o item arrastado em `getInitialData()` e renderizam `products-editor__shadow` ou `image-upload-shadow` antes/depois do alvo conforme `closest-edge`.
+- Quadro de produção: `KanbanSortableCard` e `KanbanColumnList` renderizam `quadro-producao-card-shadow` no ponto de drop, preservando o scroll interno e deixando o cálculo final de índice apenas para o drop real.
+- Correção do pisca-pisca: o shadow ativo deixou de ser estado interno de cada card. Agora a coluna/lista mantém um único shadow ativo e os cards não apagam o placeholder em `onDragLeave`, porque esse leave pode ser causado pelo próprio espaço inserido pelo shadow. O mesmo padrão foi aplicado aos itens de produto/imagem no formulário.
+- Validação: `npm run typecheck`, eslint dirigido em `src/features/fichas/ficha-form.tsx` e `src/features/quadro-producao/quadro-producao-client.tsx`, e `npm run build` passaram.
+
+## 2026-05-05 - DnD migrado para Atlassian Pragmatic
+
+- Fase/modulo: fichas e quadro de produção / troca completa da biblioteca de drag and drop.
+- Arquivos alterados: `package.json`, `package-lock.json`, `AGENTS.md`, `src/features/fichas/ficha-form.tsx`, `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: o pacote DnD anterior foi removido do projeto e o baseline passou a ser Atlassian Pragmatic Drag and Drop com `@atlaskit/pragmatic-drag-and-drop`, `@atlaskit/pragmatic-drag-and-drop-hitbox` e `@atlaskit/pragmatic-drag-and-drop-auto-scroll`.
+- Fichas: a ordenação de produtos e imagens deixou de depender de wrappers globais e passou a usar itens registrando `draggable` e `dropTargetForElements`, com cálculo de destino por `closest-edge` e `getReorderDestinationIndex`. A grade de imagens mantém auto-scroll no próprio container.
+- Quadro de produção: cards e listas foram migrados para targets independentes do Pragmatic. A lista de cada coluna voltou a ter `overflow-y: auto` e agora usa `autoScrollForElements`, removendo a limitação de nested scroll que motivou a troca.
+- Decisão: manter uma única solução de DnD no projeto. As referências operacionais no plano e no `AGENTS.md` agora apontam para Pragmatic; menções históricas antigas foram descritas sem o nome do pacote removido para facilitar varreduras por resíduo real.
+- Validação: `npm run typecheck`, eslint dirigido em `src/features/fichas/ficha-form.tsx` e `src/features/quadro-producao/quadro-producao-client.tsx`, `npm run build` e `npm run supabase:check` passaram. No Edge DevTools em `http://localhost:3000/quadro-producao`, a página renderizou 82 cartões, as listas voltaram com `overflow-y: auto`, as colunas longas mantiveram scroll interno e a varredura de DOM retornou zero atributos internos da biblioteca DnD anterior.
+
+## 2026-05-05 - Quadro de Produção sem nested scroll no DnD
+
+- Fase/modulo: quadro de produção / correção de drag and drop.
+- Arquivos alterados: `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Diagnóstico: ao mover cards entre colunas, a biblioteca DnD anterior avisava em desenvolvimento que havia nested scroll container. A documentação do componente de destino confirmava que a biblioteca só suportava dois casos: o próprio destino como scroll container sem scroll parent, ou o destino com apenas um scroll parent. O guia de detecção também confirmava que a checagem usava os valores computados de `overflow-x` e `overflow-y` como `auto`/`scroll`.
+- Implementação: `quadro-producao-column__list` deixou de usar `max-height` e `overflow-y: auto`. Assim, o destino de drop não virava mais um segundo scroll container dentro do layout; a rolagem passava a ficar no viewport/container externo compatível com a limitação da biblioteca.
+- Validação: `npm run typecheck`, eslint dirigido nos arquivos do quadro/navegação e `npm run build` passaram. No Edge DevTools em `http://localhost:3000/quadro-producao`, cada `.quadro-producao-column__list` ficou com `overflow-x/y: visible` e apenas 1 scroll parent detectado, sem o aviso de nested scroll do DnD no console após recarregar.
+- Caveat histórico: naquela rodada, a coluna longa passou a depender do scroll da página em vez de scroll interno por coluna. A migração posterior para Pragmatic reverteu esse caveat e restaurou scroll interno por coluna.
+
+## 2026-05-05 - Quadro de Produção com cards e controles alinhados
+
+- Fase/modulo: quadro de produção / correção visual pontual.
+- Arquivos alterados: `src/features/quadro-producao/config.ts`, `src/features/quadro-producao/quadro-producao-client.tsx`, `src/lib/navigation.ts`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: a toolbar do quadro passou a usar altura, raio e comportamento mais próximos dos filtros/botões do restante do App Router. O recorte semanal agora reaproveita a base visual de `ui-button`, os selects deixam de parecer controles isolados em formato pill e a ação de novo cartão não renderiza mais texto duplicado.
+- Colunas/cartões: as colunas ficaram esticadas de forma consistente dentro dos painéis redimensionáveis, com cards centralizados verticalmente no próprio corpo, altura mínima real, padding menos espremido e metadados com espaçamento suficiente para parar o efeito de cards encavalados nas listas densas.
+- Linguagem: o quadro, a navegação e os labels base voltaram para pt-BR com acentuação correta em `Quadro de Produção`, `Novo cartão`, `pendência`, `Costura/Em Revisão`, `Catálogos`, `Usuários`, `Relatórios` e descrições do menu.
+- Validação: `npm run typecheck`, `npx eslint src\\features\\quadro-producao\\quadro-producao-client.tsx src\\features\\quadro-producao\\config.ts src\\lib\\navigation.ts`, `npm run build` e scan dirigido de mojibake/textos sem acento passaram. No Edge DevTools em `http://localhost:3000/quadro-producao`, a medição confirmou `overlaps: false`, lista de coluna em `display: flex`, controles com 44px de altura/10px de raio e nenhum mojibake no texto renderizado.
+
+## 2026-05-05 - Quadro de Producao reestruturado para legado/kan
+
+- Fase/modulo: quadro de producao / refatoracao visual estrutural.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Diagnostico: mesmo depois das passadas anteriores, o board ainda tinha cara de pagina de app com hero + cards, em vez de quadro operacional. O topo competia com o proprio board, as colunas estavam arredondadas e profundas demais, e os cartoes ainda carregavam peso visual acima do legado e da referencia do `kan`.
+- Topo/barra operacional: o bloco hero deixou de ser a leitura principal do fluxo autenticado. A superficie ativa passou a concentrar titulo, total em aberto, busca, filtros, recorte semanal, atualizar, novo cartao e criacao de coluna dentro de uma unica barra compacta, com acoes administrativas mais subordinadas.
+- Colunas/cartoes: as colunas ganharam acento cromatico fino por etapa, header mais baixo com contador enxuto e acoes utilitarias discretas. Os cartoes perderam profundidade e excesso de chips: agora priorizam venda/manual + entrega, nome do cliente, metadados secos e badge de pendencia so quando necessario. O hover/focus continua revelando as acoes sem voltar a poluir a leitura.
+- Blindagem visual: `src/styles/globals.css` passou a forcar `display: none` em `quadro-producao-view__header[hidden]` para garantir que o hero legado nao volte a vazar na primeira pintura quando o JSX o mantem apenas como residuo oculto.
+- Browser: validado em sessao autenticada no Edge DevTools em `http://localhost:3000/quadro-producao`. A tela final mostrou a barra compacta acima do board, 82 cartoes carregados, header de coluna em ~58px e cartao simples em ~60px. Tambem foi conferido que o header antigo fica marcado como `hidden` no DOM e que a lista de cartoes realmente monta apos o loading inicial.
+- Validacao: `npm run typecheck`, `cmd /c npx eslint src\\features\\quadro-producao\\quadro-producao-client.tsx`, `npm run build` e `npm run supabase:check` passaram. `npm run lint` completo continua falhando por residuos preexistentes em `.kilo/*`, minificados e arquivos legados fora desta frente.
+- Caveat: o titulo operacional ficou deliberadamente mais compacto e pode quebrar em duas linhas nas larguras menores do desktop. Isso foi aceito nesta rodada porque a prioridade era devolver a leitura de quadro e reduzir o peso visual geral.
+
 ## 2026-05-05 - Quadro de Producao visual refinado
 
 - Fase/modulo: quadro de producao / polimento visual e usabilidade do board.
@@ -7,7 +78,7 @@
 - Resultado: o quadro passou por uma rodada de compactacao real no navegador autenticado. Os cards ficaram menores, com largura controlada dentro da coluna, menos padding, badges mais contidas, lista interna rolavel e uma hierarquia mais curta entre venda, entrega, titulo, chips e acoes.
 - Arraste: os atributos de drag handle foram movidos para o proprio `<article>` do card, deixando o cartao inteiro arrastavel em vez de depender de um botao pequeno no canto. O indicador visual de grip permaneceu no topo apenas como pista de affordance.
 - Colunas: a superficie desktop ganhou comportamento mais operacional, com altura util concentrada na lista de cartoes (`max-height` da coluna/lista) e menor desperdicio vertical entre header, container e cards. No mobile, a largura minima do board horizontal tambem foi reduzida para melhorar o encaixe inicial.
-- Browser: validado em `http://localhost:3000/quadro-producao` com sessao autenticada. A inspeção confirmou cards na faixa de ~148px de altura nos casos simples, largura real dentro da coluna e o atributo `data-rfd-drag-handle-draggable-id` presente no proprio card.
+- Browser: validado em `http://localhost:3000/quadro-producao` com sessao autenticada. A inspeção confirmou cards na faixa de ~148px de altura nos casos simples, largura real dentro da coluna e o atributo interno de drag da biblioteca anterior presente no proprio card.
 - Validacao: `npm run typecheck` passou. `npx eslint src/features/quadro-producao/quadro-producao-client.tsx` ficou limpo; `src/styles/globals.css` continua fora da cobertura do ESLint atual do repo e foi validado por inspeção visual/DOM no navegador.
 - Caveat: esta rodada foi focada em densidade e usabilidade imediata. Se quisermos um refinamento adicional depois, o proximo passo natural e simplificar ainda mais a coluna de acoes ou transformar parte das acoes do card em menu contextual para reduzir ruido visual.
 
@@ -15,8 +86,8 @@
 
 - Fase/modulo: quadro de producao / simplificacao visual final.
 - Arquivos alterados: `src/components/ui/tooltip.tsx`, `src/features/quadro-producao/config.ts`, `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
-- Diagnostico: o board ainda estava carregado demais em relacao ao legado e ao `kan`: chips grandes, subtitulo tecnico em cada coluna, acoes sempre expostas, nomenclatura `Insumos` pouco clara no topo e tooltip preso pelo overflow da coluna.
-- Ajuste de linguagem: o filtro e a leitura do campo deixaram de apresentar `Insumos` como se fosse o status principal do quadro. A UI agora usa `Pendencia`, e os labels ficaram mais diretos (`Tudo pronto`, `Com pendencias`, etc.), preservando o dado legado sem confundir com a etapa do card.
+- Diagnostico: o board ainda estava carregado demais em relacao ao legado e ao `kan`: chips grandes, subtitulo tecnico em cada coluna, acoes sempre expostas, nomenclatura do status pouco clara no topo e tooltip preso pelo overflow da coluna.
+- Ajuste de linguagem: o filtro e a leitura do campo deixaram de apresentar o nome tecnico antigo como se fosse o status principal do quadro. A UI agora usa `Pendencia`, e os labels ficaram mais diretos (`Tudo pronto`, `Com pendencias`, etc.), preservando o dado legado sem confundir com a etapa do card.
 - Ajuste de coluna/card: o subtitulo tecnico (`slug`) foi removido do header das colunas. Os cards ficaram menores e mais secos: venda + entrega em uma linha, cliente em destaque, chips minimos e pendencia exibida apenas quando existe. As acoes do card passaram a ficar discretas em repouso e aparecer no hover/focus, reduzindo a poluicao visual da lista.
 - Tooltip: `src/components/ui/tooltip.tsx` passou a renderizar o balao via portal em `document.body`, com posicionamento `fixed` calculado por `getBoundingClientRect()`. Isso evita que o tooltip seja cortado pelo `overflow` da coluna/lista.
 - Browser: validado novamente no board autenticado em `http://localhost:3000/quadro-producao`. A tela passou a mostrar cards de aproximadamente 109px nos casos simples, sem o subtitulo tecnico da coluna e com leitura geral bem mais proxima da referencia enxuta desejada.
@@ -27,10 +98,10 @@
 
 - Fase/modulo: quadro de producao / Kanban operacional no App Router.
 - Arquivos alterados: `supabase/migrations/202605050003_quadro_producao_dynamic_columns.sql`, `src/lib/supabase/database.types.ts`, `src/app/layout.tsx`, `src/components/ui/app-client-providers.tsx`, `src/components/ui/app-navigation.tsx`, `src/components/ui/index.ts`, `src/lib/navigation.ts`, `src/app/quadro-producao/page.tsx`, `src/app/api/quadro-producao/route.ts`, `src/app/api/quadro-producao/columns/route.ts`, `src/app/api/quadro-producao/columns/reorder/route.ts`, `src/app/api/quadro-producao/columns/[id]/route.ts`, `src/app/api/quadro-producao/columns/[id]/sort-by-date/route.ts`, `src/app/api/quadro-producao/cards/manual/route.ts`, `src/app/api/quadro-producao/cards/[id]/move/route.ts`, `src/app/api/quadro-producao/cards/[id]/insumo-status/route.ts`, `src/app/api/quadro-producao/cards/[id]/entregar/route.ts`, `src/features/quadro-producao/config.ts`, `src/features/quadro-producao/search-params.ts`, `src/features/quadro-producao/schema.ts`, `src/features/quadro-producao/data.ts`, `src/features/quadro-producao/api.ts`, `src/features/quadro-producao/quadro-producao-client.tsx`, `src/features/fichas/actions.ts`, `src/features/fichas/data.ts`, `src/features/fichas/fichas-overview.tsx`, `src/features/clientes/data.ts`, `src/features/clientes/cliente-detail.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
-- Resultado: a nova rota autenticada `/quadro-producao` foi implementada como modulo proprio, mantendo o esquema visual da app atual e sem recriar uma UI paralela. O board agora le de `kanban_columns`, suporta criacao e renomeio de colunas, reordenacao persistida de colunas, drag/drop de cartoes, ordenacao por data dentro da coluna, acao rapida de insumos, marcar como entregue e criacao de cartao manual no mesmo dominio de `fichas`.
+- Resultado: a nova rota autenticada `/quadro-producao` foi implementada como modulo proprio, mantendo o esquema visual da app atual e sem recriar uma UI paralela. O board agora le de `kanban_columns`, suporta criacao e renomeio de colunas, reordenacao persistida de colunas, drag/drop de cartoes, ordenacao por data dentro da coluna, acao rapida de status, marcar como entregue e criacao de cartao manual no mesmo dominio de `fichas`.
 - Banco/migracao: a migration criou `public.kanban_columns`, semeou as 5 colunas base do fluxo legado, adicionou `kanban_column_id`, `kanban_ordem`, `is_manual_card` e `kanban_status_updated_at` em `fichas`, fez backfill a partir do `kanban_status` antigo e adicionou funcoes SQL para reordenar colunas, ordenar cartoes por data e mover cartoes entre colunas.
 - Dados e contratos: `src/lib/supabase/database.types.ts` passou a tipar a nova tabela, os novos campos de `fichas` e as funcoes RPC. O modulo `src/features/quadro-producao/*` centraliza schemas Zod, parse de search params via `nuqs/server`, snapshot server-side, mutacoes e chamadas client-side.
-- Plugins/bibliotecas aplicados: `nuqs` entrou no estado de URL dos filtros, `@tanstack/react-query` passou a sustentar refetch e mutacoes otimistas do board, `@hello-pangea/dnd` foi reutilizado no drag/drop dos cartoes e `react-resizable-panels` passou a estruturar as colunas redimensionaveis no desktop. `AppClientProviders` foi adicionado no layout para expor `NuqsAdapter` e `QueryClientProvider` sem criar wrappers paralelos por pagina.
+- Plugins/bibliotecas aplicados: `nuqs` entrou no estado de URL dos filtros, `@tanstack/react-query` passou a sustentar refetch e mutacoes otimistas do board, a biblioteca DnD anterior foi reutilizada no drag/drop dos cartoes e `react-resizable-panels` passou a estruturar as colunas redimensionaveis no desktop. `AppClientProviders` foi adicionado no layout para expor `NuqsAdapter` e `QueryClientProvider` sem criar wrappers paralelos por pagina.
 - Integracao com o resto do produto: `Quadro de Producao` entrou na navegacao principal; novas fichas ja nascem apontando para a coluna base; e as leituras de Kanban em `/fichas` e no detalhe de clientes passaram a preferir `kanban_column.name` quando disponivel, em vez de depender apenas do enum antigo.
 - Decisao: nesta primeira entrega, a gestao de colunas cobre criar, renomear e reordenar, mas nao excluir. A reordenacao das colunas ficou por controles explicitos de mover esquerda/direita, enquanto o drag/drop foi concentrado nos cartoes. `zustand` nao foi introduzido porque React Query + estado local foram suficientes.
 - Validacao: `npm run typecheck`, `npm run build` e `npm run supabase:check` passaram. O lint dos arquivos tocados foi validado com `npx eslint` dirigido porque `npm run lint` completo continua contaminado por erros preexistentes em `.kilo/*` e arquivos legados/minificados fora desta frente.
@@ -319,15 +390,15 @@
 
 - Fase/modulo: polimento pre-producao, formulario de criacao/edicao de fichas.
 - Arquivos alterados: `package.json`, `package-lock.json`, `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
-- Resultado: adicionado `@hello-pangea/dnd` como base compartilhavel para drag/drop. O formulario Next agora permite reordenar produtos e imagens com `DragDropContext`/`Droppable`/`Draggable`, adicionar imagens por selecao, drop ou Ctrl+V, ordenar produtos automaticamente por tamanho, editar observacoes com toolbar simples e gerar auto-preenchimento aproximado da regra legada com texto em caixa alta, separadores `/` e blocos de tecido, manga, gola, bolso, filete, faixa, personalizacao e nomes/numeros.
+- Resultado: adicionada a biblioteca DnD anterior como base compartilhavel para drag/drop. O formulario Next passou a permitir reordenar produtos e imagens por wrappers da biblioteca, adicionar imagens por selecao, drop ou Ctrl+V, ordenar produtos automaticamente por tamanho, editar observacoes com toolbar simples e gerar auto-preenchimento aproximado da regra legada com texto em caixa alta, separadores `/` e blocos de tecido, manga, gola, bolso, filete, faixa, personalizacao e nomes/numeros.
 - Confirmacao de paridade ja existente: criacao e edicao carregam os mesmos catalogos/datalists via `listCatalogOptionsForFichaForm()`, preservando produtos, tamanhos, tecidos, cores, mangas, acabamentos, golas e bolsos ativos.
-- Validacao: `npm run typecheck`, `npm run lint` e `npm run build` passaram. Abertura local de `/fichas/nova` redirecionou para `/login`, confirmando a protecao da rota; validacao visual autenticada ainda depende de PIN/sessao. `npm install @hello-pangea/dnd` reportou 4 vulnerabilidades no grafo atual; nao foi rodado `npm audit fix` automatico para evitar upgrades fora de escopo.
+- Validacao: `npm run typecheck`, `npm run lint` e `npm run build` passaram. Abertura local de `/fichas/nova` redirecionou para `/login`, confirmando a protecao da rota; validacao visual autenticada ainda depende de PIN/sessao. A instalacao da biblioteca DnD anterior reportou 4 vulnerabilidades no grafo da epoca; nao foi rodado `npm audit fix` automatico para evitar upgrades fora de escopo.
 - Decisao: registrar o polimento como checklist proprio no plano principal para separar itens ja implementados das pendencias criticas restantes.
 - Caveat: ainda falta validar visualmente a regra de auto-preenchimento com sessao autenticada e reconstruir a impressao/PDF individual fiel ao legado antes de considerar a paridade critica fechada.
 
 ### Ajuste de fluidez do drag/drop
 
-- Ajuste: produtos e imagens agora usam o snapshot do `Droppable` para destacar a area de destino durante o arraste, e os cards arrastados recebem elevacao visual.
+- Ajuste: produtos e imagens passaram a usar o snapshot do destino de drop para destacar a area durante o arraste, e os cards arrastados receberam elevacao visual.
 - Ajuste: a grade de imagens passou a dimensionar cada card como 1/4 da largura disponivel em desktop, com minimo responsivo para nao esmagar em telas pequenas.
 - Ajuste: botoes de reordenar/remover imagem foram movidos para uma barra propria no card; a badge `Pendente` deixou de ficar sobreposta ao handle de drag/drop.
 - Ajuste: novas imagens adicionadas por selecao, drop ou Ctrl+V entram com a descricao vazia; o nome do arquivo fica apenas como fallback interno no upload.
@@ -336,7 +407,7 @@
 - Ajuste: o input de descricao recebeu estilo do sistema, foco visivel e placeholder especifico (`Ex: frente, costas, detalhe do bordado`), deixando de parecer input generico.
 - Ajuste: corrigido estouro visual durante o arraste com largura maxima aplicada ao item em drag; 1 imagem passou para 1/2 da largura total.
 - Ajuste: topo do card agora mostra `Imagem N`, a badge `Pendente` fica no topo e o botao remover recebeu hover/focus vermelho.
-- Ajuste: clone de arraste das imagens voltou a manter o mesmo formato do card em repouso; removido override manual de largura/preview durante drag e fixada a largura do card pela variavel `--image-card-width`, deixando o `@hello-pangea/dnd` preservar as dimensoes medidas.
+- Ajuste: clone de arraste das imagens voltou a manter o mesmo formato do card em repouso; removido override manual de largura/preview durante drag e fixada a largura do card pela variavel `--image-card-width`, deixando a biblioteca DnD anterior preservar as dimensoes medidas.
 - Ajuste: preview da imagem travado por quantidade com `--image-preview-height` e `background-size: contain`, impedindo que a imagem escale e aumente o card durante o arraste.
 - Ajuste: largura do card de imagem tambem foi travada durante o arraste; `onDragStart` mede o card em pixels e aplica `width/minWidth/maxWidth` no item enquanto ele esta em drag, evitando que percentuais sejam recalculados contra o viewport.
 - Ajuste: medicao de largura passou de `onDragStart` para `ResizeObserver`, guardando a largura real de cada card antes do primeiro frame de arraste e aplicando `width/minWidth/maxWidth` no clone.
@@ -714,7 +785,7 @@
 - Problema: o `AGENTS.md` antigo ainda refletia parte do desenho inicial da migracao e chegou a orientar errado em pontos ja consolidados, como API de toast, superfices ativas e papel de rotas antigas.
 - Reescrita: o arquivo foi substituido integralmente para descrever o produto atual em operacao, incluindo stack real, docs vivos da raiz, ownership por pasta, gate de auth em `src/app/layout.tsx`, centralidade de `/fichas`, funcao real de `/relatorios`, restricao de `/catalogos` e `/usuarios` a `superadmin`, e o status do legado como referencia funcional apenas.
 - UI: tambem ficaram explicitas as regras duraveis ja adotadas no app atual, como `sonner` direto no Next, `AlertDialog` no lugar de `window.confirm`, `Tooltip` no lugar de `title=""`, spinner para botoes/itens, barra para loading de toast/transicao e `skeleton` nunca.
-- Bibliotecas: o novo texto separa o que ja e baseline (`sonner`, `react-hook-form`, `zod`, `@hello-pangea/dnd`, `react-day-picker`, Radix Dialog/AlertDialog) do que esta apenas instalado e ainda em adocao gradual (`nuqs`, `date-fns`, `@tanstack/react-table`, `@tanstack/react-query`, `recharts`, `zustand`, `react-resizable-panels`, `@tiptap/react`).
+- Bibliotecas: o novo texto separa o que ja era baseline (`sonner`, `react-hook-form`, `zod`, biblioteca DnD anterior, `react-day-picker`, Radix Dialog/AlertDialog) do que estava apenas instalado e ainda em adocao gradual (`nuqs`, `date-fns`, `@tanstack/react-table`, `@tanstack/react-query`, `recharts`, `zustand`, `react-resizable-panels`, `@tiptap/react`).
 - Validacao: revisao cruzada com `README.md`, `package.json`, `src/app/layout.tsx`, `src/components/ui/index.ts`, rotas reais em `src/app/*` e uso corrente de `sonner`, `react-day-picker`, `AlertDialog`, `DataTable` e `contentEditable` nas features.
 - Caveat: o arquivo foi regravado em ASCII intencionalmente para reduzir risco de encoding quebrado no fluxo atual do repositorio.
 
@@ -771,3 +842,98 @@
 - Checagem do seed: o dry-run de `node scripts/seed-catalog-items.mjs` retornou um catálogo consolidado com 219 itens: `produto 65`, `tamanho 45`, `tecido 35`, `cor 40`, `manga 6`, `gola 8`, `acabamento_manga 6`, `acabamento_gola 5` e `bolso 9`.
 - Estado desta rodada: preparei a migration e o seed canônico, mas nao apliquei no banco ainda. Isso foi intencional para nao alterar dados remotos sem executar a rodada de migrate/seed no ambiente alvo.
 - Validacao local: `npm run typecheck`, `eslint` dirigido e o dry-run do seed passaram.
+
+### Quadro de producao: chips, prazo e thumbnails
+
+- Ajuste visual: `src/features/quadro-producao/quadro-producao-client.tsx` removeu o chip de tecido dos cards e manteve a leitura compacta em personalizacao, evento e status da ficha.
+- Prazo: a entrega ganhou um indicador circular com a mesma regra do legado: cards em `na_costura` nao alertam, `<= 1` dia fica vermelho e `<= 7` dias fica amarelo.
+- Status: `src/styles/globals.css` aplicou as cores legadas por status da ficha: `Tudo OK` sucesso, `Sem tecido` alerta, `Sem tinta` erro, `Sem papel` informativo e `Pendencias` em alerta discreto.
+- Tooltips: os botoes do card voltaram a usar `Tooltip`, incluindo abrir detalhes/preview e mover para a proxima coluna.
+- Imagens: o hover da primeira imagem agora transforma URLs Cloudinary em thumbnail; a imagem do preview tambem recebeu `height: auto` para evitar o warning do Next/Image sobre aspect ratio.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, `npm run lint` e scan de mojibake nos arquivos tocados passaram.
+
+### Quadro de producao: modal como card aberto
+
+- Modal: `src/features/quadro-producao/quadro-producao-client.tsx` refez o detalhe do card para mostrar a primeira imagem da ficha, identificacao, coluna atual, entrega, evento, arte, tecido, venda, responsavel e acoes operacionais.
+- Remocoes: sairam do modal os botoes `Abrir previa` e `Abrir ficha completa`, alem do bloco de `Observacoes`, que deixava o modal pesado e expunha texto bruto demais para leitura de quadro.
+- Acoes: o modal agora permite trocar o status da ficha e mover o card para a proxima etapa, com label curto e `aria-label` mantendo o nome da coluna de destino.
+- Colunas/chips: `src/styles/globals.css` colocou fundo neutro nas colunas sem voltar ao degrade; `Tudo OK` passou a ser neutro; o select-chip do card saiu do wrapper de `Tooltip` e ganhou `stopPropagation` nos eventos de ponteiro/clique para nao disputar com o drag do card.
+- Linguagem e imagens: a UI do quadro passou a exibir esse campo como status da ficha/pedido, e as imagens do tooltip e do modal foram padronizadas em 16:9 com thumbnails Cloudinary `320x180` e `640x360`.
+- Validacao: `npm run typecheck`, eslint dirigido em `src/features/quadro-producao/quadro-producao-client.tsx`, scan de mojibake nos arquivos tocados e inspeção no Edge em `/quadro-producao`.
+
+### Quadro de producao: labels dos filtros
+
+- Ajuste: os filtros principais do quadro agora exibem labels visiveis acima dos campos de busca, tecido, personalizacao e status da ficha.
+- Acessibilidade: os `aria-labels` existentes foram mantidos, entao a mudanca melhora a leitura visual sem reduzir suporte a leitores de tela.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck` e eslint dirigido no cliente do quadro.
+
+### Quadro de producao: evento, tooltip e modal compactos
+
+- Card: o chip `Evento` saiu da linha de metadados e passou para a esquerda do nome do cliente, com destaque azul/primary.
+- Tooltip de imagem: a preview agora abre abaixo e a direita do ponteiro, acompanha o movimento do mouse e preserva o recorte 16:9 via thumbnail Cloudinary.
+- Modal: removido o metadado `Ficha real`; a imagem principal usa dimensoes 16:9 explicitas, os espacamentos foram compactados e o select de status da ficha e o botao de mover foram alinhados para parecerem do mesmo conjunto.
+- Acoes: o botao de mover no modal voltou a usar o componente `Tooltip`, mantendo descricao da acao sem `title` nativo.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, eslint dirigido no cliente do quadro e checagem visual no Edge.
+
+### Quadro de producao: evento como icone no card
+
+- Ajuste: o marcador de evento deixou de usar a palavra `Evento` no card e passou a renderizar uma estrela azul/primary antes do nome do cliente.
+- Layout: o titulo do card agora fica sempre em uma linha; nomes longos usam ellipsis para nao aumentar nem estourar o card.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, eslint dirigido no cliente do quadro e checagem visual no Edge.
+
+### Quadro de producao: respiro vertical dos cards
+
+- Ajuste: os cards receberam +2px de padding vertical e +1px de gap interno, criando mais respiro entre titulo, chips/status e data.
+- Escopo: a mudanca ficou restrita ao CSS do quadro para preservar largura, truncamento do nome e densidade geral das colunas.
+- Arquivos alterados: `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: checagem visual no Edge em `/quadro-producao`.
+
+### Quadro de producao: tooltips restaurados nas acoes
+
+- Ajuste: a barra principal do quadro passou a envolver `Para essa semana`, `Limpar filtros`, `Atualizar`, `Novo cartao` e `Coluna` com o componente compartilhado `Tooltip`.
+- Card: o botao textual do nome do cliente tambem recebeu `Tooltip` com a descricao `Abrir detalhes do cartao`, preservando a largura completa e o truncamento em uma linha.
+- Cobertura: os tooltips ja existentes em botoes de coluna, preview da imagem, mover card e mover no modal foram mantidos.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, eslint dirigido no cliente do quadro e checagem visual no Edge.
+
+### UI compartilhada: Tooltip visivel em portal
+
+- Diagnostico: o `Tooltip` compartilhado renderiza o conteudo em portal, mas o CSS de visibilidade ainda dependia de seletores aninhados no wrapper. Como o conteudo sai da arvore do wrapper, ele era criado com `opacity: 0`.
+- Ajuste: `src/components/ui/tooltip.tsx` agora marca o conteudo portaled como aberto e tambem usa listeners nativos de mouse/focus como fallback dos pointer events; `src/styles/globals.css` aplica a visibilidade diretamente no conteudo do portal.
+- Resultado: as descricoes das acoes do quadro voltaram a aparecer no hover/focus sem usar `title` nativo.
+- Arquivos alterados: `src/components/ui/tooltip.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, eslint dirigido no componente e no cliente do quadro, e checagem no Edge.
+
+### Quadro de producao: tooltip removido do olho
+
+- Ajuste: o botao com icone de olho deixou de usar tooltip textual, mantendo apenas `aria-label` e a preview 16:9 da primeira imagem no hover.
+- Decisao: nesse controle, a preview visual ja descreve a funcao melhor que uma legenda textual e evita sobreposicao de dois popovers.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck` e eslint dirigido no cliente do quadro.
+
+### Dark mode: card do quadro e navegacao ativa
+
+- Quadro: no tema escuro, `.quadro-producao-card` ganhou fundo um pouco mais escuro que a coluna, com borda/acento preservados, para destacar o card sem aumentar ruido visual.
+- Shell: no tema escuro, `.app-nav__link[aria-current="page"]` passou a usar `surface-2`, o mesmo fundo do hover, mantendo a cor primaria no icone para indicar a rota atual.
+- Escopo: os overrides usam `html[data-theme="dark"]`, sem afetar o tema claro.
+- Arquivos alterados: `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck` e checagem no Edge em `/quadro-producao`.
+
+### Dark mode: borda dos cards suavizada
+
+- Ajuste: a borda dos cards do quadro no tema escuro passou de mistura com 18% do acento da coluna para 8%; no hover, a mistura caiu para 16% e a sombra tambem foi reduzida.
+- Resultado: os cards continuam destacados do fundo da coluna, mas o contorno deixa de chamar mais atencao que o conteudo.
+- Arquivos alterados: `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck` e checagem visual no Edge.
+
+### Quadro de producao: filtro de tecido removido
+
+- Ajuste: o select de tecido foi removido da barra principal do quadro por ser redundante com a busca.
+- Compatibilidade: a query/API continuam aceitando `tecido` internamente para nao quebrar links antigos, e `Limpar filtros` ainda remove esse parametro quando ele existir.
+- Card: a entrega exibida no card passou de data com mes por extenso para `DD/MM/AA`.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, eslint dirigido no cliente do quadro e scan de mojibake no cliente do quadro.

@@ -1,33 +1,37 @@
 "use client";
 
-import Link from "next/link";
+import Image from "next/image";
 import {
+  type CSSProperties,
   type FormEvent,
+  useCallback,
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
 } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createPortal } from "react-dom";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryStates } from "nuqs";
-import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
+import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
+import { draggable, dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { autoScrollForElements } from "@atlaskit/pragmatic-drag-and-drop-auto-scroll/element";
+import { attachClosestEdge, extractClosestEdge, type Edge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import {
   ArrowLeft,
   ArrowRight,
   CalendarDays,
-  CheckCheck,
   Eye,
   Filter,
   GripVertical,
-  PackageCheck,
   Pencil,
   Plus,
   RefreshCw,
   Rows3,
+  Star,
 } from "lucide-react";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
   Badge,
   Card,
   EmptyState,
@@ -40,6 +44,7 @@ import { INSUMO_STATUS_LABELS, INSUMO_STATUS_VALUES } from "./config";
 import type {
   KanbanBoardColumn,
   KanbanCardSummary,
+  QuadroProducaoFilters,
   QuadroProducaoResult,
 } from "./data";
 import {
@@ -47,7 +52,6 @@ import {
   patchKanbanCardInsumoStatus,
   patchKanbanCardMove,
   patchKanbanColumn,
-  postKanbanCardEntregar,
   postKanbanColumn,
   postKanbanColumnReorder,
   postKanbanColumnSortByDate,
@@ -56,6 +60,7 @@ import {
 import { quadroProducaoSearchParamParsers } from "./search-params";
 
 type QuadroProducaoClientProps = {
+  initialFilters: QuadroProducaoFilters;
   initialResult: QuadroProducaoResult;
 };
 
@@ -74,17 +79,141 @@ type MutationContext = {
   queryKey: readonly unknown[];
 };
 
+type KanbanDragData = {
+  cardId: string;
+  columnId: string;
+  height?: number;
+  index: number;
+  kind: "quadro-card";
+};
+
+type KanbanCardTargetData = KanbanDragData & {
+  targetKind: "card";
+};
+
+type KanbanColumnTargetData = {
+  columnId: string;
+  index: number;
+  kind: "quadro-column";
+  targetKind: "column";
+};
+
+type KanbanDropData = KanbanCardTargetData | KanbanColumnTargetData;
+
 function formatDate(value: string) {
   const date = new Date(`${value}T00:00:00`);
 
   return new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
+    year: "2-digit",
   }).format(date);
 }
 
 function formatCount(value: number) {
   return new Intl.NumberFormat("pt-BR").format(value);
+}
+
+function getRemainingDays(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  return Math.ceil((date.getTime() - today.getTime()) / 86_400_000);
+}
+
+function getDeliveryUrgency(card: KanbanCardSummary) {
+  if (card.kanbanStatus === "na_costura") {
+    return "default";
+  }
+
+  const remainingDays = getRemainingDays(card.dataEntrega);
+
+  if (remainingDays === null) {
+    return "default";
+  }
+
+  if (remainingDays <= 1) {
+    return "danger";
+  }
+
+  if (remainingDays <= 7) {
+    return "warning";
+  }
+
+  return "default";
+}
+
+function getDeliveryUrgencyLabel(urgency: ReturnType<typeof getDeliveryUrgency>) {
+  if (urgency === "danger") {
+    return "Entrega atrasada ou em risco imediato";
+  }
+
+  if (urgency === "warning") {
+    return "Entrega próxima";
+  }
+
+  return "Entrega dentro do prazo";
+}
+
+function getCloudinaryThumbnailUrl(value: string | null, width = 320, height = 180) {
+  if (!value || !value.includes("res.cloudinary.com") || !value.includes("/image/upload/")) {
+    return value;
+  }
+
+  return value.replace("/image/upload/", `/image/upload/c_fill,w_${width},h_${height},f_auto,q_auto:eco/`);
+}
+
+function isKanbanDragData(value: Record<string | symbol, unknown>): value is KanbanDragData {
+  return (
+    value.kind === "quadro-card" &&
+    typeof value.cardId === "string" &&
+    typeof value.columnId === "string" &&
+    typeof value.index === "number"
+  );
+}
+
+function isKanbanDropData(value: Record<string | symbol, unknown>): value is KanbanDropData {
+  return (
+    (value.kind === "quadro-card" || value.kind === "quadro-column") &&
+    typeof value.columnId === "string" &&
+    typeof value.index === "number"
+  );
+}
+
+function getKanbanDestinationIndex(args: {
+  closestEdge: Edge | null;
+  sourceColumnId: string;
+  sourceIndex: number;
+  targetColumnId: string;
+  targetIndex: number;
+}) {
+  let destinationIndex = args.targetIndex;
+
+  if (args.closestEdge === "bottom") {
+    destinationIndex += 1;
+  }
+
+  if (args.sourceColumnId === args.targetColumnId && args.sourceIndex < destinationIndex) {
+    destinationIndex -= 1;
+  }
+
+  return Math.max(0, destinationIndex);
+}
+
+function areQuadroFiltersEqual(left: QuadroProducaoFilters, right: QuadroProducaoFilters) {
+  return (
+    left.arte === right.arte &&
+    left.busca === right.busca &&
+    left.insumo === right.insumo &&
+    left.semana === right.semana &&
+    left.tecido === right.tecido
+  );
 }
 
 function formatDateLong(value: string) {
@@ -95,12 +224,6 @@ function formatDateLong(value: string) {
     month: "long",
     year: "numeric",
   }).format(date);
-}
-
-function getNextInsumoStatus(current: InsumoStatus): InsumoStatus {
-  const currentIndex = INSUMO_STATUS_VALUES.indexOf(current);
-  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % INSUMO_STATUS_VALUES.length : 0;
-  return INSUMO_STATUS_VALUES[nextIndex] as InsumoStatus;
 }
 
 function cloneResult(result: QuadroProducaoResult) {
@@ -202,33 +325,6 @@ function applyOptimisticInsumoStatus(
   return next;
 }
 
-function applyOptimisticDelivered(result: QuadroProducaoResult, cardId: string) {
-  if (result.kind !== "ok") {
-    return result;
-  }
-
-  const next = cloneResult(result);
-
-  if (next.kind !== "ok") {
-    return result;
-  }
-
-  next.snapshot.columns.forEach((column) => {
-    const before = column.cards.length;
-    column.cards = column.cards.filter((card) => card.id !== cardId);
-    if (column.cards.length !== before) {
-      next.snapshot.totalVisible -= 1;
-    }
-    column.openCount = column.cards.length;
-    column.cards = column.cards.map((card, cardIndex) => ({
-      ...card,
-      kanbanOrder: cardIndex,
-    }));
-  });
-
-  return next;
-}
-
 function applyOptimisticColumnOrder(result: QuadroProducaoResult, columnIds: string[]) {
   if (result.kind !== "ok") {
     return result;
@@ -269,8 +365,40 @@ function getEmptyManualCardDraft(columnId: string): ManualCardDraft {
   };
 }
 
-export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProps) {
+function getColumnAccentStyle(orderIndex: number): CSSProperties {
+  const accents = [
+    {
+      accent: "var(--color-warning)",
+      accentSoft: "color-mix(in srgb, var(--color-warning) 16%, var(--color-surface))",
+    },
+    {
+      accent: "var(--color-primary)",
+      accentSoft: "color-mix(in srgb, var(--color-primary) 16%, var(--color-surface))",
+    },
+    {
+      accent: "var(--color-info)",
+      accentSoft: "color-mix(in srgb, var(--color-info) 16%, var(--color-surface))",
+    },
+    {
+      accent: "color-mix(in srgb, var(--color-warning) 64%, var(--color-danger))",
+      accentSoft: "color-mix(in srgb, var(--color-warning) 18%, var(--color-surface))",
+    },
+    {
+      accent: "var(--color-success)",
+      accentSoft: "color-mix(in srgb, var(--color-success) 16%, var(--color-surface))",
+    },
+  ] as const;
+  const entry = accents[((orderIndex % accents.length) + accents.length) % accents.length];
+
+  return {
+    "--quadro-column-accent": entry.accent,
+    "--quadro-column-accent-soft": entry.accentSoft,
+  } as CSSProperties;
+}
+
+export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroProducaoClientProps) {
   const [filters, setFilters] = useQueryStates(quadroProducaoSearchParamParsers);
+  const [searchDraft, setSearchDraft] = useState(filters.busca);
   const [isDesktopBoard, setIsDesktopBoard] = useState(false);
   const [createColumnOpen, setCreateColumnOpen] = useState(false);
   const [createColumnName, setCreateColumnName] = useState("");
@@ -279,7 +407,6 @@ export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProp
   const [createManualCardOpen, setCreateManualCardOpen] = useState(false);
   const [manualCardDraft, setManualCardDraft] = useState<ManualCardDraft>(() => getEmptyManualCardDraft(""));
   const [viewCard, setViewCard] = useState<KanbanCardSummary | null>(null);
-  const [deliverTarget, setDeliverTarget] = useState<KanbanCardSummary | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -294,8 +421,24 @@ export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProp
     };
   }, []);
 
+  useEffect(() => {
+    if (searchDraft === filters.busca) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void setFilters({ busca: searchDraft || null });
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [filters.busca, searchDraft, setFilters]);
+
+  const isInitialQuery = areQuadroFiltersEqual(filters, initialFilters);
   const boardQuery = useQuery({
-    initialData: initialResult,
+    initialData: isInitialQuery ? initialResult : undefined,
+    placeholderData: keepPreviousData,
     queryFn: () =>
       fetchQuadroProducao({
         arte: filters.arte,
@@ -330,9 +473,6 @@ export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProp
 
       return { previous, queryKey };
     },
-    onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["quadro-producao"] });
-    },
   });
 
   const insumoMutation = useMutation<{ ok: true }, Error, { cardId: string; insumoStatus: InsumoStatus }, MutationContext>({
@@ -350,29 +490,6 @@ export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProp
 
       if (previous) {
         queryClient.setQueryData(queryKey, applyOptimisticInsumoStatus(previous, input));
-      }
-
-      return { previous, queryKey };
-    },
-    onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["quadro-producao"] });
-    },
-  });
-
-  const deliverMutation = useMutation<{ ok: true }, Error, string, MutationContext>({
-    mutationFn: (cardId: string) => postKanbanCardEntregar(cardId),
-    onError: (_error, _variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(context.queryKey, context.previous);
-      }
-    },
-    onMutate: async (cardId) => {
-      const queryKey = ["quadro-producao", filters];
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<QuadroProducaoResult>(queryKey);
-
-      if (previous) {
-        queryClient.setQueryData(queryKey, applyOptimisticDelivered(previous, cardId));
       }
 
       return { previous, queryKey };
@@ -444,6 +561,7 @@ export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProp
   }
 
   function handleClearFilters() {
+    setSearchDraft("");
     void setFilters({
       arte: null,
       busca: null,
@@ -508,25 +626,6 @@ export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProp
     }));
   }
 
-  function handleDragEnd(result: DropResult) {
-    if (!result.destination || result.type !== "CARD") {
-      return;
-    }
-
-    const sourceColumnId = result.source.droppableId.replace("column:", "");
-    const destinationColumnId = result.destination.droppableId.replace("column:", "");
-
-    if (sourceColumnId === destinationColumnId && result.source.index === result.destination.index) {
-      return;
-    }
-
-    moveCardMutation.mutate({
-      cardId: result.draggableId.replace("card:", ""),
-      destinationColumnId,
-      destinationIndex: result.destination.index,
-    });
-  }
-
   if (currentResult.kind === "not-configured") {
     return (
       <section className="quadro-producao-view" aria-labelledby="quadro-producao-title">
@@ -578,10 +677,15 @@ export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProp
     );
   }
 
+  const viewCardColumnIndex = viewCard ? currentColumns.findIndex((column) => column.id === viewCard.kanbanColumnId) : -1;
+  const viewCardCurrentColumn = viewCardColumnIndex >= 0 ? currentColumns[viewCardColumnIndex] : null;
+  const viewCardNextColumn = viewCardColumnIndex >= 0 ? currentColumns[viewCardColumnIndex + 1] : null;
+  const viewCardImageUrl = viewCard ? getCloudinaryThumbnailUrl(viewCard.thumbUrl, 640, 360) : null;
+
   return (
     <>
-      <section className="quadro-producao-view" aria-labelledby="quadro-producao-title">
-        <header className="quadro-producao-view__header">
+      <section className="quadro-producao-view" aria-labelledby="quadro-producao-toolbar-title">
+        <header aria-hidden="true" className="quadro-producao-view__header" hidden>
           <div className="page-heading">
             <div className="page-heading__copy">
               <Badge tone="info">Operação visual</Badge>
@@ -601,7 +705,7 @@ export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProp
                 }}
                 type="button"
               >
-                <Rows3 aria-hidden="true" size={18} />
+                <Rows3 aria-hidden="true" size={16} />
                 Novo cartão
               </button>
               <button className="ui-button ui-button--primary" onClick={() => setCreateColumnOpen(true)} type="button">
@@ -614,38 +718,34 @@ export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProp
 
         <Card className="quadro-producao-toolbar-card">
           <div className="quadro-producao-toolbar">
+            <div className="quadro-producao-toolbar__title">
+              <div>
+                <h1 id="quadro-producao-toolbar-title" className="app-title quadro-producao-toolbar__heading">
+                  Quadro de Produção
+                </h1>
+                <p className="quadro-producao-toolbar__summary">Painel operacional das fichas em aberto.</p>
+              </div>
+              <Badge tone="info">{formatCount(currentResult.snapshot.totalVisible)} em aberto</Badge>
+            </div>
+
             <label className="quadro-producao-field quadro-producao-field--search">
-              <span>Buscar</span>
+              <span>Busca</span>
               <div className="quadro-producao-search-wrap">
                 <Filter aria-hidden="true" size={16} />
                 <input
+                  aria-label="Buscar no quadro"
                   className="quadro-producao-input"
-                  onChange={(event) => void setFilters({ busca: event.target.value || null })}
+                  onChange={(event) => setSearchDraft(event.target.value)}
                   placeholder="Cliente, venda, tecido, arte..."
-                  value={filters.busca}
+                  value={searchDraft}
                 />
               </div>
             </label>
 
             <label className="quadro-producao-field">
-              <span>Tecido</span>
+              <span>Personalização</span>
               <select
-                className="quadro-producao-select"
-                onChange={(event) => void setFilters({ tecido: event.target.value || null })}
-                value={filters.tecido}
-              >
-                <option value="">Todos</option>
-                {currentResult.snapshot.filterOptions.tecidos.map((tecido) => (
-                  <option key={tecido} value={tecido}>
-                    {tecido}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="quadro-producao-field">
-              <span>Arte</span>
-              <select
+                aria-label="Filtrar por arte"
                 className="quadro-producao-select"
                 onChange={(event) => void setFilters({ arte: event.target.value || null })}
                 value={filters.arte}
@@ -660,8 +760,9 @@ export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProp
             </label>
 
             <label className="quadro-producao-field">
-              <span>Pendencia</span>
+              <span>Status da ficha</span>
               <select
+                aria-label="Filtrar por status da ficha"
                 className="quadro-producao-select"
                 onChange={(event) => void setFilters({ insumo: event.target.value || null })}
                 value={filters.insumo}
@@ -676,93 +777,139 @@ export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProp
             </label>
 
             <div className="quadro-producao-toolbar-actions">
-              <button
-                aria-pressed={filters.semana}
-                className={`quadro-producao-week-toggle${filters.semana ? " is-active" : ""}`}
-                onClick={() => void setFilters({ semana: filters.semana ? null : true })}
-                type="button"
-              >
-                <CalendarDays aria-hidden="true" size={16} />
-                Para essa semana
-              </button>
-              <Badge tone="info">{formatCount(currentResult.snapshot.totalVisible)} em aberto</Badge>
-              <button className="ui-button ui-button--ghost" onClick={handleClearFilters} type="button">
-                Limpar filtros
-              </button>
-              <button className="ui-button ui-button--secondary" onClick={handleRefresh} type="button">
-                <RefreshCw
-                  aria-hidden="true"
-                  className={boardQuery.isFetching ? "quadro-producao-spin" : undefined}
-                  size={16}
-                />
-                Atualizar
-              </button>
+              <Tooltip label="Mostrar apenas fichas com entrega nesta semana">
+                <button
+                  aria-pressed={filters.semana}
+                  className={`ui-button ui-button--secondary quadro-producao-week-toggle${filters.semana ? " is-active" : ""}`}
+                  onClick={() => void setFilters({ semana: filters.semana ? null : true })}
+                  type="button"
+                >
+                  <CalendarDays aria-hidden="true" size={16} />
+                  Para essa semana
+                </button>
+              </Tooltip>
+              <Tooltip label="Remover todos os filtros do quadro">
+                <button className="ui-button ui-button--ghost" onClick={handleClearFilters} type="button">
+                  Limpar filtros
+                </button>
+              </Tooltip>
+              <Tooltip label="Recarregar dados do quadro">
+                <button className="ui-button ui-button--secondary" onClick={handleRefresh} type="button">
+                  <RefreshCw
+                    aria-hidden="true"
+                    className={boardQuery.isFetching ? "quadro-producao-spin" : undefined}
+                    size={16}
+                  />
+                  Atualizar
+                </button>
+              </Tooltip>
+              <Tooltip label="Criar um cartão manual no quadro">
+                <button
+                  className="ui-button ui-button--secondary quadro-producao-toolbar-actions__new-card"
+                  onClick={() => {
+                    setManualCardDraft(getEmptyManualCardDraft(defaultColumnId));
+                    setCreateManualCardOpen(true);
+                  }}
+                  type="button"
+                >
+                  <Rows3 aria-hidden="true" size={16} />
+                  Novo cartão
+                </button>
+              </Tooltip>
+              <Tooltip label="Criar nova coluna no quadro">
+                <button
+                  className="ui-button ui-button--ghost quadro-producao-toolbar-actions__quiet"
+                  onClick={() => setCreateColumnOpen(true)}
+                  type="button"
+                >
+                  <Plus aria-hidden="true" size={16} />
+                  Coluna
+                </button>
+              </Tooltip>
             </div>
           </div>
         </Card>
 
-        <DragDropContext onDragEnd={handleDragEnd}>
-          {isDesktopBoard ? (
-            <Group
-              className="quadro-producao-panels"
-              defaultLayout={Object.fromEntries(
-                currentColumns.map((column) => [column.id, 100 / Math.max(currentColumns.length, 1)]),
-              )}
-              id="quadro-producao-layout"
-              orientation="horizontal"
-            >
+        {isDesktopBoard ? (
+          <Group
+            className="quadro-producao-panels"
+            defaultLayout={Object.fromEntries(
+              currentColumns.map((column) => [column.id, 100 / Math.max(currentColumns.length, 1)]),
+            )}
+            id="quadro-producao-layout"
+            orientation="horizontal"
+          >
+            {currentColumns.map((column, index) => (
+              <FragmentColumnPanel
+                column={column}
+                currentColumns={currentColumns}
+                index={index}
+                insumoMutationPending={insumoMutation.isPending}
+                key={column.id}
+                onChangeInsumo={(card, insumoStatus) =>
+                  insumoMutation.mutate({
+                    cardId: card.id,
+                    insumoStatus,
+                  })
+                }
+                onMoveCard={(move) => moveCardMutation.mutate(move)}
+                onMoveNextCard={(card) => {
+                  const nextColumn = currentColumns[index + 1];
+                  if (!nextColumn) {
+                    return;
+                  }
+
+                  moveCardMutation.mutate({
+                    cardId: card.id,
+                    destinationColumnId: nextColumn.id,
+                    destinationIndex: nextColumn.openCount,
+                  });
+                }}
+                onOpenRename={handleOpenRenameModal}
+                onOpenView={setViewCard}
+                onShiftColumn={handleColumnShift}
+                onSortByDate={(columnId) => sortColumnMutation.mutate(columnId)}
+              />
+            ))}
+          </Group>
+        ) : (
+          <div className="quadro-producao-board-scroll">
+            <div className="quadro-producao-board">
               {currentColumns.map((column, index) => (
-                <FragmentColumnPanel
+                <ColumnSurface
                   column={column}
                   currentColumns={currentColumns}
-                  deliverMutationPending={deliverMutation.isPending}
                   index={index}
                   insumoMutationPending={insumoMutation.isPending}
                   key={column.id}
-                  moveCardMutationPending={moveCardMutation.isPending}
-                  onCycleInsumo={(card) =>
+                  onChangeInsumo={(card, insumoStatus) =>
                     insumoMutation.mutate({
                       cardId: card.id,
-                      insumoStatus: getNextInsumoStatus(card.insumoStatus),
+                      insumoStatus,
                     })
                   }
-                  onOpenDeliver={setDeliverTarget}
+                  onMoveCard={(move) => moveCardMutation.mutate(move)}
+                  onMoveNextCard={(card) => {
+                    const nextColumn = currentColumns[index + 1];
+                    if (!nextColumn) {
+                      return;
+                    }
+
+                    moveCardMutation.mutate({
+                      cardId: card.id,
+                      destinationColumnId: nextColumn.id,
+                      destinationIndex: nextColumn.openCount,
+                    });
+                  }}
                   onOpenRename={handleOpenRenameModal}
                   onOpenView={setViewCard}
                   onShiftColumn={handleColumnShift}
                   onSortByDate={(columnId) => sortColumnMutation.mutate(columnId)}
                 />
               ))}
-            </Group>
-          ) : (
-            <div className="quadro-producao-board-scroll">
-              <div className="quadro-producao-board">
-                {currentColumns.map((column, index) => (
-                  <ColumnSurface
-                    column={column}
-                    currentColumns={currentColumns}
-                    deliverMutationPending={deliverMutation.isPending}
-                    index={index}
-                    insumoMutationPending={insumoMutation.isPending}
-                    key={column.id}
-                    moveCardMutationPending={moveCardMutation.isPending}
-                    onCycleInsumo={(card) =>
-                      insumoMutation.mutate({
-                        cardId: card.id,
-                        insumoStatus: getNextInsumoStatus(card.insumoStatus),
-                      })
-                    }
-                    onOpenDeliver={setDeliverTarget}
-                    onOpenRename={handleOpenRenameModal}
-                    onOpenView={setViewCard}
-                    onShiftColumn={handleColumnShift}
-                    onSortByDate={(columnId) => sortColumnMutation.mutate(columnId)}
-                  />
-                ))}
-              </div>
             </div>
-          )}
-        </DragDropContext>
+          </div>
+        )}
       </section>
 
       {createColumnOpen ? (
@@ -911,7 +1058,7 @@ export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProp
               </label>
 
               <label className="quadro-producao-field">
-                <span>Insumos</span>
+                <span>Status da ficha</span>
                 <select
                   className="quadro-producao-select"
                   onChange={(event) => handleManualDraftChange("insumoStatus", event.target.value as InsumoStatus)}
@@ -950,94 +1097,110 @@ export function QuadroProducaoClient({ initialResult }: QuadroProducaoClientProp
       {viewCard ? (
         <Modal onClose={() => setViewCard(null)} size="md" title="Detalhes do cartão">
           <section className="quadro-producao-view-modal">
-            <header className="quadro-producao-view-modal__header">
-              <div>
-                <Badge tone={viewCard.isManualCard ? "warning" : "info"}>
-                  {viewCard.isManualCard ? "Cartão manual" : "Ficha real"}
-                </Badge>
-                <h2>{viewCard.clienteNome}</h2>
-              </div>
-              <div className="quadro-producao-view-modal__tags">
-                <Badge tone="neutral">{formatDateLong(viewCard.dataEntrega)}</Badge>
-                <Badge tone="neutral">{INSUMO_STATUS_LABELS[viewCard.insumoStatus]}</Badge>
-                {viewCard.evento ? <Badge tone="info">Evento</Badge> : null}
-              </div>
-            </header>
-
-            <dl className="quadro-producao-view-grid">
-              <div>
-                <dt>Arte</dt>
-                <dd>{normalizePersonalizacaoLabel(viewCard.arte)}</dd>
-              </div>
-              <div>
-                <dt>Tecido</dt>
-                <dd>{viewCard.material || "Não informado"}</dd>
-              </div>
-              <div>
-                <dt>Venda</dt>
-                <dd>{viewCard.numeroVenda || "Sem número"}</dd>
-              </div>
-              <div>
-                <dt>Responsável</dt>
-                <dd>{viewCard.vendedor || "Sem responsável"}</dd>
-              </div>
-            </dl>
-
-            <div className="quadro-producao-view-modal__notes">
-              <h3>Observações</h3>
-              <p>{viewCard.observacoes || "Sem observações registradas."}</p>
+            <div className="quadro-producao-view-modal__media">
+              {viewCardImageUrl ? (
+                <Image
+                  alt={`Imagem da ficha de ${viewCard.clienteNome}`}
+                  className="quadro-producao-view-modal__image"
+                  height={360}
+                  src={viewCardImageUrl}
+                  width={640}
+                />
+              ) : (
+                <div className="quadro-producao-view-modal__image-placeholder">
+                  Sem imagem
+                </div>
+              )}
             </div>
 
-            {!viewCard.isManualCard ? (
-              <div className="confirm-dialog__actions">
-                <Link className="ui-button ui-button--secondary" href={`/fichas?print=${encodeURIComponent(viewCard.id)}`} scroll={false}>
-                  Abrir prévia
-                </Link>
-                <Link className="ui-button ui-button--primary" href={`/fichas/${encodeURIComponent(viewCard.id)}`}>
-                  Abrir ficha completa
-                </Link>
+            <div className="quadro-producao-view-modal__content">
+              <header className="quadro-producao-view-modal__header">
+                <div>
+                  <h2>{viewCard.clienteNome}</h2>
+                </div>
+                <div className="quadro-producao-view-modal__tags">
+                  <Badge tone="neutral">{viewCardCurrentColumn?.name ?? "Sem coluna"}</Badge>
+                  <Badge tone="neutral">{formatDateLong(viewCard.dataEntrega)}</Badge>
+                  {viewCard.evento ? <Badge tone="info">Evento</Badge> : null}
+                </div>
+              </header>
+
+              <dl className="quadro-producao-view-grid">
+                <div>
+                  <dt>Arte</dt>
+                  <dd>{normalizePersonalizacaoLabel(viewCard.arte)}</dd>
+                </div>
+                <div>
+                  <dt>Tecido</dt>
+                  <dd>{viewCard.material || "Não informado"}</dd>
+                </div>
+                <div>
+                  <dt>Venda</dt>
+                  <dd>{viewCard.numeroVenda || "Sem número"}</dd>
+                </div>
+                <div>
+                  <dt>Responsável</dt>
+                  <dd>{viewCard.vendedor || "Sem responsável"}</dd>
+                </div>
+              </dl>
+
+              <div className="quadro-producao-view-modal__actions">
+                <label className="quadro-producao-view-modal__status quadro-producao-status-chip" data-status={viewCard.insumoStatus}>
+                  <span>Status da ficha</span>
+                  <select
+                    aria-label={`Status da ficha de ${viewCard.clienteNome}`}
+                    disabled={insumoMutation.isPending}
+                    onChange={(event) => {
+                      const insumoStatus = event.target.value as InsumoStatus;
+                      setViewCard((current) => (current ? { ...current, insumoStatus } : current));
+                      insumoMutation.mutate({
+                        cardId: viewCard.id,
+                        insumoStatus,
+                      });
+                    }}
+                    value={viewCard.insumoStatus}
+                  >
+                    {INSUMO_STATUS_VALUES.map((value) => (
+                      <option key={value} value={value}>
+                        {INSUMO_STATUS_LABELS[value as InsumoStatus]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <Tooltip label={viewCardNextColumn ? `Mover para ${viewCardNextColumn.name}` : "Este cartão já está na última coluna"}>
+                  <button
+                    aria-label={viewCardNextColumn ? `Mover ${viewCard.clienteNome} para ${viewCardNextColumn.name}` : "Cartão já está na última coluna"}
+                    className="ui-button ui-button--primary quadro-producao-view-modal__move"
+                    disabled={!viewCardNextColumn || moveCardMutation.isPending}
+                    onClick={() => {
+                      if (!viewCardNextColumn) {
+                        return;
+                      }
+
+                      moveCardMutation.mutate({
+                        cardId: viewCard.id,
+                        destinationColumnId: viewCardNextColumn.id,
+                        destinationIndex: viewCardNextColumn.openCount,
+                      });
+                      setViewCard({
+                        ...viewCard,
+                        kanbanColumnId: viewCardNextColumn.id,
+                        kanbanOrder: viewCardNextColumn.openCount,
+                      });
+                    }}
+                    type="button"
+                  >
+                    <ArrowRight aria-hidden="true" size={16} />
+                    {viewCardNextColumn ? "Mover para próxima etapa" : "Última coluna"}
+                  </button>
+                </Tooltip>
               </div>
-            ) : null}
+            </div>
           </section>
         </Modal>
       ) : null}
 
-      {deliverTarget ? (
-        <AlertDialog onClose={() => setDeliverTarget(null)} size="sm" title="Marcar como entregue">
-          <section className="confirm-dialog" aria-describedby="quadro-producao-deliver-description">
-            <header className="confirm-dialog__header">
-              <div>
-                <span className="confirm-dialog__eyebrow">Confirmação necessária</span>
-                <h2>Marcar como entregue</h2>
-              </div>
-            </header>
-
-            <p id="quadro-producao-deliver-description">
-              O cartão <strong>{deliverTarget.clienteNome}</strong> sairá do quadro de produção em aberto após a confirmação.
-            </p>
-
-            <div className="confirm-dialog__actions">
-              <AlertDialogCancel asChild>
-                <button className="ui-button ui-button--ghost" type="button">
-                  Cancelar
-                </button>
-              </AlertDialogCancel>
-              <AlertDialogAction asChild>
-                <button
-                  className="ui-button ui-button--primary"
-                  onClick={() => {
-                    deliverMutation.mutate(deliverTarget.id);
-                    setDeliverTarget(null);
-                  }}
-                  type="button"
-                >
-                  Confirmar entrega
-                </button>
-              </AlertDialogAction>
-            </div>
-          </section>
-        </AlertDialog>
-      ) : null}
     </>
   );
 }
@@ -1049,7 +1212,7 @@ function FragmentColumnPanel(props: ColumnSurfaceProps) {
         className="quadro-producao-panel"
         defaultSize={100 / Math.max(props.currentColumns.length, 1)}
         id={props.column.id}
-        minSize={18}
+        minSize={Math.min(20, 100 / Math.max(props.currentColumns.length, 1))}
       >
         <ColumnSurface {...props} />
       </Panel>
@@ -1058,46 +1221,356 @@ function FragmentColumnPanel(props: ColumnSurfaceProps) {
   );
 }
 
+type KanbanMove = {
+  cardId: string;
+  destinationColumnId: string;
+  destinationIndex: number;
+};
+
+type KanbanActiveShadow =
+  | {
+      cardId: string;
+      columnId: string;
+      edge: Edge | null;
+      height: number;
+      index: number;
+      target: "card";
+    }
+  | {
+      height: number;
+      target: "column";
+    };
+
+type KanbanColumnListProps = {
+  activeShadow: KanbanActiveShadow | null;
+  children: React.ReactNode;
+  column: KanbanBoardColumn;
+  onShadowChange: (shadow: KanbanActiveShadow | null) => void;
+  onMoveCard: (move: KanbanMove) => void;
+};
+
+function KanbanColumnList({ activeShadow, children, column, onMoveCard, onShadowChange }: KanbanColumnListProps) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const activeShadowRef = useRef<KanbanActiveShadow | null>(activeShadow);
+  const [isOver, setIsOver] = useState(false);
+
+  useEffect(() => {
+    activeShadowRef.current = activeShadow;
+  }, [activeShadow]);
+
+  useEffect(() => {
+    const element = listRef.current;
+    if (!element) {
+      return;
+    }
+
+    const data: KanbanColumnTargetData = {
+      columnId: column.id,
+      index: column.cards.length,
+      kind: "quadro-column",
+      targetKind: "column",
+    };
+
+    return combine(
+      dropTargetForElements({
+        element,
+        canDrop: ({ source }) => isKanbanDragData(source.data),
+        getData: () => data,
+        onDrag: ({ location, self, source }) => {
+          if (location.current.dropTargets[0]?.data === self.data) {
+            setIsOver(true);
+            if (activeShadowRef.current?.target !== "card" && isKanbanDragData(source.data) && source.data.height) {
+              onShadowChange({ height: source.data.height, target: "column" });
+            }
+          } else {
+            setIsOver(false);
+          }
+        },
+        onDragEnter: ({ location, self, source }) => {
+          if (location.current.dropTargets[0]?.data === self.data) {
+            setIsOver(true);
+            if (activeShadowRef.current?.target !== "card" && isKanbanDragData(source.data) && source.data.height) {
+              onShadowChange({ height: source.data.height, target: "column" });
+            }
+          }
+        },
+        onDragLeave: () => {
+          setIsOver(false);
+          onShadowChange(null);
+        },
+        onDrop: ({ location, self, source }) => {
+          setIsOver(false);
+
+          if (location.current.dropTargets[0]?.data !== self.data || !isKanbanDragData(source.data)) {
+            onShadowChange(null);
+            return;
+          }
+
+          const shadow = activeShadowRef.current;
+          const destinationIndex =
+            shadow?.target === "card"
+              ? getKanbanDestinationIndex({
+                  closestEdge: shadow.edge,
+                  sourceColumnId: source.data.columnId,
+                  sourceIndex: source.data.index,
+                  targetColumnId: shadow.columnId,
+                  targetIndex: shadow.index,
+                })
+              : source.data.columnId === column.id && source.data.index < column.cards.length
+                ? column.cards.length - 1
+                : column.cards.length;
+
+          onShadowChange(null);
+
+          if (source.data.columnId === column.id && source.data.index === destinationIndex) {
+            return;
+          }
+
+          onMoveCard({
+            cardId: source.data.cardId,
+            destinationColumnId: column.id,
+            destinationIndex,
+          });
+        },
+      }),
+      autoScrollForElements({
+        element,
+        canScroll: ({ source }) => isKanbanDragData(source.data),
+      }),
+    );
+  }, [column.cards.length, column.id, onMoveCard, onShadowChange]);
+
+  return (
+    <div className="quadro-producao-column__list" data-over={isOver ? "true" : "false"} ref={listRef}>
+      {children}
+      {activeShadow?.target === "column" ? (
+        <div aria-hidden="true" className="quadro-producao-card-shadow" style={{ minHeight: activeShadow.height }} />
+      ) : null}
+    </div>
+  );
+}
+
+type KanbanSortableCardProps = {
+  card: KanbanCardSummary;
+  children: (args: {
+    isDragging: boolean;
+    isOver: boolean;
+    setElementRef: (node: HTMLElement | null) => void;
+  }) => React.ReactNode;
+  columnId: string;
+  index: number;
+  onShadowChange: (shadow: KanbanActiveShadow | null) => void;
+  onMoveCard: (move: KanbanMove) => void;
+};
+
+function KanbanSortableCard({ card, children, columnId, index, onMoveCard, onShadowChange }: KanbanSortableCardProps) {
+  const [element, setElement] = useState<HTMLElement | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isOver, setIsOver] = useState(false);
+
+  useEffect(() => {
+    if (!element) {
+      return;
+    }
+    const currentElement = element;
+
+    const data: KanbanCardTargetData = {
+      cardId: card.id,
+      columnId,
+      index,
+      kind: "quadro-card",
+      targetKind: "card",
+    };
+
+    function updateShadow(selfData: Record<string | symbol, unknown>, sourceData: Record<string | symbol, unknown>) {
+      const edge = extractClosestEdge(selfData);
+      const height = isKanbanDragData(sourceData) && sourceData.height ? sourceData.height : currentElement.getBoundingClientRect().height;
+      setIsOver(true);
+      onShadowChange({ cardId: card.id, columnId, edge, height, index, target: "card" });
+    }
+
+    return combine(
+      draggable({
+        element,
+        getInitialData: () => ({
+          ...data,
+          height: currentElement.getBoundingClientRect().height,
+        }),
+        onDragStart: () => setIsDragging(true),
+        onDrop: () => setIsDragging(false),
+      }),
+      dropTargetForElements({
+        element,
+        canDrop: ({ source }) => isKanbanDragData(source.data) && source.data.cardId !== card.id,
+        getData: ({ input, element }) =>
+          attachClosestEdge(data, {
+            allowedEdges: ["top", "bottom"],
+            element,
+            input,
+          }),
+        onDrag: ({ self, source }) => updateShadow(self.data, source.data),
+        onDragEnter: ({ self, source }) => updateShadow(self.data, source.data),
+        onDragLeave: () => setIsOver(false),
+        onDrop: ({ self, source }) => {
+          setIsOver(false);
+          onShadowChange(null);
+
+          if (!isKanbanDragData(source.data) || !isKanbanDropData(self.data) || self.data.targetKind !== "card") {
+            return;
+          }
+
+          const destinationIndex = getKanbanDestinationIndex({
+            closestEdge: extractClosestEdge(self.data),
+            sourceColumnId: source.data.columnId,
+            sourceIndex: source.data.index,
+            targetColumnId: columnId,
+            targetIndex: index,
+          });
+
+          if (source.data.columnId === columnId && source.data.index === destinationIndex) {
+            return;
+          }
+
+          onMoveCard({
+            cardId: source.data.cardId,
+            destinationColumnId: columnId,
+            destinationIndex,
+          });
+        },
+      }),
+    );
+  }, [card.id, columnId, element, index, onMoveCard, onShadowChange]);
+
+  return <>{children({ isDragging, isOver, setElementRef: setElement })}</>;
+}
+
 type ColumnSurfaceProps = {
   column: KanbanBoardColumn;
   currentColumns: KanbanBoardColumn[];
-  deliverMutationPending: boolean;
   index: number;
   insumoMutationPending: boolean;
-  moveCardMutationPending: boolean;
-  onCycleInsumo: (card: KanbanCardSummary) => void;
-  onOpenDeliver: (card: KanbanCardSummary) => void;
+  onChangeInsumo: (card: KanbanCardSummary, insumoStatus: InsumoStatus) => void;
+  onMoveCard: (move: { cardId: string; destinationColumnId: string; destinationIndex: number }) => void;
+  onMoveNextCard: (card: KanbanCardSummary) => void;
   onOpenRename: (column: KanbanBoardColumn) => void;
   onOpenView: (card: KanbanCardSummary) => void;
   onShiftColumn: (columnId: string, direction: "left" | "right") => void;
   onSortByDate: (columnId: string) => void;
 };
 
+type CardImagePreviewButtonProps = {
+  card: KanbanCardSummary;
+  onOpenView: (card: KanbanCardSummary) => void;
+};
+
+function CardImagePreviewButton({ card, onOpenView }: CardImagePreviewButtonProps) {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState<CSSProperties | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const thumbnailUrl = getCloudinaryThumbnailUrl(card.thumbUrl);
+
+  const updatePointerPosition = useCallback((clientX: number, clientY: number) => {
+    const preview = previewRef.current;
+    const previewWidth = preview?.offsetWidth ?? 252;
+    const previewHeight = preview?.offsetHeight ?? 150;
+    const viewportPadding = 8;
+    const pointerOffset = 16;
+    const maxLeft = window.innerWidth - previewWidth - viewportPadding;
+    const maxTop = window.innerHeight - previewHeight - viewportPadding;
+    const left = Math.min(clientX + pointerOffset, maxLeft);
+    const top = Math.min(clientY + pointerOffset, maxTop);
+
+    setPosition({
+      left: Math.max(viewportPadding, left),
+      top: Math.max(viewportPadding, top),
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open || position) {
+      return;
+    }
+
+    const trigger = triggerRef.current;
+
+    if (!trigger) {
+      return;
+    }
+
+    const triggerRect = trigger.getBoundingClientRect();
+    updatePointerPosition(triggerRect.right, triggerRect.bottom);
+  }, [open, position, updatePointerPosition]);
+
+  return (
+    <>
+      <button
+        aria-label={`Abrir detalhes de ${card.clienteNome}`}
+        className="quadro-producao-icon-button quadro-producao-image-preview-trigger"
+        onBlur={() => {
+          setOpen(false);
+          setPosition(null);
+        }}
+        onClick={() => onOpenView(card)}
+        onFocus={() => setOpen(true)}
+        onPointerEnter={(event) => {
+          setOpen(true);
+          updatePointerPosition(event.clientX, event.clientY);
+        }}
+        onPointerLeave={() => {
+          setOpen(false);
+          setPosition(null);
+        }}
+        onPointerMove={(event) => updatePointerPosition(event.clientX, event.clientY)}
+        ref={triggerRef}
+        type="button"
+      >
+        <Eye aria-hidden="true" size={16} />
+      </button>
+      {typeof document !== "undefined" && open && thumbnailUrl
+        ? createPortal(
+            <div
+              className="quadro-producao-image-preview"
+              ref={previewRef}
+              role="tooltip"
+              style={position ?? undefined}
+            >
+              <Image alt="" height={180} src={thumbnailUrl} width={320} />
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
 function ColumnSurface({
   column,
   currentColumns,
-  deliverMutationPending,
   index,
   insumoMutationPending,
-  moveCardMutationPending,
-  onCycleInsumo,
-  onOpenDeliver,
+  onChangeInsumo,
+  onMoveCard,
+  onMoveNextCard,
   onOpenRename,
   onOpenView,
   onShiftColumn,
   onSortByDate,
 }: ColumnSurfaceProps) {
+  const [activeShadow, setActiveShadow] = useState<KanbanActiveShadow | null>(null);
+
   return (
-    <section className="quadro-producao-column">
+    <section className="quadro-producao-column" style={getColumnAccentStyle(column.order_index)}>
       <header className="quadro-producao-column__header">
-        <div className="quadro-producao-column__heading">
-          <GripVertical aria-hidden="true" className="quadro-producao-column__grip" size={14} />
-          <h2>{column.name}</h2>
+        <div className="quadro-producao-column__topline">
+          <div className="quadro-producao-column__heading">
+            <GripVertical aria-hidden="true" className="quadro-producao-column__grip" size={14} />
+            <h2>{column.name}</h2>
+          </div>
+          <Badge tone="neutral">{formatCount(column.openCount)}</Badge>
         </div>
 
-        <div className="quadro-producao-column__meta">
-          <Badge tone="neutral">{formatCount(column.openCount)}</Badge>
-          <div className="quadro-producao-column__actions">
+        <div className="quadro-producao-column__actions">
             <Tooltip label="Mover coluna para a esquerda">
               <button
                 aria-label="Mover coluna para a esquerda"
@@ -1140,100 +1613,111 @@ function ColumnSurface({
                 <Pencil aria-hidden="true" size={16} />
               </button>
             </Tooltip>
-          </div>
         </div>
       </header>
 
-      <Droppable droppableId={`column:${column.id}`} type="CARD">
-        {(provided, snapshot) => (
-          <div
-            {...provided.droppableProps}
-            className={`quadro-producao-column__list${snapshot.isDraggingOver ? " is-drag-over" : ""}`}
-            ref={provided.innerRef}
+      <KanbanColumnList activeShadow={activeShadow} column={column} onMoveCard={onMoveCard} onShadowChange={setActiveShadow}>
+        {column.cards.length === 0 ? <div className="quadro-producao-empty-column">Nenhum cartão nesta etapa.</div> : null}
+        {column.cards.map((card, cardIndex) => (
+          <KanbanSortableCard
+            card={card}
+            columnId={column.id}
+            index={cardIndex}
+            key={card.id}
+            onMoveCard={onMoveCard}
+            onShadowChange={setActiveShadow}
           >
-            {column.cards.length === 0 ? <div className="quadro-producao-empty-column">Nenhum cartão nesta etapa.</div> : null}
-            {column.cards.map((card, cardIndex) => (
-              <Draggable draggableId={`card:${card.id}`} index={cardIndex} key={card.id}>
-                {(dragProvided, dragSnapshot) => (
-                  <article
-                    className={`quadro-producao-card${dragSnapshot.isDragging ? " is-dragging" : ""}`}
-                    ref={dragProvided.innerRef}
-                    {...dragProvided.draggableProps}
-                    {...dragProvided.dragHandleProps}
-                  >
-                    <div className="quadro-producao-card__body">
-                      <div className="quadro-producao-card__top">
-                        <div className="quadro-producao-card__identity">
-                          <div className="quadro-producao-card__eyebrow">
-                            <span>{card.numeroVenda ? `Venda ${card.numeroVenda}` : card.isManualCard ? "Cartao manual" : "Sem venda"}</span>
-                            <span>Entrega {formatDate(card.dataEntrega)}</span>
-                          </div>
-                          <button
-                            aria-label={`Abrir detalhes de ${card.clienteNome}`}
-                            className="quadro-producao-card__title"
-                            onClick={() => onOpenView(card)}
-                            type="button"
-                          >
-                            {card.clienteNome}
-                          </button>
-                        </div>
-                      </div>
+            {({ isDragging, isOver, setElementRef }) => {
+              const deliveryUrgency = getDeliveryUrgency(card);
 
-                      <div className="quadro-producao-card__chips">
-                        <Badge tone="neutral">{normalizePersonalizacaoLabel(card.arte)}</Badge>
-                        {card.material ? <Badge tone="neutral">{card.material}</Badge> : null}
-                        {card.evento ? <Badge tone="info">Evento</Badge> : null}
-                        {card.insumoStatus !== "tudo_ok" ? (
-                          <Badge tone="warning">{INSUMO_STATUS_LABELS[card.insumoStatus]}</Badge>
+              return (
+              <>
+                {activeShadow?.target === "card" && activeShadow.cardId === card.id && activeShadow.edge === "top" ? (
+                  <div aria-hidden="true" className="quadro-producao-card-shadow" style={{ minHeight: activeShadow.height }} />
+                ) : null}
+                <article
+                  className={`quadro-producao-card${isDragging ? " is-dragging" : ""}`}
+                  data-over={isOver ? "true" : "false"}
+                  ref={setElementRef}
+                >
+                <div className="quadro-producao-card__body">
+                  <div className="quadro-producao-card__identity">
+                    <Tooltip label="Abrir detalhes do cartão">
+                      <button
+                        aria-label={`Abrir detalhes de ${card.clienteNome}`}
+                        className="quadro-producao-card__title"
+                        onClick={() => onOpenView(card)}
+                        type="button"
+                      >
+                        {card.evento ? (
+                          <span aria-label="Pedido de evento" className="quadro-producao-card__event-chip" role="img">
+                            <Star aria-hidden="true" size={11} />
+                          </span>
                         ) : null}
-                      </div>
+                        <span className="quadro-producao-card__title-text">{card.clienteNome}</span>
+                      </button>
+                    </Tooltip>
+                  </div>
 
-                      <div className="quadro-producao-card__footer">
-                        <div className="quadro-producao-card__actions">
-                          <Tooltip label="Abrir detalhes do cartao">
-                            <button
-                              aria-label={`Abrir detalhes de ${card.clienteNome}`}
-                              className="quadro-producao-icon-button"
-                              onClick={() => onOpenView(card)}
-                              type="button"
-                            >
-                              <Eye aria-hidden="true" size={16} />
-                            </button>
-                          </Tooltip>
-                          <Tooltip label="Alterar pendencia de material">
-                            <button
-                              aria-label={`Atualizar pendencia de material de ${card.clienteNome}`}
-                              className="quadro-producao-icon-button"
-                              disabled={insumoMutationPending}
-                              onClick={() => onCycleInsumo(card)}
-                              type="button"
-                            >
-                              <PackageCheck aria-hidden="true" size={16} />
-                            </button>
-                          </Tooltip>
-                          <Tooltip label="Marcar cartao como entregue">
-                            <button
-                              aria-label={`Marcar ${card.clienteNome} como entregue`}
-                              className="quadro-producao-icon-button quadro-producao-icon-button--success"
-                              disabled={deliverMutationPending}
-                              onClick={() => onOpenDeliver(card)}
-                              type="button"
-                            >
-                              <CheckCheck aria-hidden="true" size={16} />
-                            </button>
-                          </Tooltip>
-                        </div>
-                      </div>
+                  <div className="quadro-producao-card__meta">
+                    <span className="quadro-producao-card__chip">{normalizePersonalizacaoLabel(card.arte)}</span>
+                    <label className="quadro-producao-status-chip" data-status={card.insumoStatus}>
+                      <span className="sr-only">Status da ficha de {card.clienteNome}</span>
+                      <select
+                        aria-label={`Status da ficha de ${card.clienteNome}`}
+                        disabled={insumoMutationPending}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => onChangeInsumo(card, event.target.value as InsumoStatus)}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        value={card.insumoStatus}
+                      >
+                        {INSUMO_STATUS_VALUES.map((value) => (
+                          <option key={value} value={value}>
+                            {INSUMO_STATUS_LABELS[value as InsumoStatus]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="quadro-producao-card__delivery" data-urgency={deliveryUrgency}>
+                    <CalendarDays aria-hidden="true" size={13} />
+                    <span
+                      aria-label={getDeliveryUrgencyLabel(deliveryUrgency)}
+                      className="quadro-producao-card__delivery-dot"
+                      role="img"
+                    />
+                    <span>Entrega {formatDate(card.dataEntrega)}</span>
+                  </div>
+
+                  <div className="quadro-producao-card__footer">
+                    <div className="quadro-producao-card__actions">
+                      <CardImagePreviewButton card={card} onOpenView={onOpenView} />
+                      <Tooltip label="Mover para a próxima coluna">
+                        <button
+                          aria-label={`Mover ${card.clienteNome} para a próxima coluna`}
+                          className="quadro-producao-icon-button quadro-producao-icon-button--success"
+                          disabled={index === currentColumns.length - 1}
+                          onClick={() => onMoveNextCard(card)}
+                          type="button"
+                        >
+                          <ArrowRight aria-hidden="true" size={16} />
+                        </button>
+                      </Tooltip>
                     </div>
-                  </article>
-                )}
-              </Draggable>
-            ))}
-            {provided.placeholder}
-            {moveCardMutationPending ? <div className="quadro-producao-column__pending">Sincronizando movimento...</div> : null}
-          </div>
-        )}
-      </Droppable>
+                  </div>
+                </div>
+                </article>
+                {activeShadow?.target === "card" && activeShadow.cardId === card.id && activeShadow.edge === "bottom" ? (
+                  <div aria-hidden="true" className="quadro-producao-card-shadow" style={{ minHeight: activeShadow.height }} />
+                ) : null}
+              </>
+              );
+            }}
+          </KanbanSortableCard>
+        ))}
+      </KanbanColumnList>
     </section>
   );
 }

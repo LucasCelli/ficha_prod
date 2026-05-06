@@ -2,7 +2,11 @@
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync, useFormStatus } from "react-dom";
-import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
+import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
+import { draggable, dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { autoScrollForElements } from "@atlaskit/pragmatic-drag-and-drop-auto-scroll/element";
+import { attachClosestEdge, extractClosestEdge, type Edge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
+import { getReorderDestinationIndex } from "@atlaskit/pragmatic-drag-and-drop-hitbox/util/get-reorder-destination-index";
 import { DayPicker } from "react-day-picker";
 import { ptBR } from "react-day-picker/locale";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
@@ -65,6 +69,26 @@ const SIZE_ORDER = new Map(
 );
 
 type RichTextCommand = "bold" | "italic" | "underline" | "insertUnorderedList" | "insertOrderedList" | "removeFormat";
+type FichaSortableType = "ficha-product" | "ficha-image";
+
+type FichaSortableData = {
+  height?: number;
+  id: string;
+  index: number;
+  kind: "ficha-sortable";
+  type: FichaSortableType;
+  width?: number;
+};
+
+type FichaSortableShadow = {
+  edge: Edge | null;
+  size: number;
+};
+
+type FichaActiveShadow = FichaSortableShadow & {
+  id: string;
+  type: FichaSortableType;
+};
 
 const MATERIAL_OPTIONS = [
   { composicao: "65% Poliéster / 35% Viscose", nome: "Malha Fria (PV)" },
@@ -107,6 +131,24 @@ function createOption(label: string): CustomDatalistOption {
     label,
     value: label,
   };
+}
+
+function isFichaSortableData(value: Record<string | symbol, unknown>): value is FichaSortableData {
+  return value.kind === "ficha-sortable" && typeof value.id === "string" && typeof value.index === "number";
+}
+
+function getFichaReorderDestination(args: {
+  closestEdge: Edge | null;
+  sourceIndex: number;
+  targetIndex: number;
+  type: FichaSortableType;
+}) {
+  return getReorderDestinationIndex({
+    axis: args.type === "ficha-image" ? "horizontal" : "vertical",
+    closestEdgeOfTarget: args.closestEdge,
+    indexOfTarget: args.targetIndex,
+    startIndex: args.sourceIndex,
+  });
 }
 
 function getOptions(
@@ -406,6 +448,8 @@ function FichaFormInner({
       ],
     });
   const [imageGridWidth, setImageGridWidth] = useState(0);
+  const [imageGridElement, setImageGridElement] = useState<HTMLDivElement | null>(null);
+  const [activeSortableShadow, setActiveSortableShadow] = useState<FichaActiveShadow | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [draftPrintFicha, setDraftPrintFicha] = useState<FichaDetail | null>(null);
   const [observacoesConfirmationValue, setObservacoesConfirmationValue] = useState<string | null>(null);
@@ -922,20 +966,6 @@ function FichaFormInner({
     replaceProductItems(sortedItems);
   }
 
-  function handleDragEnd(result: DropResult) {
-    const { destination, source } = result;
-
-    if (!destination || destination.index === source.index) return;
-
-    if (source.droppableId === "ficha-products" && destination.droppableId === "ficha-products") {
-      moveProductItem(source.index, destination.index);
-    }
-
-    if (source.droppableId === "ficha-images" && destination.droppableId === "ficha-images") {
-      moveImageItem(source.index, destination.index);
-    }
-  }
-
   function applyRichTextCommand(command: RichTextCommand) {
     observacoesEditorRef.current?.focus();
     document.execCommand(command);
@@ -1169,6 +1199,10 @@ function FichaFormInner({
   );
   const serializedImages = serializeImageItems(imagens);
   const lockedImageCardWidth = imageGridWidth ? getImageCardWidthFromGrid(imageGridWidth, imagens.length) : null;
+  const handleImageGridRef = useCallback((node: HTMLDivElement | null) => {
+    imageGridRef.current = node;
+    setImageGridElement(node);
+  }, []);
 
   useEffect(() => {
     updateObservacoesAutofill();
@@ -1233,7 +1267,6 @@ function FichaFormInner({
         </div>
       ) : null}
 
-      <DragDropContext onDragEnd={handleDragEnd}>
       <div className="form-grid">
         <fieldset className="form-section form-section--customer">
           <legend>
@@ -1353,29 +1386,33 @@ function FichaFormInner({
               <span>Detalhes</span>
               <span>Ações</span>
             </div>
-            <Droppable droppableId="ficha-products">
-              {(dropProvided, dropSnapshot) => (
-                <div
-                  ref={dropProvided.innerRef}
-                  {...dropProvided.droppableProps}
-                  className="products-editor__list"
-                  data-over={dropSnapshot.isDraggingOver ? "true" : "false"}
-                  data-sorted={sortFeedbackVisible ? "true" : "false"}
+            <div className="products-editor__list" data-sorted={sortFeedbackVisible ? "true" : "false"}>
+              {itens.map((item, index) => (
+                <FichaSortableItem
+                  id={item.id}
+                  index={index}
+                  key={item.id}
+                  activeShadow={activeSortableShadow}
+                  onShadowChange={setActiveSortableShadow}
+                  onMove={moveProductItem}
+                  type="ficha-product"
                 >
-                  {itens.map((item, index) => (
-                    <Draggable draggableId={item.id} index={index} key={item.id}>
-                      {(dragProvided, dragSnapshot) => (
+                  {({ isDragging, isOver, setDragHandleRef, setElementRef, shadow }) => (
+                    <>
+                      {shadow?.edge === "top" ? (
+                        <div aria-hidden="true" className="products-editor__shadow" style={{ minHeight: shadow.size }} />
+                      ) : null}
                         <div
-                          ref={dragProvided.innerRef}
-                          {...dragProvided.draggableProps}
+                          ref={setElementRef}
                           className="products-editor__row"
-                          data-dragging={dragSnapshot.isDragging ? "true" : "false"}
+                          data-dragging={isDragging ? "true" : "false"}
+                          data-over={isOver ? "true" : "false"}
                         >
                 <span
                   aria-label={`Reordenar produto ${index + 1}`}
                   className="products-editor__drag"
+                  ref={setDragHandleRef}
                   role="button"
-                  {...dragProvided.dragHandleProps}
                 >
                   <GripVertical aria-hidden="true" size={16} />
                 </span>
@@ -1441,13 +1478,14 @@ function FichaFormInner({
                   </Tooltip>
                 </div>
                         </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {dropProvided.placeholder}
-                </div>
-              )}
-            </Droppable>
+                      {shadow?.edge === "bottom" ? (
+                        <div aria-hidden="true" className="products-editor__shadow" style={{ minHeight: shadow.size }} />
+                      ) : null}
+                    </>
+                  )}
+                </FichaSortableItem>
+              ))}
+            </div>
             {state.fieldErrors?.itensJson ? (
               <p className="field-error" id="itensJson-error">
                 {state.fieldErrors.itensJson}
@@ -1968,30 +2006,37 @@ function FichaFormInner({
             </div>
 
             {imagens.length > 0 ? (
-              <Droppable direction="horizontal" droppableId="ficha-images">
-                {(dropProvided, dropSnapshot) => (
-              <div
-                ref={(node) => {
-                  dropProvided.innerRef(node);
-                  imageGridRef.current = node;
-                }}
-                {...dropProvided.droppableProps}
-                className="image-upload-grid"
-                data-count={imagens.length}
-                data-over={dropSnapshot.isDraggingOver ? "true" : "false"}
-              >
+              <div ref={handleImageGridRef} className="image-upload-grid" data-count={imagens.length}>
                 {imagens.map((image, index) => (
-                  <Draggable draggableId={image.id} index={index} key={image.id}>
-                    {(dragProvided, dragSnapshot) => (
+                  <FichaSortableItem
+                    id={image.id}
+                    index={index}
+                    key={image.id}
+                    activeShadow={activeSortableShadow}
+                    onShadowChange={setActiveSortableShadow}
+                    onMove={moveImageItem}
+                    scrollElement={imageGridElement}
+                    type="ficha-image"
+                  >
+                    {({ isDragging, isOver, setElementRef, shadow }) => (
+                      <>
+                        {shadow?.edge === "left" ? (
+                          <div
+                            aria-hidden="true"
+                            className="image-upload-shadow"
+                            style={{
+                              minWidth: shadow.size,
+                              width: shadow.size,
+                            }}
+                          />
+                        ) : null}
                   <article
-                    ref={dragProvided.innerRef}
-                    {...dragProvided.draggableProps}
-                    {...dragProvided.dragHandleProps}
+                    ref={setElementRef}
                     className="image-upload-card"
                     data-image-id={image.id}
-                    data-dragging={dragSnapshot.isDragging ? "true" : "false"}
+                    data-dragging={isDragging ? "true" : "false"}
+                    data-over={isOver ? "true" : "false"}
                     style={{
-                      ...dragProvided.draggableProps.style,
                       ...(lockedImageCardWidth
                         ? {
                             maxWidth: `${lockedImageCardWidth}px`,
@@ -2052,13 +2097,21 @@ function FichaFormInner({
                     </label>
                     {image.importWarning ? <p className="image-upload-card__warning">{image.importWarning}</p> : null}
                   </article>
+                        {shadow?.edge === "right" ? (
+                          <div
+                            aria-hidden="true"
+                            className="image-upload-shadow"
+                            style={{
+                              minWidth: shadow.size,
+                              width: shadow.size,
+                            }}
+                          />
+                        ) : null}
+                      </>
                     )}
-                  </Draggable>
+                  </FichaSortableItem>
                 ))}
-                {dropProvided.placeholder}
               </div>
-                )}
-              </Droppable>
             ) : (
               <p className="image-upload-empty">Nenhuma imagem adicionada.</p>
             )}
@@ -2085,8 +2138,6 @@ function FichaFormInner({
           </div>
         </fieldset>
       </div>
-      </DragDropContext>
-
       <div className="form-actions">
         {mode === "edit" && ficha?.id ? (
           <PrintTriggerButton className="ui-button ui-button--secondary" href={`/fichas/${ficha.id}/imprimir`} label={`Imprimir ficha ${ficha.cliente_nome_snapshot}`}>
@@ -2282,6 +2333,117 @@ function buildDraftPrintFicha(form: HTMLFormElement, values: FichaFormClientValu
     updated_at: new Date().toISOString(),
     vendedor: text("vendedor") || null,
   } as FichaDetail;
+}
+
+type FichaSortableItemProps = {
+  activeShadow: FichaActiveShadow | null;
+  children: (args: {
+    isDragging: boolean;
+    isOver: boolean;
+    setDragHandleRef: (node: HTMLElement | null) => void;
+    setElementRef: (node: HTMLElement | null) => void;
+    shadow: FichaSortableShadow | null;
+  }) => React.ReactNode;
+  id: string;
+  index: number;
+  onMove: (sourceIndex: number, destinationIndex: number) => void;
+  onShadowChange: (shadow: FichaActiveShadow | null) => void;
+  scrollElement?: HTMLElement | null;
+  type: FichaSortableType;
+};
+
+function FichaSortableItem({ activeShadow, children, id, index, onMove, onShadowChange, scrollElement, type }: FichaSortableItemProps) {
+  const [element, setElement] = useState<HTMLElement | null>(null);
+  const [dragHandle, setDragHandle] = useState<HTMLElement | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isOver, setIsOver] = useState(false);
+  const shadow = activeShadow?.id === id && activeShadow.type === type ? activeShadow : null;
+
+  useEffect(() => {
+    if (!element) {
+      return;
+    }
+    const currentElement = element;
+
+    const data: FichaSortableData = {
+      id,
+      index,
+      kind: "ficha-sortable",
+      type,
+    };
+    const allowedEdges: Edge[] = type === "ficha-image" ? ["left", "right"] : ["top", "bottom"];
+    function updateShadow(selfData: Record<string | symbol, unknown>, sourceData: Record<string | symbol, unknown>) {
+      const edge = extractClosestEdge(selfData);
+      const fallbackSize = type === "ficha-image" ? currentElement.getBoundingClientRect().width : currentElement.getBoundingClientRect().height;
+      const sourceSize =
+        isFichaSortableData(sourceData) && type === "ficha-image" ? sourceData.width : isFichaSortableData(sourceData) ? sourceData.height : null;
+      setIsOver(true);
+      onShadowChange({
+        edge,
+        id,
+        size: sourceSize ?? fallbackSize,
+        type,
+      });
+    }
+    const cleanups = [
+      draggable({
+        element,
+        dragHandle: dragHandle ?? undefined,
+        getInitialData: () => ({
+          ...data,
+          height: currentElement.getBoundingClientRect().height,
+          width: currentElement.getBoundingClientRect().width,
+        }),
+        onDragStart: () => setIsDragging(true),
+        onDrop: () => setIsDragging(false),
+      }),
+      dropTargetForElements({
+        element,
+        canDrop: ({ source }) => isFichaSortableData(source.data) && source.data.type === type && source.data.id !== id,
+        getData: ({ input, element }) => attachClosestEdge(data, { allowedEdges, element, input }),
+        onDrag: ({ self, source }) => updateShadow(self.data, source.data),
+        onDragEnter: ({ self, source }) => updateShadow(self.data, source.data),
+        onDragLeave: () => setIsOver(false),
+        onDrop: ({ self, source }) => {
+          setIsOver(false);
+          onShadowChange(null);
+
+          if (!isFichaSortableData(source.data)) {
+            return;
+          }
+
+          const target = self.data;
+          if (!isFichaSortableData(target) || source.data.type !== type || source.data.id === id) {
+            return;
+          }
+
+          const destinationIndex = getFichaReorderDestination({
+            closestEdge: extractClosestEdge(target),
+            sourceIndex: source.data.index,
+            targetIndex: target.index,
+            type,
+          });
+
+          if (destinationIndex !== source.data.index) {
+            onMove(source.data.index, destinationIndex);
+          }
+        },
+      }),
+    ];
+
+    if (scrollElement) {
+      cleanups.push(
+        autoScrollForElements({
+          element: scrollElement,
+          canScroll: ({ source }) => isFichaSortableData(source.data) && source.data.type === type,
+        }),
+      );
+    }
+
+    return combine(...cleanups);
+  }, [dragHandle, element, id, index, onMove, onShadowChange, scrollElement, type]);
+
+  return <>{children({ isDragging, isOver, setDragHandleRef: setDragHandle, setElementRef: setElement, shadow })}</>;
 }
 
 type FieldProps = {

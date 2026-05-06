@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type TooltipProps = {
@@ -19,6 +19,48 @@ export function Tooltip({ children, label }: TooltipProps) {
   } | null>(null);
   const triggerRef = useRef<HTMLSpanElement | null>(null);
   const tooltipRef = useRef<HTMLSpanElement | null>(null);
+
+  function handleOpen() {
+    setDismissed(false);
+    setOpen(true);
+  }
+
+  function handleClose() {
+    setOpen(false);
+  }
+
+  useEffect(() => {
+    const trigger = triggerRef.current;
+
+    if (!trigger) {
+      return;
+    }
+
+    function handleFocusOut(event: FocusEvent) {
+      if (!trigger?.contains(event.relatedTarget as Node | null)) {
+        handleClose();
+      }
+    }
+
+    function handleClick() {
+      setDismissed(true);
+      handleClose();
+    }
+
+    trigger.addEventListener("mouseenter", handleOpen);
+    trigger.addEventListener("mouseleave", handleClose);
+    trigger.addEventListener("focusin", handleOpen);
+    trigger.addEventListener("focusout", handleFocusOut);
+    trigger.addEventListener("click", handleClick, { capture: true });
+
+    return () => {
+      trigger.removeEventListener("mouseenter", handleOpen);
+      trigger.removeEventListener("mouseleave", handleClose);
+      trigger.removeEventListener("focusin", handleOpen);
+      trigger.removeEventListener("focusout", handleFocusOut);
+      trigger.removeEventListener("click", handleClick, { capture: true });
+    };
+  }, []);
 
   useLayoutEffect(() => {
     if (!open) {
@@ -89,19 +131,17 @@ export function Tooltip({ children, label }: TooltipProps) {
           setOpen(true);
         }
       }}
-      onPointerEnter={() => {
-        setDismissed(false);
-        setOpen(true);
-      }}
-      onPointerLeave={() => {
-        setOpen(false);
-      }}
+      onMouseEnter={handleOpen}
+      onMouseLeave={handleClose}
+      onPointerEnter={handleOpen}
+      onPointerLeave={handleClose}
     >
       {children}
       {typeof document !== "undefined" && open
         ? createPortal(
             <span
               className="ui-tooltip__content"
+              data-open="true"
               data-side={position?.side ?? "top"}
               ref={tooltipRef}
               role="tooltip"

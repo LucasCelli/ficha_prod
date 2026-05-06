@@ -16,11 +16,11 @@ export type BaseKanbanColumnSlug = (typeof BASE_KANBAN_COLUMN_SLUGS)[number];
 export type InsumoStatus = Database["public"]["Enums"]["insumo_status"];
 
 export const INSUMO_STATUS_LABELS: Record<InsumoStatus, string> = {
-  tudo_ok: "Tudo pronto",
+  tudo_ok: "Tudo OK",
   sem_tecido: "Sem tecido",
   sem_tinta: "Sem tinta",
   sem_papel: "Sem papel",
-  pendencias: "Com pendencias",
+  pendencias: "Pendências",
 };
 
 export const BASE_COLUMN_LABELS: Record<BaseKanbanColumnSlug, string> = {
@@ -28,7 +28,7 @@ export const BASE_COLUMN_LABELS: Record<BaseKanbanColumnSlug, string> = {
   exportando: "Exportado/Arte Separada",
   fila_impressao: "Impresso/Fotolito Impresso",
   sublimando: "Sublimando/Na Estamparia",
-  na_costura: "Costura/Em Revisao",
+  na_costura: "Costura/Em Revisão",
 };
 
 export function isBaseKanbanColumnSlug(value: string): value is BaseKanbanColumnSlug {

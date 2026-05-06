@@ -22,7 +22,9 @@
     "test:visual:update": "playwright test tests/visual --update-snapshots"
   },
   "dependencies": {
-    "@hello-pangea/dnd": "^18.0.1",
+    "@atlaskit/pragmatic-drag-and-drop": "^1.8.1",
+    "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "^2.1.5",
+    "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
     "@hookform/resolvers": "^5.2.2",
     "@libsql/client": "^0.14.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",

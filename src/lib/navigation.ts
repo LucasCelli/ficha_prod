@@ -10,8 +10,8 @@ type NavigationItem = {
 export const mainNavigation: readonly NavigationItem[] = [
   {
     href: "/",
-    label: "Inicio",
-    description: "Visao geral da migracao",
+    label: "Início",
+    description: "Visão geral da migração",
   },
   {
     href: "/fichas",
@@ -20,29 +20,29 @@ export const mainNavigation: readonly NavigationItem[] = [
   },
   {
     href: "/quadro-producao",
-    label: "Quadro de Producao",
-    description: "Kanban de operacao",
+    label: "Quadro de Produção",
+    description: "Kanban de operação",
   },
   {
     href: "/clientes",
     label: "Clientes",
-    description: "Cadastro e historico",
+    description: "Cadastro e histórico",
   },
   {
     href: "/catalogos",
-    label: "Catalogos",
-    description: "Produtos e opcoes",
+    label: "Catálogos",
+    description: "Produtos e opções",
     roles: ["superadmin"],
   },
   {
     href: "/usuarios",
-    label: "Usuarios",
+    label: "Usuários",
     description: "Acessos e perfis",
     roles: ["superadmin"],
   },
   {
     href: "/relatorios",
-    label: "Relatorios",
-    description: "Indicadores e exportacoes",
+    label: "Relatórios",
+    description: "Indicadores e exportações",
   },
 ];
