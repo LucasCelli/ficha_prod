@@ -22,9 +22,6 @@
     "test:visual:update": "playwright test tests/visual --update-snapshots"
   },
   "dependencies": {
-    "@atlaskit/pragmatic-drag-and-drop": "^1.8.1",
-    "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "^2.1.5",
-    "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
     "@hookform/resolvers": "^5.2.2",
     "@libsql/client": "^0.14.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -39,6 +36,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "express": "^4.18.2",
+    "fluid-dnd": "^2.6.3",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.11.0",

@@ -2,11 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync, useFormStatus } from "react-dom";
-import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
-import { draggable, dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
-import { autoScrollForElements } from "@atlaskit/pragmatic-drag-and-drop-auto-scroll/element";
-import { attachClosestEdge, extractClosestEdge, type Edge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
-import { getReorderDestinationIndex } from "@atlaskit/pragmatic-drag-and-drop-hitbox/util/get-reorder-destination-index";
+import { useDragAndDrop } from "fluid-dnd/react";
 import { DayPicker } from "react-day-picker";
 import { ptBR } from "react-day-picker/locale";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
@@ -69,26 +65,6 @@ const SIZE_ORDER = new Map(
 );
 
 type RichTextCommand = "bold" | "italic" | "underline" | "insertUnorderedList" | "insertOrderedList" | "removeFormat";
-type FichaSortableType = "ficha-product" | "ficha-image";
-
-type FichaSortableData = {
-  height?: number;
-  id: string;
-  index: number;
-  kind: "ficha-sortable";
-  type: FichaSortableType;
-  width?: number;
-};
-
-type FichaSortableShadow = {
-  edge: Edge | null;
-  size: number;
-};
-
-type FichaActiveShadow = FichaSortableShadow & {
-  id: string;
-  type: FichaSortableType;
-};
 
 const MATERIAL_OPTIONS = [
   { composicao: "65% Poliéster / 35% Viscose", nome: "Malha Fria (PV)" },
@@ -131,24 +107,6 @@ function createOption(label: string): CustomDatalistOption {
     label,
     value: label,
   };
-}
-
-function isFichaSortableData(value: Record<string | symbol, unknown>): value is FichaSortableData {
-  return value.kind === "ficha-sortable" && typeof value.id === "string" && typeof value.index === "number";
-}
-
-function getFichaReorderDestination(args: {
-  closestEdge: Edge | null;
-  sourceIndex: number;
-  targetIndex: number;
-  type: FichaSortableType;
-}) {
-  return getReorderDestinationIndex({
-    axis: args.type === "ficha-image" ? "horizontal" : "vertical",
-    closestEdgeOfTarget: args.closestEdge,
-    indexOfTarget: args.targetIndex,
-    startIndex: args.sourceIndex,
-  });
 }
 
 function getOptions(
@@ -322,6 +280,14 @@ function serializeImageItems(images: ImageFormItem[]) {
   );
 }
 
+function haveSameItemOrder(left: Array<{ id: string }>, right: Array<{ id: string }>) {
+  return left.length === right.length && left.every((item, index) => item.id === right[index]?.id);
+}
+
+function hasUniqueItemIds(items: Array<{ id: string }>) {
+  return new Set(items.map((item) => item.id)).size === items.length;
+}
+
 type ImportedLegacyState = {
   fileName: string;
   importedAt: number;
@@ -370,7 +336,6 @@ function FichaFormInner({
   const formRef = useRef<HTMLFormElement>(null);
   const legacyImportInputRef = useRef<HTMLInputElement>(null);
   const imagensJsonInputRef = useRef<HTMLInputElement>(null);
-  const imageGridRef = useRef<HTMLDivElement | null>(null);
   const imagensRef = useRef<ImageFormItem[]>([]);
   const lastToastMessageRef = useRef<string | null>(null);
   const lastImportedLegacyToastRef = useRef<number | null>(null);
@@ -407,7 +372,6 @@ function FichaFormInner({
   const { control, getValues, setValue } = fichaForm;
   const {
     append: appendProductItem,
-    move: moveProductItem,
     replace: replaceProductItems,
     remove: removeProductItemAt,
   } = useFieldArray({
@@ -417,7 +381,6 @@ function FichaFormInner({
   });
   const {
     append: appendImageItem,
-    move: moveImageItem,
     remove: removeImageItemAt,
     replace: replaceImageItems,
     update: updateImageItem,
@@ -448,8 +411,6 @@ function FichaFormInner({
       ],
     });
   const [imageGridWidth, setImageGridWidth] = useState(0);
-  const [imageGridElement, setImageGridElement] = useState<HTMLDivElement | null>(null);
-  const [activeSortableShadow, setActiveSortableShadow] = useState<FichaActiveShadow | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [draftPrintFicha, setDraftPrintFicha] = useState<FichaDetail | null>(null);
   const [observacoesConfirmationValue, setObservacoesConfirmationValue] = useState<string | null>(null);
@@ -479,6 +440,23 @@ function FichaFormInner({
   const showCorAbertura = isPolo && aberturaLateral === "sim";
   const showCorSublimacao = arte === "sublimacao";
   const primeiroProduto = itens.find((item) => item.produto.trim())?.produto ?? "";
+  const [productsListRef, fluidProductItems, setFluidProductItems] = useDragAndDrop<ProductFormItem, HTMLDivElement>(itens, {
+    animationDuration: 90,
+    delayBeforeInsert: 0,
+    delayBeforeRemove: 0,
+    draggingClass: "products-editor__row--dragging",
+    handlerSelector: ".products-editor__drag",
+    isDraggable: (element) => element.classList.contains("products-editor__row"),
+  });
+  const [imageGridRef, fluidImageItems, setFluidImageItems] = useDragAndDrop<ImageFormItem, HTMLDivElement>(imagens, {
+    animationDuration: 90,
+    delayBeforeInsert: 0,
+    delayBeforeRemove: 0,
+    direction: "horizontal",
+    draggingClass: "image-upload-card--dragging",
+    handlerSelector: ".image-upload-card__order",
+    isDraggable: (element) => element.classList.contains("image-upload-card"),
+  });
 
   const syncComposicaoByMaterial = useCallback((nextMaterial: string, source: "auto" | "manual", compositionOverride?: string) => {
     const materialOption = MATERIAL_OPTIONS.find((option) => option.nome === nextMaterial);
@@ -603,8 +581,10 @@ function FichaFormInner({
       previewUrl: URL.createObjectURL(file),
     }));
 
+    const currentImages = getValues("imagens");
     appendImageItem(localImages);
-  }, [appendImageItem, imagens.length]);
+    setFluidImageItems([...currentImages, ...localImages]);
+  }, [appendImageItem, getValues, imagens.length, setFluidImageItems]);
 
   function handleImageSelection(files: FileList | null) {
     handleImageFiles(Array.from(files ?? []));
@@ -623,6 +603,7 @@ function FichaFormInner({
     const imageIndex = getValues("imagens").findIndex((item) => item.id === image.id);
     if (imageIndex >= 0) {
       removeImageItemAt(imageIndex);
+      setFluidImageItems((current) => current.filter((item) => item.id !== image.id));
     }
 
     if (image.previewUrl) {
@@ -760,6 +741,7 @@ function FichaFormInner({
 
       flushSync(() => {
         replaceImageItems(uploadedImages);
+        setFluidImageItems(uploadedImages);
       });
       if (imagensJsonInputRef.current) {
         imagensJsonInputRef.current.value = serializeImageItems(uploadedImages);
@@ -823,7 +805,29 @@ function FichaFormInner({
     observer.observe(grid);
 
     return () => observer.disconnect();
-  }, [imagens]);
+  }, [imageGridRef, imagens]);
+
+  useEffect(() => {
+    if (!hasUniqueItemIds(fluidProductItems)) {
+      return;
+    }
+
+    const sameOrder = haveSameItemOrder(fluidProductItems, itens);
+    if (!sameOrder && fluidProductItems.length === itens.length) {
+      replaceProductItems(fluidProductItems);
+    }
+  }, [fluidProductItems, itens, replaceProductItems]);
+
+  useEffect(() => {
+    if (!hasUniqueItemIds(fluidImageItems)) {
+      return;
+    }
+
+    const sameOrder = haveSameItemOrder(fluidImageItems, imagens);
+    if (!sameOrder && fluidImageItems.length === imagens.length) {
+      replaceImageItems(fluidImageItems);
+    }
+  }, [fluidImageItems, imagens, replaceImageItems]);
 
   useEffect(() => {
     function handlePaste(event: ClipboardEvent) {
@@ -915,11 +919,15 @@ function FichaFormInner({
     const itemIndex = getValues("itens").findIndex((item) => item.id === id);
     if (itemIndex >= 0) {
       setValue(`itens.${itemIndex}.${field}`, value, { shouldDirty: true });
+      setFluidProductItems((current) => current.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
     }
   }
 
   function addProductItem() {
-    appendProductItem(createEmptyProductItem(`item-${Date.now()}-${getValues("itens").length}`));
+    const current = getValues("itens");
+    const item = createEmptyProductItem(`item-${Date.now()}-${current.length}`);
+    appendProductItem(item);
+    setFluidProductItems([...current, item]);
   }
 
   function duplicateProductItem(id: string) {
@@ -927,7 +935,9 @@ function FichaFormInner({
     const item = current.find((candidate) => candidate.id === id);
     if (!item) return;
 
-    appendProductItem({ ...item, id: `item-${Date.now()}-${current.length}` });
+    const duplicated = { ...item, id: `item-${Date.now()}-${current.length}` };
+    appendProductItem(duplicated);
+    setFluidProductItems([...current, duplicated]);
   }
 
   function removeProductItem(id: string) {
@@ -936,10 +946,13 @@ function FichaFormInner({
 
     if (current.length > 1 && itemIndex >= 0) {
       removeProductItemAt(itemIndex);
+      setFluidProductItems(current.filter((item) => item.id !== id));
       return;
     }
 
-    setValue("itens", [createEmptyProductItem()], { shouldDirty: true });
+    const emptyItem = createEmptyProductItem();
+    setValue("itens", [emptyItem], { shouldDirty: true });
+    setFluidProductItems([emptyItem]);
   }
 
   function showProductSortFeedback() {
@@ -964,6 +977,7 @@ function FichaFormInner({
 
     showProductSortFeedback();
     replaceProductItems(sortedItems);
+    setFluidProductItems(sortedItems);
   }
 
   function applyRichTextCommand(command: RichTextCommand) {
@@ -1199,10 +1213,6 @@ function FichaFormInner({
   );
   const serializedImages = serializeImageItems(imagens);
   const lockedImageCardWidth = imageGridWidth ? getImageCardWidthFromGrid(imageGridWidth, imagens.length) : null;
-  const handleImageGridRef = useCallback((node: HTMLDivElement | null) => {
-    imageGridRef.current = node;
-    setImageGridElement(node);
-  }, []);
 
   useEffect(() => {
     updateObservacoesAutofill();
@@ -1386,33 +1396,18 @@ function FichaFormInner({
               <span>Detalhes</span>
               <span>Ações</span>
             </div>
-            <div className="products-editor__list" data-sorted={sortFeedbackVisible ? "true" : "false"}>
-              {itens.map((item, index) => (
-                <FichaSortableItem
-                  id={item.id}
-                  index={index}
-                  key={item.id}
-                  activeShadow={activeSortableShadow}
-                  onShadowChange={setActiveSortableShadow}
-                  onMove={moveProductItem}
-                  type="ficha-product"
+            <div className="products-editor__list" data-sorted={sortFeedbackVisible ? "true" : "false"} ref={productsListRef}>
+              {fluidProductItems.map((item, index) => (
+                <div
+                  className="products-editor__row"
+                  data-index={index}
+                  key={`${item.id}-${index}`}
                 >
-                  {({ isDragging, isOver, setDragHandleRef, setElementRef, shadow }) => (
-                    <>
-                      {shadow?.edge === "top" ? (
-                        <div aria-hidden="true" className="products-editor__shadow" style={{ minHeight: shadow.size }} />
-                      ) : null}
-                        <div
-                          ref={setElementRef}
-                          className="products-editor__row"
-                          data-dragging={isDragging ? "true" : "false"}
-                          data-over={isOver ? "true" : "false"}
-                        >
                 <span
                   aria-label={`Reordenar produto ${index + 1}`}
                   className="products-editor__drag"
-                  ref={setDragHandleRef}
                   role="button"
+                  tabIndex={0}
                 >
                   <GripVertical aria-hidden="true" size={16} />
                 </span>
@@ -1477,13 +1472,7 @@ function FichaFormInner({
                     </button>
                   </Tooltip>
                 </div>
-                        </div>
-                      {shadow?.edge === "bottom" ? (
-                        <div aria-hidden="true" className="products-editor__shadow" style={{ minHeight: shadow.size }} />
-                      ) : null}
-                    </>
-                  )}
-                </FichaSortableItem>
+                </div>
               ))}
             </div>
             {state.fieldErrors?.itensJson ? (
@@ -2006,36 +1995,13 @@ function FichaFormInner({
             </div>
 
             {imagens.length > 0 ? (
-              <div ref={handleImageGridRef} className="image-upload-grid" data-count={imagens.length}>
-                {imagens.map((image, index) => (
-                  <FichaSortableItem
-                    id={image.id}
-                    index={index}
-                    key={image.id}
-                    activeShadow={activeSortableShadow}
-                    onShadowChange={setActiveSortableShadow}
-                    onMove={moveImageItem}
-                    scrollElement={imageGridElement}
-                    type="ficha-image"
-                  >
-                    {({ isDragging, isOver, setElementRef, shadow }) => (
-                      <>
-                        {shadow?.edge === "left" ? (
-                          <div
-                            aria-hidden="true"
-                            className="image-upload-shadow"
-                            style={{
-                              minWidth: shadow.size,
-                              width: shadow.size,
-                            }}
-                          />
-                        ) : null}
+              <div ref={imageGridRef} className="image-upload-grid" data-count={imagens.length}>
+                {fluidImageItems.map((image, index) => (
                   <article
-                    ref={setElementRef}
                     className="image-upload-card"
+                    data-index={index}
                     data-image-id={image.id}
-                    data-dragging={isDragging ? "true" : "false"}
-                    data-over={isOver ? "true" : "false"}
+                    key={`${image.id}-${index}`}
                     style={{
                       ...(lockedImageCardWidth
                         ? {
@@ -2089,6 +2055,9 @@ function FichaFormInner({
                         onChange={(event) => {
                           const value = event.currentTarget.value;
                           updateImageItem(index, { ...image, altText: value });
+                          setFluidImageItems((current) =>
+                            current.map((item) => (item.id === image.id ? { ...item, altText: value } : item)),
+                          );
                         }}
                         onTouchStart={(event) => event.stopPropagation()}
                         placeholder="Ex: frente, costas, detalhe do bordado"
@@ -2097,19 +2066,6 @@ function FichaFormInner({
                     </label>
                     {image.importWarning ? <p className="image-upload-card__warning">{image.importWarning}</p> : null}
                   </article>
-                        {shadow?.edge === "right" ? (
-                          <div
-                            aria-hidden="true"
-                            className="image-upload-shadow"
-                            style={{
-                              minWidth: shadow.size,
-                              width: shadow.size,
-                            }}
-                          />
-                        ) : null}
-                      </>
-                    )}
-                  </FichaSortableItem>
                 ))}
               </div>
             ) : (
@@ -2333,117 +2289,6 @@ function buildDraftPrintFicha(form: HTMLFormElement, values: FichaFormClientValu
     updated_at: new Date().toISOString(),
     vendedor: text("vendedor") || null,
   } as FichaDetail;
-}
-
-type FichaSortableItemProps = {
-  activeShadow: FichaActiveShadow | null;
-  children: (args: {
-    isDragging: boolean;
-    isOver: boolean;
-    setDragHandleRef: (node: HTMLElement | null) => void;
-    setElementRef: (node: HTMLElement | null) => void;
-    shadow: FichaSortableShadow | null;
-  }) => React.ReactNode;
-  id: string;
-  index: number;
-  onMove: (sourceIndex: number, destinationIndex: number) => void;
-  onShadowChange: (shadow: FichaActiveShadow | null) => void;
-  scrollElement?: HTMLElement | null;
-  type: FichaSortableType;
-};
-
-function FichaSortableItem({ activeShadow, children, id, index, onMove, onShadowChange, scrollElement, type }: FichaSortableItemProps) {
-  const [element, setElement] = useState<HTMLElement | null>(null);
-  const [dragHandle, setDragHandle] = useState<HTMLElement | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isOver, setIsOver] = useState(false);
-  const shadow = activeShadow?.id === id && activeShadow.type === type ? activeShadow : null;
-
-  useEffect(() => {
-    if (!element) {
-      return;
-    }
-    const currentElement = element;
-
-    const data: FichaSortableData = {
-      id,
-      index,
-      kind: "ficha-sortable",
-      type,
-    };
-    const allowedEdges: Edge[] = type === "ficha-image" ? ["left", "right"] : ["top", "bottom"];
-    function updateShadow(selfData: Record<string | symbol, unknown>, sourceData: Record<string | symbol, unknown>) {
-      const edge = extractClosestEdge(selfData);
-      const fallbackSize = type === "ficha-image" ? currentElement.getBoundingClientRect().width : currentElement.getBoundingClientRect().height;
-      const sourceSize =
-        isFichaSortableData(sourceData) && type === "ficha-image" ? sourceData.width : isFichaSortableData(sourceData) ? sourceData.height : null;
-      setIsOver(true);
-      onShadowChange({
-        edge,
-        id,
-        size: sourceSize ?? fallbackSize,
-        type,
-      });
-    }
-    const cleanups = [
-      draggable({
-        element,
-        dragHandle: dragHandle ?? undefined,
-        getInitialData: () => ({
-          ...data,
-          height: currentElement.getBoundingClientRect().height,
-          width: currentElement.getBoundingClientRect().width,
-        }),
-        onDragStart: () => setIsDragging(true),
-        onDrop: () => setIsDragging(false),
-      }),
-      dropTargetForElements({
-        element,
-        canDrop: ({ source }) => isFichaSortableData(source.data) && source.data.type === type && source.data.id !== id,
-        getData: ({ input, element }) => attachClosestEdge(data, { allowedEdges, element, input }),
-        onDrag: ({ self, source }) => updateShadow(self.data, source.data),
-        onDragEnter: ({ self, source }) => updateShadow(self.data, source.data),
-        onDragLeave: () => setIsOver(false),
-        onDrop: ({ self, source }) => {
-          setIsOver(false);
-          onShadowChange(null);
-
-          if (!isFichaSortableData(source.data)) {
-            return;
-          }
-
-          const target = self.data;
-          if (!isFichaSortableData(target) || source.data.type !== type || source.data.id === id) {
-            return;
-          }
-
-          const destinationIndex = getFichaReorderDestination({
-            closestEdge: extractClosestEdge(target),
-            sourceIndex: source.data.index,
-            targetIndex: target.index,
-            type,
-          });
-
-          if (destinationIndex !== source.data.index) {
-            onMove(source.data.index, destinationIndex);
-          }
-        },
-      }),
-    ];
-
-    if (scrollElement) {
-      cleanups.push(
-        autoScrollForElements({
-          element: scrollElement,
-          canScroll: ({ source }) => isFichaSortableData(source.data) && source.data.type === type,
-        }),
-      );
-    }
-
-    return combine(...cleanups);
-  }, [dragHandle, element, id, index, onMove, onShadowChange, scrollElement, type]);
-
-  return <>{children({ isDragging, isOver, setDragHandleRef: setDragHandle, setElementRef: setElement, shadow })}</>;
 }
 
 type FieldProps = {

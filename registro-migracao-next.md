@@ -1,12 +1,23 @@
 # Registro da migracao Next
 
+## 2026-05-06 - DnD migrado para Fluid DnD
+
+- Fase/modulo: fichas e quadro de producao / troca completa da biblioteca de drag and drop.
+- Arquivos alterados: `package.json`, `package-lock.json`, `AGENTS.md`, `src/features/fichas/ficha-form.tsx`, `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: Atlassian Pragmatic deixou de ser dependencia ativa e `fluid-dnd` passou a ser a unica biblioteca DnD do App Router.
+- Fichas: produtos e imagens agora usam `useDragAndDrop` de `fluid-dnd/react`, com handle dedicado para produtos e para o topo do card de imagem; a ordem retornada pelo Fluid e sincronizada com `react-hook-form` por ids estaveis, preservando `itensJson`, `imagensJson` e a persistencia de `ordem`.
+- Quadro de producao: cada coluna virou uma lista Fluid no grupo compartilhado `quadro-producao-cards`; o drop e convertido para `{ cardId, destinationColumnId, destinationIndex }` e segue pela mutation otimista existente.
+- Visual/UX: estados de drag/drop passaram a usar classes Fluid explicitas, os shadows manuais da biblioteca anterior foram removidos, o scroll interno das colunas foi mantido e cards ganharam handle de arraste proprio para nao disputar com botoes/selects.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e varredura por residuos da biblioteca anterior passaram. No Edge em `http://localhost:3000/fichas/nova`, a tela renderizou a lista de produtos com 1 item, sem erros de console e sem residuos Pragmatic no DOM. Em `http://localhost:3000/quadro-producao`, a tela renderizou 5 colunas, 82 cards, 82 handles de arraste, listas com `overflow-y: auto`, sem erros de console e sem residuos Pragmatic no DOM.
+- Hotfix: apos teste manual, a sincronizacao generica entre Fluid e `react-hook-form` no formulario foi trocada por sincronizacao dirigida. Add/remover/duplicar/ordenar/editar agora atualizam explicitamente RHF e Fluid, enquanto o efeito de drag apenas persiste a ordem final quando a lista volta a ter ids unicos. Tambem foram zerados os delays de inserir/remover e reduzida a animacao para 90ms, evitando duplicacao visual de produto e a sensacao de camera lenta. Revalidado com `npm run typecheck`, `npm run lint`, `npm run build` e Edge em `/fichas/nova`: adicionar produto passou a renderizar 2 linhas e o drag simulado manteve 2 linhas, sem warning de key duplicada.
+
 ## 2026-05-06 - Quadro de produção: persistência de ordem e filtros
 
 - Fase/modulo: quadro de produção / correção do drag and drop e filtros.
 - Arquivos alterados: `supabase/migrations/202605060001_fix_kanban_move_dense_order.sql`, `src/app/quadro-producao/page.tsx`, `src/features/quadro-producao/quadro-producao-client.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
 - Diagnóstico: a API de filtros respondia corretamente quando chamada direto, mas o cliente reaplicava `initialData` para chaves filtradas novas, exibindo o snapshot sem filtro durante a troca. No movimento dos cards, a RPC recebia o índice denso da UI e comparava contra `kanban_ordem`; como a coluna já tinha buracos de ordenação, o card podia voltar para a posição anterior depois do refresh/refetch.
 - Implementação: o cliente agora recebe `initialFilters`, só usa `initialData` quando a query atual bate com esses filtros iniciais e mantém `placeholderData: keepPreviousData` nas trocas. A mutation de mover card deixou de invalidar/refazer o board imediatamente após o drop e o aviso visual por coluna foi removido para evitar flash/layout shift.
-- Correção posterior: quando o ponteiro soltava sobre o próprio shadow, o alvo da coluna tratava o drop como fim da lista. `KanbanColumnList` agora guarda o último shadow ativo e usa esse card/edge como fallback de destino, preservando a posição visual indicada. A busca também passou a usar debounce de 350ms antes de gravar `busca` na URL, reduzindo as chamadas repetidas por caractere.
+- Correção posterior: quando o ponteiro soltava sobre o próprio shadow, o alvo da coluna tratava o drop como fim da lista. A lista do quadro passou a guardar o último shadow ativo e usar esse card/edge como fallback de destino, preservando a posição visual indicada. A busca também passou a usar debounce de 350ms antes de gravar `busca` na URL, reduzindo as chamadas repetidas por caractere.
 - Banco/migração: criada a migration `202605060001_fix_kanban_move_dense_order.sql`, redefinindo `move_kanban_card(...)` para recalcular a ordem por ranking denso, inserir o card no índice solicitado e normalizar os cartões pendentes existentes por coluna.
 - Validação: `npm run typecheck`, eslint dirigido em `src/features/quadro-producao/quadro-producao-client.tsx` e `src/app/quadro-producao/page.tsx`, `npm run build` e `npm run supabase:check` passaram. No Edge DevTools em `http://localhost:3000/quadro-producao`, a busca por `zzzzzz-nao-existe` atualizou a URL, zerou os cards e mostrou `0 em aberto`; limpar filtros restaurou os 82 cards.
 - Caveat: a migration foi versionada, mas não aplicada por CLI local porque esta máquina não tem `supabase` CLI nem `psql` no PATH. Aplicar essa migration no banco alvo é necessário para a persistência sobreviver a refresh.
@@ -26,8 +37,8 @@
 - Fase/modulo: fichas e quadro de produção / refinamento de drag and drop.
 - Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
 - Correção: a primeira tentativa de pré-ordenar a lista durante o drag foi descartada por ser frágil. O comportamento foi refeito no padrão de shadow: o estado real da lista não muda durante o arraste; cada alvo renderiza apenas um placeholder visual no ponto de encaixe.
-- Fichas: produtos e imagens agora medem o item arrastado em `getInitialData()` e renderizam `products-editor__shadow` ou `image-upload-shadow` antes/depois do alvo conforme `closest-edge`.
-- Quadro de produção: `KanbanSortableCard` e `KanbanColumnList` renderizam `quadro-producao-card-shadow` no ponto de drop, preservando o scroll interno e deixando o cálculo final de índice apenas para o drop real.
+- Fichas: produtos e imagens passaram a medir o item arrastado e renderizar placeholders antes/depois do alvo.
+- Quadro de produção: cards e listas renderizavam um placeholder no ponto de drop, preservando o scroll interno e deixando o cálculo final de índice apenas para o drop real.
 - Correção do pisca-pisca: o shadow ativo deixou de ser estado interno de cada card. Agora a coluna/lista mantém um único shadow ativo e os cards não apagam o placeholder em `onDragLeave`, porque esse leave pode ser causado pelo próprio espaço inserido pelo shadow. O mesmo padrão foi aplicado aos itens de produto/imagem no formulário.
 - Validação: `npm run typecheck`, eslint dirigido em `src/features/fichas/ficha-form.tsx` e `src/features/quadro-producao/quadro-producao-client.tsx`, e `npm run build` passaram.
 
@@ -35,9 +46,9 @@
 
 - Fase/modulo: fichas e quadro de produção / troca completa da biblioteca de drag and drop.
 - Arquivos alterados: `package.json`, `package-lock.json`, `AGENTS.md`, `src/features/fichas/ficha-form.tsx`, `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
-- Resultado: o pacote DnD anterior foi removido do projeto e o baseline passou a ser Atlassian Pragmatic Drag and Drop com `@atlaskit/pragmatic-drag-and-drop`, `@atlaskit/pragmatic-drag-and-drop-hitbox` e `@atlaskit/pragmatic-drag-and-drop-auto-scroll`.
-- Fichas: a ordenação de produtos e imagens deixou de depender de wrappers globais e passou a usar itens registrando `draggable` e `dropTargetForElements`, com cálculo de destino por `closest-edge` e `getReorderDestinationIndex`. A grade de imagens mantém auto-scroll no próprio container.
-- Quadro de produção: cards e listas foram migrados para targets independentes do Pragmatic. A lista de cada coluna voltou a ter `overflow-y: auto` e agora usa `autoScrollForElements`, removendo a limitação de nested scroll que motivou a troca.
+- Resultado: o pacote DnD anterior foi removido do projeto e o baseline passou a ser Atlassian Pragmatic Drag and Drop com os pacotes Pragmatic usados naquela rodada.
+- Fichas: a ordenação de produtos e imagens deixou de depender de wrappers globais e passou a usar registros diretos de drag/drop, com cálculo de destino por item. A grade de imagens manteve auto-scroll no próprio container.
+- Quadro de produção: cards e listas foram migrados para targets independentes do Pragmatic. A lista de cada coluna voltou a ter `overflow-y: auto`, removendo a limitação de nested scroll que motivou a troca.
 - Decisão: manter uma única solução de DnD no projeto. As referências operacionais no plano e no `AGENTS.md` agora apontam para Pragmatic; menções históricas antigas foram descritas sem o nome do pacote removido para facilitar varreduras por resíduo real.
 - Validação: `npm run typecheck`, eslint dirigido em `src/features/fichas/ficha-form.tsx` e `src/features/quadro-producao/quadro-producao-client.tsx`, `npm run build` e `npm run supabase:check` passaram. No Edge DevTools em `http://localhost:3000/quadro-producao`, a página renderizou 82 cartões, as listas voltaram com `overflow-y: auto`, as colunas longas mantiveram scroll interno e a varredura de DOM retornou zero atributos internos da biblioteca DnD anterior.
 
@@ -937,3 +948,28 @@
 - Card: a entrega exibida no card passou de data com mes por extenso para `DD/MM/AA`.
 - Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
 - Validacao: `npm run typecheck`, eslint dirigido no cliente do quadro e scan de mojibake no cliente do quadro.
+
+### Quadro de producao: acoes da toolbar em linha
+
+- Ajuste: a grid base da toolbar passou de tres colunas de filtro para duas, acompanhando a remocao do filtro de tecido e deixando a area de acoes cair na coluna `auto` correta.
+- Resultado: os botoes `Para essa semana`, `Limpar filtros`, `Atualizar`, `Novo cartao` e `Coluna` permanecem na mesma linha no desktop e no breakpoint mobile, usando scroll horizontal quando o espaco for menor que o conjunto.
+- Escopo: a mudanca ficou restrita ao CSS do quadro; `.quadro-producao-header-actions` continua podendo empilhar no mobile.
+- Arquivos alterados: `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, scan de mojibake no CSS e checagem do CSS renderizado no Edge.
+
+### Quadro de producao: abas por personalizacao
+
+- Ajuste: o select `Status da ficha` foi removido da pesquisa principal do quadro, mantendo esse status apenas no card e no modal.
+- Personalizacao: o antigo select virou uma faixa de abas horizontais baseada em `currentResult.snapshot.filterOptions.artes`, com `Todos` como aba inicial e uma aba por tipo de personalizacao.
+- Comportamento: cada aba atualiza o mesmo filtro `arte` ja usado pela URL/API, entao o board passa a mostrar apenas os cards daquele tipo sem criar uma superficie paralela.
+- Layout: a toolbar ficou concentrada em titulo, busca e acoes, evitando esconder `Para essa semana`.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, eslint dirigido, scan de mojibake nos arquivos tocados e checagem no Edge.
+
+### Fichas: DnD do editor sem shadow travado
+
+- Diagnostico: o placeholder fisico desloca o alvo durante o drag e dispara `dragLeave` intermediario; limpar o shadow nesse momento fazia produtos e imagens piscarem e impedia um drop estavel.
+- Ajuste: `dragLeave` voltou a limpar apenas `isOver`; o shadow ativo agora e removido no drop do alvo ou no `onDrop` do proprio draggable, cobrindo cancelamento/drop fora de alvo sem apagar o espaco de destino durante a movimentacao.
+- Visual: os placeholders de produto e imagem receberam `box-sizing`, `pointer-events: none`, opacidade controlada e animacao curta de entrada para a abertura do espaco parecer mais fluida.
+- Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, eslint dirigido no form de ficha, scan de mojibake nos arquivos tocados e checagem visual no Edge.
