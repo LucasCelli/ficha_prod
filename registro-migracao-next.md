@@ -1,5 +1,39 @@
 # Registro da migracao Next
 
+## 2026-05-07 - Plano: corte final e legado reposicionados
+
+- Fase/modulo: documentacao executiva / fechamento da migracao.
+- Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Analise: o inventario atual do App Router confirma que a nova aplicacao ja cobre as superficies operacionais principais: `/`, `/fichas`, `/quadro-producao`, `/clientes`, `/catalogos`, `/usuarios`, `/relatorios`, auth/logout, APIs de Cloudinary, APIs do quadro, PDF/exportacoes e scripts de validacao/corte.
+- Resultado: o topo do plano agora mostra apenas o que realmente falta para subir e abandonar o legado: congelar escrita no legado, gerar snapshot, rodar importacao final, aplicar migrations pendentes no banco alvo, executar checks finais, publicar na Vercel, validar fluxos reais em producao, monitorar logs e depois remover `server.js`/`public`/residuos legados com novo ciclo de checks.
+- Decisao: refinos visuais, sensacao final de drag real, paridade fina do auto-preenchimento de observacoes e possivel migracao do editor para Tiptap foram classificados como pos-corte, desde que a homologacao de producao nao revele bloqueador funcional.
+- Caveat: o `git status --short` ja tinha alteracoes existentes em varias features e nos documentos antes desta rodada; esta atualizacao respeitou esse estado e limitou a edicao aos documentos vivos.
+
+## 2026-05-07 - Quadro de producao: entrega otimista corrigida
+
+- Fase/modulo: `/quadro-producao` / entrega final de card.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Diagnostico: a API de entrega ja marcava a ficha correta por `fichas.id`/UUID, mas a UI podia manter o card visivel porque a lista renderizada vinha do estado interno do `fluid-dnd` (`fluidCards`) em vez da lista canonica do React Query quando nao havia arraste ativo. Em cenarios com cache/placeholder, a remocao otimista tambem ficava limitada a uma unica chave de filtro.
+- Resultado: a mutation de entrega agora remove o card de todos os caches `quadro-producao` e restaura todos eles em caso de erro. A coluna renderiza `column.cards` fora de drag ativo e usa `fluidCards` apenas durante arraste, permitindo que o `AnimatePresence` veja a remocao do card e execute a animacao de saida.
+- Validacao: `npx eslint src\features\quadro-producao\quadro-producao-client.tsx`, `npm run typecheck`, `npm run lint`, `npm run build` e `npm run supabase:check` passaram. O dev server foi iniciado em `http://localhost:3000` e `/quadro-producao` respondeu HTTP 200; a validacao visual de clique/animacao ficou pendente porque a sessao nao tinha browser interativo/`agent-browser` disponivel.
+
+## 2026-05-07 - Quadro de producao: largura, flash inicial e entrega final
+
+- Fase/modulo: `/quadro-producao` / responsividade visual e acoes do card.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: a troca de layout desktop do quadro passou para `useLayoutEffect`, reduzindo o flash em que a grade aparecia e depois virava painel redimensionavel. O container principal agora libera largura maior para paginas com `quadro-producao-view`, aproveitando melhor monitores ultrawide.
+- Acoes: na ultima coluna, o botao de avancar foi substituido por `Marcar pedido como entregue`, com icone de check e destaque verde. A entrega usa a API existente `/api/quadro-producao/cards/[id]/entregar`, remove o card de forma otimista do board e invalida os dados depois.
+- Motion: cards removidos do quadro agora usam `AnimatePresence`/`motion.article` para sair com fade, escala leve e colapso de altura, sem animar layout continuo para nao disputar com o `fluid-dnd`.
+- Validacao: `npm run typecheck` passou; `npm run lint`, `npm run build`, `npm run supabase:check` e checagem visual ainda precisam ser executados apos esta anotacao.
+
+## 2026-05-07 - UI: Motion adotado nos primitivos
+
+- Fase/modulo: design system compartilhado / microinteracoes.
+- Arquivos alterados: `package.json`, `package-lock.json`, `AGENTS.md`, `src/components/ui/button.tsx`, `src/components/ui/modal.tsx`, `src/components/ui/alert-dialog.tsx`, `src/components/ui/app-shell.tsx`, `src/components/ui/motion-page.tsx`, `src/components/ui/index.ts`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: `motion` foi instalado e passou a ser usado em leafs client compartilhados. `Button` ganhou feedback sutil de tap, `Modal` e `AlertDialog` ganharam entrada suave de overlay/conteudo, e o shell autenticado passou a animar transicoes de rota com `MotionPage`, respeitando `prefers-reduced-motion`.
+- Decisao: concentrar Motion nos primitivos e na camada de pagina para gerar sensacao premium sem espalhar animacoes locais por modulo.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `npm run supabase:check` passaram. A primeira tentativa de build sem permissao externa falhou apenas no fetch da fonte Google do `next/font`; o build rerodado com permissao passou. Edge DevTools em `http://localhost:3000/clientes` confirmou login, listagem e modal `Novo cliente` renderizados sem erros de console capturados.
+
 ## 2026-05-06 - Fichas: metadados compactos na listagem
 
 - Fase/modulo: `/fichas` / refinamento visual da listagem operacional.
@@ -1042,3 +1076,19 @@
 - Arquivos alterados: `AGENTS.md`, `src/app/page.tsx`, `src/app/layout.tsx`, `src/app/login/page.tsx`, `src/app/error.tsx`, `src/app/global-error.tsx`, `src/app/not-found.tsx`, `src/app/fichas/nova/page.tsx`, `src/app/fichas/[id]/page.tsx`, `src/app/fichas/[id]/imprimir/page.tsx`, `src/app/clientes/page.tsx`, `src/app/clientes/novo/page.tsx`, `src/app/clientes/[id]/editar/page.tsx`, `src/app/relatorios/excel/route.ts`, `src/components/ui/app-navigation.tsx`, `src/components/ui/module-overview.tsx`, `src/lib/navigation.ts`, `src/features/*` e `src/styles/globals.css`.
 - Varredura: `rg -n "Supabase ainda|consulta ao Supabase|Configure as vari|variáveis de ambiente|Ambiente atual|app-summary|sem gravar nada no banco|novo modelo|fluxo legado|JSON legado|legado importado|A rota solicitada|preparad|API|banco" src/app src/features src/components/ui` ficou sem resultados apos a limpeza.
 - Validacao: `npm run typecheck`, eslint dirigido nos arquivos TS/TSX tocados e `git diff --check` passaram. A varredura de mojibake nos arquivos principais retornou apenas falsos positivos de exemplos documentados no `AGENTS.md` e palavras pt-BR acentuadas validas.
+
+### UX: toasts semanticos e feedbacks faltantes
+
+- Ajuste visual: `src/app/layout.tsx` passou a configurar o Sonner com duracao maior, close button e icones Lucide por tipo; `src/styles/globals.css` agora aplica a casca branca do app com faixa/acento semantico para `info`, `success`, `warning`, `error` e `loading`.
+- Feedback pos-redirect: criado `src/components/ui/route-toast.tsx`, que le um parametro curto da URL, mostra o toast uma unica vez e limpa o parametro com `router.replace(..., { scroll: false })`.
+- Fluxos cobertos: clientes, catalogos e usuarios agora mostram sucesso ao salvar/editar quando voltam para a listagem/modal de origem; fichas mostram retorno ao concluir, reabrir ou remover; impressao mostra preparacao, conclusao ou falha com mensagens e cores distintas.
+- Arquivos alterados: `src/app/layout.tsx`, `src/styles/globals.css`, `src/components/ui/route-toast.tsx`, `src/app/clientes/page.tsx`, `src/app/clientes/[id]/page.tsx`, `src/features/clientes/actions.ts`, `src/features/catalogos/actions.ts`, `src/features/catalogos/catalogos-overview.tsx`, `src/features/usuarios/actions.ts`, `src/features/usuarios/usuarios-overview.tsx`, `src/features/fichas/actions.ts`, `src/features/fichas/ficha-save-toast.tsx`, `src/features/fichas/print-trigger-button.tsx`, `src/features/fichas/ficha-print-preview-modal.tsx`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --check` e scan de mojibake nos arquivos tocados passaram. No Edge DevTools, `/clientes?toast=cliente-updated` e `/fichas?toast=ficha-reverted` renderizaram toasts success/warning com icone, faixa semantica, close button interno e URL limpa apos consumo; console sem erros capturados.
+
+### Clientes e catalogos: exclusao controlada
+
+- Ajuste: `/clientes` ganhou acao de exclusao na listagem e no detalhe, usando `AlertDialog`, Server Action, estado pending e toast por URL. A exclusao remove o cadastro do cliente; fichas existentes preservam o nome salvo no snapshot.
+- Catalogos: cada item ganhou menu de acoes com editar/excluir, tambem com `AlertDialog`, Server Action, feedback de erro por Sonner e toast de sucesso apos redirect.
+- Dados: removido do Supabase o item de catalogo `Teste` em `produto`; corrigido `Dry NBA Soft` de `produto` para `tecido`, mantendo aliases `Falcon NBA` e `Dry NBA Furadinho`, composicao `100% Poliester`, ativo e `sort_order=35`.
+- Arquivos alterados: `src/features/clientes/actions.ts`, `src/features/clientes/form-state.ts`, `src/features/clientes/cliente-delete-action.tsx`, `src/features/clientes/clientes-overview.tsx`, `src/features/clientes/cliente-detail.tsx`, `src/app/clientes/page.tsx`, `src/features/catalogos/actions.ts`, `src/features/catalogos/form-state.ts`, `src/features/catalogos/catalog-item-actions.tsx`, `src/features/catalogos/catalogos-overview.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck` passou; queries Supabase confirmaram que `teste` e `dry-nba-soft` nao aparecem mais em `produto`, e `Dry NBA Soft` aparece em `tecido`.

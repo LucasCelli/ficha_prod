@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requireSuperadmin } from "@/features/auth/session";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { CatalogoFieldErrors, CatalogoFormState } from "./form-state";
+import type { CatalogoDeleteActionState, CatalogoFieldErrors, CatalogoFormState } from "./form-state";
 import { catalogItemSchema, type CatalogItemValues } from "./schema";
 
 function slugify(value: string) {
@@ -65,6 +65,14 @@ function getReturnTo(formData: FormData) {
   return value.startsWith("/") && !value.startsWith("//") ? value : undefined;
 }
 
+function withToastParam(path: string, value: string) {
+  const [pathname, query = ""] = path.split("?");
+  const params = new URLSearchParams(query);
+  params.set("toast", value);
+  const nextQuery = params.toString();
+  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
+}
+
 export async function saveCatalogItemAction(_previousState: CatalogoFormState, formData: FormData): Promise<CatalogoFormState> {
   await requireSuperadmin();
 
@@ -99,11 +107,47 @@ export async function saveCatalogItemAction(_previousState: CatalogoFormState, f
 
   const returnTo = getReturnTo(formData);
   if (returnTo) {
-    redirect(returnTo);
+    redirect(withToastParam(returnTo, id ? "catalog-item-updated" : "catalog-item-created"));
   }
 
   return {
     message: "Item salvo no catálogo.",
     status: "success",
   };
+}
+
+export async function deleteCatalogItemAction(
+  _previousState: CatalogoDeleteActionState,
+  formData: FormData,
+): Promise<CatalogoDeleteActionState> {
+  await requireSuperadmin();
+
+  const id = String(formData.get("id") ?? "").trim();
+
+  if (!id) {
+    return {
+      message: "Item invalido para exclusao.",
+      status: "error",
+    };
+  }
+
+  if (!getSupabaseConfigStatus().hasServerConfig) {
+    return {
+      message: "Catalogos indisponiveis.",
+      status: "error",
+    };
+  }
+
+  const { error } = await createServerSupabaseClient().from("catalog_items").delete().eq("id", id);
+
+  if (error) {
+    return {
+      message: error.message,
+      status: "error",
+    };
+  }
+
+  revalidatePath("/catalogos");
+  revalidatePath("/fichas");
+  redirect(withToastParam(getReturnTo(formData) ?? "/catalogos", "catalog-item-deleted"));
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Badge, DataTable, EmptyState, Pagination } from "@/components/ui";
 import { CLIENTES_PAGE_SIZE, type ClienteFilters, type ClienteListItem, type ClientesListResult } from "./data";
+import { ClienteDeleteAction } from "./cliente-delete-action";
 import { ClientesSearchToolbar } from "./clientes-search-toolbar";
 
 type ClientesOverviewProps = {
@@ -105,6 +106,8 @@ function renderClientesContent(result: ClientesListResult, filters: ClienteFilte
 }
 
 function ClienteRow({ cliente, filters }: { cliente: ClienteListItem; filters: ClienteFilters }) {
+  const returnTo = buildClientesHref(filters);
+
   return (
     <tr>
       <td>
@@ -124,14 +127,13 @@ function ClienteRow({ cliente, filters }: { cliente: ClienteListItem; filters: C
       <td>{formatDate(cliente.ultima_ficha)}</td>
       <td>{formatNumber(cliente.total_fichas)}</td>
       <td>
-        <span className="ui-table__primary">
-          <Link className="ui-table__link" href={`/fichas?cliente=${encodeURIComponent(cliente.nome)}`}>
-            Ver fichas
-          </Link>
-          <Link className="ui-table__link" href={buildClientesHref(filters, { edit: cliente.id })}>
-            Editar
-          </Link>
-        </span>
+        <ClienteDeleteAction
+          clienteId={cliente.id}
+          clienteNome={cliente.nome}
+          editHref={buildClientesHref(filters, { edit: cliente.id })}
+          returnTo={returnTo}
+          viewFichasHref={`/fichas?cliente=${encodeURIComponent(cliente.nome)}`}
+        />
       </td>
     </tr>
   );

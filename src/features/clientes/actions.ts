@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requireAppSession } from "@/features/auth/session";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { ClienteFieldErrors, ClienteFormState } from "./form-state";
+import type { ClienteDeleteActionState, ClienteFieldErrors, ClienteFormState } from "./form-state";
 import { clienteFormSchema, type ClienteFormValues } from "./schema";
 
 function getClienteFormInput(formData: FormData) {
@@ -27,6 +27,14 @@ function getClientePayload(values: ClienteFormValues) {
 function getReturnTo(formData: FormData, fallback: string) {
   const value = String(formData.get("returnTo") ?? "").trim();
   return value.startsWith("/") && !value.startsWith("//") ? value : fallback;
+}
+
+function withToastParam(path: string, value: string) {
+  const [pathname, query = ""] = path.split("?");
+  const params = new URLSearchParams(query);
+  params.set("toast", value);
+  const nextQuery = params.toString();
+  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
 }
 
 function normalizeClienteName(value: string) {
@@ -93,7 +101,7 @@ export async function createClienteAction(_previousState: ClienteFormState, form
   }
 
   revalidatePath("/clientes");
-  redirect(getReturnTo(formData, `/clientes/${cliente.id}`));
+  redirect(withToastParam(getReturnTo(formData, `/clientes/${cliente.id}`), "cliente-created"));
 }
 
 export async function updateClienteAction(_previousState: ClienteFormState, formData: FormData): Promise<ClienteFormState> {
@@ -154,5 +162,42 @@ export async function updateClienteAction(_previousState: ClienteFormState, form
 
   revalidatePath("/clientes");
   revalidatePath(`/clientes/${id}`);
-  redirect(getReturnTo(formData, `/clientes/${id}`));
+  redirect(withToastParam(getReturnTo(formData, `/clientes/${id}`), "cliente-updated"));
+}
+
+export async function deleteClienteAction(
+  _previousState: ClienteDeleteActionState,
+  formData: FormData,
+): Promise<ClienteDeleteActionState> {
+  await requireAppSession();
+
+  const id = String(formData.get("id") ?? "").trim();
+
+  if (!id) {
+    return {
+      message: "Cliente invalido para exclusao.",
+      status: "error",
+    };
+  }
+
+  if (!getSupabaseConfigStatus().hasServerConfig) {
+    return {
+      message: "Clientes indisponiveis.",
+      status: "error",
+    };
+  }
+
+  const { error } = await createServerSupabaseClient().from("clientes").delete().eq("id", id);
+
+  if (error) {
+    return {
+      message: error.message,
+      status: "error",
+    };
+  }
+
+  revalidatePath("/clientes");
+  revalidatePath(`/clientes/${id}`);
+  revalidatePath("/fichas");
+  redirect(withToastParam(getReturnTo(formData, "/clientes"), "cliente-deleted"));
 }

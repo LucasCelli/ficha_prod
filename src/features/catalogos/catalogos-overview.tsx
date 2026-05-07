@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { ChevronDown, ListPlus, SlidersHorizontal } from "lucide-react";
 import { Badge, DataTable, EmptyState, FloatingMenu, FloatingMenuLink, Modal } from "@/components/ui";
+import { RouteToast, type RouteToastMessage } from "@/components/ui/route-toast";
 import type { CatalogosResult } from "./data";
 import { CatalogoForm } from "./catalogo-form";
+import { CatalogItemActions } from "./catalog-item-actions";
 import type { CatalogKind } from "./types";
 import { catalogKindLabels, catalogKinds } from "./types";
 
@@ -34,6 +36,7 @@ export function CatalogosOverview({ editId, modalMode, result, selectedKind }: C
 
   return (
     <section className="catalogos-view" aria-labelledby="catalogos-title">
+      <RouteToast messages={catalogoToastMessages} paramName="toast" />
       <header className="catalogos-view__header">
         <div>
           <span className="eyebrow">Catálogos</span>
@@ -107,9 +110,12 @@ export function CatalogosOverview({ editId, modalMode, result, selectedKind }: C
                       <Badge tone={item.active ? "success" : "warning"}>{item.active ? "Ativo" : "Inativo"}</Badge>
                     </td>
                     <td>
-                      <Link className="ui-button ui-button--secondary" href={`/catalogos?tipo=${selectedKind}&edit=${item.id}`}>
-                        Editar
-                      </Link>
+                      <CatalogItemActions
+                        editHref={`/catalogos?tipo=${selectedKind}&edit=${item.id}`}
+                        itemId={item.id}
+                        itemName={item.name}
+                        returnTo={closeHref}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -147,3 +153,21 @@ export function CatalogosOverview({ editId, modalMode, result, selectedKind }: C
     </section>
   );
 }
+
+const catalogoToastMessages: Record<string, RouteToastMessage> = {
+  "catalog-item-created": {
+    description: "O item foi adicionado.",
+    title: "Item salvo",
+    tone: "success",
+  },
+  "catalog-item-updated": {
+    description: "As alterações foram salvas.",
+    title: "Item atualizado",
+    tone: "success",
+  },
+  "catalog-item-deleted": {
+    description: "O item foi excluido.",
+    title: "Item excluido",
+    tone: "success",
+  },
+};

@@ -11,6 +11,7 @@ export { EmptyState } from "./empty-state";
 export { FloatingMenu, FloatingMenuButton, FloatingMenuLink } from "./floating-menu";
 export { Modal } from "./modal";
 export { ModuleOverview } from "./module-overview";
+export { MotionPage } from "./motion-page";
 export { Pagination } from "./pagination";
 export { StatusPanel } from "./status-panel";
 export { Tooltip } from "./tooltip";

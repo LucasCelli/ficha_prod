@@ -45,6 +45,14 @@ function getReturnTo(formData: FormData) {
   return value.startsWith("/") && !value.startsWith("//") ? value : undefined;
 }
 
+function withToastParam(path: string, value: string) {
+  const [pathname, query = ""] = path.split("?");
+  const params = new URLSearchParams(query);
+  params.set("toast", value);
+  const nextQuery = params.toString();
+  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
+}
+
 function getOperadorBasePayload(values: OperadorValues) {
   return {
     active: values.active,
@@ -121,7 +129,7 @@ export async function saveOperadorAction(_previousState: UsuarioFormState, formD
 
   const returnTo = getReturnTo(formData);
   if (returnTo) {
-    redirect(returnTo);
+    redirect(withToastParam(returnTo, id ? "operador-updated" : "operador-created"));
   }
 
   return {

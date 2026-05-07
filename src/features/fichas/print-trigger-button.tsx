@@ -36,17 +36,23 @@ export function PrintTriggerButton({ children, className, disabled, href, label,
     frame.title = label;
     frame.setAttribute("aria-hidden", "true");
 
-    toast.loading("Impressão", {
+    toast.loading("Preparando impressão", {
       description: "Carregando a ficha para impressão.",
       duration: Infinity,
       id: toastId,
     });
 
-    function finish() {
+    function finish(ready = false) {
       toast.dismiss(toastId);
       setIsPrinting(false);
       cleanupJob?.();
       cleanupJob = null;
+
+      if (ready) {
+        toast.success("Impressão pronta", {
+          description: "A janela de impressão foi aberta.",
+        });
+      }
     }
 
     cleanupJob = watchPrintSignal(printJobId, finish);
@@ -82,9 +88,9 @@ export function PrintTriggerButton({ children, className, disabled, href, label,
   );
 }
 
-function watchPrintSignal(printJobId: string, onReady: () => void) {
+function watchPrintSignal(printJobId: string, onReady: (ready?: boolean) => void) {
   const timeoutId = window.setTimeout(() => {
-    onReady();
+    onReady(false);
   }, PRINT_SIGNAL_TIMEOUT_MS);
 
   function handleMessage(event: MessageEvent) {
@@ -97,7 +103,7 @@ function watchPrintSignal(printJobId: string, onReady: () => void) {
       return;
     }
 
-    onReady();
+    onReady(true);
   }
 
   window.addEventListener("message", handleMessage);

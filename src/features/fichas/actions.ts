@@ -357,7 +357,7 @@ export async function markFichaEntregueAction(
   revalidatePath("/fichas");
   revalidatePath("/relatorios");
   revalidatePath(`/fichas/${id}`);
-  redirect(returnTo ?? "/fichas");
+  redirect(withToastParam(returnTo ?? "/fichas", "ficha-delivered"));
 }
 
 export async function markFichaEntregueFormAction(formData: FormData): Promise<void> {
@@ -405,7 +405,7 @@ export async function revertFichaToPendenteAction(
   revalidatePath("/fichas");
   revalidatePath("/relatorios");
   revalidatePath(`/fichas/${id}`);
-  redirect(returnTo ?? "/fichas");
+  redirect(withToastParam(returnTo ?? "/fichas", "ficha-reverted"));
 }
 
 export async function revertFichaToPendenteFormAction(formData: FormData): Promise<void> {
@@ -474,7 +474,7 @@ export async function deleteFichaAction(
 
   revalidatePath("/fichas");
   revalidatePath("/relatorios");
-  redirect(returnTo ?? "/fichas");
+  redirect(withToastParam(returnTo ?? "/fichas", "ficha-deleted"));
 }
 
 function getSafeReturnPath(value: FormDataEntryValue | null) {
@@ -482,6 +482,14 @@ function getSafeReturnPath(value: FormDataEntryValue | null) {
   const path = value.trim();
   if (!path.startsWith("/") || path.startsWith("//")) return null;
   return path;
+}
+
+function withToastParam(path: string, value: string) {
+  const [pathname, query = ""] = path.split("?");
+  const params = new URLSearchParams(query);
+  params.set("toast", value);
+  const nextQuery = params.toString();
+  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
 }
 
 async function resolveClienteId(nome: string, dataEntrega: string, mode: "create" | "update") {

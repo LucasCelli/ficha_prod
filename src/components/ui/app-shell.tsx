@@ -3,6 +3,7 @@ import Link from "next/link";
 import { LogOut } from "lucide-react";
 import type { AppSession } from "@/features/auth/types";
 import { AppNavigation } from "./app-navigation";
+import { MotionPage } from "./motion-page";
 import { ThemeToggle } from "./theme-toggle";
 
 type AppShellProps = {
@@ -43,7 +44,7 @@ export function AppShell({ children, session, title }: AppShellProps) {
         </div>
       </aside>
       <main id="conteudo" className="app-shell" aria-label={title}>
-        <div className="app-main">{children}</div>
+        <MotionPage>{children}</MotionPage>
       </main>
     </div>
   );

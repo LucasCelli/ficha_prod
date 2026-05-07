@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { KeyRound, ShieldCheck, UserPlus } from "lucide-react";
 import { Badge, DataTable, EmptyState, Modal } from "@/components/ui";
+import { RouteToast, type RouteToastMessage } from "@/components/ui/route-toast";
 import type { UsuariosResult } from "./data";
 import { UsuarioForm } from "./usuario-form";
 
@@ -33,6 +34,7 @@ export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverview
 
   return (
     <section className="usuarios-view" aria-labelledby="usuarios-title">
+      <RouteToast messages={usuarioToastMessages} paramName="toast" />
       <header className="usuarios-view__header">
         <div>
           <span className="eyebrow">Usuários</span>
@@ -129,3 +131,16 @@ export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverview
     </section>
   );
 }
+
+const usuarioToastMessages: Record<string, RouteToastMessage> = {
+  "operador-created": {
+    description: "O operador foi cadastrado.",
+    title: "Operador salvo",
+    tone: "success",
+  },
+  "operador-updated": {
+    description: "As alterações foram salvas.",
+    title: "Operador atualizado",
+    tone: "success",
+  },
+};

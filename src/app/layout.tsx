@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { CheckCircle2, CircleAlert, CircleX, Info, Loader2, X } from "lucide-react";
 import { Toaster } from "sonner";
 import { AppShell } from "@/components/ui";
 import { AppClientProviders } from "@/components/ui/app-client-providers";
@@ -56,12 +57,28 @@ export default async function RootLayout({
           </a>
           {isLoginRoute ? children : <AppShell session={session} title="Aplicacao Fichas Tecnicas">{children}</AppShell>}
           <Toaster
+            closeButton
+            duration={6500}
+            icons={{
+              close: <X aria-hidden="true" size={14} />,
+              error: <CircleX aria-hidden="true" size={18} />,
+              info: <Info aria-hidden="true" size={18} />,
+              loading: <Loader2 aria-hidden="true" className="app-toast__loading-icon" size={18} />,
+              success: <CheckCircle2 aria-hidden="true" size={18} />,
+              warning: <CircleAlert aria-hidden="true" size={18} />,
+            }}
             toastOptions={{
               classNames: {
-                loading: "toast-loading-minimal",
+                error: "app-toast app-toast--error",
+                info: "app-toast app-toast--info",
+                loading: "app-toast app-toast--loading toast-loading-minimal",
+                success: "app-toast app-toast--success",
+                toast: "app-toast",
+                warning: "app-toast app-toast--warning",
               },
             }}
             position="bottom-center"
+            visibleToasts={4}
           />
         </AppClientProviders>
       </body>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Modal } from "@/components/ui";
+import { RouteToast, type RouteToastMessage } from "@/components/ui/route-toast";
 import { ClienteForm } from "@/features/clientes/cliente-form";
 import { ClientesOverview } from "@/features/clientes/clientes-overview";
 import { getClienteById, listClientes, normalizeClientePage, normalizeClienteSearch } from "@/features/clientes/data";
@@ -25,6 +26,7 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
 
   return (
     <>
+      <RouteToast messages={clienteToastMessages} paramName="toast" />
       <ClientesOverview filters={filters} result={result} />
       {modalMode === "novo" ? (
         <Modal onCloseHref={closeHref} size="md" title="Novo cliente">
@@ -51,6 +53,24 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
     </>
   );
 }
+
+const clienteToastMessages: Record<string, RouteToastMessage> = {
+  "cliente-created": {
+    description: "O cliente foi cadastrado.",
+    title: "Cliente salvo",
+    tone: "success",
+  },
+  "cliente-updated": {
+    description: "As alterações foram salvas.",
+    title: "Cliente atualizado",
+    tone: "success",
+  },
+  "cliente-deleted": {
+    description: "O cliente foi excluido.",
+    title: "Cliente excluido",
+    tone: "success",
+  },
+};
 
 function buildClientesCloseHref(filters: { page?: number; termo?: string }) {
   const params = new URLSearchParams();

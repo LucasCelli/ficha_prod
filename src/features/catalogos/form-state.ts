@@ -6,7 +6,18 @@ export type CatalogoFormState = {
   status: "idle" | "error" | "success";
 };
 
+export type CatalogoDeleteActionState = {
+  message?: string;
+  status: "idle" | "error";
+};
+
 export function getInitialCatalogoFormState(): CatalogoFormState {
+  return {
+    status: "idle",
+  };
+}
+
+export function getInitialCatalogoDeleteActionState(): CatalogoDeleteActionState {
   return {
     status: "idle",
   };

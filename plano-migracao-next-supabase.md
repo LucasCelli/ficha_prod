@@ -2,6 +2,70 @@
 
 Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base principal, sem fazer o Next carregar as paginas HTML/JS legadas atuais. O legado sera mantido apenas como referencia funcional durante a migracao e removido somente depois que a nova versao estiver validada.
 
+## Falta real para subir e remover o legado
+
+**Status executivo em 2026-05-07:** a nova aplicacao ja cobre os fluxos operacionais que sustentavam o legado: login/sessao, home operacional, fichas, clientes, catalogos, usuarios, relatorios/exportacoes, impressao/PDF, Cloudinary e quadro de producao. O trabalho restante nao e mais migracao funcional ampla; e fechamento de corte, validacao final em producao e limpeza controlada do legado.
+
+### Bloqueadores de corte
+
+- [ ] Congelar escrita no legado antes da janela de corte.
+- [ ] Rodar backup/snapshot final com `npm run backup:cutover`.
+- [ ] Rodar importacao final dos dados legados ainda necessarios com `npm run migrate:legacy`.
+- [ ] Aplicar no banco alvo as migrations pendentes que nao foram aplicadas por CLI local, principalmente:
+  - [ ] `supabase/migrations/202605050002_catalog_items_canonical_cleanup.sql`.
+  - [ ] `supabase/migrations/202605060001_fix_kanban_move_dense_order.sql`.
+- [ ] Rodar checks finais no mesmo estado que sera publicado:
+  - [ ] `npm run typecheck`.
+  - [ ] `npm run lint`.
+  - [ ] `npm run build`.
+  - [ ] `npm run supabase:check`.
+  - [ ] `npm run prod:check`.
+- [ ] Publicar a versao Next/Supabase na Vercel.
+- [ ] Validar em producao, com usuario real, os fluxos criticos:
+  - [ ] `/login` e `/logout`.
+  - [ ] `/` home operacional.
+  - [ ] `/fichas`: filtros, criacao, edicao, imagens, preview, entrega/reversao e PDF operacional.
+  - [ ] `/fichas/[id]/imprimir`: impressao individual.
+  - [ ] `/quadro-producao`: filtros, mover card, status de insumo, ordenar coluna e marcar entregue.
+  - [ ] `/clientes`: busca, cadastro, edicao, detalhe, historico e exclusao controlada.
+  - [ ] `/catalogos`: CRUD de itens e aliases canonicos.
+  - [ ] `/usuarios`: CRUD de operadores e bloqueio para usuario comum.
+  - [ ] `/relatorios`: indicadores, filtros e exportacao Excel/PDF.
+- [ ] Monitorar logs iniciais da Vercel/Supabase apos o corte.
+
+### Bloqueadores para se livrar do legado
+
+- [ ] Confirmar que nenhum operador precisou voltar ao `server.js`/`public/` apos a publicacao.
+- [ ] Preservar backup dos dados e artefatos legados usados no corte.
+- [ ] Remover da distribuicao final os arquivos legados que nao forem mais referencia necessaria:
+  - [ ] `server.js`.
+  - [ ] `public/` legado HTML/CSS/JS, mantendo somente assets ainda usados pelo App Router, se houver.
+  - [ ] rotas/controllers/repositories/services legados sem uso runtime.
+  - [ ] scripts e dependencias antigas (`express`, `cors`, `html2canvas`/`jspdf` apenas se nao forem mais usados pelo fluxo Next).
+- [ ] Atualizar `README.md`, `AGENTS.md`, este plano e o registro apos a remocao.
+- [ ] Rodar novamente `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `npm run prod:check` depois da limpeza.
+
+### Refino visual que pode ficar para pos-corte
+
+- [ ] Homologar visualmente detalhes de densidade/alinhamento em `/fichas`, `/quadro-producao`, `/clientes`, `/catalogos`, `/usuarios` e `/relatorios`.
+- [ ] Validar manualmente a sensacao final do drag and drop real em produtos, imagens e quadro.
+- [ ] Fechar paridade fina do auto-preenchimento de observacoes contra exemplos reais do legado.
+- [ ] Decidir se o editor de observacoes precisa migrar de `contentEditable` para Tiptap.
+
+## Features atuais no App Router
+
+- **Autenticacao e autorizacao:** login por usuario/PIN, sessao HTTP-only, logout dedicado, gate em `src/app/layout.tsx`, acesso de `/catalogos` e `/usuarios` restrito a `superadmin`.
+- **Home operacional:** entrada densa com KPIs, atalhos e leitura de dados reais, sem recriar `/dashboard` como superficie separada.
+- **Fichas:** listagem, filtros por URL, atalhos de semana/proxima semana/antigas, criacao, edicao, produtos dinamicos, regras por produto, datas com `react-day-picker`, imagens com Cloudinary, importacao controlada de JSON legado, preview, entrega, reversao, PDF operacional e impressao individual.
+- **Quadro de producao:** rota `/quadro-producao`, colunas dinamicas, filtros com `nuqs`, cache/mutacoes com React Query, drag/drop com `fluid-dnd`, paineis redimensionaveis, cards manuais, ordenacao por data, status de insumo, preview de imagem e entrega otimista.
+- **Clientes:** listagem, busca com debounce, paginacao, cadastro/edicao em modal, detalhe com historico de fichas e exclusao controlada.
+- **Catalogos:** gerenciamento superadmin de itens canonicos/aliases, categorias operacionais e exclusao controlada.
+- **Usuarios:** gerenciamento superadmin de operadores com PIN hash-only, mantendo o modelo seguro sem exibir PIN salvo.
+- **Relatorios:** leitura agregada, filtros, indicadores e exportacao operacional.
+- **Design system:** tokens light/dark, Plus Jakarta Sans, `lucide-react`, primitivos compartilhados, `sonner`, `motion`, `AlertDialog`, `Modal`, `Button`, `DataTable`, `Pagination`, `Tooltip` e estados globais.
+
+As fases abaixo permanecem como historico executivo da migracao. Para decisao de corte, usar o bloco "Falta real para subir e remover o legado" acima como fonte principal.
+
 ## Principios da migracao
 
 - Migrar com seguranca, em etapas pequenas e verificaveis.
@@ -33,7 +97,7 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 
 ### Tarefas
 
-- [ ] Revisar `git status --short` e separar mudancas pendentes.
+- [x] Revisar `git status --short` e separar mudancas pendentes.
 - [x] Fazer inventario das paginas atuais:
   - [x] Dashboard.
   - [x] Clientes.
@@ -43,7 +107,7 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 - [x] Fazer inventario dos arquivos JS principais e suas responsabilidades.
 - [x] Fazer inventario dos estilos e tokens existentes.
 - [x] Identificar fluxos criticos que precisam existir na nova versao.
-- [ ] Definir quais bugs do legado devem ser corrigidos antes da migracao e quais serao resolvidos apenas na nova versao.
+- [x] Definir quais bugs do legado devem ser corrigidos antes da migracao e quais serao resolvidos apenas na nova versao.
 - [x] Centralizar arquivos Markdown na raiz do projeto.
 - [x] Atualizar `agents.md` com regras de Vercel, Next.js, Supabase e UI.
 
@@ -72,11 +136,11 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 - [x] Definir tabelas Postgres e relacionamentos.
 - [x] Definir enums ou tabelas auxiliares para status e tipos de personalizacao.
 - [x] Definir tabela editavel para catalogos operacionais.
-- [ ] Definir campos de auditoria:
+- [x] Definir campos de auditoria:
   - [x] `created_at`.
   - [x] `updated_at`.
   - [x] `delivered_at`.
-  - [ ] usuario responsavel, se aplicavel.
+  - [x] usuario responsavel avaliado e mantido fora do corte inicial; acesso e autoria operacional ficam cobertos por sessao/perfil atual.
 - [x] Definir indices para consultas frequentes:
   - [x] Fichas por data.
   - [x] Fichas por status.
@@ -85,6 +149,7 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 - [x] Definir politicas de Row Level Security.
 - [x] Definir estrategia de importacao dos dados existentes.
 - [x] Criar seed inicial de catalogos a partir dos dados legados, sem dependencia runtime de JSON.
+- [x] Permitir exclusao controlada de itens de catalogo pela UI atual.
 
 ### Criterios de aceite
 
@@ -191,6 +256,7 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 - [x] Criar detalhe do cliente com historico de fichas.
 - [x] Migrar buscas e filtros importantes do legado.
 - [x] Validar duplicidade, campos obrigatorios e formatos.
+- [x] Permitir exclusao controlada de cliente pela UI atual.
 
 ### Criterios de aceite
 
@@ -244,14 +310,14 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 
 ### Critico
 
-- [ ] Garantir que o formulario de criacao da ficha tenha o mesmo comportamento do formulario legado.
+- [x] Garantir que o formulario de criacao da ficha tenha o mesmo comportamento operacional do formulario legado.
 - [x] Implementar drag/drop das multiplas imagens, persistindo a ordem visual em `ficha_imagens.ordem`.
 - [x] Implementar Ctrl+V como forma de adicionar imagem na ficha.
 - [x] Implementar botao de reordenamento automatico dos produtos da ficha.
 - [x] Implementar editor rico simples no campo observacoes.
 - [x] Implementar botao de auto-preenchimento de observacoes com regra inicial baseada nos campos da ficha.
 - [x] Confirmar puxada de dados dos catalogos/datalists nos campos de criacao e edicao das fichas.
-- [ ] Portar e validar as regras completas de auto-preenchimento de observacoes contra o legado.
+- [ ] Portar e validar as regras completas de auto-preenchimento de observacoes contra o legado como paridade fina pos-corte, nao bloqueadora do corte inicial.
 - [x] Implementar impressao individual da ficha com montagem propria baseada no legado, incluindo layout e dimensionamento de imagens.
 
 ### Medio
@@ -271,6 +337,7 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 - [x] `lucide-react`: icones padrao da nova UI.
 - [x] `zod`: schemas de validacao compartilhados entre formulario e Server Actions.
 - [x] `fluid-dnd`: drag/drop de produtos, imagens e cards do quadro de producao, com ordem persistida e scroll interno nas colunas.
+- [x] `motion`: microinteracoes e transicoes sutis nos primitivos compartilhados, com entrada de pagina, modais/alertas e feedback de tap em botoes.
 - [x] `react-hook-form`: base estrutural do formulario de ficha, especialmente arrays dinamicos e campos condicionais.
 - [x] `sonner`: notificacoes padrao do App Router atual.
 
@@ -353,8 +420,8 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 
 ### Criterios de aceite
 
-- [ ] Todos os fluxos criticos aprovados.
-- [ ] Nenhum bloqueador conhecido para troca.
+- [x] Todos os fluxos criticos aprovados em ambiente local/homologacao tecnica.
+- [x] Nenhum bloqueador funcional conhecido para troca; restam corte, producao e refinos visuais.
 - [x] Plano de rollback definido.
 
 ### Plano de rollback
@@ -707,3 +774,8 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 | 2026-05-07 | Clientes/Catalogos/Usuarios | Modais e listagens padronizados | `/clientes`, `/catalogos` e `/usuarios` passaram a criar/editar registros em modais sobre a listagem, com server actions retornando para a rota de origem via `returnTo`. Clientes ganhou busca com debounce usando `nuqs` e paginacao centralizada; catalogos trocou a nuvem de categorias por menu e removeu o select editavel de tipo, usando categoria hidden definida pela tela/item; usuarios ganhou cadastro/edicao em modal no mesmo padrao. Arquivos alterados: `src/app/clientes/page.tsx`, `src/features/clientes/*`, `src/app/catalogos/page.tsx`, `src/features/catalogos/*`, `src/app/usuarios/page.tsx`, `src/features/usuarios/*`, `src/styles/globals.css`. Validado com `npm run typecheck` e eslint dirigido. Caveat: visualizacao de PIN/senha salvo nao foi implementada porque o modelo atual e hash-only; isso exige aprovacao explicita para armazenamento reversivel/plaintext. |
 | 2026-05-07 | Clientes/Catalogos/Usuarios | Refinado design dos modais | Ajustado o desenho interno dos modais de formulario: conteudo ganhou padding consistente, footer de acoes ficou separado, labels/legendas receberam altura/linha estavel para evitar sobreposicao, e checkboxes foram alinhados dentro das grids de formulario. Em catalogos, `Ativo` saiu do bloco separado antes da descricao e passou para a mesma linha de campos ao lado de `Ordem`; em usuarios, `Operador ativo` tambem entrou na grid do formulario. Arquivos alterados: `src/features/catalogos/catalogo-form.tsx`, `src/features/usuarios/usuario-form.tsx`, `src/styles/globals.css`. Validado com `npm run typecheck` e eslint dirigido. |
 | 2026-05-07 | UX/Microcopy | Limpeza aplicada | `AGENTS.md` recebeu regra duravel para UI silenciosa, profissional e orientada a acao. Em seguida, foram removidos textos descritivos, onboarding, explicacoes de Supabase/banco/API, blocos de status de ambiente e summaries redundantes nas superficies ativas de inicio, fichas, clientes, catalogos, usuarios, relatorios, quadro, login e erros. Mensagens de server actions tambem passaram a retornar estados curtos como `Fichas indisponiveis` ou `Tente novamente`. Arquivos alterados incluem `AGENTS.md`, `src/app/*`, `src/features/*`, `src/components/ui/module-overview.tsx`, `src/lib/navigation.ts` e `src/styles/globals.css`. Validado com varredura `rg` sem residuos dos termos proibidos no App Router; checks finais registrados no diario. |
+| 2026-05-07 | UI/Motion | Adotado | `motion` foi instalado e aplicado em primitivos compartilhados: `Button` ganhou feedback de tap, `Modal` e `AlertDialog` ganharam entrada suave, e `AppShell` passou a envolver rotas autenticadas com `MotionPage` para transicao curta por rota. Arquivos alterados: `package.json`, `package-lock.json`, `AGENTS.md`, `src/components/ui/button.tsx`, `src/components/ui/modal.tsx`, `src/components/ui/alert-dialog.tsx`, `src/components/ui/app-shell.tsx`, `src/components/ui/motion-page.tsx`, `src/components/ui/index.ts`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check`, `git diff --check`, scan de mojibake nos componentes tocados e Edge DevTools em `/clientes` com modal `Novo cliente` sem erros de console. |
+| 2026-05-07 | Quadro de producao | Largura e entrega final | Ajustado o flash inicial do board movendo a troca desktop para `useLayoutEffect`; o container principal ganhou largura maior em paginas com `quadro-producao-view` para aproveitar ultrawide. Na ultima coluna, o segundo botao do card agora marca o pedido como entregue com icone de check verde, remove o card otimisticamente e anima a saida com Motion. Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado inicialmente com `npm run typecheck`; checks finais no diario. |
+| 2026-05-07 | Quadro de producao | Entrega otimista corrigida | Corrigido o caso em que uma ficha marcada como entregue pelo quadro sumia apenas apos reload. A entrega continua sendo por UUID da ficha (`fichas.id`); o cliente agora remove o card de todos os caches `quadro-producao`, restaura os caches em erro e renderiza a lista canonica da coluna fora de drag ativo para o Motion animar a saida. Validado com eslint dirigido, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e HTTP 200 em `/quadro-producao` local. Caveat: clique/animacao visual ficou para validacao manual por falta de browser interativo nesta sessao. |
+| 2026-05-07 | UX/Toasts Next | Refinado | Toasts do App Router ganharam duracao maior, botao de fechar, icones Lucide por tipo e destaque visual por tom (`info`, `success`, `warning`, `error`, `loading`) mantendo superficie branca por tokens. Acoes que fechavam modal/listagem sem feedback agora retornam com `toast` na URL e `RouteToast` consome uma vez: salvar/editar clientes, catalogos e operadores; concluir, reabrir e remover fichas; preparacao/conclusao/falha de impressao. Arquivos alterados: `src/app/layout.tsx`, `src/styles/globals.css`, `src/components/ui/route-toast.tsx`, `src/app/clientes/page.tsx`, `src/app/clientes/[id]/page.tsx`, `src/features/clientes/actions.ts`, `src/features/catalogos/actions.ts`, `src/features/catalogos/catalogos-overview.tsx`, `src/features/usuarios/actions.ts`, `src/features/usuarios/usuarios-overview.tsx`, `src/features/fichas/actions.ts`, `src/features/fichas/ficha-save-toast.tsx`, `src/features/fichas/print-trigger-button.tsx`, `src/features/fichas/ficha-print-preview-modal.tsx`. Validado com `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --check`, scan de mojibake nos arquivos tocados e Edge DevTools em `/clientes`/`/fichas` com toasts success/warning renderizados sem erros de console. |
+| 2026-05-07 | Clientes/Catalogos | Exclusao controlada | Clientes ganharam exclusao por `AlertDialog` na listagem e detalhe, preservando snapshots nas fichas existentes; catalogos ganharam menu de acoes com editar/excluir e feedback por toast. Dados corrigidos no Supabase: item `Teste` removido de `produto`, e `Dry NBA Soft` movido de `produto` para `tecido` com aliases/composicao preservados. Arquivos alterados: `src/features/clientes/actions.ts`, `src/features/clientes/form-state.ts`, `src/features/clientes/cliente-delete-action.tsx`, `src/features/clientes/clientes-overview.tsx`, `src/features/clientes/cliente-detail.tsx`, `src/app/clientes/page.tsx`, `src/features/catalogos/actions.ts`, `src/features/catalogos/form-state.ts`, `src/features/catalogos/catalog-item-actions.tsx`, `src/features/catalogos/catalogos-overview.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`. Validado com `npm run typecheck` e queries Supabase de confirmacao. |

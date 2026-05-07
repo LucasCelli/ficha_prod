@@ -37,7 +37,7 @@ export function FichaPrintPreviewShell({ children, duplicateHref, printHref }: F
     }
 
     setIsPrinting(true);
-    toast.loading("Impressão", {
+    toast.loading("Preparando impressão", {
       description: "Montando o PDF da ficha.",
       duration: Infinity,
       id: PREVIEW_PRINT_TOAST_ID,
@@ -45,6 +45,9 @@ export function FichaPrintPreviewShell({ children, duplicateHref, printHref }: F
 
     try {
       await printElementToPdf(element);
+      toast.success("Impressão pronta", {
+        description: "O PDF foi enviado para impressão.",
+      });
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast.error("Falha ao imprimir", {

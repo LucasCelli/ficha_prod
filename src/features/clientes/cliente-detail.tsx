@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge, DataTable, EmptyState } from "@/components/ui";
 import type { FichaListItem, FichaStatus } from "@/features/fichas/data";
+import { ClienteDeleteAction } from "./cliente-delete-action";
 import type { ClienteDetailResult } from "./data";
 
 type ClienteDetailProps = {
@@ -67,12 +68,14 @@ export function ClienteDetail({ result }: ClienteDetailProps) {
               {cliente.nome}
             </h1>
           </div>
-          <Link className="ui-button ui-button--secondary" href={`/fichas?cliente=${encodeURIComponent(cliente.nome)}`}>
-            Ver fichas
-          </Link>
-          <Link className="ui-button ui-button--primary" href={`/clientes/${cliente.id}/editar`}>
-            Editar cliente
-          </Link>
+          <ClienteDeleteAction
+            clienteId={cliente.id}
+            clienteNome={cliente.nome}
+            editHref={`/clientes/${cliente.id}/editar`}
+            returnTo="/clientes"
+            variant="header"
+            viewFichasHref={`/fichas?cliente=${encodeURIComponent(cliente.nome)}`}
+          />
         </div>
       </header>
 
