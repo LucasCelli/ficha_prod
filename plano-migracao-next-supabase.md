@@ -9,17 +9,39 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
 ### Bloqueadores de corte
 
 - [ ] Congelar escrita no legado antes da janela de corte.
-- [ ] Rodar backup/snapshot final com `npm run backup:cutover`.
-- [ ] Rodar importacao final dos dados legados ainda necessarios com `npm run migrate:legacy`.
+- [x] Rodar backup/snapshot final com `npm run backup:cutover`.
+- [x] Adicionar manualmente por JSON as fichas legadas ainda faltantes no Supabase, sem rodar `npm run migrate:legacy -- --apply` neste corte:
+  - [x] legacy `356` - Larissa Cordeiro - entrega 2026-05-22.
+  - [x] legacy `357` - Larissa Cordeiro - entrega 2026-05-22.
+  - [x] legacy `358` - JEAN Correa - entrega 2026-05-20.
+  - [x] legacy `359` - Bruno de Oliveira - entrega 2026-05-25.
+  - [x] legacy `360` - Alisson Souza - venda 6302 - entrega 2026-05-26.
+  - [x] legacy `361` - Cecilia Mothorhome - entrega 2026-05-13.
+  - [x] legacy `362` - Cecilia Mothorhome - entrega 2026-05-13.
+  - [x] legacy `363` - Cecilia Mothorhome - entrega 2026-05-13.
+  - [x] legacy `364` - Cecilia Mothorhome - entrega 2026-05-13.
+  - [x] legacy `365` - Cecilia Mothorhome - entrega 2026-05-13.
+  - [x] legacy `366` - Matosul - entrega 2026-05-15.
+  - [x] legacy `367` - Marines Florentino - entrega 2026-05-14.
+  - [x] legacy `368` - Paroquia Nsra. da Abadia - Sidrolandia - venda 6313 - entrega 2026-05-11.
+  - [x] legacy `369` - Nathan Ferreira - entrega 2026-05-27.
+  - [x] legacy `370` - Gabriela Carvalho - entrega 2026-05-19.
+- [x] Validar a contagem final considerando a ficha criada nativamente no novo sistema:
+  - [x] `333` fichas legadas nao manuais cobertas por `legacy_ficha_id` ou JSON manual.
+  - [x] `1` ficha nativa do Next/Supabase sem correspondente no legado.
+  - [x] total operacional no Supabase: `334` fichas, sem cards manuais.
+- [x] Rodar `npm run cutover:check` ate retornar `ready-for-cutover-data`.
 - [ ] Aplicar no banco alvo as migrations pendentes que nao foram aplicadas por CLI local, principalmente:
   - [ ] `supabase/migrations/202605050002_catalog_items_canonical_cleanup.sql`.
   - [ ] `supabase/migrations/202605060001_fix_kanban_move_dense_order.sql`.
+  - [ ] Caveat atual: esta sessao nao tem Supabase CLI, `psql`, `SUPABASE_DB_URL` nem ferramenta MCP de `execute_sql`; aplicar via SQL Editor do Supabase, CLI em ambiente com acesso ao banco ou nova sessao com MCP Supabase ativo.
 - [ ] Rodar checks finais no mesmo estado que sera publicado:
-  - [ ] `npm run typecheck`.
-  - [ ] `npm run lint`.
-  - [ ] `npm run build`.
-  - [ ] `npm run supabase:check`.
-  - [ ] `npm run prod:check`.
+  - [x] `npm run typecheck` passou em 2026-05-07 antes da carga manual das fichas faltantes.
+  - [x] `npm run lint` passou em 2026-05-07 antes da carga manual das fichas faltantes.
+  - [x] `npm run build` passou em 2026-05-07 antes da carga manual das fichas faltantes.
+  - [x] `npm run supabase:check` passou em 2026-05-07 antes da carga manual das fichas faltantes.
+  - [x] `npm run prod:check` passou em 2026-05-07 antes da carga manual das fichas faltantes.
+  - [x] Rerodar todos os checks acima depois da carga manual por JSON.
 - [ ] Publicar a versao Next/Supabase na Vercel.
 - [ ] Validar em producao, com usuario real, os fluxos criticos:
   - [ ] `/login` e `/logout`.

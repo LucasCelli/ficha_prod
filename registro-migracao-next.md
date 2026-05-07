@@ -1,5 +1,35 @@
 # Registro da migracao Next
 
+## 2026-05-07 - Corte: carga manual fechada e checks finais
+
+- Fase/modulo: corte de dados / validacao final local.
+- Arquivos alterados: `README.md`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: apos a importacao manual por JSON feita pelo usuario, `npm run cutover:check` retornou `ready-for-cutover-data`. O Supabase ficou com 334 fichas totais: 333 fichas legadas cobertas por `legacy_ficha_id` ou correspondencia de JSON manual, 1 ficha nativa do Next/Supabase e 0 cards manuais.
+- Contagens atuais: `npm run supabase:check` retornou `ready` com 200 clientes, 334 fichas, 1871 itens, 416 imagens e 224 itens de catalogo.
+- Checks finais pos-carga manual: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `npm run prod:check` passaram. O primeiro `prod:check` dentro do sandbox falhou apenas no acesso do `npx vercel` ao cache do npm; repetido fora do sandbox, retornou `ready-for-production-cutover` com Vercel CLI 53.2.0.
+- Documentacao: `README.md` passou a listar `npm run cutover:check` entre os comandos principais, e o plano registrou que a aplicacao das migrations pendentes exige SQL Editor/Supabase CLI/`execute_sql`, ja que esta sessao nao tem Supabase CLI, `psql`, `SUPABASE_DB_URL` nem ferramenta MCP de SQL remoto.
+- Proxima pendencia de corte: aplicar/confirmar as migrations pendentes no banco alvo e entao publicar a versao Next/Supabase na Vercel.
+
+## 2026-05-07 - Corte: checagem repetivel da lacuna de fichas
+
+- Fase/modulo: corte de dados / validacao de importacao manual.
+- Arquivos alterados: `package.json`, `scripts/check-cutover-gap.mjs`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: criado `npm run cutover:check`, um verificador read-only que compara as fichas nao manuais do Turso com o Supabase. Ele aceita duas formas de cobertura: `legacy_ficha_id` preenchido ou ficha criada manualmente no Next/Supabase com mesmo cliente normalizado, data de entrega e numero de venda.
+- Validacao: `node --check scripts/check-cutover-gap.mjs` passou. `npm run cutover:check` retornou `pending-cutover-data`, com 333 fichas legadas nao manuais, 331 fichas no Supabase, 318 com `legacy_ficha_id`, 12 cobertas por JSON manual sem `legacy_ficha_id`, 1 ficha nativa sem legado e 0 cards manuais.
+- Pendencia real apos a carga manual parcial: faltam somente `368` (Paroquia Nsra. da Abadia - Sidrolandia, venda 6313, entrega 2026-05-11), `369` (Nathan Ferreira, entrega 2026-05-27) e `370` (Gabriela Carvalho, entrega 2026-05-19).
+- Caveat: `vercel build` local e `vercel build --standalone` compilaram o Next, mas a CLI falhou ao empacotar `.vercel/output` por `EPERM` ao criar symlink de funcao no Windows. A validacao local confiavel segue sendo `npm run build`; a validacao Vercel final deve ser remota ou em ambiente com permissao de symlink.
+
+## 2026-05-07 - Corte: snapshot e checks pre-carga manual
+
+- Fase/modulo: corte para producao / validacao pre-corte.
+- Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: workspace estava limpo apos o commit do estado anterior. Foram executados `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check`, `npm run prod:check` e `npm run migrate:legacy` em dry-run. Typecheck, lint, build e Supabase check passaram; `prod:check` passou ao repetir fora do sandbox porque o `npx vercel` precisava acessar o cache do npm. O dry-run do import nao gravou dados.
+- Snapshot: `npm run backup:cutover` gerou `data/backups/cutover-snapshot-2026-05-07T23-40-57-956Z.json`, com 333 fichas legadas nao manuais, 330 fichas no Supabase, 1839 itens, 411 imagens, 224 itens de catalogo e 7 usuarios no resumo.
+- Diagnostico de lacuna: comparando `legacy_ficha_id`, ha 318 fichas importadas com origem legada e 15 fichas legadas ainda ausentes no Supabase: `356`, `357`, `358`, `359`, `360`, `361`, `362`, `363`, `364`, `365`, `366`, `367`, `368`, `369` e `370`.
+- Contagem esperada: o Supabase tera uma ficha a mais que o legado porque ja existe 1 ficha criada diretamente no novo sistema. Portanto, apos a carga manual, a validacao correta e `333` fichas legadas com `legacy_ficha_id` + `1` ficha nativa do Next/Supabase, totalizando pelo menos `334` fichas operacionais, sem contar cards manuais se houver.
+- Decisao do usuario: nao rodar `npm run migrate:legacy -- --apply`; as fichas faltantes serao adicionadas manualmente por JSON.
+- Caveat: a tentativa de iniciar `npx vercel build` foi interrompida pelo usuario antes de produzir resultado e nao deve ser tratada como validacao.
+
 ## 2026-05-07 - Plano: corte final e legado reposicionados
 
 - Fase/modulo: documentacao executiva / fechamento da migracao.

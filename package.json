@@ -9,6 +9,7 @@
     "dev:legacy": "node --watch server.js",
     "build": "node scripts/build-next.mjs",
     "backup:cutover": "node scripts/export-cutover-snapshot.mjs",
+    "cutover:check": "node scripts/check-cutover-gap.mjs",
     "start": "next start",
     "start:legacy": "node server.js",
     "lint": "eslint .",

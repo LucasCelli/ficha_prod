@@ -20,6 +20,7 @@ npm run build
 npm run lint
 npm run typecheck
 npm run supabase:check
+npm run cutover:check
 npm run prod:check
 ```
 
