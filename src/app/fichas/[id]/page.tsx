@@ -44,8 +44,8 @@ export default async function FichaPage({ params }: FichaPageProps) {
             Voltar para fichas
           </Link>
         }
-        title="Supabase ainda não configurado"
-        description="A edição de ficha já está preparada, mas precisa das variáveis de ambiente do Supabase para carregar os dados."
+        title="Ficha indisponível"
+        description="Tente novamente."
       />
     );
   }
@@ -59,7 +59,7 @@ export default async function FichaPage({ params }: FichaPageProps) {
           </Link>
         }
         title="Não foi possível carregar a ficha"
-        description={`A consulta ao Supabase falhou: ${result.message}`}
+        description={result.message}
       />
     );
   }
@@ -77,9 +77,6 @@ export default async function FichaPage({ params }: FichaPageProps) {
         <h1 id="editar-ficha-title" className="app-title">
           Editar ficha
         </h1>
-        <p className="app-summary">
-          Atualize os dados comerciais e técnicos de {ficha.cliente_nome_snapshot} com os controles condicionais da ficha.
-        </p>
       </header>
 
       <Card className="ficha-create__card">

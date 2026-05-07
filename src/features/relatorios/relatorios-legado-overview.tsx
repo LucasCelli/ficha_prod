@@ -23,8 +23,8 @@ export function RelatoriosLegadoOverview({ filters, result }: RelatoriosLegadoOv
       <section className="relatorios-view" aria-labelledby="relatorios-title">
         <RelatoriosHeader filters={filters} />
         <EmptyState
-          title="Supabase ainda não configurado"
-          description="O relatório já está preparado para calcular estatísticas, rankings e exportação Excel a partir do Supabase."
+          title="Relatórios indisponíveis"
+          description="Tente novamente."
         />
       </section>
     );
@@ -34,7 +34,7 @@ export function RelatoriosLegadoOverview({ filters, result }: RelatoriosLegadoOv
     return (
       <section className="relatorios-view" aria-labelledby="relatorios-title">
         <RelatoriosHeader filters={filters} />
-        <EmptyState title="Não foi possível carregar o relatório" description={`A consulta ao Supabase falhou: ${result.message}`} />
+        <EmptyState title="Não foi possível carregar o relatório" description={result.message} />
       </section>
     );
   }
@@ -60,9 +60,6 @@ function RelatoriosHeader({ filters }: { filters: RelatorioFilters }) {
           <h1 id="relatorios-title" className="app-title">
             Relatórios e Estatísticas
           </h1>
-          <p className="app-summary">
-            Visão operacional por período com estatísticas, vendedores, materiais, produtos, clientes, tamanhos e exportações.
-          </p>
         </div>
         <div className="dashboard-actions">
           <Link className="ui-button ui-button--secondary" href={`/fichas/pdf${suffix}`}>

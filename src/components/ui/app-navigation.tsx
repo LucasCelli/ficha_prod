@@ -44,7 +44,6 @@ export function AppNavigation({ role }: AppNavigationProps) {
             </span>
             <span className="app-nav__copy">
               <span>{item.label}</span>
-              <small>{item.description}</small>
             </span>
           </Link>
         );

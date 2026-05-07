@@ -7,7 +7,7 @@ type GlobalErrorPageProps = {
   reset: () => void;
 };
 
-export default function GlobalErrorPage({ error, reset }: GlobalErrorPageProps) {
+export default function GlobalErrorPage({ reset }: GlobalErrorPageProps) {
   return (
     <html data-theme="light" lang="pt-BR">
       <body>
@@ -16,7 +16,7 @@ export default function GlobalErrorPage({ error, reset }: GlobalErrorPageProps) 
             <div className="status-panel__content">
               <p className="status-panel__eyebrow">Erro</p>
               <h1>Nao foi possivel continuar</h1>
-              <p>{error.digest ? `Codigo de referencia: ${error.digest}` : "A aplicacao nao pode ser carregada agora."}</p>
+              <p>Tente novamente.</p>
               <button className="ui-button ui-button--secondary" onClick={reset} type="button">
                 Tentar novamente
               </button>

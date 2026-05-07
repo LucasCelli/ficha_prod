@@ -38,6 +38,7 @@ import {
   type CustomDatalistOption,
 } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
+import { useFluidDndEventTargetGuard } from "@/lib/fluid-dnd-event-target-guard";
 import { createFichaAction, updateFichaAction } from "./actions";
 import type { FichaDetail } from "./data";
 import type { FichaFormClientValues, FichaFormInitialData, ImageFormItem, ProductFormItem } from "./ficha-form-seed";
@@ -53,6 +54,7 @@ type FichaFormProps = {
   catalogOptions?: CatalogOptionsByKind;
   clienteOptions?: CustomDatalistOption[];
   ficha?: FichaDetail;
+  initialData?: FichaFormInitialData;
   mode?: "create" | "edit";
   vendedorOptions?: CustomDatalistOption[];
 };
@@ -298,9 +300,11 @@ type ImportedLegacyState = {
 type PendingLegacyImport = ImportedLegacyState;
 
 export function FichaForm(props: FichaFormProps) {
-  const { ficha, mode = "create" } = props;
+  useFluidDndEventTargetGuard();
+
+  const { ficha, initialData, mode = "create" } = props;
   const [importedLegacyState, setImportedLegacyState] = useState<ImportedLegacyState | null>(null);
-  const renderKey = `${mode}-${ficha?.id ?? "new"}-${importedLegacyState?.importedAt ?? 0}`;
+  const renderKey = `${mode}-${ficha?.id ?? initialData?.cliente ?? "new"}-${importedLegacyState?.importedAt ?? 0}`;
 
   return (
     <FichaFormInner
@@ -322,14 +326,15 @@ function FichaFormInner({
   catalogOptions,
   clienteOptions = [],
   ficha,
+  initialData: seededInitialData,
   importedLegacyState,
   mode = "create",
   onApplyImportedLegacyState,
   vendedorOptions = [],
 }: FichaFormInnerProps) {
   const initialData = useMemo(
-    () => importedLegacyState?.initialData ?? mapFichaToInitialData(ficha),
-    [ficha, importedLegacyState],
+    () => importedLegacyState?.initialData ?? seededInitialData ?? mapFichaToInitialData(ficha),
+    [ficha, importedLegacyState, seededInitialData],
   );
   const action = mode === "edit" ? updateFichaAction : createFichaAction;
   const [state, formAction] = useActionState(action, getInitialFichaFormState());
@@ -440,23 +445,31 @@ function FichaFormInner({
   const showCorAbertura = isPolo && aberturaLateral === "sim";
   const showCorSublimacao = arte === "sublimacao";
   const primeiroProduto = itens.find((item) => item.produto.trim())?.produto ?? "";
-  const [productsListRef, fluidProductItems, setFluidProductItems] = useDragAndDrop<ProductFormItem, HTMLDivElement>(itens, {
+  const productDragConfig = useMemo(() => ({
     animationDuration: 90,
     delayBeforeInsert: 0,
     delayBeforeRemove: 0,
     draggingClass: "products-editor__row--dragging",
     handlerSelector: ".products-editor__drag",
-    isDraggable: (element) => element.classList.contains("products-editor__row"),
-  });
-  const [imageGridRef, fluidImageItems, setFluidImageItems] = useDragAndDrop<ImageFormItem, HTMLDivElement>(imagens, {
+    isDraggable: (element: HTMLElement) => element.classList.contains("products-editor__row"),
+  }), []);
+  const imageDragConfig = useMemo(() => ({
     animationDuration: 90,
     delayBeforeInsert: 0,
     delayBeforeRemove: 0,
-    direction: "horizontal",
+    direction: "horizontal" as const,
     draggingClass: "image-upload-card--dragging",
     handlerSelector: ".image-upload-card__order",
-    isDraggable: (element) => element.classList.contains("image-upload-card"),
-  });
+    isDraggable: (element: HTMLElement) => element.classList.contains("image-upload-card"),
+  }), []);
+  const [productsListRef, fluidProductItems, setFluidProductItems] = useDragAndDrop<ProductFormItem, HTMLDivElement>(
+    itens,
+    productDragConfig,
+  );
+  const [imageGridRef, fluidImageItems, setFluidImageItems] = useDragAndDrop<ImageFormItem, HTMLDivElement>(
+    imagens,
+    imageDragConfig,
+  );
 
   const syncComposicaoByMaterial = useCallback((nextMaterial: string, source: "auto" | "manual", compositionOverride?: string) => {
     const materialOption = MATERIAL_OPTIONS.find((option) => option.nome === nextMaterial);
@@ -699,8 +712,8 @@ function FichaFormInner({
         applyParsedLegacyImport(nextImport);
       }
     } catch (error) {
-      toast.error("Importação legado inválida", {
-        description: error instanceof Error ? error.message : "Não foi possível ler este JSON legado.",
+      toast.error("Importação inválida", {
+        description: error instanceof Error ? error.message : "Não foi possível ler este JSON.",
       });
     } finally {
       if (legacyImportInputRef.current) {
@@ -781,10 +794,10 @@ function FichaFormInner({
 
     const warningCount = importedLegacyState.warnings.length;
     const imageCount = importedLegacyState.initialData.imagens.length;
-    toast.success("JSON legado importado como rascunho", {
+    toast.success("JSON importado", {
       description: warningCount > 0
         ? `${importedLegacyState.fileName}: ${imageCount} imagem(ns) aproveitada(s) e ${warningCount} aviso(s) de conversão parcial.`
-        : `${importedLegacyState.fileName}: rascunho preenchido sem gravar nada no banco.`,
+        : `${importedLegacyState.fileName}: rascunho preenchido.`,
     });
     lastImportedLegacyToastRef.current = importedLegacyState.importedAt;
   }, [importedLegacyState]);
@@ -1247,12 +1260,11 @@ function FichaFormInner({
         <div className="form-banner form-banner--soft">
           <div className="legacy-import-toolbar">
             <div>
-              <strong>Importar JSON legado</strong>
-              <p>Disponível apenas para superadmin. O arquivo preenche este rascunho e nada é salvo até clicar em salvar ficha.</p>
+              <strong>Importar JSON</strong>
             </div>
             <Button onClick={() => legacyImportInputRef.current?.click()} type="button" variant="secondary">
               <Upload aria-hidden="true" size={18} />
-              Importar JSON legado
+              Importar JSON
             </Button>
             <input
               ref={legacyImportInputRef}
@@ -1268,7 +1280,7 @@ function FichaFormInner({
       ) : null}
       {importedLegacyState?.warnings.length ? (
         <div className="form-banner" role="status">
-          <strong>Importação parcial do legado</strong>
+          <strong>Importação parcial</strong>
           <ul className="legacy-import-warning-list">
             {importedLegacyState.warnings.map((warning, index) => (
               <li key={`${warning.code}-${index}`}>{warning.message}</li>
@@ -1401,7 +1413,7 @@ function FichaFormInner({
                 <div
                   className="products-editor__row"
                   data-index={index}
-                  key={`${item.id}-${index}`}
+                  key={item.id}
                 >
                 <span
                   aria-label={`Reordenar produto ${index + 1}`}
@@ -2001,7 +2013,7 @@ function FichaFormInner({
                     className="image-upload-card"
                     data-index={index}
                     data-image-id={image.id}
-                    key={`${image.id}-${index}`}
+                    key={image.id}
                     style={{
                       ...(lockedImageCardWidth
                         ? {
@@ -2168,7 +2180,7 @@ function FichaFormInner({
               </AlertDialogCancel>
               <AlertDialogAction asChild>
                 <button className="ui-button ui-button--primary" onClick={confirmPendingLegacyImport} type="button">
-                  Substituir pelo JSON legado
+                  Substituir pelo JSON
                 </button>
               </AlertDialogAction>
             </div>

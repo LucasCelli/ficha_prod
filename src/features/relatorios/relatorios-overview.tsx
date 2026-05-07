@@ -39,9 +39,6 @@ export function RelatoriosOverview({ filters, result }: RelatoriosOverviewProps)
             <h1 id="relatorios-title" className="app-title">
               Relatórios
             </h1>
-            <p className="app-summary">
-              Consulta operacional de fichas usando os mesmos filtros do PDF, para conferir tela e arquivo antes da exportação.
-            </p>
           </div>
           <Link className="ui-button ui-button--primary" href={hrefForPdf(filters)}>
             <FileText aria-hidden="true" size={18} />
@@ -99,14 +96,14 @@ function renderRelatorioContent(result: FichaListResult) {
   if (result.kind === "not-configured") {
     return (
       <EmptyState
-        title="Supabase ainda não configurado"
-        description="A tela de relatórios já está conectada aos filtros e ao PDF operacional. Configure o Supabase para carregar dados reais."
+        title="Relatórios indisponíveis"
+        description="Tente novamente."
       />
     );
   }
 
   if (result.kind === "error") {
-    return <EmptyState title="Não foi possível carregar o relatório" description={`A consulta ao Supabase falhou: ${result.message}`} />;
+    return <EmptyState title="Não foi possível carregar o relatório" description={result.message} />;
   }
 
   if (result.fichas.length === 0) {
@@ -118,7 +115,7 @@ function renderRelatorioContent(result: FichaListResult) {
           </Link>
         }
         title="Nenhuma ficha encontrada"
-        description="Ajuste os filtros para conferir as fichas antes de gerar o PDF."
+        description="Ajuste os filtros."
       />
     );
   }

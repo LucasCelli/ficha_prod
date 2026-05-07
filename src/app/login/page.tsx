@@ -25,7 +25,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <div className="auth-copy">
           <Badge tone="info">Acesso operacional</Badge>
           <h1 id="login-title">Fichas Tecnicas</h1>
-          <p>Entre com usuario e PIN para acessar os fluxos de producao, clientes e relatorios.</p>
         </div>
         <Card className="auth-card">
           <h2>Entrar</h2>

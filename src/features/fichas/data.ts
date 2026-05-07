@@ -22,6 +22,7 @@ export type FichaListItem = Pick<
   | "evento"
 > & {
   ficha_imagens?: { url: string }[];
+  ficha_itens?: { quantidade: number | null }[];
   kanban_column?: { name: string; slug: string } | null;
 };
 
@@ -95,7 +96,7 @@ export async function listFichas(filters: FichaFilters = {}): Promise<FichaListR
       supabase
         .from("fichas")
         .select(
-          "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, ficha_imagens(url), kanban_column:kanban_columns(name,slug)",
+          "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, ficha_itens(quantidade), ficha_imagens(url), kanban_column:kanban_columns(name,slug)",
           { count: "exact" },
         )
         .order("created_at", { ascending: false })

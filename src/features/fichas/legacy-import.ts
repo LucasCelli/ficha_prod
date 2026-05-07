@@ -180,7 +180,7 @@ export function mapLegacyDraftToFichaFormInitialData(draft: ImportedLegacyFichaD
 
 function extractFichaPayload(input: unknown) {
   if (!isRecord(input)) {
-    throw new Error("JSON legado inválido. Envie um objeto de ficha ou um backup com exatamente uma ficha.");
+    throw new Error("JSON inválido. Envie um objeto de ficha ou um backup com exatamente uma ficha.");
   }
 
   const fichas = readArray(input, "fichas");

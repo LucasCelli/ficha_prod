@@ -24,6 +24,11 @@ function getClientePayload(values: ClienteFormValues) {
   };
 }
 
+function getReturnTo(formData: FormData, fallback: string) {
+  const value = String(formData.get("returnTo") ?? "").trim();
+  return value.startsWith("/") && !value.startsWith("//") ? value : fallback;
+}
+
 function normalizeClienteName(value: string) {
   return value.trim().toLowerCase();
 }
@@ -55,7 +60,7 @@ export async function createClienteAction(_previousState: ClienteFormState, form
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Configure as variáveis de ambiente do Supabase para salvar clientes.",
+      message: "Clientes indisponíveis.",
       status: "error",
     };
   }
@@ -88,7 +93,7 @@ export async function createClienteAction(_previousState: ClienteFormState, form
   }
 
   revalidatePath("/clientes");
-  redirect(`/clientes/${cliente.id}`);
+  redirect(getReturnTo(formData, `/clientes/${cliente.id}`));
 }
 
 export async function updateClienteAction(_previousState: ClienteFormState, formData: FormData): Promise<ClienteFormState> {
@@ -118,7 +123,7 @@ export async function updateClienteAction(_previousState: ClienteFormState, form
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Configure as variáveis de ambiente do Supabase para editar clientes.",
+      message: "Clientes indisponíveis.",
       status: "error",
     };
   }
@@ -149,5 +154,5 @@ export async function updateClienteAction(_previousState: ClienteFormState, form
 
   revalidatePath("/clientes");
   revalidatePath(`/clientes/${id}`);
-  redirect(`/clientes/${id}`);
+  redirect(getReturnTo(formData, `/clientes/${id}`));
 }

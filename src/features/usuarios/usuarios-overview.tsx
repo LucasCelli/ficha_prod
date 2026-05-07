@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ArrowLeft, KeyRound, ShieldCheck, UserPlus } from "lucide-react";
-import { Badge, DataTable, EmptyState } from "@/components/ui";
+import { KeyRound, ShieldCheck, UserPlus } from "lucide-react";
+import { Badge, DataTable, EmptyState, Modal } from "@/components/ui";
 import type { UsuariosResult } from "./data";
 import { UsuarioForm } from "./usuario-form";
 
 type UsuariosOverviewProps = {
   editId?: string;
+  modalMode?: string;
   result: UsuariosResult;
 };
 
@@ -26,10 +27,9 @@ function formatDate(value: string | null) {
   return dateFormatter.format(new Date(value));
 }
 
-export function UsuariosOverview({ editId, result }: UsuariosOverviewProps) {
+export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverviewProps) {
   const selectedOperador = result.operadores.find((operador) => operador.id === editId);
   const activeCount = result.operadores.filter((operador) => operador.active).length;
-  const isEditing = Boolean(selectedOperador);
 
   return (
     <section className="usuarios-view" aria-labelledby="usuarios-title">
@@ -37,13 +37,8 @@ export function UsuariosOverview({ editId, result }: UsuariosOverviewProps) {
         <div>
           <span className="eyebrow">Usuários</span>
           <h1 id="usuarios-title" className="app-title">
-            {selectedOperador ? `Editando ${selectedOperador.display_name}` : "Operadores da aplicação"}
+            Operadores
           </h1>
-          <p>
-            {selectedOperador
-              ? "Altere dados, status ou PIN deste operador. A listagem fica fora desta tela para evitar confusão."
-              : "Cadastre acessos operacionais por usuário e PIN, mantendo catálogos e gestão de usuários restritos ao superadmin."}
-          </p>
         </div>
         <div className="usuarios-summary" aria-label="Resumo de operadores">
           <span>
@@ -54,70 +49,82 @@ export function UsuariosOverview({ editId, result }: UsuariosOverviewProps) {
             <KeyRound aria-hidden="true" size={18} />
             {result.operadores.length} cadastrados
           </span>
+          <Link className="ui-button ui-button--primary" href="/usuarios?modal=novo">
+            <UserPlus aria-hidden="true" size={18} />
+            Novo operador
+          </Link>
         </div>
       </header>
 
       {result.kind === "not-configured" ? (
         <EmptyState
           actions={<Link className="ui-button ui-button--secondary" href="/">Voltar ao início</Link>}
-          description="Configure as variáveis de ambiente do Supabase para administrar operadores."
-          title="Supabase ainda não configurado"
+          description="Tente novamente."
+          title="Operadores indisponíveis"
         />
       ) : null}
 
       {result.kind === "error" ? <EmptyState description={result.message} title="Não foi possível carregar operadores" /> : null}
 
       {result.kind === "ok" ? (
-        <div className={isEditing ? "usuarios-layout usuarios-layout--editing" : "usuarios-layout"}>
-          <section className="usuarios-panel" aria-labelledby="usuarios-form-title">
-            <div className="usuarios-panel__title">
-              <UserPlus aria-hidden="true" size={18} />
-              <h2 id="usuarios-form-title">{selectedOperador ? "Editar operador" : "Cadastrar operador"}</h2>
+        <section className="usuarios-panel" aria-labelledby="usuarios-list-title">
+          <div className="usuarios-panel__title usuarios-panel__title--spread">
+            <div>
+              <ShieldCheck aria-hidden="true" size={18} />
+              <h2 id="usuarios-list-title">Operadores cadastrados</h2>
             </div>
-            <UsuarioForm operador={selectedOperador} />
-          </section>
+            <Badge>{result.operadores.length}</Badge>
+          </div>
+          {result.operadores.length ? (
+            <DataTable caption="Operadores cadastrados" columns={columns}>
+              {result.operadores.map((operador) => (
+                <tr key={operador.id}>
+                  <td>
+                    <span className="ui-table__primary">
+                      <strong>{operador.display_name}</strong>
+                      <span className="ui-table__muted">{operador.username}</span>
+                    </span>
+                  </td>
+                  <td>
+                    <Badge tone={operador.active ? "success" : "warning"}>{operador.active ? "Ativo" : "Inativo"}</Badge>
+                  </td>
+                  <td>{formatDate(operador.last_login_at)}</td>
+                  <td>
+                    <Link className="ui-button ui-button--secondary" href={`/usuarios?edit=${operador.id}`}>
+                      Editar
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </DataTable>
+          ) : (
+            <EmptyState description="Sem registros." title="Nenhum operador" />
+          )}
+
+          {modalMode === "novo" ? (
+            <Modal onCloseHref="/usuarios" size="md" title="Novo operador">
+              <div className="modal-form">
+                <div className="modal-form__header">
+                  <span className="eyebrow">Usuários</span>
+                  <h2>Cadastrar operador</h2>
+                </div>
+                <UsuarioForm returnTo="/usuarios" />
+              </div>
+            </Modal>
+          ) : null}
 
           {selectedOperador ? (
-            <Link className="ui-button ui-button--secondary usuarios-back-link" href="/usuarios">
-              <ArrowLeft aria-hidden="true" size={18} />
-              Voltar para lista de operadores
-            </Link>
-          ) : null}
-
-          {!selectedOperador ? (
-            <section className="usuarios-panel" aria-labelledby="usuarios-list-title">
-              <div className="usuarios-panel__title">
-                <ShieldCheck aria-hidden="true" size={18} />
-                <h2 id="usuarios-list-title">Operadores cadastrados</h2>
+            <Modal onCloseHref="/usuarios" size="md" title={`Editar ${selectedOperador.display_name}`}>
+              <div className="modal-form">
+                <div className="modal-form__header">
+                  <span className="eyebrow">Usuários</span>
+                  <h2>Editar operador</h2>
+                </div>
+                <UsuarioForm operador={selectedOperador} returnTo="/usuarios" />
               </div>
-              {result.operadores.length ? (
-                <DataTable caption="Operadores cadastrados" columns={columns}>
-                  {result.operadores.map((operador) => (
-                    <tr key={operador.id}>
-                      <td>
-                        <span className="ui-table__primary">
-                          <strong>{operador.display_name}</strong>
-                          <span className="ui-table__muted">{operador.username}</span>
-                        </span>
-                      </td>
-                      <td>
-                        <Badge tone={operador.active ? "success" : "warning"}>{operador.active ? "Ativo" : "Inativo"}</Badge>
-                      </td>
-                      <td>{formatDate(operador.last_login_at)}</td>
-                      <td>
-                        <Link className="ui-button ui-button--secondary" href={`/usuarios?edit=${operador.id}`}>
-                          Editar
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </DataTable>
-              ) : (
-                <EmptyState description="Cadastre o primeiro operador para liberar acesso restrito aos fluxos operacionais." title="Nenhum operador" />
-              )}
-            </section>
+            </Modal>
           ) : null}
-        </div>
+        </section>
       ) : null}
     </section>
   );

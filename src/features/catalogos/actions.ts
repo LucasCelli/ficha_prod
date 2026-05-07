@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireSuperadmin } from "@/features/auth/session";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -59,6 +60,11 @@ function getParsedErrors(issues: { message: string; path: PropertyKey[] }[]) {
   }, {});
 }
 
+function getReturnTo(formData: FormData) {
+  const value = String(formData.get("returnTo") ?? "").trim();
+  return value.startsWith("/") && !value.startsWith("//") ? value : undefined;
+}
+
 export async function saveCatalogItemAction(_previousState: CatalogoFormState, formData: FormData): Promise<CatalogoFormState> {
   await requireSuperadmin();
 
@@ -70,7 +76,7 @@ export async function saveCatalogItemAction(_previousState: CatalogoFormState, f
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Configure as variáveis de ambiente do Supabase para salvar catálogos.",
+      message: "Catálogos indisponíveis.",
       status: "error",
     };
   }
@@ -90,6 +96,11 @@ export async function saveCatalogItemAction(_previousState: CatalogoFormState, f
   }
 
   revalidatePath("/catalogos");
+
+  const returnTo = getReturnTo(formData);
+  if (returnTo) {
+    redirect(returnTo);
+  }
 
   return {
     message: "Item salvo no catálogo.",

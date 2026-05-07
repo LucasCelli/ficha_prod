@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireSuperadmin } from "@/features/auth/session";
 import { createPinHash } from "@/features/auth/crypto";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
@@ -37,6 +38,11 @@ function getParsedErrors(issues: { message: string; path: PropertyKey[] }[]) {
     }
     return errors;
   }, {});
+}
+
+function getReturnTo(formData: FormData) {
+  const value = String(formData.get("returnTo") ?? "").trim();
+  return value.startsWith("/") && !value.startsWith("//") ? value : undefined;
 }
 
 function getOperadorBasePayload(values: OperadorValues) {
@@ -87,7 +93,7 @@ export async function saveOperadorAction(_previousState: UsuarioFormState, formD
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Configure as variáveis de ambiente do Supabase para salvar operadores.",
+      message: "Operadores indisponíveis.",
       status: "error",
     };
   }
@@ -112,6 +118,11 @@ export async function saveOperadorAction(_previousState: UsuarioFormState, formD
   }
 
   revalidatePath("/usuarios");
+
+  const returnTo = getReturnTo(formData);
+  if (returnTo) {
+    redirect(returnTo);
+  }
 
   return {
     message: id ? "Operador atualizado." : "Operador cadastrado.",

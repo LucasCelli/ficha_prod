@@ -1,6 +1,7 @@
 "use client";
 
-import { Printer } from "lucide-react";
+import Link from "next/link";
+import { Copy, Printer } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ import { PrintTriggerButton } from "./print-trigger-button";
 
 type FichaPrintPreviewShellProps = {
   children: ReactNode;
+  duplicateHref: string;
   printHref: string;
 };
 
@@ -20,7 +22,7 @@ type FichaPrintPreviewContentProps = {
 
 const PREVIEW_PRINT_TOAST_ID = "ficha-print-preview";
 
-export function FichaPrintPreviewShell({ children, printHref }: FichaPrintPreviewShellProps) {
+export function FichaPrintPreviewShell({ children, duplicateHref, printHref }: FichaPrintPreviewShellProps) {
   const [isPrinting, setIsPrinting] = useState(false);
 
   async function handlePrint(event: MouseEvent<HTMLButtonElement>) {
@@ -61,16 +63,22 @@ export function FichaPrintPreviewShell({ children, printHref }: FichaPrintPrevie
           <span>Prévia de impressão</span>
           <h2>Imprimir ficha</h2>
         </div>
-        <PrintTriggerButton
-          className="ui-button ui-button--primary"
-          disabled={isPrinting}
-          href={printHref}
-          label="Imprimir ficha"
-          onClick={handlePrint}
-        >
-          <Printer aria-hidden="true" size={18} />
-          {isPrinting ? "Gerando PDF..." : "Imprimir"}
-        </PrintTriggerButton>
+        <div className="ficha-print-preview__actions">
+          <Link className="ui-button ui-button--secondary" href={duplicateHref}>
+            <Copy aria-hidden="true" size={18} />
+            Duplicar
+          </Link>
+          <PrintTriggerButton
+            className="ui-button ui-button--primary"
+            disabled={isPrinting}
+            href={printHref}
+            label="Imprimir ficha"
+            onClick={handlePrint}
+          >
+            <Printer aria-hidden="true" size={18} />
+            {isPrinting ? "Gerando PDF..." : "Imprimir"}
+          </PrintTriggerButton>
+        </div>
       </header>
       {children}
     </section>

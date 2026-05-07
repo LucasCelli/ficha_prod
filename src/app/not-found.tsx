@@ -9,7 +9,7 @@ export default function NotFound() {
           Voltar ao início
         </Link>
       }
-      description="A rota solicitada não faz parte da nova aplicação."
+      description="Verifique o endereço."
       eyebrow="404"
       title="Página não encontrada"
       tone="info"

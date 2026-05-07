@@ -31,8 +31,8 @@ export function ClienteDetail({ result }: ClienteDetailProps) {
   if (result.kind === "not-configured") {
     return (
       <EmptyState
-        title="Supabase ainda não configurado"
-        description="O detalhe do cliente já está preparado para consultar cadastro e histórico de fichas assim que as variáveis de ambiente estiverem disponíveis."
+        title="Cliente indisponível"
+        description="Tente novamente."
       />
     );
   }
@@ -46,13 +46,13 @@ export function ClienteDetail({ result }: ClienteDetailProps) {
           </Link>
         }
         title="Cliente não encontrado"
-        description="O cliente solicitado não existe na tabela nova ou ainda não foi importado."
+        description="Verifique a busca."
       />
     );
   }
 
   if (result.kind === "error") {
-    return <EmptyState title="Não foi possível carregar o cliente" description={`A consulta ao Supabase falhou: ${result.message}`} />;
+    return <EmptyState title="Não foi possível carregar o cliente" description={result.message} />;
   }
 
   const { cliente } = result;
@@ -66,9 +66,6 @@ export function ClienteDetail({ result }: ClienteDetailProps) {
             <h1 id="cliente-title" className="app-title">
               {cliente.nome}
             </h1>
-            <p className="app-summary">
-              Cadastro e histórico recente de fichas vinculadas ao cliente no novo modelo Supabase.
-            </p>
           </div>
           <Link className="ui-button ui-button--secondary" href={`/fichas?cliente=${encodeURIComponent(cliente.nome)}`}>
             Ver fichas
@@ -101,7 +98,6 @@ export function ClienteDetail({ result }: ClienteDetailProps) {
       <section className="cliente-detail__history" aria-labelledby="cliente-history-title">
         <div className="section-heading">
           <h2 id="cliente-history-title">Histórico recente</h2>
-          <p>Últimas fichas vinculadas diretamente ao cadastro do cliente.</p>
         </div>
         {cliente.fichas.length ? (
           <DataTable caption={`Histórico de fichas de ${cliente.nome}`} columns={columns}>
@@ -117,7 +113,7 @@ export function ClienteDetail({ result }: ClienteDetailProps) {
               </Link>
             }
             title="Nenhuma ficha vinculada"
-            description="O cliente existe, mas ainda não há fichas relacionadas pelo `cliente_id`. A busca por nome ajuda a localizar registros importados antes da vinculação final."
+            description="Busque por nome."
           />
         )}
       </section>

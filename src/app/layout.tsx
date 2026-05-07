@@ -16,7 +16,7 @@ const plusJakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: "Fichas Tecnicas",
-  description: "Sistema operacional de fichas tecnicas em migracao para Next.js e Supabase.",
+  description: "Fichas tecnicas de producao.",
 };
 
 function normalizeTheme(value: string | undefined) {

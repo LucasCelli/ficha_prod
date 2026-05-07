@@ -2,7 +2,6 @@
 
 import type { FormEvent } from "react";
 import { useActionState, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { Eye, EyeOff, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -13,9 +12,10 @@ import type { Operador } from "./types";
 
 type UsuarioFormProps = {
   operador?: Operador;
+  returnTo?: string;
 };
 
-export function UsuarioForm({ operador }: UsuarioFormProps) {
+export function UsuarioForm({ operador, returnTo }: UsuarioFormProps) {
   const [state, formAction] = useActionState(saveOperadorAction, getInitialUsuarioFormState());
   const [showPin, setShowPin] = useState(false);
   const lastToastRef = useRef<string | null>(null);
@@ -41,6 +41,7 @@ export function UsuarioForm({ operador }: UsuarioFormProps) {
   return (
     <form action={formAction} className="usuario-form">
       {operador ? <input name="id" type="hidden" value={operador.id} /> : null}
+      {returnTo ? <input name="returnTo" type="hidden" value={returnTo} /> : null}
 
       <div className="usuario-form__grid">
         <div className="field">
@@ -98,20 +99,14 @@ export function UsuarioForm({ operador }: UsuarioFormProps) {
             {operador ? "Preencha somente para trocar o PIN." : "O PIN não fica visível depois de salvo."}
           </small>
         </div>
+        <label className="checkbox-field usuario-form__status">
+          <input defaultChecked={operador?.active ?? true} name="active" type="checkbox" />
+          <span>Operador ativo</span>
+        </label>
       </div>
-
-      <label className="checkbox-field usuario-form__status">
-        <input defaultChecked={operador?.active ?? true} name="active" type="checkbox" />
-        <span>Operador ativo</span>
-      </label>
 
       <div className="usuario-form__actions">
         <SubmitButton isEdit={Boolean(operador)} />
-        {operador ? (
-          <Link className="ui-button ui-button--secondary" href="/usuarios">
-            Cancelar
-          </Link>
-        ) : null}
       </div>
     </form>
   );

@@ -24,7 +24,8 @@ export default async function CatalogosPage({ searchParams }: CatalogosPageProps
   const params = await searchParams;
   const selectedKind = normalizeKind(params.tipo);
   const editId = Array.isArray(params.edit) ? params.edit[0] : params.edit;
+  const modalMode = Array.isArray(params.modal) ? params.modal[0] : params.modal;
   const result = await listCatalogItems();
 
-  return <CatalogosOverview editId={editId} result={result} selectedKind={selectedKind} />;
+  return <CatalogosOverview editId={editId} modalMode={modalMode} result={result} selectedKind={selectedKind} />;
 }

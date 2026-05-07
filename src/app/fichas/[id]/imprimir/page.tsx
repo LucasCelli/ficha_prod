@@ -45,8 +45,8 @@ export default async function PrintFichaPage({ params }: PrintFichaPageProps) {
             Voltar para fichas
           </Link>
         }
-        title="Supabase ainda não configurado"
-        description="A impressão individual precisa carregar a ficha no Supabase."
+        title="Ficha indisponível"
+        description="Tente novamente."
       />
     );
   }
@@ -60,7 +60,7 @@ export default async function PrintFichaPage({ params }: PrintFichaPageProps) {
           </Link>
         }
         title="Não foi possível carregar a ficha"
-        description={`A consulta ao Supabase falhou: ${result.message}`}
+        description={result.message}
       />
     );
   }

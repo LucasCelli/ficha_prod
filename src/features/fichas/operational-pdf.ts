@@ -110,7 +110,7 @@ function generateWeeklyStyledPdf(weeklyResult: FichaListResult, filters: FichaFi
     return renderFallbackPdf(
       doc,
       weeklyMode === "current-week" ? "Planejamento desta semana" : "Planejamento da próxima semana",
-      weeklyResult.kind === "error" ? weeklyResult.message : "Supabase ainda não configurado.",
+      weeklyResult.kind === "error" ? weeklyResult.message : "Relatório indisponível.",
     );
   }
 
@@ -499,7 +499,7 @@ function generateDefaultOperationalPdf(result: FichaListResult, filters: FichaFi
   });
 
   if (result.kind === "not-configured") {
-    return renderFallbackPdf(doc, "Relatório Operacional de Fichas", "Supabase ainda não configurado.");
+    return renderFallbackPdf(doc, "Relatório Operacional de Fichas", "Relatório indisponível.");
   }
 
   if (result.kind === "error") {

@@ -42,7 +42,7 @@ export async function loginAction(_previousState: LoginFormState, formData: Form
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Configure as variaveis de ambiente do Supabase para entrar.",
+      message: "Acesso indisponível.",
       status: "error",
     };
   }

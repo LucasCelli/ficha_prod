@@ -12,9 +12,10 @@ import { getInitialClienteFormState } from "./form-state";
 type ClienteFormProps = {
   cliente?: ClienteDetail;
   mode?: "create" | "edit";
+  returnTo?: string;
 };
 
-export function ClienteForm({ cliente, mode = "create" }: ClienteFormProps) {
+export function ClienteForm({ cliente, mode = "create", returnTo }: ClienteFormProps) {
   const action = mode === "edit" ? updateClienteAction : createClienteAction;
   const [state, formAction] = useActionState(action, getInitialClienteFormState());
   const formRef = useRef<HTMLFormElement>(null);
@@ -41,6 +42,7 @@ export function ClienteForm({ cliente, mode = "create" }: ClienteFormProps) {
   return (
     <form ref={formRef} className="cliente-form" action={formAction} noValidate>
       {cliente ? <input name="id" type="hidden" value={cliente.id} /> : null}
+      {returnTo ? <input name="returnTo" type="hidden" value={returnTo} /> : null}
       {state.message ? (
         <div className="form-banner" role="alert">
           {state.message}

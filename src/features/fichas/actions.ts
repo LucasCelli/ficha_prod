@@ -138,7 +138,7 @@ export async function createFichaAction(_previousState: FichaFormState, formData
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Configure as variáveis de ambiente do Supabase para salvar fichas.",
+      message: "Fichas indisponíveis.",
       status: "error",
     };
   }
@@ -242,7 +242,7 @@ export async function updateFichaAction(_previousState: FichaFormState, formData
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Configure as variáveis de ambiente do Supabase para editar fichas.",
+      message: "Fichas indisponíveis.",
       status: "error",
     };
   }
@@ -334,7 +334,7 @@ export async function markFichaEntregueAction(
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Configure as variáveis de ambiente do Supabase para marcar fichas como entregues.",
+      message: "Fichas indisponíveis.",
       status: "error",
     };
   }
@@ -382,7 +382,7 @@ export async function revertFichaToPendenteAction(
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Configure as variáveis de ambiente do Supabase para reverter fichas para pendente.",
+      message: "Fichas indisponíveis.",
       status: "error",
     };
   }
@@ -439,7 +439,7 @@ export async function deleteFichaAction(
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Configure as variáveis de ambiente do Supabase para excluir fichas.",
+      message: "Fichas indisponíveis.",
       status: "error",
     };
   }

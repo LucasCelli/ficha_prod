@@ -1,5 +1,12 @@
 # Registro da migracao Next
 
+## 2026-05-06 - Fichas: metadados compactos na listagem
+
+- Fase/modulo: `/fichas` / refinamento visual da listagem operacional.
+- Arquivos alterados: `src/features/fichas/data.ts`, `src/features/fichas/fichas-overview.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: a listagem passou a buscar `ficha_itens(quantidade)` junto com as fichas, calcular o total de itens da ficha e exibir esse total antes do numero da venda. Os dois metadados agora usam `Badge` neutro com classe compacta local, em vez de texto secundario solto.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `npm run supabase:check` passaram. No Edge em `/fichas`, as primeiras linhas renderizaram badges neutros compactos de 18px com o total de itens antes da venda.
+
 ## 2026-05-06 - DnD migrado para Fluid DnD
 
 - Fase/modulo: fichas e quadro de producao / troca completa da biblioteca de drag and drop.
@@ -10,6 +17,15 @@
 - Visual/UX: estados de drag/drop passaram a usar classes Fluid explicitas, os shadows manuais da biblioteca anterior foram removidos, o scroll interno das colunas foi mantido e cards ganharam handle de arraste proprio para nao disputar com botoes/selects.
 - Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e varredura por residuos da biblioteca anterior passaram. No Edge em `http://localhost:3000/fichas/nova`, a tela renderizou a lista de produtos com 1 item, sem erros de console e sem residuos Pragmatic no DOM. Em `http://localhost:3000/quadro-producao`, a tela renderizou 5 colunas, 82 cards, 82 handles de arraste, listas com `overflow-y: auto`, sem erros de console e sem residuos Pragmatic no DOM.
 - Hotfix: apos teste manual, a sincronizacao generica entre Fluid e `react-hook-form` no formulario foi trocada por sincronizacao dirigida. Add/remover/duplicar/ordenar/editar agora atualizam explicitamente RHF e Fluid, enquanto o efeito de drag apenas persiste a ordem final quando a lista volta a ter ids unicos. Tambem foram zerados os delays de inserir/remover e reduzida a animacao para 90ms, evitando duplicacao visual de produto e a sensacao de camera lenta. Revalidado com `npm run typecheck`, `npm run lint`, `npm run build` e Edge em `/fichas/nova`: adicionar produto passou a renderizar 2 linhas e o drag simulado manteve 2 linhas, sem warning de key duplicada.
+- Correcao de uso Fluid: a configuracao de `useDragAndDrop` deixou de ser criada inline a cada render e passou a ser memoizada em produtos, imagens e colunas do quadro. As keys dos itens tambem deixaram de incluir o indice, preservando o mesmo no DOM durante reordenacao. No quadro, os callbacks de mover card/status foram estabilizados antes de chegar em `ColumnSurface`, evitando recriacao desnecessaria da configuracao Fluid.
+- Validacao adicional: `npm run typecheck`, `npm run lint`, `npm run build` e `npm run supabase:check` passaram. Edge em `http://localhost:3000/fichas/nova` confirmou adicionar produto com 2 linhas e console limpo; Edge em `http://localhost:3000/quadro-producao` confirmou 5 colunas, 82 cards e 82 handles, tambem sem warnings/erros de console. Caveat: a tentativa de simular drag completo por JS nao reproduziu um gesto fisico confiavel, entao a validacao visual desta rodada ficou como smoke de renderizacao/console e estabilidade estrutural.
+- Correcao de fluidez real: comparando com o exemplo React oficial de listas agrupadas da Fluid, o app tinha `transition` em `transform` nos itens arrastaveis. Como a Fluid move os itens por `transform`, isso atrasava cada frame do ponteiro. `src/styles/globals.css` removeu `transform` das transicoes de `products-editor__row` e `quadro-producao-card`, removeu translate/rotate decorativos de hover/drag dos cards DnD e adicionou `will-change: transform` nos itens controlados pela Fluid. No Edge, o CSS computado passou a mostrar `transformInTransition: false` em produtos e cards do quadro.
+- Correcao de colunas Kanban: o quadro deixou de depender da alca `.quadro-producao-card__drag-handle`; a Fluid agora marca o proprio `.quadro-producao-card` como `handler-class`, deixando o card inteiro arrastavel. O movimento entre colunas passou a ser persistido diretamente no `onDragEnd` da lista de destino, usando a coluna atual como `destinationColumnId` e normalizando `destinationIndex` para nunca ficar negativo em drops no topo. Botoes/selects internos param `pointerdown/mousedown` para continuar clicaveis sem iniciar arraste.
+- Validacao Kanban: no Edge, `.quadro-producao-card` apareceu com `handler-class grab draggable`, enquanto a antiga alca visual deixou de ser handler. Uma simulacao de drag da primeira para a segunda coluna, com `fetch` interceptado para nao gravar no banco, moveu o card no UI e gerou payload `/move` com `destinationColumnId` da segunda coluna e `destinationIndex: 0`. Depois do reload, o quadro voltou ao snapshot real com 82 cards.
+- Primeira mitigacao de alvo de ponteiro: o log `t.closest is not a function` vinha de uma suposicao interna da Fluid ao chamar `.closest()` no alvo do evento. Para reduzir alvos nao interativos durante o drag, `src/styles/globals.css` colocou `pointer-events: none` nos spans, chips, icones e alca visual nao interativos do card, mantendo `button`/`select` clicaveis com `pointer-events: auto` e `stopPropagation`. A correcao definitiva para eventos globais sem alvo `Element` veio no guard descrito abaixo.
+- Ajuste visual: removida a alca/dropzone visivel dos cards do Kanban. Como o card inteiro ja e a area de arraste, `src/features/quadro-producao/quadro-producao-client.tsx` deixou de renderizar `.quadro-producao-card__drag-handle` e `src/styles/globals.css` removeu os estilos correspondentes. O grip do cabecalho da coluna foi mantido.
+- Correcao de tooltip durante drag: o botao de preview de imagem agora consulta o drag ativo antes de abrir por hover/focus/click e fecha o preview se o ponteiro passar por ele durante um arraste. A regra CSS que ativava o footer de acoes em `.quadro-producao-card--dragging` tambem foi removida, evitando que os controles do card acordem por causa da classe de drag. Validado com `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e Edge em `/quadro-producao`: 82 cards, 0 handles antigos, card como `handler-class`, seletor de footer-drag removido, drag simulado entre colunas gerando payload `/move` correto e 0 previews no DOM durante todo o arraste.
+- Correcao definitiva do `t.closest`: inspecionado o bundle da `fluid-dnd@2.6.3`, o stack vinha de `usePositioning`, que chama `event.target.closest(...)` assumindo que todo alvo de `mousedown/mousemove/mouseup` e `Element`. Como a biblioteca escuta `mousemove` no `document`, alguns eventos reais chegam com alvo `Document`/`Node` sem `.closest`. Criado `src/lib/fluid-dnd-event-target-guard.ts` para normalizar somente esses eventos invalidos antes da Fluid, redisparando o mouse event no `parentElement` ou no elemento sob o ponteiro. O guard foi ligado em `src/features/fichas/ficha-form.tsx` e `src/features/quadro-producao/quadro-producao-client.tsx`.
 
 ## 2026-05-06 - Quadro de produção: persistência de ordem e filtros
 
@@ -973,3 +989,56 @@
 - Visual: os placeholders de produto e imagem receberam `box-sizing`, `pointer-events: none`, opacidade controlada e animacao curta de entrada para a abertura do espaco parecer mais fluida.
 - Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
 - Validacao: `npm run typecheck`, eslint dirigido no form de ficha, scan de mojibake nos arquivos tocados e checagem visual no Edge.
+
+### Inicio: dashboard operacional polido
+
+- Ajuste: `src/app/page.tsx` deixou de ser uma grade simples de modulos e passou a carregar uma visao executiva com KPIs reais de fichas, pendentes, entregues, clientes e atrasadas.
+- Fluxos: a home agora oferece acoes primarias para nova ficha e atrasos, atalhos para `/fichas`, `/quadro-producao` e `/relatorios`, lista de fichas recentes e bloco de prontidao com catalogos/colunas configurados.
+- Navegacao: `src/lib/navigation.ts` foi alinhado para exibir a home como `Visao geral operacional`, mantendo `/` como entrada do app sem reativar `/dashboard`.
+- Estilo: `src/styles/globals.css` recebeu o layout responsivo da home com cards de KPI, paineis de rotina e estados de hover/focus usando tokens.
+- Decisao: manter a home com tom de dashboard de verdade, mas sem duplicar as responsabilidades de `/fichas`, `/relatorios` ou do quadro.
+- Caveat: ainda falta a checagem visual em navegador apos os checks locais.
+
+### Fichas: thumbnails otimizados, zoom e duplicacao por rascunho
+
+- Ajuste de imagem: a listagem de `/fichas` passou a renderizar `FichaRowThumbnail`, um leaf client que transforma URLs Cloudinary para miniaturas `160x90` com `f_auto/q_auto:eco`, mostra spinner enquanto a imagem carrega e usa cursor pointer.
+- Zoom: ao passar o mouse/foco sobre o thumbnail, a listagem abre um preview fixo em portal no mesmo padrao do quadro de producao, mas maior, usando transformacao Cloudinary `520x360` com qualidade melhor para leitura.
+- Duplicacao: a previa de impressao ganhou botao `Duplicar`; ele abre `/fichas/nova?duplicar=<id>` e a pagina de criacao carrega os dados da ficha original como `initialData`, excluindo imagens. Nada e gravado ate o usuario clicar em `Salvar ficha`, criando uma nova ficha com novo id.
+- Arquivos alterados: `src/lib/cloudinary-images.ts`, `src/features/fichas/ficha-row-thumbnail.tsx`, `src/features/fichas/fichas-overview.tsx`, `src/features/fichas/ficha-print-preview-modal.tsx`, `src/features/fichas/ficha-preview.tsx`, `src/features/fichas/ficha-form.tsx`, `src/app/fichas/page.tsx`, `src/app/fichas/nova/page.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck` e eslint dirigido nos arquivos tocados passaram. Caveat: checagem visual refinada ficou para depois, conforme combinado.
+
+### Quadro de producao: select e duplo clique protegidos do DnD
+
+- Ajuste: os controles interativos dentro do card do quadro passaram a bloquear eventos de ponteiro/mouse/toque tambem na fase de captura e com `nativeEvent.stopImmediatePropagation()`, evitando que o select de status acorde o handler de arraste da Fluid.
+- Duplo clique: o botao de titulo do card agora tambem bloqueia inicio de drag, e a lista renderizada por coluna deduplica cards por id antes do render. Se a Fluid gerar um frame intermediario com id repetido, o React nao recebe duas keys iguais.
+- Arquivo alterado: `src/features/quadro-producao/quadro-producao-client.tsx`.
+- Validacao: `npm run typecheck` e eslint dirigido no cliente do quadro passaram.
+
+### Clientes, catalogos e usuarios: edicao centralizada em modal
+
+- Clientes: `/clientes` passou a abrir cadastro e edicao por query string (`modal=novo` / `edit=<id>`) em `Modal`, preservando busca/pagina ao fechar ou salvar. A busca saiu do submit manual e virou um leaf client com debounce usando `nuqs`; a paginacao compartilhada foi centralizada.
+- Catalogos: a listagem deixou de renderizar o formulario fixo e passou a criar/editar em modal. O select editavel de tipo foi removido do formulario; a categoria agora vem da tela aberta ou do proprio item e segue como campo hidden, evitando salvar tecido como produto por engano. A antiga nuvem de botoes foi substituida por menu de categorias com contadores.
+- Usuarios: cadastro e edicao de operadores tambem migraram para modal sobre a listagem, mantendo resumo e tabela como contexto principal.
+- Server actions: clientes, catalogos e usuarios aceitam `returnTo` local para voltar a listagem apos salvar sem cair em rota paralela de detalhe.
+- Arquivos alterados: `src/app/clientes/page.tsx`, `src/features/clientes/actions.ts`, `src/features/clientes/cliente-form.tsx`, `src/features/clientes/clientes-overview.tsx`, `src/features/clientes/clientes-search-toolbar.tsx`, `src/app/catalogos/page.tsx`, `src/features/catalogos/actions.ts`, `src/features/catalogos/catalogo-form.tsx`, `src/features/catalogos/catalogos-overview.tsx`, `src/app/usuarios/page.tsx`, `src/features/usuarios/actions.ts`, `src/features/usuarios/usuario-form.tsx`, `src/features/usuarios/usuarios-overview.tsx`, `src/styles/globals.css`.
+- Validacao: `npm run typecheck` passou antes e depois do lint; eslint dirigido nos arquivos TS/TSX tocados passou.
+- Caveat: mostrar PIN/senha ja salvo nao entrou nesta etapa. O fluxo atual guarda `pin_hash`/`pin_salt`, entao nao existe senha recuperavel para exibir; armazenar PIN reversivel/plaintext continua exigindo aprovacao explicita por ser mudanca de seguranca.
+
+### Modais administrativos: alinhamento de checkbox, labels e legendas
+
+- Ajuste visual: `modal-form` ganhou padding interno e footer de acoes com separador consistente, deixando os modais de clientes, catalogos e usuarios menos crus.
+- Catalogos: o checkbox `Ativo` saiu do bloco flex separado que ficava antes de `Descricao` e entrou na `catalog-form__grid`, alinhado ao fim da linha de campos ao lado de `Ordem`. A descricao agora ocupa a linha inteira da grid, sem label atravessando o checkbox.
+- Usuarios: `Operador ativo` tambem entrou na grid do formulario, evitando um checkbox solto em linha propria dentro do modal.
+- Prevenção de novas quebras: labels de `.field` e legends de `.form-section` receberam line-height/limites explicitos para reduzir sobreposicoes quando textos longos, acentuados ou quebrados aparecem em modais e formularios maiores.
+- Arquivos alterados: `src/features/catalogos/catalogo-form.tsx`, `src/features/usuarios/usuario-form.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, eslint dirigido em `catalogo-form.tsx`/`usuario-form.tsx`, e varredura sem residuos de `catalog-form__bottom`/`catalog-form__full`.
+
+### UX: regra de microcopy silenciosa e limpeza de textos
+
+- Regra duravel: `AGENTS.md` agora explicita que a interface deve evitar textos descritivos, onboarding, explicacoes tecnicas, microcopy redundante, blocos de ambiente e cards explicativos automaticos. A preferencia documentada e por titulos curtos, labels objetivas, contexto implicito e UI densa/limpa.
+- Limpeza de superficies: foram removidos summaries e frases tutorais de `/`, `/fichas`, `/fichas/nova`, edicao/impressao de ficha, `/clientes`, detalhe/edicao/criacao de cliente, `/catalogos`, `/usuarios`, `/relatorios`, `/quadro-producao`, login, erro global e 404.
+- Mensagens tecnicas: empty states, toasts e server actions deixaram de citar Supabase, banco, API, variaveis de ambiente ou modelo novo quando isso nao ajuda a executar uma acao. Exemplos passaram para `Tente novamente.`, `Ajuste os filtros.`, `Fichas indisponiveis.` e equivalentes por modulo.
+- Primitivos: `src/lib/navigation.ts` perdeu descricoes secundarias da navegacao; `AppNavigation` renderiza apenas labels; `ModuleOverview` deixou de aceitar/mostrar descricoes para evitar novo uso com cards explicativos redundantes.
+- Arquivos alterados: `AGENTS.md`, `src/app/page.tsx`, `src/app/layout.tsx`, `src/app/login/page.tsx`, `src/app/error.tsx`, `src/app/global-error.tsx`, `src/app/not-found.tsx`, `src/app/fichas/nova/page.tsx`, `src/app/fichas/[id]/page.tsx`, `src/app/fichas/[id]/imprimir/page.tsx`, `src/app/clientes/page.tsx`, `src/app/clientes/novo/page.tsx`, `src/app/clientes/[id]/editar/page.tsx`, `src/app/relatorios/excel/route.ts`, `src/components/ui/app-navigation.tsx`, `src/components/ui/module-overview.tsx`, `src/lib/navigation.ts`, `src/features/*` e `src/styles/globals.css`.
+- Varredura: `rg -n "Supabase ainda|consulta ao Supabase|Configure as vari|variáveis de ambiente|Ambiente atual|app-summary|sem gravar nada no banco|novo modelo|fluxo legado|JSON legado|legado importado|A rota solicitada|preparad|API|banco" src/app src/features src/components/ui` ficou sem resultados apos a limpeza.
+- Validacao: `npm run typecheck`, eslint dirigido nos arquivos TS/TSX tocados e `git diff --check` passaram. A varredura de mojibake nos arquivos principais retornou apenas falsos positivos de exemplos documentados no `AGENTS.md` e palavras pt-BR acentuadas validas.

@@ -64,7 +64,10 @@ export default async function FichasPage({ searchParams }: FichasPageProps) {
       <FichasOverview filters={filters} result={result} />
       {printId ? (
         <Modal onCloseHref={onCloseHref} size="print" title="Prévia de impressão">
-          <FichaPrintPreviewShell printHref={`/fichas/${encodeURIComponent(printId)}/imprimir`}>
+          <FichaPrintPreviewShell
+            duplicateHref={`/fichas/nova?duplicar=${encodeURIComponent(printId)}`}
+            printHref={`/fichas/${encodeURIComponent(printId)}/imprimir`}
+          >
             <Suspense fallback={<FichaPrintPreviewLoading />}>
               <FichaPrintPreviewModalSlot printId={printId} />
             </Suspense>

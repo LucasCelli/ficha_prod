@@ -8,13 +8,14 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { createPortal } from "react-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryStates } from "nuqs";
-import type { DragStartEventData } from "fluid-dnd";
+import type { DragEndEventData, DragStartEventData } from "fluid-dnd";
 import { useDragAndDrop } from "fluid-dnd/react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import {
@@ -37,6 +38,7 @@ import {
   Modal,
   Tooltip,
 } from "@/components/ui";
+import { useFluidDndEventTargetGuard } from "@/lib/fluid-dnd-event-target-guard";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import type { InsumoStatus } from "./config";
 import { INSUMO_STATUS_LABELS, INSUMO_STATUS_VALUES } from "./config";
@@ -171,6 +173,22 @@ function haveSameCardOrder(left: KanbanCardSummary[], right: KanbanCardSummary[]
 
 function hasUniqueCardIds(cards: KanbanCardSummary[]) {
   return new Set(cards.map((card) => card.id)).size === cards.length;
+}
+
+function getUniqueCardsById(cards: KanbanCardSummary[]) {
+  const seen = new Set<string>();
+  return cards.filter((card) => {
+    if (seen.has(card.id)) {
+      return false;
+    }
+    seen.add(card.id);
+    return true;
+  });
+}
+
+function stopKanbanCardDrag(event: { nativeEvent?: Event; stopPropagation: () => void }) {
+  event.nativeEvent?.stopImmediatePropagation();
+  event.stopPropagation();
 }
 
 function formatDateLong(value: string) {
@@ -354,6 +372,8 @@ function getColumnAccentStyle(orderIndex: number): CSSProperties {
 }
 
 export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroProducaoClientProps) {
+  useFluidDndEventTargetGuard();
+
   const [filters, setFilters] = useQueryStates(quadroProducaoSearchParamParsers);
   const [searchDraft, setSearchDraft] = useState(filters.busca);
   const [isDesktopBoard, setIsDesktopBoard] = useState(false);
@@ -513,6 +533,17 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
       await queryClient.invalidateQueries({ queryKey: ["quadro-producao"] });
     },
   });
+  const moveCard = moveCardMutation.mutate;
+  const changeInsumo = insumoMutation.mutate;
+  const handleMoveCard = useCallback((move: { cardId: string; destinationColumnId: string; destinationIndex: number }) => {
+    moveCard(move);
+  }, [moveCard]);
+  const handleChangeInsumo = useCallback((card: KanbanCardSummary, insumoStatus: InsumoStatus) => {
+    changeInsumo({
+      cardId: card.id,
+      insumoStatus,
+    });
+  }, [changeInsumo]);
 
   function handleRefresh() {
     void boardQuery.refetch();
@@ -590,19 +621,16 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
         <header className="quadro-producao-view__header">
           <div className="page-heading">
             <div className="page-heading__copy">
-              <Badge tone="info">Novo módulo</Badge>
+              <Badge tone="info">Quadro</Badge>
               <h1 id="quadro-producao-title" className="app-title">
                 Quadro de Produção
               </h1>
-              <p className="app-summary">
-                O quadro já foi estruturado, mas ainda depende da configuração ativa do Supabase para ler colunas e cartões.
-              </p>
             </div>
           </div>
         </header>
         <EmptyState
-          title="Supabase ainda não configurado"
-          description="Configure as variáveis do ambiente atual para carregar o Quadro de Produção com colunas dinâmicas."
+          title="Quadro indisponível"
+          description="Tente novamente."
         />
       </section>
     );
@@ -618,7 +646,6 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
               <h1 id="quadro-producao-title" className="app-title">
                 Quadro de Produção
               </h1>
-              <p className="app-summary">A leitura do quadro falhou e precisa ser restabelecida antes de continuar operando.</p>
             </div>
           </div>
         </header>
@@ -646,13 +673,10 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
         <header aria-hidden="true" className="quadro-producao-view__header" hidden>
           <div className="page-heading">
             <div className="page-heading__copy">
-              <Badge tone="info">Operação visual</Badge>
+              <Badge tone="info">Quadro</Badge>
               <h1 id="quadro-producao-title" className="app-title">
                 Quadro de Produção
               </h1>
-              <p className="app-summary">
-                Colunas persistidas em banco, leitura rápida dos pedidos e movimentação visual para acompanhar a produção em aberto.
-              </p>
             </div>
             <div className="quadro-producao-header-actions">
               <button
@@ -681,7 +705,6 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                 <h1 id="quadro-producao-toolbar-title" className="app-title quadro-producao-toolbar__heading">
                   Quadro de Produção
                 </h1>
-                <p className="quadro-producao-toolbar__summary">Painel operacional das fichas em aberto.</p>
               </div>
               <Badge tone="info">{formatCount(currentResult.snapshot.totalVisible)} em aberto</Badge>
             </div>
@@ -797,13 +820,8 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                 insumoMutationPending={insumoMutation.isPending}
                 key={column.id}
                 activeCardDragRef={activeCardDragRef}
-                onChangeInsumo={(card, insumoStatus) =>
-                  insumoMutation.mutate({
-                    cardId: card.id,
-                    insumoStatus,
-                  })
-                }
-                onMoveCard={(move) => moveCardMutation.mutate(move)}
+                onChangeInsumo={handleChangeInsumo}
+                onMoveCard={handleMoveCard}
                 onMoveNextCard={(card) => {
                   const nextColumn = currentColumns[index + 1];
                   if (!nextColumn) {
@@ -834,13 +852,8 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                   insumoMutationPending={insumoMutation.isPending}
                   key={column.id}
                   activeCardDragRef={activeCardDragRef}
-                  onChangeInsumo={(card, insumoStatus) =>
-                    insumoMutation.mutate({
-                      cardId: card.id,
-                      insumoStatus,
-                    })
-                  }
-                  onMoveCard={(move) => moveCardMutation.mutate(move)}
+                  onChangeInsumo={handleChangeInsumo}
+                  onMoveCard={handleMoveCard}
                   onMoveNextCard={(card) => {
                     const nextColumn = currentColumns[index + 1];
                     if (!nextColumn) {
@@ -866,17 +879,13 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
 
       {createColumnOpen ? (
         <Modal onClose={() => setCreateColumnOpen(false)} size="sm" title="Nova coluna">
-          <section className="confirm-dialog" aria-describedby="quadro-producao-create-column-description">
+          <section className="confirm-dialog">
             <header className="confirm-dialog__header">
               <div>
                 <span className="confirm-dialog__eyebrow">Coluna do quadro</span>
                 <h2>Criar nova coluna</h2>
               </div>
             </header>
-
-            <p id="quadro-producao-create-column-description">
-              A nova coluna entra no quadro atual com ordem persistida e já pode receber cartões em seguida.
-            </p>
 
             <form className="quadro-producao-modal-form" onSubmit={handleCreateColumnSubmit}>
               <label className="quadro-producao-field">
@@ -904,17 +913,13 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
 
       {renameTarget ? (
         <Modal onClose={() => setRenameTarget(null)} size="sm" title="Renomear coluna">
-          <section className="confirm-dialog" aria-describedby="quadro-producao-rename-column-description">
+          <section className="confirm-dialog">
             <header className="confirm-dialog__header">
               <div>
                 <span className="confirm-dialog__eyebrow">Coluna do quadro</span>
                 <h2>Renomear coluna</h2>
               </div>
             </header>
-
-            <p id="quadro-producao-rename-column-description">
-              A mudança afeta apenas o nome visível da coluna. O identificador técnico continua estável no banco.
-            </p>
 
             <form className="quadro-producao-modal-form" onSubmit={handleRenameColumnSubmit}>
               <label className="quadro-producao-field">
@@ -941,17 +946,13 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
 
       {createManualCardOpen ? (
         <Modal onClose={() => setCreateManualCardOpen(false)} size="md" title="Novo cartão manual">
-          <section className="confirm-dialog" aria-describedby="quadro-producao-manual-card-description">
+          <section className="confirm-dialog">
             <header className="confirm-dialog__header">
               <div>
-                <span className="confirm-dialog__eyebrow">Entrada operacional rápida</span>
+                <span className="confirm-dialog__eyebrow">Cartão</span>
                 <h2>Novo cartão manual</h2>
               </div>
             </header>
-
-            <p id="quadro-producao-manual-card-description">
-              Use este fluxo quando a operação precisar registrar uma demanda no quadro antes de virar uma ficha completa.
-            </p>
 
             <form className="quadro-producao-modal-form quadro-producao-modal-form--grid" onSubmit={handleManualCardSubmit}>
               <label className="quadro-producao-field quadro-producao-field--full">
@@ -1189,16 +1190,21 @@ type ColumnSurfaceProps = {
 };
 
 type CardImagePreviewButtonProps = {
+  activeCardDragRef: KanbanDragTracker;
   card: KanbanCardSummary;
   onOpenView: (card: KanbanCardSummary) => void;
 };
 
-function CardImagePreviewButton({ card, onOpenView }: CardImagePreviewButtonProps) {
+function CardImagePreviewButton({ activeCardDragRef, card, onOpenView }: CardImagePreviewButtonProps) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<CSSProperties | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const thumbnailUrl = getCloudinaryThumbnailUrl(card.thumbUrl);
+  const closePreview = useCallback(() => {
+    setOpen(false);
+    setPosition(null);
+  }, []);
 
   const updatePointerPosition = useCallback((clientX: number, clientY: number) => {
     const preview = previewRef.current;
@@ -1237,21 +1243,39 @@ function CardImagePreviewButton({ card, onOpenView }: CardImagePreviewButtonProp
       <button
         aria-label={`Abrir detalhes de ${card.clienteNome}`}
         className="quadro-producao-icon-button quadro-producao-image-preview-trigger"
-        onBlur={() => {
-          setOpen(false);
-          setPosition(null);
+        onBlur={closePreview}
+        onClick={() => {
+          if (activeCardDragRef.current) {
+            closePreview();
+            return;
+          }
+          onOpenView(card);
         }}
-        onClick={() => onOpenView(card)}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          if (activeCardDragRef.current) {
+            closePreview();
+            return;
+          }
+          setOpen(true);
+        }}
+        onMouseDown={stopKanbanCardDrag}
         onPointerEnter={(event) => {
+          if (activeCardDragRef.current) {
+            closePreview();
+            return;
+          }
           setOpen(true);
           updatePointerPosition(event.clientX, event.clientY);
         }}
-        onPointerLeave={() => {
-          setOpen(false);
-          setPosition(null);
+        onPointerDown={stopKanbanCardDrag}
+        onPointerLeave={closePreview}
+        onPointerMove={(event) => {
+          if (activeCardDragRef.current) {
+            closePreview();
+            return;
+          }
+          updatePointerPosition(event.clientX, event.clientY);
         }}
-        onPointerMove={(event) => updatePointerPosition(event.clientX, event.clientY)}
         ref={triggerRef}
         type="button"
       >
@@ -1288,15 +1312,14 @@ function ColumnSurface({
   onShiftColumn,
   onSortByDate,
 }: ColumnSurfaceProps) {
-  const [cardListRef, fluidCards, setFluidCards] = useDragAndDrop<KanbanCardSummary, HTMLDivElement>(column.cards, {
+  const cardDragConfig = useMemo(() => ({
     animationDuration: 90,
     delayBeforeInsert: 0,
     delayBeforeRemove: 0,
     draggingClass: "quadro-producao-card--dragging",
     droppableClass: "quadro-producao-column__list--droppable",
     droppableGroup: "quadro-producao-cards",
-    handlerSelector: ".quadro-producao-card__drag-handle",
-    isDraggable: (element) => element.classList.contains("quadro-producao-card"),
+    isDraggable: (element: HTMLElement) => element.classList.contains("quadro-producao-card"),
     onDragStart: (data: DragStartEventData<KanbanCardSummary>) => {
       activeCardDragRef.current = {
         cardId: data.value.id,
@@ -1304,45 +1327,47 @@ function ColumnSurface({
         sourceIndex: data.index,
       };
     },
-    onDragEnd: () => {
+    onDragEnd: (data: DragEndEventData<KanbanCardSummary>) => {
+      const dragSource = activeCardDragRef.current;
+      if (dragSource) {
+        const destinationIndex = Math.max(0, data.index);
+
+        if (dragSource.sourceColumnId !== column.id || dragSource.sourceIndex !== destinationIndex) {
+          onMoveCard({
+            cardId: dragSource.cardId,
+            destinationColumnId: column.id,
+            destinationIndex,
+          });
+        }
+      }
+
       window.setTimeout(() => {
         activeCardDragRef.current = null;
       }, 0);
     },
-  });
+  }), [activeCardDragRef, column.id, onMoveCard]);
+  const [cardListRef, fluidCards, setFluidCards] = useDragAndDrop<KanbanCardSummary, HTMLDivElement>(
+    column.cards,
+    cardDragConfig,
+  );
+  const visibleCards = useMemo(() => getUniqueCardsById(fluidCards), [fluidCards]);
 
   useEffect(() => {
     if (!hasUniqueCardIds(fluidCards)) {
+      setFluidCards(getUniqueCardsById(fluidCards));
       return;
     }
 
-    const dragSource = activeCardDragRef.current;
     const sameOrder = haveSameCardOrder(fluidCards, column.cards);
 
-    if (dragSource) {
-      const destinationIndex = fluidCards.findIndex((card) => card.id === dragSource.cardId);
-
-      if (destinationIndex >= 0 && (!sameOrder || dragSource.sourceColumnId !== column.id)) {
-        activeCardDragRef.current = null;
-
-        if (dragSource.sourceColumnId === column.id && dragSource.sourceIndex === destinationIndex) {
-          return;
-        }
-
-        onMoveCard({
-          cardId: dragSource.cardId,
-          destinationColumnId: column.id,
-          destinationIndex,
-        });
-      }
-
+    if (activeCardDragRef.current) {
       return;
     }
 
     if (!sameOrder || JSON.stringify(fluidCards) !== JSON.stringify(column.cards)) {
       setFluidCards(column.cards);
     }
-  }, [activeCardDragRef, column.cards, column.id, fluidCards, onMoveCard, setFluidCards]);
+  }, [activeCardDragRef, column.cards, fluidCards, setFluidCards]);
 
   return (
     <section className="quadro-producao-column" style={getColumnAccentStyle(column.order_index)}>
@@ -1403,23 +1428,15 @@ function ColumnSurface({
 
       <div className="quadro-producao-column__list" ref={cardListRef}>
         {column.cards.length === 0 ? <div className="quadro-producao-empty-column">Nenhum cartão nesta etapa.</div> : null}
-        {fluidCards.map((card, cardIndex) => {
+        {visibleCards.map((card, cardIndex) => {
               const deliveryUrgency = getDeliveryUrgency(card);
 
               return (
                 <article
                   className="quadro-producao-card"
                   data-index={cardIndex}
-                  key={`${card.id}-${cardIndex}`}
+                  key={card.id}
                 >
-                <span
-                  aria-label={`Mover cartão de ${card.clienteNome}`}
-                  className="quadro-producao-card__drag-handle"
-                  role="button"
-                  tabIndex={0}
-                >
-                  <GripVertical aria-hidden="true" size={14} />
-                </span>
                 <div className="quadro-producao-card__body">
                   <div className="quadro-producao-card__identity">
                     <Tooltip label="Abrir detalhes do cartão">
@@ -1446,10 +1463,13 @@ function ColumnSurface({
                       <select
                         aria-label={`Status da ficha de ${card.clienteNome}`}
                         disabled={insumoMutationPending}
-                        onClick={(event) => event.stopPropagation()}
+                        onClick={stopKanbanCardDrag}
                         onChange={(event) => onChangeInsumo(card, event.target.value as InsumoStatus)}
-                        onMouseDown={(event) => event.stopPropagation()}
-                        onPointerDown={(event) => event.stopPropagation()}
+                        onMouseDownCapture={stopKanbanCardDrag}
+                        onMouseDown={stopKanbanCardDrag}
+                        onPointerDownCapture={stopKanbanCardDrag}
+                        onPointerDown={stopKanbanCardDrag}
+                        onTouchStartCapture={stopKanbanCardDrag}
                         value={card.insumoStatus}
                       >
                         {INSUMO_STATUS_VALUES.map((value) => (
@@ -1473,13 +1493,15 @@ function ColumnSurface({
 
                   <div className="quadro-producao-card__footer">
                     <div className="quadro-producao-card__actions">
-                      <CardImagePreviewButton card={card} onOpenView={onOpenView} />
+                      <CardImagePreviewButton activeCardDragRef={activeCardDragRef} card={card} onOpenView={onOpenView} />
                       <Tooltip label="Mover para a próxima coluna">
                         <button
                           aria-label={`Mover ${card.clienteNome} para a próxima coluna`}
                           className="quadro-producao-icon-button quadro-producao-icon-button--success"
                           disabled={index === currentColumns.length - 1}
                           onClick={() => onMoveNextCard(card)}
+                          onMouseDown={stopKanbanCardDrag}
+                          onPointerDown={stopKanbanCardDrag}
                           type="button"
                         >
                           <ArrowRight aria-hidden="true" size={16} />

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Edit, Image as ImageIcon, PackageOpen, Ruler, Shirt, Tag, UserRound, type LucideIcon } from "lucide-react";
+import { CalendarDays, Copy, Edit, Image as ImageIcon, PackageOpen, Ruler, Shirt, Tag, UserRound, type LucideIcon } from "lucide-react";
 import { Badge, EmptyState } from "@/components/ui";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { getFichaById, type FichaDetail, type FichaStatus } from "./data";
@@ -47,6 +47,10 @@ export async function FichaPreview({ id }: { id: string }) {
         <div className="ficha-preview__header-actions">
           <Badge tone={statusTones[ficha.status]}>{statusLabels[ficha.status]}</Badge>
           {ficha.evento ? <Badge tone="info">Evento</Badge> : null}
+          <Link className="ui-button ui-button--secondary" href={`/fichas/nova?duplicar=${encodeURIComponent(ficha.id)}`}>
+            <Copy aria-hidden="true" size={16} />
+            Duplicar
+          </Link>
           <Link className="ui-button ui-button--primary" href={`/fichas/${ficha.id}`}>
             <Edit aria-hidden="true" size={16} />
             Editar

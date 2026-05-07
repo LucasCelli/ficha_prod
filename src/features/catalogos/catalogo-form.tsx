@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
@@ -9,10 +8,11 @@ import { Button } from "@/components/ui";
 import { saveCatalogItemAction } from "./actions";
 import { getInitialCatalogoFormState } from "./form-state";
 import type { CatalogItem, CatalogKind } from "./types";
-import { catalogKindLabels, catalogKinds } from "./types";
+import { catalogKindLabels } from "./types";
 
 type CatalogoFormProps = {
   item?: CatalogItem;
+  returnTo?: string;
   selectedKind: CatalogKind;
 };
 
@@ -23,7 +23,7 @@ function getMetadataText(item: CatalogItem | undefined, key: string) {
   return typeof value === "string" ? value : "";
 }
 
-export function CatalogoForm({ item, selectedKind }: CatalogoFormProps) {
+export function CatalogoForm({ item, returnTo, selectedKind }: CatalogoFormProps) {
   const [state, formAction] = useActionState(saveCatalogItemAction, getInitialCatalogoFormState());
   const lastToastRef = useRef<string | null>(null);
 
@@ -40,17 +40,13 @@ export function CatalogoForm({ item, selectedKind }: CatalogoFormProps) {
   return (
     <form action={formAction} className="catalog-form">
       {item ? <input name="id" type="hidden" value={item.id} /> : null}
+      <input name="kind" type="hidden" value={item?.kind ?? selectedKind} />
+      {returnTo ? <input name="returnTo" type="hidden" value={returnTo} /> : null}
 
       <div className="catalog-form__grid">
         <div className="field">
-          <label htmlFor="catalog-kind">Tipo</label>
-          <select id="catalog-kind" defaultValue={item?.kind ?? selectedKind} name="kind">
-            {catalogKinds.map((kind) => (
-              <option key={kind} value={kind}>
-                {catalogKindLabels[kind]}
-              </option>
-            ))}
-          </select>
+          <label>Categoria</label>
+          <div className="readonly-field">{catalogKindLabels[item?.kind ?? selectedKind]}</div>
         </div>
 
         <div className="field">
@@ -79,15 +75,12 @@ export function CatalogoForm({ item, selectedKind }: CatalogoFormProps) {
           <label htmlFor="catalog-sort">Ordem</label>
           <input id="catalog-sort" defaultValue={item?.sort_order ?? 0} inputMode="numeric" name="sortOrder" placeholder="0…" type="number" />
         </div>
-      </div>
-
-      <div className="catalog-form__bottom">
-        <label className="checkbox-field">
+        <label className="checkbox-field catalog-form__active">
           <input defaultChecked={item?.active ?? true} name="active" type="checkbox" />
           <span>Ativo</span>
         </label>
 
-        <div className="field catalog-form__full">
+        <div className="field catalog-form__description">
           <label htmlFor="catalog-description">Descrição</label>
           <textarea id="catalog-description" defaultValue={item?.description ?? ""} name="description" placeholder="Notas internas…" rows={3} />
         </div>
@@ -95,11 +88,6 @@ export function CatalogoForm({ item, selectedKind }: CatalogoFormProps) {
 
       <div className="catalog-form__actions">
         <SubmitButton isEdit={Boolean(item)} />
-        {item ? (
-          <Link className="ui-button ui-button--secondary" href={`/catalogos?tipo=${selectedKind}`}>
-            Cancelar
-          </Link>
-        ) : null}
       </div>
     </form>
   );

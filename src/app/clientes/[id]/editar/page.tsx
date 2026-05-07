@@ -31,8 +31,8 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
   if (result.kind === "not-configured") {
     return (
       <EmptyState
-        title="Supabase ainda não configurado"
-        description="Configure as variáveis de ambiente do Supabase para editar clientes."
+        title="Cliente indisponível"
+        description="Tente novamente."
       />
     );
   }
@@ -41,13 +41,13 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
     return (
       <EmptyState
         title="Cliente não encontrado"
-        description="O cliente solicitado não existe na tabela nova ou ainda não foi importado."
+        description="Verifique a busca."
       />
     );
   }
 
   if (result.kind === "error") {
-    return <EmptyState title="Não foi possível carregar o cliente" description={`A consulta ao Supabase falhou: ${result.message}`} />;
+    return <EmptyState title="Não foi possível carregar o cliente" description={result.message} />;
   }
 
   return (
@@ -57,9 +57,6 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
         <h1 id="cliente-edit-title" className="app-title">
           Editar cliente
         </h1>
-        <p className="app-summary">
-          Atualize os dados principais de {result.cliente.nome} mantendo o vínculo com o histórico de fichas.
-        </p>
       </header>
 
       <Card className="cliente-create__card">

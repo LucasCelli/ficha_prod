@@ -1,10 +1,10 @@
-import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, History, Image as ImageIcon, ListFilter, Plus } from "lucide-react";
+import { CalendarDays, History, ListFilter, Plus } from "lucide-react";
 import { Badge, DataTable, EmptyState, Pagination } from "@/components/ui";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { FichasFilterToolbar } from "./fichas-filter-toolbar";
 import { FichaRowActions } from "./ficha-row-actions";
+import { FichaRowThumbnail } from "./ficha-row-thumbnail";
 import { FichaSaveToast } from "./ficha-save-toast";
 import {
   FICHAS_PAGE_SIZE,
@@ -55,9 +55,6 @@ export function FichasOverview({ filters, result }: FichasOverviewProps) {
             <h1 id="fichas-title" className="app-title">
               Fichas
             </h1>
-            <p className="app-summary">
-              Primeira leitura operacional ligada ao modelo Supabase, com filtros na URL e tabela compartilhada para a nova base.
-            </p>
           </div>
           <Link className="ui-button ui-button--primary" href="/fichas/nova">
             <Plus aria-hidden="true" size={18} />
@@ -206,8 +203,8 @@ function renderFichasContent(result: FichaListResult, filters: FichaFilters) {
   if (result.kind === "not-configured") {
     return (
       <EmptyState
-        title="Supabase ainda não configurado"
-        description="A tela já está preparada para consultar a tabela nova de fichas. Configure as variáveis de ambiente do Supabase para carregar dados reais."
+        title="Fichas indisponíveis"
+        description="Tente novamente."
       />
     );
   }
@@ -216,7 +213,7 @@ function renderFichasContent(result: FichaListResult, filters: FichaFilters) {
     return (
       <EmptyState
         title="Não foi possível carregar fichas"
-        description={`A consulta ao Supabase falhou: ${result.message}`}
+        description={result.message}
       />
     );
   }
@@ -230,7 +227,7 @@ function renderFichasContent(result: FichaListResult, filters: FichaFilters) {
           </Link>
         }
         title="Nenhuma ficha encontrada"
-        description="Quando a importação ou os novos cadastros começarem, as fichas aparecerão aqui com status, data de entrega e personalização."
+        description="Ajuste os filtros."
       />
     );
   }
@@ -294,8 +291,17 @@ function formatOverdueDays(days: number) {
   return days === 1 ? "Atrasado há 1 dia" : `Atrasado há ${formatCount(days)} dias`;
 }
 
+function getFichaItemsTotal(ficha: FichaListItem) {
+  return ficha.ficha_itens?.reduce((total, item) => total + (item.quantidade ?? 0), 0) ?? 0;
+}
+
+function formatItemsTotal(total: number) {
+  return total === 1 ? "1 item" : `${formatCount(total)} itens`;
+}
+
 function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilters: FichaFilters }) {
   const thumbUrl = ficha.ficha_imagens?.[0]?.url;
+  const itemsTotal = getFichaItemsTotal(ficha);
   const isOverdue = isFichaOverdue(ficha);
   const overdueDays = getFichaOverdueDays(ficha);
   const statusLabel = isOverdue ? "Atrasado" : statusLabels[ficha.status];
@@ -316,18 +322,17 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
     <tr>
       <td>
         <div className="ficha-row__client">
-          <div className="ficha-row__thumb">
-            {thumbUrl ? (
-              <Image src={thumbUrl} alt="Thumbnail da ficha" fill className="ficha-row__image" unoptimized />
-            ) : (
-              <ImageIcon className="ficha-row__placeholder" aria-hidden="true" size={20} />
-            )}
-          </div>
+          <FichaRowThumbnail alt={ficha.cliente_nome_snapshot} imageUrl={thumbUrl} />
           <span className="ui-table__primary">
             <Link className="ui-table__link" href={href} prefetch={false} scroll={false}>
               {ficha.cliente_nome_snapshot}
             </Link>
-            <span className="ui-table__muted">{ficha.numero_venda ? `Venda ${ficha.numero_venda}` : "Sem número de venda"}</span>
+            <span className="ficha-row__meta">
+              <Badge className="ficha-row__meta-badge" tone="neutral">{formatItemsTotal(itemsTotal)}</Badge>
+              <Badge className="ficha-row__meta-badge" tone="neutral">
+                {ficha.numero_venda ? `Venda ${ficha.numero_venda}` : "Sem venda"}
+              </Badge>
+            </span>
           </span>
         </div>
       </td>

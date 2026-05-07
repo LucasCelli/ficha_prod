@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const result = await getRelatorioData(filters);
 
   if (result.kind !== "ok") {
-    return new Response(result.kind === "error" ? result.message : "Supabase ainda não configurado.", {
+    return new Response(result.kind === "error" ? result.message : "Relatório indisponível.", {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
       },

@@ -14,9 +14,6 @@ export default function NovoClientePage() {
         <h1 id="cliente-create-title" className="app-title">
           Novo cliente
         </h1>
-        <p className="app-summary">
-          Cadastre os dados principais do cliente para vincular fichas, histórico e relatórios no novo modelo.
-        </p>
       </header>
 
       <Card className="cliente-create__card">
