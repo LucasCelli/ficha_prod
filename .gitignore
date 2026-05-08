@@ -14,3 +14,4 @@ playwright.config.js
 tests/
 
 .vercel
+supabase/.temp/

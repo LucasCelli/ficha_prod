@@ -31,34 +31,71 @@ Objetivo: reconstruir o sistema em Next.js usando Supabase/Postgres como base pr
   - [x] `1` ficha nativa do Next/Supabase sem correspondente no legado.
   - [x] total operacional no Supabase: `334` fichas, sem cards manuais.
 - [x] Rodar `npm run cutover:check` ate retornar `ready-for-cutover-data`.
-- [ ] Aplicar no banco alvo as migrations pendentes que nao foram aplicadas por CLI local, principalmente:
-  - [ ] `supabase/migrations/202605050002_catalog_items_canonical_cleanup.sql`.
-  - [ ] `supabase/migrations/202605060001_fix_kanban_move_dense_order.sql`.
-  - [ ] Caveat atual: esta sessao nao tem Supabase CLI, `psql`, `SUPABASE_DB_URL` nem ferramenta MCP de `execute_sql`; aplicar via SQL Editor do Supabase, CLI em ambiente com acesso ao banco ou nova sessao com MCP Supabase ativo.
-- [ ] Rodar checks finais no mesmo estado que sera publicado:
+- [x] Aplicar no banco alvo as migrations pendentes que nao foram aplicadas por CLI local:
+  - [x] `supabase/migrations/202605050002_catalog_items_canonical_cleanup.sql`.
+  - [x] `supabase/migrations/202605060001_fix_kanban_move_dense_order.sql`.
+  - [x] Supabase CLI instalada localmente no projeto em 2026-05-08 como dev dependency (`npx supabase --version` = `2.98.2`), com `supabase db query` disponivel.
+  - [x] A instalacao da CLI foi validada com `npm run typecheck`, `npm run lint`, `npm run build` e `npm run supabase:check`.
+  - [x] Repo linkado ao projeto Supabase `qgqoxzbncbcmuaqmytou`; `supabase db query --linked` validado com `select 1`.
+  - [x] Verificacao pos-SQL: catalogos canonicos presentes, `move_kanban_card` com ranking denso e `kanban_ordem` pendente sem divergencias (`out_of_order = 0`).
+  - [x] `psql` nao foi instalado porque `supabase db query --linked` destravou a aplicacao das migrations sem `SUPABASE_DB_URL`/`DATABASE_URL`.
+  - [x] Token pessoal usado para a CLI foi revogado pelo usuario apos a aplicacao/validacao.
+- [x] Rodar checks finais no mesmo estado que sera publicado:
   - [x] `npm run typecheck` passou em 2026-05-07 antes da carga manual das fichas faltantes.
   - [x] `npm run lint` passou em 2026-05-07 antes da carga manual das fichas faltantes.
   - [x] `npm run build` passou em 2026-05-07 antes da carga manual das fichas faltantes.
   - [x] `npm run supabase:check` passou em 2026-05-07 antes da carga manual das fichas faltantes.
   - [x] `npm run prod:check` passou em 2026-05-07 antes da carga manual das fichas faltantes.
   - [x] Rerodar todos os checks acima depois da carga manual por JSON.
-- [ ] Publicar a versao Next/Supabase na Vercel.
-- [ ] Validar em producao, com usuario real, os fluxos criticos:
-  - [ ] `/login` e `/logout`.
-  - [ ] `/` home operacional.
-  - [ ] `/fichas`: filtros, criacao, edicao, imagens, preview, entrega/reversao e PDF operacional.
-  - [ ] `/fichas/[id]/imprimir`: impressao individual.
-  - [ ] `/quadro-producao`: filtros, mover card, status de insumo, ordenar coluna e marcar entregue.
-  - [ ] `/clientes`: busca, cadastro, edicao, detalhe, historico e exclusao controlada.
-  - [ ] `/catalogos`: CRUD de itens e aliases canonicos.
-  - [ ] `/usuarios`: CRUD de operadores e bloqueio para usuario comum.
-  - [ ] `/relatorios`: indicadores, filtros e exportacao Excel/PDF.
-- [ ] Monitorar logs iniciais da Vercel/Supabase apos o corte.
+  - [x] Rerodar `npm run supabase:check`, `npm run cutover:check` e `npm run prod:check` depois de aplicar as migrations pendentes.
+  - [x] Corrigir warnings do Supabase Security Advisor:
+    - [x] `function_search_path_mutable` nas funcoes do kanban, busca e `set_updated_at`.
+    - [x] `extension_in_public` para `pg_trgm` e `unaccent`.
+    - [x] `rls_policy_always_true` nas policies antigas de `authenticated`.
+    - [x] `npx supabase db advisors --linked --type security --level warn --fail-on none -o json` retornou `No issues found`.
+  - [x] Rerodar checks depois da revogacao do token Supabase: `npm run cutover:check`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run prod:check`.
+- [x] Publicar a versao Next/Supabase na Vercel em preview:
+  - [x] `vercel inspect` confirmou o deployment `dpl_7cWfNJywKVHcNYWbEecuT2TP158C` como `Ready` em `target preview`.
+  - [x] URL publicada: `https://fichaprimalhas-7qpmh5ida-lucascellis-projects.vercel.app`.
+  - [x] Smoke tecnico via `vercel curl`: `/login` retornou 200 com a tela do app; `/fichas` sem sessao redirecionou para `/login?next=%2Ffichas`.
+  - [x] Logs recentes do deployment: `vercel logs dpl_7cWfNJywKVHcNYWbEecuT2TP158C --no-follow --level error --since 30m` retornou sem erros.
+  - [x] Caveat resolvido pela publicacao em producao abaixo; a validacao com usuario real passou a acontecer no alias publico.
+- [x] Publicar a versao Next/Supabase em producao:
+  - [x] Deployment `dpl_BJrFWxBfPyXirk9uKrAGRTGWNPQW` ficou `Ready` em `target production`.
+  - [x] Alias ativo: `https://fichaprimalhas.vercel.app`.
+- [x] Validar em producao, com usuario real, os fluxos criticos:
+  - [x] `/login` e `/logout` com usuario real `fernanda`.
+  - [x] `/` home operacional com indicadores reais.
+  - [x] `/fichas`: filtros, criacao, edicao, imagens, preview, entrega/reversao e PDF operacional.
+    - [x] Listagem carregou 25 de 334 fichas.
+    - [x] PDF operacional autenticado retornou 200 em `/fichas/pdf?status=pendente`.
+    - [x] Criacao, preview, edicao, entrega, reversao e exclusao foram homologados em producao com ficha temporaria, removida ao final.
+    - [x] Upload novo de imagem em producao homologado pelo usuario com criacao real de ficha com imagem.
+  - [x] `/fichas/[id]/imprimir`: impressao individual carregou `#print-version`.
+  - [x] `/quadro-producao`: filtros, mover card, status de insumo, ordenar coluna e marcar entregue.
+    - [x] Quadro carregou 92 cards em aberto.
+    - [x] Criar cartao manual, mover entre colunas, alterar status de insumo, ordenar coluna por data e marcar entregue foram homologados via API autenticada em producao com cartoes temporarios, removidos ao final.
+    - [x] Arraste real no quadro e persistencia foram homologados manualmente pelo usuario em producao.
+  - [x] `/clientes`: busca, cadastro, edicao, detalhe, historico e exclusao controlada.
+    - [x] Listagem carregou 200 clientes.
+    - [x] Busca, cadastro, edicao, detalhe/historico e exclusao foram homologados em producao com cliente temporario, removido ao final.
+  - [x] `/catalogos`: CRUD de itens e aliases canonicos.
+    - [x] Acesso bloqueado para operador comum.
+    - [x] Criacao, edicao e exclusao de item canonico com alias foram homologadas em producao com superadmin temporario.
+  - [x] `/usuarios`: CRUD de operadores e bloqueio para usuario comum.
+    - [x] Acesso bloqueado para operador comum.
+    - [x] Criacao, edicao e desativacao de operador foram homologadas em producao com superadmin temporario; usuario e sessoes temporarios foram removidos ao final.
+  - [x] `/relatorios`: indicadores, filtros e exportacao Excel/PDF.
+    - [x] Indicadores carregaram em producao.
+    - [x] Excel autenticado retornou 200 em `/relatorios/excel?periodo=mes`.
+- [x] Monitorar logs iniciais da Vercel/Supabase apos o corte.
+  - [x] `vercel logs dpl_BJrFWxBfPyXirk9uKrAGRTGWNPQW --no-follow --level error --since 30m` retornou sem erros.
 
 ### Bloqueadores para se livrar do legado
 
 - [ ] Confirmar que nenhum operador precisou voltar ao `server.js`/`public/` apos a publicacao.
-- [ ] Preservar backup dos dados e artefatos legados usados no corte.
+- [x] Preservar backup dos dados e artefatos legados usados no corte.
+  - [x] Snapshot final preservado em `data/backups/cutover-snapshot-2026-05-07T23-40-57-956Z.json`.
 - [ ] Remover da distribuicao final os arquivos legados que nao forem mais referencia necessaria:
   - [ ] `server.js`.
   - [ ] `public/` legado HTML/CSS/JS, mantendo somente assets ainda usados pelo App Router, se houver.
@@ -188,7 +225,7 @@ As fases abaixo permanecem como historico executivo da migracao. Para decisao de
 
 - [x] Escolher estrutura do projeto:
   - [x] Novo app dentro do repo atual.
-  - [ ] Ou nova raiz Next substituindo gradualmente a estrutura antiga.
+  - [x] Nova raiz Next separada descartada; a migracao seguiu dentro do repo atual.
 - [x] Criar projeto Next.js com TypeScript.
 - [x] Configurar lint e scripts de build.
 - [x] Configurar variaveis de ambiente para Supabase.
@@ -411,7 +448,7 @@ As fases abaixo permanecem como historico executivo da migracao. Para decisao de
 - [x] Popular catalogos no Supabase antes da importacao completa das fichas.
 - [x] Validar amostras de clientes, fichas e relatorios.
 - [x] Registrar inconsistencias encontradas.
-- [ ] Planejar janela de migracao final.
+- [x] Planejar janela de migracao final.
 
 ### Criterios de aceite
 
@@ -461,18 +498,23 @@ As fases abaixo permanecem como historico executivo da migracao. Para decisao de
 ### Tarefas
 
 - [ ] Congelar alteracoes no legado.
-- [ ] Rodar migracao final de dados.
+- [x] Rodar migracao final de dados.
 - [x] Validar dados importados.
 - [x] Configurar ambiente de producao.
-- [ ] Publicar nova versao.
-- [ ] Testar fluxos criticos em producao.
-- [ ] Monitorar erros iniciais.
+- [x] Publicar nova versao.
+- [x] Testar fluxos criticos em producao.
+  - [x] Smoke autenticado de leitura, exports, impressao e autorizacao passou no alias `https://fichaprimalhas.vercel.app`.
+  - [x] Fluxos mutativos principais passaram em producao com registros temporarios e limpeza ao final.
+  - [x] Upload novo de imagem, arraste real no quadro e persistencia foram homologados manualmente pelo usuario.
+- [x] Monitorar erros iniciais.
 
 ### Criterios de aceite
 
-- [ ] Nova versao esta em uso.
-- [ ] Fluxos criticos confirmados em producao.
-- [ ] Dados principais conferidos apos o corte.
+- [x] Nova versao esta em uso.
+- [x] Fluxos criticos confirmados em producao.
+  - [x] Leitura, exports, impressao, autorizacao e mutacoes principais confirmadas.
+- [x] Nova versao em producao e validada.
+- [x] Dados principais conferidos apos o corte.
 
 ## Fase 11. Remocao do legado
 
@@ -480,9 +522,9 @@ As fases abaixo permanecem como historico executivo da migracao. Para decisao de
 
 ### Pre-condicoes obrigatorias
 
-- [ ] Nova versao em producao e validada.
-- [ ] Backup dos dados antigos preservado.
-- [ ] Paridade funcional aprovada.
+- [x] Nova versao em producao e validada.
+- [x] Backup dos dados antigos preservado.
+- [x] Paridade funcional aprovada.
 - [ ] Nenhum fluxo operacional depende dos arquivos legados.
 - [ ] Usuario confirmou que o legado pode ser removido.
 

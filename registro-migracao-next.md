@@ -1,5 +1,100 @@
 # Registro da migracao Next
 
+## 2026-05-08 - Producao: aceite funcional do usuario
+
+- Fase/modulo: producao / aceite funcional.
+- Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: o usuario homologou manualmente em producao a criacao de ficha com upload de imagem, o arraste real no quadro de producao e a persistencia do quadro apos movimentacao. Relato: tudo funciona; restam apenas refinos visuais.
+- Decisao: marcar como concluidos os fluxos criticos de producao, incluindo upload de imagem e drag/drop real do quadro, e marcar a paridade funcional como aprovada. Manter abertos os refinos visuais pos-corte e a etapa separada de remocao do legado, que ainda depende de confirmacao operacional.
+
+## 2026-05-08 - Producao: homologacao mutativa controlada
+
+- Fase/modulo: producao / homologacao controlada dos fluxos mutativos pendentes.
+- Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Fichas: em `https://fichaprimalhas.vercel.app`, com usuario operador, foi criada uma ficha temporaria `Codex Homologacao Ficha 20260508`, validada na listagem, aberta em previa de impressao, editada (`numero_venda` alterado), marcada como entregue, revertida para pendente e removida pela acao de exclusao com codigo. A contagem voltou para `334` fichas e a busca por fichas `Codex Homologacao%` retornou `0`.
+- Clientes: criado cliente temporario `Codex Homologacao Cliente 20260508`, validada busca, edicao de contato, detalhe/historico e exclusao controlada. A contagem voltou para `200` clientes.
+- Quadro de producao: via API autenticada de producao, foram criados cartoes temporarios, validando criacao manual, movimento entre colunas, ordenacao por data, entrega e alteracao de status de insumo (`sem_tecido`). Os cartoes temporarios foram removidos via Supabase ao final e a contagem voltou para `334` fichas, sem fichas `Codex Homologacao%`.
+- Catalogos/usuarios: criado superadmin temporario `codexsuper20260508` para homologar superficies restritas. Em `/catalogos`, foi criado, editado e excluido o item `Codex Produto Homologacao 20260508` com alias canonico. Em `/usuarios`, foi criado, editado e desativado o operador `codexop20260508`. Ao final, o superadmin, o operador, suas sessoes e qualquer item de catalogo temporario foram removidos; a verificacao retornou `codexUsers=0` e `codexCatalogItems=0`.
+- Plano: a auditoria dos checkboxes abertos tambem marcou como concluidos os itens ja comprovados de janela final planejada, estrutura Next escolhida dentro do repo atual e backup preservado em `data/backups/cutover-snapshot-2026-05-07T23-40-57-956Z.json`.
+- Decisao: marcar no plano os mutativos principais de producao como homologados, mantendo abertos apenas os pontos que dependem de interacao manual fina: upload novo de imagem com arquivo real e sensacao final do drag and drop real.
+- Caveat: a validacao do quadro cobriu as APIs autenticadas e a persistencia das acoes, mas nao substitui uma sessao manual de arrastar e soltar com mouse/touch em producao.
+
+## 2026-05-08 - Vercel: producao publicada e smoke com usuario real
+
+- Fase/modulo: corte para producao / publicacao Vercel e homologacao inicial.
+- Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: `npx vercel deploy --prod --yes` publicou o deployment `dpl_BJrFWxBfPyXirk9uKrAGRTGWNPQW`, que ficou `Ready` em `target production` e recebeu o alias `https://fichaprimalhas.vercel.app`. `npx vercel inspect https://fichaprimalhas.vercel.app` confirmou a producao ativa e `npx vercel logs dpl_BJrFWxBfPyXirk9uKrAGRTGWNPQW --no-follow --level error --since 30m` retornou sem erros.
+- Smoke tecnico: `vercel curl` confirmou `/login` com HTTP 200 e `/fichas` sem sessao redirecionando para `/login?next=%2Ffichas`, preservando o gate server-side.
+- Smoke autenticado: pelo navegador em producao, o login com `fernanda` entrou no app, a home mostrou indicadores reais (`334` fichas, `92` pendentes, `242` entregues, `200` clientes e `43` atrasadas), `/fichas` carregou 25 de 334 fichas, `/quadro-producao` carregou 92 cards em aberto, `/clientes` carregou 200 registros, `/relatorios` carregou indicadores e `/fichas/eba1df56-35fb-4f2d-a9bc-16dbe4be4f95/imprimir?autoprint=0` carregou a versao de impressao com `#print-version`.
+- Exports: chamadas autenticadas retornaram HTTP 200 para `/relatorios/excel?periodo=mes` (`application/vnd.ms-excel`) e `/fichas/pdf?status=pendente` (`application/pdf`).
+- Autorizacao: com usuario operador, `/usuarios` e `/catalogos` redirecionaram para `/`, confirmando o bloqueio de superficies de `superadmin`. O logout pela UI voltou para `/login`.
+- Caveat: ainda falta homologacao manual controlada dos fluxos mutativos em producao: criar/editar ficha, upload de imagens, entregar/reverter, mover/ordenar cards no kanban, CRUD de clientes, CRUD de catalogos e CRUD de usuarios com `superadmin`.
+
+## 2026-05-08 - Corte: checks finais apos revogar token Supabase
+
+- Fase/modulo: corte para producao / validacao final pre-publicacao.
+- Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: apos o usuario revogar o token pessoal usado pela Supabase CLI, os checks finais foram repetidos sem depender de novo SQL remoto. `npm run cutover:check` retornou `ready-for-cutover-data`; `npm run typecheck`, `npm run lint` e `npm run build` passaram; `npm run prod:check` retornou `ready-for-production-cutover` fora do sandbox.
+- Decisao: marcar o bloco de checks finais do plano como concluido. As pendencias abertas agora sao operacionais de corte: congelar escrita no legado, publicar/promover para producao acessivel, validar fluxos com usuario real e monitorar logs.
+
+## 2026-05-08 - Banco: warnings do Security Advisor corrigidos
+
+- Fase/modulo: Supabase / seguranca pre-corte.
+- Arquivos alterados: `supabase/migrations/20260508004128_security_advisor_cleanup.sql`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: criada e aplicada a migration `20260508004128_security_advisor_cleanup.sql` para resolver os warnings informados no dashboard da Supabase. A migration fixa `search_path` nas funcoes `resolve_kanban_column_id`, `sync_fichas_kanban_column`, `reorder_kanban_columns`, `sort_kanban_cards_by_delivery_date`, `set_updated_at`, `move_kanban_card`, `normalize_search_text` e `sync_fichas_busca_normalizada`.
+- Extensoes: `pg_trgm` e `unaccent` foram movidas de `public` para o schema `extensions`, com grants para `anon`, `authenticated` e `service_role`. `normalize_search_text` e `sync_fichas_busca_normalizada` receberam `search_path = public, extensions, pg_temp`, preservando a chamada a `unaccent`.
+- RLS: removidas as policies antigas `authenticated users can manage ...` com `USING (true)`/`WITH CHECK (true)` das tabelas operacionais. Decisao: o App Router atual acessa o banco server-side com `SUPABASE_SERVICE_ROLE_KEY`; nao ha fluxo client-side usando Supabase Auth para operar essas tabelas, entao manter policies permissivas para `authenticated` era desnecessario e gerava alerta real.
+- Verificacao SQL: funcoes retornaram `proconfig` com `search_path` fixo; `pg_extension` mostrou `pg_trgm` e `unaccent` no schema `extensions`; `pg_policies` nao retornou policies `authenticated users can manage%`; `public.normalize_search_text('Paróquia Áéí 123')` retornou `paroquia aei 123`.
+- Validacao: `npm run supabase:check`, `npm run cutover:check`, `npm run typecheck`, `npm run lint`, `npm run build` e `npm run prod:check` passaram. `npx supabase db advisors --linked --type security --level warn --fail-on none -o json` retornou `No issues found`.
+- Caveat: o token pessoal da Supabase usado nesta sessao foi revogado pelo usuario apos a aplicacao das migrations e validacoes.
+
+## 2026-05-08 - Banco: migrations pendentes aplicadas
+
+- Fase/modulo: corte para producao / aplicacao de migrations Supabase.
+- Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: o repo foi linkado ao projeto Supabase `qgqoxzbncbcmuaqmytou` com a CLI local. `npx supabase db query --linked` foi validado com query read-only (`current_database() = postgres`, `current_schema() = public`, `ok = 1`).
+- Migrations aplicadas no banco alvo via `npx supabase db query --linked -f`: `supabase/migrations/202605050002_catalog_items_canonical_cleanup.sql` e `supabase/migrations/202605060001_fix_kanban_move_dense_order.sql`.
+- Verificacao SQL: catalogos canonicos conferidos com contagens `gola=8`, `acabamento_manga=6`, `acabamento_gola=5`, `bolso=13`; amostras como `gola-padre-com-ziper`, `punho-sublimado`, `ribana-em-molde` e `2-bolsos-na-frente-e-2-atras` retornaram com nomes/aliases esperados.
+- Verificacao Kanban: `pg_get_functiondef(public.move_kanban_card(uuid,uuid,integer))` contem `clamped_target` e `row_number() over`, confirmando a versao com ranking denso; a checagem de divergencia de ordem dos pendentes retornou `out_of_order = 0`.
+- Checks pos-SQL: `npm run supabase:check` passou com 200 clientes, 334 fichas, 1871 itens, 416 imagens e 224 catalogos; `npm run cutover:check` retornou `ready-for-cutover-data`; `npm run prod:check` retornou `ready-for-production-cutover` ao repetir fora do sandbox por causa do EPERM conhecido do cache npm/Vercel.
+- Caveat: como um token pessoal da Supabase foi usado nesta sessao para destravar a CLI, ele foi revogado pelo usuario apos a aplicacao e validacao.
+
+## 2026-05-08 - Ferramentas: Supabase CLI instalada
+
+- Fase/modulo: corte para producao / ferramentas de banco.
+- Arquivos alterados: `.gitignore`, `package.json`, `package-lock.json`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: instalada a Supabase CLI como dev dependency do projeto com `npm install supabase --save-dev`, seguindo a orientacao atual da documentacao de usar `npx supabase` ou dependency local em vez de `npm install -g`. `npx supabase --version` retornou `2.98.2`; `npx supabase db --help` confirmou `db query`, `db push`, `db pull`, `db dump` e `db advisors`.
+- Higiene: `supabase/.temp/` foi adicionado ao `.gitignore` porque a CLI grava cache local como `cli-latest`.
+- `psql`: nao foi instalado nesta etapa porque `.env` nao contem `SUPABASE_DB_URL`/`DATABASE_URL`, entao o cliente direto nao teria string de conexao para usar. Como a CLI instalada ja oferece `npx supabase db query --linked -f <arquivo.sql>`, ela deve ser suficiente para aplicar as migrations apos autenticar.
+- Caveat: `npx supabase projects list` ainda falha com `Access token not provided`; para aplicar as migrations pendentes pela CLI, falta executar `npx supabase login` ou definir `SUPABASE_ACCESS_TOKEN` no ambiente.
+
+## 2026-05-08 - Ferramentas: CLI validada e bloqueio de token isolado
+
+- Fase/modulo: corte para producao / preparacao para aplicar migrations.
+- Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: a CLI local continuou funcional (`npx supabase --version` = `2.98.2`), mas o fluxo interativo `npx supabase login` nao roda nesta sessao por ser non-TTY. A CLI retornou: `Cannot use automatic login flow inside non-TTY environments. Please provide --token flag or set the SUPABASE_ACCESS_TOKEN environment variable.`
+- Ambiente: `npx vercel env ls` confirmou que Vercel tem `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, Turso e Cloudinary, mas nao tem `SUPABASE_DB_URL`/`DATABASE_URL`. Portanto, `psql` ainda nao destrava a execucao SQL sem uma connection string.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `npm run supabase:check` passaram depois da instalacao da CLI. O build compilou Next/App Router com as rotas atuais e o Supabase check segue `ready` com 200 clientes, 334 fichas, 1871 itens, 416 imagens e 224 catalogos.
+- Proximo passo objetivo: fornecer `SUPABASE_ACCESS_TOKEN` ou rodar `npx supabase login --token <token>`; em seguida aplicar as migrations pendentes com `npx supabase db query --linked -f supabase/migrations/202605050002_catalog_items_canonical_cleanup.sql` e `npx supabase db query --linked -f supabase/migrations/202605060001_fix_kanban_move_dense_order.sql`.
+
+## 2026-05-08 - Vercel: preview publicado e pronto
+
+- Fase/modulo: corte para producao / publicacao Vercel em preview.
+- Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: o `npx vercel inspect` executado pelo usuario confirmou o deployment `dpl_7cWfNJywKVHcNYWbEecuT2TP158C` como `Ready`, com `target preview`, para `https://fichaprimalhas-7qpmh5ida-lucascellis-projects.vercel.app`. O inspect tambem mostrou build remoto com funcoes Next/App Router, incluindo `_not-found`, `api/cloudinary/config` e `api/cloudinary/image/[...publicId]`.
+- Decisao: marcar a publicacao Vercel em preview como concluida no plano, mas manter abertas a validacao com usuario real, a promocao/troca de dominio em producao e o monitoramento inicial de logs.
+- Caveat: este registro usa o output do inspect informado pelo usuario; nao houve nova validacao interativa de login/rotas neste ciclo.
+
+## 2026-05-08 - Vercel: smoke tecnico do preview
+
+- Fase/modulo: corte para producao / validacao tecnica do preview Vercel.
+- Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: `supabase:check` continua `ready` com 200 clientes, 334 fichas, 1871 itens, 416 imagens e 224 catalogos; `cutover:check` continua `ready-for-cutover-data`, com 333 fichas legadas cobertas, 1 ficha nativa e 0 cards manuais. A maquina ainda nao tem `supabase` CLI nem `psql`, entao as duas migrations pendentes seguem exigindo SQL Editor, ambiente com CLI/DB URL ou MCP Supabase com `execute_sql`.
+- Preview: `npx vercel inspect` foi repetido fora do sandbox e confirmou novamente o deployment `dpl_7cWfNJywKVHcNYWbEecuT2TP158C` como `Ready`. Pelo browser comum, `/login` abre a protecao/login da Vercel; pela CLI autenticada, `npx vercel curl /login --deployment https://fichaprimalhas-7qpmh5ida-lucascellis-projects.vercel.app` atravessou a protecao e retornou 200 com `Login | Fichas Tecnicas`.
+- Rotas: via `vercel curl`, `/fichas` sem sessao retornou 307 para `/login?next=%2Ffichas`, confirmando o gate server-side no preview. `/api/cloudinary/config` e uma rota inexistente tambem foram interceptadas pelo gate sem sessao e redirecionaram para login, comportamento esperado enquanto sem cookie de app.
+- Logs: `npx vercel logs dpl_7cWfNJywKVHcNYWbEecuT2TP158C --no-follow --level error --since 30m` retornou `No logs found`.
+- Caveat: ainda nao houve homologacao com usuario real no preview/producao porque o navegador comum fica na protecao da Vercel; para validar UI autenticada remotamente, liberar/bypassar Deployment Protection ou promover para um ambiente acessivel durante a janela de corte.
+
 ## 2026-05-07 - Corte: carga manual fechada e checks finais
 
 - Fase/modulo: corte de dados / validacao final local.
