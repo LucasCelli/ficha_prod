@@ -1,3 +1,4 @@
+import { formatBusinessDateTime, formatDateInput } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import {
   ArrowLeftRight,
@@ -43,7 +44,6 @@ type PrintProductRow = {
   tamanho: string;
 };
 
-const BUSINESS_TIME_ZONE = "America/Cuiaba";
 const MAX_PRINT_IMAGES = 4;
 
 export function PrintFicha({ ficha, printedBy }: PrintFichaProps) {
@@ -428,21 +428,15 @@ function formatValue(value: boolean | number | string | null | undefined) {
 
 function formatDate(value: null | string) {
   if (!value) return "-";
-
-  return new Intl.DateTimeFormat("pt-BR", {
+  return formatDateInput(value, {
     day: "2-digit",
     month: "2-digit",
-    timeZone: "UTC",
     year: "numeric",
-  }).format(new Date(`${value}T00:00:00.000Z`));
+  });
 }
 
 function formatDateTime(value: Date) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: BUSINESS_TIME_ZONE,
-  }).format(value);
+  return formatBusinessDateTime(value);
 }
 
 function hasAcabamentoMangaExtra(value: string | null) {

@@ -1,3 +1,4 @@
+import { getBusinessTodayInput, getDateInputDifferenceInDays } from "@/lib/dates";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -79,7 +80,6 @@ export type FichaDetailResult =
     };
 
 export const FICHAS_PAGE_SIZE = 25;
-const BUSINESS_TIME_ZONE = "America/Cuiaba";
 
 export async function listFichas(filters: FichaFilters = {}): Promise<FichaListResult> {
   if (!getSupabaseConfigStatus().hasServerConfig) {
@@ -349,29 +349,13 @@ export function getFichaOverdueDays(ficha: FichaOverdueCandidate) {
     return 0;
   }
 
-  const deliveryTime = Date.parse(`${ficha.data_entrega}T00:00:00.000Z`);
-  const todayTime = Date.parse(`${getBusinessTodayInput()}T00:00:00.000Z`);
+  const difference = getDateInputDifferenceInDays(getBusinessTodayInput(), ficha.data_entrega);
 
-  if (!Number.isFinite(deliveryTime) || !Number.isFinite(todayTime)) {
+  if (difference === null) {
     return 0;
   }
 
-  return Math.max(0, Math.floor((todayTime - deliveryTime) / 86_400_000));
-}
-
-function getBusinessTodayInput() {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: BUSINESS_TIME_ZONE,
-    year: "numeric",
-  }).formatToParts(new Date());
-
-  const year = parts.find((part) => part.type === "year")?.value ?? "1970";
-  const month = parts.find((part) => part.type === "month")?.value ?? "01";
-  const day = parts.find((part) => part.type === "day")?.value ?? "01";
-
-  return `${year}-${month}-${day}`;
+  return Math.max(0, difference);
 }
 
 export function normalizeDateFilter(value: string | string[] | undefined) {

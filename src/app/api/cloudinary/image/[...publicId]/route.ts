@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCurrentSession } from "@/features/auth/session";
 import { generateCloudinarySignature, getCloudinaryConfig, isCloudinaryConfigured } from "@/lib/cloudinary";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -12,6 +13,12 @@ type RouteContext = {
 };
 
 export async function DELETE(request: Request, context: RouteContext) {
+  const session = await getCurrentSession();
+
+  if (!session) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
   if (!isCloudinaryConfigured()) {
     return NextResponse.json({ error: "Cloudinary não configurado." }, { status: 503 });
   }

@@ -15,6 +15,7 @@ import {
 import { createPortal } from "react-dom";
 import { keepPreviousData, type QueryKey, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryStates } from "nuqs";
+import { toast } from "sonner";
 import type { DragEndEventData, DragStartEventData } from "fluid-dnd";
 import { useDragAndDrop } from "fluid-dnd/react";
 import { Group, Panel, Separator } from "react-resizable-panels";
@@ -32,7 +33,6 @@ import {
   Rows3,
   Star,
 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   Badge,
   Card,
@@ -40,6 +40,7 @@ import {
   Modal,
   Tooltip,
 } from "@/components/ui";
+import { formatDateInput, formatShortDateInput, getBusinessTodayInput, getDateInputDifferenceInDays } from "@/lib/dates";
 import { useFluidDndEventTargetGuard } from "@/lib/fluid-dnd-event-target-guard";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import type { InsumoStatus } from "./config";
@@ -93,13 +94,7 @@ type KanbanDragSource = {
 type KanbanDragTracker = MutableRefObject<KanbanDragSource | null>;
 
 function formatDate(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  }).format(date);
+  return formatShortDateInput(value);
 }
 
 function formatCount(value: number) {
@@ -107,16 +102,7 @@ function formatCount(value: number) {
 }
 
 function getRemainingDays(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  return Math.ceil((date.getTime() - today.getTime()) / 86_400_000);
+  return getDateInputDifferenceInDays(value);
 }
 
 function getDeliveryUrgency(card: KanbanCardSummary) {
@@ -196,13 +182,11 @@ function stopKanbanCardDrag(event: { nativeEvent?: Event; stopPropagation: () =>
 }
 
 function formatDateLong(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-
-  return new Intl.DateTimeFormat("pt-BR", {
+  return formatDateInput(value, {
     day: "2-digit",
     month: "long",
     year: "numeric",
-  }).format(date);
+  });
 }
 
 function cloneResult(result: QuadroProducaoResult) {
@@ -384,7 +368,7 @@ function getEmptyManualCardDraft(columnId: string): ManualCardDraft {
   return {
     arte: "",
     columnId,
-    dataEntrega: new Date().toISOString().slice(0, 10),
+    dataEntrega: getBusinessTodayInput(),
     evento: false,
     insumoStatus: "tudo_ok",
     material: "",
@@ -437,6 +421,8 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
   const [manualCardDraft, setManualCardDraft] = useState<ManualCardDraft>(() => getEmptyManualCardDraft(""));
   const [viewCard, setViewCard] = useState<KanbanCardSummary | null>(null);
   const activeCardDragRef = useRef<KanbanDragSource | null>(null);
+  const [activeCardDrag, setActiveCardDrag] = useState<KanbanDragSource | null>(null);
+  const [hiddenDeliveredCardIds, setHiddenDeliveredCardIds] = useState<Set<string>>(() => new Set());
   const queryClient = useQueryClient();
 
   useLayoutEffect(() => {
@@ -481,27 +467,62 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
   });
 
   const currentResult = boardQuery.data ?? initialResult;
-  const currentColumns = currentResult.kind === "ok" ? currentResult.snapshot.columns : [];
+  const currentColumns = useMemo(
+    () =>
+      currentResult.kind === "ok"
+        ? currentResult.snapshot.columns.map((column) => {
+            const cards = column.cards.filter((card) => !hiddenDeliveredCardIds.has(card.id));
+
+            return {
+              ...column,
+              cards,
+              openCount: cards.length,
+            };
+          })
+        : [],
+    [currentResult, hiddenDeliveredCardIds],
+  );
+  const currentTotalVisible = currentColumns.reduce((total, column) => total + column.openCount, 0);
   const defaultColumnId = currentColumns[0]?.id ?? "";
+
+  const cancelCardDrag = useCallback(() => {
+    activeCardDragRef.current = null;
+    setActiveCardDrag(null);
+  }, []);
+
+  const startCardDrag = useCallback((source: KanbanDragSource) => {
+    activeCardDragRef.current = source;
+    setActiveCardDrag(source);
+  }, []);
 
   const moveCardMutation = useMutation<{ ok: true }, Error, { cardId: string; destinationColumnId: string; destinationIndex: number }, MutationContext>({
     mutationFn: (input: { cardId: string; destinationColumnId: string; destinationIndex: number }) =>
       patchKanbanCardMove(input.cardId, input.destinationColumnId, input.destinationIndex),
     onError: (_error, _variables, context) => {
+      if (context?.previousQueries) {
+        restorePreviousQueries(queryClient, context.previousQueries);
+        return;
+      }
+
       if (context?.previous) {
         queryClient.setQueryData(context.queryKey, context.previous);
       }
     },
     onMutate: async (input) => {
       const queryKey = ["quadro-producao", filters];
-      await queryClient.cancelQueries({ queryKey });
+      const boardQueryKey = ["quadro-producao"];
+      await queryClient.cancelQueries({ queryKey: boardQueryKey });
       const previous = queryClient.getQueryData<QuadroProducaoResult>(queryKey);
+      const previousQueries = queryClient.getQueriesData<QuadroProducaoResult>({ queryKey: boardQueryKey });
 
-      if (previous) {
-        queryClient.setQueryData(queryKey, applyOptimisticCardMove(previous, input));
-      }
+      queryClient.setQueriesData<QuadroProducaoResult>({ queryKey: boardQueryKey }, (current) =>
+        current ? applyOptimisticCardMove(current, input) : current,
+      );
 
-      return { previous, queryKey };
+      return { previous, previousQueries, queryKey };
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["quadro-producao"] });
     },
   });
 
@@ -532,6 +553,12 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
   const deliverCardMutation = useMutation<{ ok: true }, Error, { cardId: string }, MutationContext>({
     mutationFn: (input: { cardId: string }) => postKanbanCardEntregar(input.cardId),
     onError: (_error, _variables, context) => {
+      setHiddenDeliveredCardIds((current) => {
+        const next = new Set(current);
+        next.delete(_variables.cardId);
+        return next;
+      });
+
       if (context?.previousQueries) {
         restorePreviousQueries(queryClient, context.previousQueries);
         return;
@@ -547,6 +574,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
       await queryClient.cancelQueries({ queryKey: boardQueryKey });
       const previous = queryClient.getQueryData<QuadroProducaoResult>(queryKey);
       const previousQueries = queryClient.getQueriesData<QuadroProducaoResult>({ queryKey: boardQueryKey });
+      setHiddenDeliveredCardIds((current) => new Set(current).add(input.cardId));
 
       queryClient.setQueriesData<QuadroProducaoResult>({ queryKey: boardQueryKey }, (current) =>
         current ? applyOptimisticCardDelivered(current, input.cardId) : current,
@@ -556,6 +584,11 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
     },
     onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: ["quadro-producao"] });
+    },
+    onSuccess: () => {
+      toast.success("Ficha entregue", {
+        description: "A ficha foi marcada como entregue.",
+      });
     },
   });
 
@@ -604,6 +637,9 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
     mutationFn: (columnId: string) => postKanbanColumnSortByDate(columnId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["quadro-producao"] });
+      toast.success("Coluna reordenada", {
+        description: "Os cartões foram ordenados por entrega.",
+      });
     },
   });
 
@@ -617,18 +653,33 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
   });
   const moveCard = moveCardMutation.mutate;
   const changeInsumo = insumoMutation.mutate;
+  const deliverCard = deliverCardMutation.mutate;
   const handleMoveCard = useCallback((move: { cardId: string; destinationColumnId: string; destinationIndex: number }) => {
-    moveCard(move);
-  }, [moveCard]);
+    moveCard(move, {
+      onSettled: cancelCardDrag,
+    });
+    window.setTimeout(cancelCardDrag, 0);
+  }, [cancelCardDrag, moveCard]);
   const handleChangeInsumo = useCallback((card: KanbanCardSummary, insumoStatus: InsumoStatus) => {
     changeInsumo({
       cardId: card.id,
       insumoStatus,
     });
   }, [changeInsumo]);
+  const handleDeliverCard = useCallback((card: KanbanCardSummary) => {
+    cancelCardDrag();
+    deliverCard({ cardId: card.id });
+  }, [cancelCardDrag, deliverCard]);
 
-  function handleRefresh() {
-    void boardQuery.refetch();
+  async function handleRefresh() {
+    const result = await boardQuery.refetch();
+
+    if (result.isSuccess) {
+      setHiddenDeliveredCardIds(new Set());
+      toast.success("Quadro atualizado", {
+        description: "Os dados foram recarregados.",
+      });
+    }
   }
 
   function handleClearFilters() {
@@ -788,7 +839,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                   Quadro de Produção
                 </h1>
               </div>
-              <Badge tone="info">{formatCount(currentResult.snapshot.totalVisible)} em aberto</Badge>
+              <Badge tone="info">{formatCount(currentTotalVisible)} em aberto</Badge>
             </div>
 
             <label className="quadro-producao-field quadro-producao-field--search">
@@ -902,9 +953,11 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                 insumoMutationPending={insumoMutation.isPending}
                 deliverMutationPending={deliverCardMutation.isPending}
                 key={column.id}
+                activeCardDrag={activeCardDrag}
                 activeCardDragRef={activeCardDragRef}
+                onCancelCardDrag={cancelCardDrag}
                 onChangeInsumo={handleChangeInsumo}
-                onDeliverCard={(card) => deliverCardMutation.mutate({ cardId: card.id })}
+                onDeliverCard={handleDeliverCard}
                 onMoveCard={handleMoveCard}
                 onMoveNextCard={(card) => {
                   const nextColumn = currentColumns[index + 1];
@@ -912,7 +965,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                     return;
                   }
 
-                  moveCardMutation.mutate({
+                  handleMoveCard({
                     cardId: card.id,
                     destinationColumnId: nextColumn.id,
                     destinationIndex: nextColumn.openCount,
@@ -922,6 +975,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                 onOpenView={setViewCard}
                 onShiftColumn={handleColumnShift}
                 onSortByDate={(columnId) => sortColumnMutation.mutate(columnId)}
+                onStartCardDrag={startCardDrag}
               />
             ))}
           </Group>
@@ -936,9 +990,11 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                   insumoMutationPending={insumoMutation.isPending}
                   deliverMutationPending={deliverCardMutation.isPending}
                   key={column.id}
+                  activeCardDrag={activeCardDrag}
                   activeCardDragRef={activeCardDragRef}
+                  onCancelCardDrag={cancelCardDrag}
                   onChangeInsumo={handleChangeInsumo}
-                  onDeliverCard={(card) => deliverCardMutation.mutate({ cardId: card.id })}
+                  onDeliverCard={handleDeliverCard}
                   onMoveCard={handleMoveCard}
                   onMoveNextCard={(card) => {
                     const nextColumn = currentColumns[index + 1];
@@ -946,7 +1002,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                       return;
                     }
 
-                    moveCardMutation.mutate({
+                    handleMoveCard({
                       cardId: card.id,
                       destinationColumnId: nextColumn.id,
                       destinationIndex: nextColumn.openCount,
@@ -956,6 +1012,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                   onOpenView={setViewCard}
                   onShiftColumn={handleColumnShift}
                   onSortByDate={(columnId) => sortColumnMutation.mutate(columnId)}
+                  onStartCardDrag={startCardDrag}
                 />
               ))}
             </div>
@@ -1214,12 +1271,12 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                     disabled={viewCardNextColumn ? moveCardMutation.isPending : deliverCardMutation.isPending}
                     onClick={() => {
                       if (!viewCardNextColumn) {
-                        deliverCardMutation.mutate({ cardId: viewCard.id });
+                        handleDeliverCard(viewCard);
                         setViewCard(null);
                         return;
                       }
 
-                      moveCardMutation.mutate({
+                      handleMoveCard({
                         cardId: viewCard.id,
                         destinationColumnId: viewCardNextColumn.id,
                         destinationIndex: viewCardNextColumn.openCount,
@@ -1263,12 +1320,15 @@ function FragmentColumnPanel(props: ColumnSurfaceProps) {
 }
 
 type ColumnSurfaceProps = {
+  activeCardDrag: KanbanDragSource | null;
   activeCardDragRef: KanbanDragTracker;
   column: KanbanBoardColumn;
   currentColumns: KanbanBoardColumn[];
   index: number;
   insumoMutationPending: boolean;
   deliverMutationPending: boolean;
+  onCancelCardDrag: () => void;
+  onStartCardDrag: (source: KanbanDragSource) => void;
   onChangeInsumo: (card: KanbanCardSummary, insumoStatus: InsumoStatus) => void;
   onDeliverCard: (card: KanbanCardSummary) => void;
   onMoveCard: (move: { cardId: string; destinationColumnId: string; destinationIndex: number }) => void;
@@ -1389,12 +1449,15 @@ function CardImagePreviewButton({ activeCardDragRef, card, onOpenView }: CardIma
 }
 
 function ColumnSurface({
+  activeCardDrag,
   activeCardDragRef,
   column,
   currentColumns,
   index,
   insumoMutationPending,
   deliverMutationPending,
+  onCancelCardDrag,
+  onStartCardDrag,
   onChangeInsumo,
   onDeliverCard,
   onMoveCard,
@@ -1404,8 +1467,6 @@ function ColumnSurface({
   onShiftColumn,
   onSortByDate,
 }: ColumnSurfaceProps) {
-  const reduceMotion = useReducedMotion();
-  const [isCardDragging, setIsCardDragging] = useState(false);
   const cardDragConfig = useMemo(() => ({
     animationDuration: 90,
     delayBeforeInsert: 0,
@@ -1415,12 +1476,11 @@ function ColumnSurface({
     droppableGroup: "quadro-producao-cards",
     isDraggable: (element: HTMLElement) => element.classList.contains("quadro-producao-card"),
     onDragStart: (data: DragStartEventData<KanbanCardSummary>) => {
-      setIsCardDragging(true);
-      activeCardDragRef.current = {
+      onStartCardDrag({
         cardId: data.value.id,
         sourceColumnId: column.id,
         sourceIndex: data.index,
-      };
+      });
     },
     onDragEnd: (data: DragEndEventData<KanbanCardSummary>) => {
       const dragSource = activeCardDragRef.current;
@@ -1433,23 +1493,21 @@ function ColumnSurface({
             destinationColumnId: column.id,
             destinationIndex,
           });
+          return;
         }
       }
 
-      window.setTimeout(() => {
-        activeCardDragRef.current = null;
-        setIsCardDragging(false);
-      }, 0);
+      onCancelCardDrag();
     },
-  }), [activeCardDragRef, column.id, onMoveCard]);
+  }), [activeCardDragRef, column.id, onCancelCardDrag, onMoveCard, onStartCardDrag]);
   const [cardListRef, fluidCards, setFluidCards] = useDragAndDrop<KanbanCardSummary, HTMLDivElement>(
     column.cards,
     cardDragConfig,
   );
   const visibleCards = useMemo(() => {
-    const sourceCards = isCardDragging ? fluidCards : column.cards;
+    const sourceCards = activeCardDrag ? fluidCards : column.cards;
     return getUniqueCardsById(sourceCards);
-  }, [column.cards, fluidCards, isCardDragging]);
+  }, [activeCardDrag, column.cards, fluidCards]);
 
   useEffect(() => {
     if (!hasUniqueCardIds(fluidCards)) {
@@ -1459,14 +1517,14 @@ function ColumnSurface({
 
     const sameOrder = haveSameCardOrder(fluidCards, column.cards);
 
-    if (activeCardDragRef.current) {
+    if (activeCardDrag) {
       return;
     }
 
     if (!sameOrder || JSON.stringify(fluidCards) !== JSON.stringify(column.cards)) {
       setFluidCards(column.cards);
     }
-  }, [activeCardDragRef, column.cards, fluidCards, setFluidCards]);
+  }, [activeCardDrag, column.cards, fluidCards, setFluidCards]);
 
   return (
     <section className="quadro-producao-column" style={getColumnAccentStyle(column.order_index)}>
@@ -1527,31 +1585,15 @@ function ColumnSurface({
 
       <div className="quadro-producao-column__list" ref={cardListRef}>
         {column.cards.length === 0 ? <div className="quadro-producao-empty-column">Nenhum cartão nesta etapa.</div> : null}
-        <AnimatePresence initial={false}>
-          {visibleCards.map((card, cardIndex) => {
+        {visibleCards.map((card, cardIndex) => {
               const deliveryUrgency = getDeliveryUrgency(card);
               const isLastColumn = index === currentColumns.length - 1;
 
               return (
-                <motion.article
-                  animate={reduceMotion ? undefined : { opacity: 1, scale: 1 }}
+                <article
                   className="quadro-producao-card"
                   data-index={cardIndex}
-                  exit={
-                    reduceMotion
-                      ? undefined
-                      : {
-                          height: 0,
-                          marginBlock: 0,
-                          opacity: 0,
-                          paddingBlock: 0,
-                          scale: 0.96,
-                        }
-                  }
-                  initial={false}
                   key={card.id}
-                  style={{ overflow: "hidden" }}
-                  transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                 >
                 <div className="quadro-producao-card__body">
                   <div className="quadro-producao-card__identity">
@@ -1641,10 +1683,9 @@ function ColumnSurface({
                     </div>
                   </div>
                 </div>
-                </motion.article>
+                </article>
               );
           })}
-        </AnimatePresence>
       </div>
     </section>
   );

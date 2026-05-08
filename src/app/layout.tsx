@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Playfair_Display, Plus_Jakarta_Sans } from "next/font/google";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { CheckCircle2, CircleAlert, CircleX, Info, Loader2, X } from "lucide-react";
@@ -12,6 +12,13 @@ import "@/styles/globals.css";
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
+  display: "swap",
+});
+
+const playfairDisplay = Playfair_Display({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  variable: "--font-serif-display",
   display: "swap",
 });
 
@@ -50,7 +57,7 @@ export default async function RootLayout({
 
   return (
     <html data-scroll-behavior="smooth" data-theme={theme} lang="pt-BR">
-      <body className={plusJakarta.variable}>
+      <body className={`${plusJakarta.variable} ${playfairDisplay.variable}`}>
         <AppClientProviders>
           <a className="skip-link" href="#conteudo">
             Pular para o conteudo

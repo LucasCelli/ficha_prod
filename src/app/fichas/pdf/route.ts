@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { getCurrentSession } from "@/features/auth/session";
 import {
   listFichasForOperationalPdf,
   normalizeBooleanFilter,
@@ -8,10 +9,17 @@ import {
   normalizeTextFilter,
 } from "@/features/fichas/data";
 import { generateOperationalFichasPdf } from "@/features/fichas/operational-pdf";
+import { getBusinessWeekRange } from "@/lib/dates";
 
 type WeeklyPdfMode = "current-week" | "next-week";
 
 export async function GET(request: NextRequest) {
+  const session = await getCurrentSession();
+
+  if (!session) {
+    return new Response("Não autenticado.", { status: 401 });
+  }
+
   const filters = {
     busca:
       normalizeTextFilter(request.nextUrl.searchParams.get("busca") ?? undefined) ??
@@ -70,51 +78,18 @@ function resolveWeeklyPdfMode(dataInicio?: string, dataFim?: string, id?: string
     return undefined;
   }
 
-  const today = getBusinessToday();
-  const currentWeekStart = startOfWeek(today);
-  const currentWeekEnd = addDays(currentWeekStart, 6);
-  const nextWeekStart = addDays(currentWeekStart, 7);
-  const nextWeekEnd = addDays(nextWeekStart, 6);
+  const currentWeek = getBusinessWeekRange();
+  const nextWeek = getBusinessWeekRange(1);
 
-  if (dataInicio === formatDateInput(currentWeekStart) && dataFim === formatDateInput(currentWeekEnd)) {
+  if (dataInicio === currentWeek.start && dataFim === currentWeek.end) {
     return "current-week";
   }
 
-  if (dataInicio === formatDateInput(nextWeekStart) && dataFim === formatDateInput(nextWeekEnd)) {
+  if (dataInicio === nextWeek.start && dataFim === nextWeek.end) {
     return "next-week";
   }
 
   return undefined;
-}
-
-function getBusinessToday() {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Cuiaba",
-  });
-
-  return new Date(`${formatter.format(new Date())}T00:00:00`);
-}
-
-function startOfWeek(date: Date) {
-  const next = new Date(date);
-  const day = next.getDay();
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  next.setDate(next.getDate() + mondayOffset);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function addDays(date: Date, amount: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + amount);
-  return next;
-}
-
-function formatDateInput(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function formatFileDate(value: string) {

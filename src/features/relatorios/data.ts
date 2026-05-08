@@ -1,3 +1,4 @@
+import { addDaysToInput, createUtcDateFromInput, formatDateInput, formatUtcDateInput, getBusinessTodayInput } from "@/lib/dates";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -95,7 +96,6 @@ export type RelatorioResult =
       message: string;
     };
 
-const TIME_ZONE = "America/Cuiaba";
 const MAX_ROWS = 1200;
 
 export async function getRelatorioData(filters: RelatorioFilters): Promise<RelatorioResult> {
@@ -449,7 +449,7 @@ function getPercent(value: number, total: number) {
 }
 
 function getPeriodRange(filters: RelatorioFilters) {
-  const today = getTodayInput();
+  const today = getBusinessTodayInput();
   const current = createDateFromInput(today);
 
   if (filters.periodo === "ano") {
@@ -488,7 +488,7 @@ function getPreviousPeriodRange(range: { end: string; start: string }) {
 }
 
 function getActivityRange() {
-  const today = getTodayInput();
+  const today = getBusinessTodayInput();
   return {
     end: today,
     start: addDays(today, -364),
@@ -500,8 +500,8 @@ function monthRange(date: Date) {
   const end = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
 
   return {
-    end: formatDateInput(end),
-    start: formatDateInput(start),
+    end: formatUtcDateInput(end),
+    start: formatUtcDateInput(start),
   };
 }
 
@@ -512,42 +512,18 @@ function formatPeriodLabel(periodo: RelatorioPeriodo, range: { end: string; star
   return `${formatDate(range.start)} até ${formatDate(range.end)}`;
 }
 
-function getTodayInput() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: TIME_ZONE,
-    year: "numeric",
-  }).formatToParts(new Date());
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-
-  return `${year}-${month}-${day}`;
-}
-
 function addDays(value: string, amount: number) {
-  const date = createDateFromInput(value);
-  date.setUTCDate(date.getUTCDate() + amount);
-  return formatDateInput(date);
+  return addDaysToInput(value, amount);
 }
 
 function createDateFromInput(value: string) {
-  return new Date(`${value}T00:00:00.000Z`);
-}
-
-function formatDateInput(date: Date) {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return createUtcDateFromInput(value);
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
+  return formatDateInput(value, {
     day: "2-digit",
     month: "short",
-    timeZone: "UTC",
     year: "numeric",
-  }).format(createDateFromInput(value));
+  });
 }

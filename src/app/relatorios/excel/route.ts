@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { getCurrentSession } from "@/features/auth/session";
 import {
   getRelatorioData,
   normalizeRelatorioDate,
@@ -6,8 +7,15 @@ import {
   normalizeRelatorioPeriodo,
   normalizeRelatorioStatus,
 } from "@/features/relatorios/data";
+import { getBusinessTodayInput } from "@/lib/dates";
 
 export async function GET(request: NextRequest) {
+  const session = await getCurrentSession();
+
+  if (!session) {
+    return new Response("Não autenticado.", { status: 401 });
+  }
+
   const filters = {
     dataFim: normalizeRelatorioDate(request.nextUrl.searchParams.get("dataFim") ?? undefined),
     dataInicio: normalizeRelatorioDate(request.nextUrl.searchParams.get("dataInicio") ?? undefined),
@@ -27,7 +35,7 @@ export async function GET(request: NextRequest) {
   }
 
   const body = buildExcelHtml(result.data);
-  const fileName = `relatorio-producao-${result.data.filtros.periodo}-${new Date().toISOString().slice(0, 10)}.xls`;
+  const fileName = `relatorio-producao-${result.data.filtros.periodo}-${getBusinessTodayInput()}.xls`;
 
   return new Response(body, {
     headers: {

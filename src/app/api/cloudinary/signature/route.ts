@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCurrentSession } from "@/features/auth/session";
 import {
   generateCloudinarySignature,
   getCloudinaryConfig,
@@ -15,6 +16,12 @@ type SignatureRequestBody = {
 };
 
 export async function POST(request: Request) {
+  const session = await getCurrentSession();
+
+  if (!session) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
   if (!isCloudinaryConfigured()) {
     return NextResponse.json({ error: "Cloudinary não configurado." }, { status: 503 });
   }

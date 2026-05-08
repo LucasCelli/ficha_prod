@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CalendarDays, History, ListFilter, Plus } from "lucide-react";
 import { Badge, DataTable, EmptyState, Pagination } from "@/components/ui";
+import { formatCompactDateInput, getBusinessWeekRange } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { getKanbanColumnLabel } from "@/features/quadro-producao/config";
 import { FichasFilterToolbar } from "./fichas-filter-toolbar";
@@ -44,7 +45,7 @@ const statusTones: Record<FichaStatus, "danger" | "success" | "warning"> = {
 };
 
 export function FichasOverview({ filters, result }: FichasOverviewProps) {
-  const shortcuts = buildOperationalShortcuts(new Date());
+  const shortcuts = buildOperationalShortcuts();
 
   return (
     <section className="fichas-view" aria-labelledby="fichas-title">
@@ -101,11 +102,10 @@ type OperationalShortcut = {
   label: string;
 };
 
-function buildOperationalShortcuts(today: Date): OperationalShortcut[] {
-  const currentWeekStart = startOfWeek(today);
-  const currentWeekEnd = addDays(currentWeekStart, 6);
-  const nextWeekStart = addDays(currentWeekStart, 7);
-  const nextWeekEnd = addDays(nextWeekStart, 6);
+function buildOperationalShortcuts(): OperationalShortcut[] {
+  const currentWeek = getBusinessWeekRange();
+  const nextWeek = getBusinessWeekRange(1);
+
   return [
     {
       filters: {},
@@ -114,16 +114,16 @@ function buildOperationalShortcuts(today: Date): OperationalShortcut[] {
     },
     {
       filters: {
-        dataFim: formatDateInput(currentWeekEnd),
-        dataInicio: formatDateInput(currentWeekStart),
+        dataFim: currentWeek.end,
+        dataInicio: currentWeek.start,
       },
       icon: CalendarDays,
       label: "Esta semana",
     },
     {
       filters: {
-        dataFim: formatDateInput(nextWeekEnd),
-        dataInicio: formatDateInput(nextWeekStart),
+        dataFim: nextWeek.end,
+        dataInicio: nextWeek.start,
       },
       icon: CalendarDays,
       label: "Próxima semana",
@@ -175,29 +175,6 @@ function matchesShortcut(current: FichaFilters, shortcut: ShortcutFilters) {
     (current.dataInicio ?? "") === (shortcut.dataInicio ?? "") &&
     (current.dataFim ?? "") === (shortcut.dataFim ?? "")
   );
-}
-
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function startOfWeek(date: Date) {
-  const day = date.getDay();
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  return addDays(startOfDay(date), mondayOffset);
-}
-
-function addDays(date: Date, amount: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + amount);
-  return next;
-}
-
-function formatDateInput(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function renderFichasContent(result: FichaListResult, filters: FichaFilters) {
@@ -279,15 +256,7 @@ function formatCount(value: number) {
 }
 
 function formatDate(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
-    .format(date)
-    .replace(/ de /g, " ");
+  return formatCompactDateInput(value);
 }
 
 function formatOverdueDays(days: number) {

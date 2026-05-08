@@ -2,6 +2,7 @@ import Link from "next/link";
 import { KeyRound, ShieldCheck, UserPlus } from "lucide-react";
 import { Badge, DataTable, EmptyState, Modal } from "@/components/ui";
 import { RouteToast, type RouteToastMessage } from "@/components/ui/route-toast";
+import { formatBusinessDateTime } from "@/lib/dates";
 import type { UsuariosResult } from "./data";
 import { UsuarioForm } from "./usuario-form";
 
@@ -18,14 +19,9 @@ const columns = [
   { key: "actions", label: "Ações" },
 ];
 
-const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
-  dateStyle: "short",
-  timeStyle: "short",
-});
-
 function formatDate(value: string | null) {
   if (!value) return <em className="ui-table__muted">Nunca acessou</em>;
-  return dateFormatter.format(new Date(value));
+  return formatBusinessDateTime(new Date(value));
 }
 
 export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverviewProps) {

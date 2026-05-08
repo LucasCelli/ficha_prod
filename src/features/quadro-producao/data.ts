@@ -1,3 +1,4 @@
+import { getBusinessTodayInput, getBusinessWeekRange, isDateInputWithinRange } from "@/lib/dates";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -17,7 +18,6 @@ type BoardFichaRow = Pick<
   Database["public"]["Tables"]["fichas"]["Row"],
   | "arte"
   | "cliente_nome_snapshot"
-  | "created_at"
   | "data_entrega"
   | "evento"
   | "id"
@@ -26,12 +26,9 @@ type BoardFichaRow = Pick<
   | "kanban_column_id"
   | "kanban_ordem"
   | "kanban_status"
-  | "kanban_status_updated_at"
   | "material"
   | "numero_venda"
-  | "observacoes"
   | "status"
-  | "updated_at"
   | "vendedor"
 > & {
   ficha_imagens?: Array<Pick<Database["public"]["Tables"]["ficha_imagens"]["Row"], "ordem" | "url">>;
@@ -48,7 +45,6 @@ export type QuadroProducaoFilters = {
 export type KanbanCardSummary = {
   arte: string | null;
   clienteNome: string;
-  createdAt: string;
   dataEntrega: string;
   evento: boolean;
   id: string;
@@ -57,13 +53,10 @@ export type KanbanCardSummary = {
   kanbanColumnId: string;
   kanbanOrder: number;
   kanbanStatus: KanbanStatus;
-  kanbanStatusUpdatedAt: string;
   material: string | null;
   numeroVenda: string | null;
-  observacoes: string | null;
   status: FichaStatus;
   thumbUrl: string | null;
-  updatedAt: string;
   vendedor: string | null;
 };
 
@@ -109,29 +102,8 @@ export type CreateManualKanbanCardInput = {
   title: string;
 };
 
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function addDays(date: Date, amount: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + amount);
-  return next;
-}
-
-function getCurrentWeekRange() {
-  const today = startOfDay(new Date());
-  const day = today.getDay();
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  const start = addDays(today, mondayOffset);
-  const end = addDays(start, 6);
-  return { end, start };
-}
-
 function isWithinCurrentWeek(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-  const { end, start } = getCurrentWeekRange();
-  return date >= start && date <= end;
+  return isDateInputWithinRange(value, getBusinessWeekRange());
 }
 
 function normalizeForSearch(value: string | null | undefined) {
@@ -154,7 +126,6 @@ function mapBoardCard(row: BoardFichaRow): KanbanCardSummary {
   return {
     arte: row.arte,
     clienteNome: row.cliente_nome_snapshot,
-    createdAt: row.created_at,
     dataEntrega: row.data_entrega,
     evento: row.evento,
     id: row.id,
@@ -163,13 +134,10 @@ function mapBoardCard(row: BoardFichaRow): KanbanCardSummary {
     kanbanColumnId: row.kanban_column_id,
     kanbanOrder: row.kanban_ordem,
     kanbanStatus: row.kanban_status,
-    kanbanStatusUpdatedAt: row.kanban_status_updated_at,
     material: row.material,
     numeroVenda: row.numero_venda,
-    observacoes: row.observacoes,
     status: row.status,
     thumbUrl: orderedImages[0]?.url ?? null,
-    updatedAt: row.updated_at,
     vendedor: row.vendedor,
   };
 }
@@ -227,7 +195,7 @@ async function getOpenBoardCards() {
   const { data, error } = await supabase
     .from("fichas")
     .select(
-      "id, cliente_nome_snapshot, numero_venda, data_entrega, evento, arte, material, status, insumo_status, kanban_column_id, kanban_ordem, kanban_status, kanban_status_updated_at, is_manual_card, observacoes, vendedor, created_at, updated_at, ficha_imagens(url,ordem)",
+      "id, cliente_nome_snapshot, numero_venda, data_entrega, evento, arte, material, status, insumo_status, kanban_column_id, kanban_ordem, kanban_status, is_manual_card, vendedor, ficha_imagens(url,ordem)",
     )
     .eq("status", "pendente")
     .order("kanban_ordem", { ascending: true });
@@ -458,7 +426,7 @@ export async function createManualKanbanCard(input: CreateManualKanbanCardInput)
       arte: input.arte ?? null,
       cliente_nome_snapshot: input.title,
       data_entrega: input.dataEntrega,
-      data_inicio: new Date().toISOString().slice(0, 10),
+      data_inicio: getBusinessTodayInput(),
       evento: input.evento,
       insumo_status: input.insumoStatus,
       is_manual_card: true,

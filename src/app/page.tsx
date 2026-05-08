@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, BarChart3, CalendarClock, FileText, Layers3, Plus } from "lucide-react";
 import { Badge, Card } from "@/components/ui";
 import { getCurrentSession } from "@/features/auth/session";
+import { formatBusinessDashboardDate, getBusinessGreeting, getBusinessTodayInput } from "@/lib/dates";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -61,6 +62,7 @@ export default async function HomePage() {
   const session = await getCurrentSession();
   const firstName = getFirstName(session?.user.displayName);
   const todayInput = getBusinessTodayInput();
+  const greeting = getBusinessGreeting().toLocaleLowerCase("pt-BR");
 
   return (
     <section className="home-dashboard" aria-labelledby="home-title">
@@ -68,10 +70,16 @@ export default async function HomePage() {
         <div className="home-dashboard__hero-copy">
           <div className="home-dashboard__greeting">
             <p className="eyebrow">Visão geral</p>
-            <time dateTime={todayInput}>{formatDashboardDate(new Date())}</time>
+            <time dateTime={todayInput}>{formatBusinessDashboardDate()}</time>
           </div>
           <h1 id="home-title" className="home-dashboard__title">
-            {firstName ? `Olá, ${firstName}` : "Visão geral"}
+            {firstName ? (
+              <>
+                Olá, {firstName}, <span className="home-dashboard__title-greeting">{greeting}!</span>
+              </>
+            ) : (
+              "Visão geral"
+            )}
           </h1>
           <div className="home-dashboard__actions" aria-label="Ações principais">
             <Link className="ui-button ui-button--primary" href="/fichas/nova">
@@ -301,30 +309,4 @@ function getInitials(value: string) {
   const initials = words.length > 1 ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}` : words[0]?.slice(0, 2) ?? "";
 
   return initials.toLocaleUpperCase("pt-BR");
-}
-
-function formatDashboardDate(date: Date) {
-  const formatted = new Intl.DateTimeFormat("pt-BR", {
-    day: "numeric",
-    month: "long",
-    timeZone: "America/Cuiaba",
-    weekday: "long",
-  }).format(date);
-
-  return formatted.charAt(0).toLocaleUpperCase("pt-BR") + formatted.slice(1);
-}
-
-function getBusinessTodayInput() {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: "America/Cuiaba",
-    year: "numeric",
-  }).formatToParts(new Date());
-
-  const year = parts.find((part) => part.type === "year")?.value ?? "1970";
-  const month = parts.find((part) => part.type === "month")?.value ?? "01";
-  const day = parts.find((part) => part.type === "day")?.value ?? "01";
-
-  return `${year}-${month}-${day}`;
 }

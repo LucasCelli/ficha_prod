@@ -39,6 +39,7 @@ import {
   type CustomDatalistOption,
 } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
+import { formatDateInput, formatLocalDateInput, parseDateInputToLocalDate } from "@/lib/dates";
 import { useFluidDndEventTargetGuard } from "@/lib/fluid-dnd-event-target-guard";
 import { createFichaAction, updateFichaAction } from "./actions";
 import type { FichaDetail } from "./data";
@@ -172,33 +173,20 @@ function getImageCardWidthFromGrid(gridWidth: number, count: number) {
 }
 
 function parseDateValue(value?: string | null) {
-  if (!value) return undefined;
-
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) return undefined;
-
-  return new Date(year, month - 1, day);
+  return parseDateInputToLocalDate(value);
 }
 
 function formatDateValue(date?: Date) {
-  if (!date) return "";
-
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
+  return formatLocalDateInput(date);
 }
 
 function formatDateLabel(value: string) {
-  const date = parseDateValue(value);
-  if (!date) return "Selecionar data";
-
-  return new Intl.DateTimeFormat("pt-BR", {
+  if (!parseDateValue(value)) return "Selecionar data";
+  return formatDateInput(value, {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(date);
+  });
 }
 
 function getPlainTextFromHtml(value: string) {
@@ -491,6 +479,7 @@ export function FichaForm(props: FichaFormProps) {
         },
       },
       closeButton: false,
+      className: "ficha-draft-toast",
       description: "Escolha se deseja continuar a ficha salva neste navegador.",
       dismissible: false,
       duration: Infinity,
@@ -1202,7 +1191,17 @@ function FichaFormInner({
   }, [handleImageFiles]);
 
   useEffect(() => {
+    const form = formRef.current;
+
     return () => {
+      if (mode === "create" && !isSubmittingRef.current && form) {
+        const snapshot = buildFichaDraftSnapshot(form, getValues(), getValues("imagens"));
+        if (hasMeaningfulFichaDraft(snapshot.initialData)) {
+          writeFichaDraftSnapshot(snapshot);
+        } else {
+          clearCreateFichaDraftSnapshot();
+        }
+      }
       imagensRef.current.forEach((image) => {
         if (image.previewUrl) {
           URL.revokeObjectURL(image.previewUrl);
@@ -1218,7 +1217,7 @@ function FichaFormInner({
         window.clearTimeout(applyingObservacoesAutoTimerRef.current);
       }
     };
-  }, []);
+  }, [getValues, mode]);
 
   useEffect(() => {
     const produtoNormalizado = normalizeProductForRule(primeiroProduto);

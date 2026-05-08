@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge, DataTable, EmptyState } from "@/components/ui";
 import type { FichaListItem, FichaStatus } from "@/features/fichas/data";
+import { formatDateInput } from "@/lib/dates";
 import { ClienteDeleteAction } from "./cliente-delete-action";
 import type { ClienteDetailResult } from "./data";
 
@@ -155,13 +156,7 @@ function formatContact(telefone: string | null, email: string | null) {
 
 function formatDate(value: string | null) {
   if (!value) return "Sem data";
-  const date = new Date(`${value}T00:00:00`);
-
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return formatDateInput(value);
 }
 
 function formatNumber(value: number) {

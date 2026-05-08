@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { CalendarDays, FileSpreadsheet, FileText, Search } from "lucide-react";
 import { Badge, Button, EmptyState } from "@/components/ui";
+import { formatDateInput } from "@/lib/dates";
 import type { RelatorioData, RelatorioFilters, RelatorioRankItem, RelatorioResult, RelatorioVendedor } from "./data";
 import { buildRelatorioSearchParams } from "./data";
 
@@ -302,10 +303,5 @@ function formatNumber(value: number) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    timeZone: "UTC",
-    year: "numeric",
-  }).format(new Date(`${value}T00:00:00.000Z`));
+  return formatDateInput(value);
 }

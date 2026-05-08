@@ -1,5 +1,14 @@
 # Registro da migracao Next
 
+## 2026-05-08 - Inicio: cumprimento inline com Playfair
+
+- Fase/modulo: inicio / dashboard operacional.
+- Arquivos alterados: `src/app/page.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: o titulo da home agora renderiza nome e cumprimento na mesma linha/logica de texto (`Ola, usuario, boa tarde!`), com o trecho do cumprimento usando `Playfair Display` via `--font-family-serif-display`, italico e sem o paragrafo separado que quebrava a composicao.
+- Decisao: manter a fonte carregada no layout global e aplicar apenas no trecho destacado do `h1`, preservando a home como entrada operacional silenciosa.
+- Hotfix: `Playfair_Display` passou a carregar tambem o estilo `italic` via `next/font`, e o CSS do cumprimento passou a apontar diretamente para `--font-serif-display`, evitando falso italico sintetizado.
+- Validacao: `npm run typecheck`, `npx eslint src/app/layout.tsx src/app/page.tsx`, `npm run build` e `git diff --check` passaram. Edge em `localhost:3000/?fontcheck=playfair` confirmou o titulo em linha unica e o trecho `boa tarde!` com a Playfair real aplicada.
+
 ## 2026-05-08 - Fichas: rascunho local e alerta de saida
 
 - Fase/modulo: fichas / criacao e protecao de dados nao salvos.
@@ -7,6 +16,8 @@
 - Resultado: a tela `/fichas/nova` agora grava um snapshot local no `localStorage` durante a edicao, ao tentar salvar e tambem antes de sair com alteracoes pendentes. Se o salvamento falhar e a aba for fechada, ao abrir a criacao novamente um toast warning persistente avisa que existe rascunho local e oferece `Restaurar` ou `Descartar`. Imagens locais ainda nao enviadas nao entram no snapshot por limitacao do navegador; imagens ja enviadas ao Cloudinary entram como referencia serializavel.
 - Decisao: nao restaurar rascunho automaticamente, para evitar sobrescrever a intencao do operador quando ele quer comecar uma ficha limpa.
 - Hotfix: apos teste manual sem toast, o rascunho deixou de depender apenas de submit/saida e passou a ser salvo com debounce em alteracoes de campos, produtos, imagens e datas. Se um teste anterior nao chegou a gravar snapshot no `localStorage`, esse rascunho antigo nao e recuperavel; a correcao vale para os novos rascunhos.
+- Hotfix adicional: ao navegar pelo shell do app, o desmontar do formulario agora faz flush do snapshot antes de cancelar timers de autosave, cobrindo cliques na navegacao interna mesmo quando o debounce ainda nao executou.
+- Ajuste visual: o toast de rascunho recebeu classe propria para posicionar as acoes abaixo da descricao; `Descartar` usa tom vermelho, `Restaurar` usa tom verde, e o alinhamento do icone dos toasts foi estabilizado no topo do conteudo.
 - Protecao de saida: links internos passam por `AlertDialog` quando ha dados nao salvos; fechamento/reload da aba usa `beforeunload`, que so permite o dialogo nativo do navegador.
 - Sucesso: ao voltar para `/fichas?saved=created`, o snapshot local de criacao e removido.
 - Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `npm run supabase:check` passaram. Scan de encoding nos arquivos tocados nao encontrou mojibake novo; os matches restantes sao palavras pt-BR validas com acento.
@@ -1273,3 +1284,47 @@
 - Decisao: a regra de autorizacao continua baseada em `session.user.role`, mas o papel deixa de aparecer no shell para manter a interface mais silenciosa.
 - Arquivos alterados: `src/components/ui/app-shell.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
 - Validacao: `npm run typecheck`, `npm run lint` e `git diff --check` passaram. Edge em `localhost:3000/fichas?busca=Larissa` confirmou `.app-user` renderizando somente `Fernanda`; console sem erros.
+
+### Quadro de producao: duplicacao e flash de cards
+
+- Ajuste: o estado ativo de drag/drop dos cards foi elevado para o quadro inteiro. Todas as colunas passam a alternar juntas entre a lista local do `fluid-dnd` e os dados vindos do React Query, impedindo que a coluna de origem continue renderizando uma lista local antiga depois do drop.
+- Cache: a mutacao de movimento agora cancela e atualiza otimisticamente todas as queries `quadro-producao`, nao apenas a query exata do filtro atual. Em erro, o rollback restaura todos os snapshots afetados.
+- Hotfix: os botoes de mover para a proxima coluna passaram a chamar o mesmo fluxo de movimento usado no drag/drop, limpando o estado local do DnD tambem em interacoes por clique.
+- Hotfix: os cards deixaram de renderizar como `motion.article`; o `fluid-dnd` agora e o unico responsavel por escrever `transform` no card durante o arraste, evitando que o item escape do ponteiro.
+- Feedback: adicionados toasts de sucesso para `Atualizar`, `Ordenar cartões por entrega` e `Marcar pedido como entregue`, usando `sonner` direto no client do quadro.
+- Hotfix de entrega: cards marcados como entregues entram em uma lista local de ocultos no mesmo clique; as colunas e o contador passam a ser derivados dessa lista filtrada, e o rollback remove o card da lista oculta se a mutacao falhar.
+- Decisao: manter a persistencia na RPC `move_kanban_card`; o bug revisado estava na borda client-side entre listas locais do DnD, cache filtrado e revalidacao.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `npm run supabase:check` passaram no primeiro ajuste; `npm run typecheck`, `npm run lint` e `npm run build` passaram apos os hotfixes; `npm run typecheck`, `npm run lint` e `npm run build` passaram apos os toasts; `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram apos o hotfix de entrega. Caveat: a validacao visual do arraste real ficou pendente porque o Edge local redirecionou para `/login?next=/quadro-producao`.
+
+## 2026-05-08 - Otimizacao de Fast Origin Transfer na Vercel
+
+- Fase/modulo: infraestrutura Vercel/CDN, proxy, exports e API do quadro.
+- Analise: pela documentacao da Vercel, Fast Origin Transfer e cobrado em compute por bytes de request/response entre CDN e origem; Functions podem ser otimizadas reduzindo payload ou usando cache, e Middleware deve rodar apenas quando necessario porque pode duplicar a transferencia em uma chamada de Function.
+- Ajuste: `src/proxy.ts` agora exclui `/api/*`, `/fichas/pdf`, `/relatorios/excel`, assets Next e arquivos com extensao do matcher. Isso evita passar pelo proxy antes de route handlers que ja sao Functions.
+- Seguranca preservada: as rotas que deixaram de depender do proxy para auth ganharam checagem direta de sessao: Cloudinary config/signature/delete, PDF operacional e Excel de relatorios.
+- Payload: `src/features/quadro-producao/data.ts` deixou de selecionar e serializar campos que a UI do quadro nao consome (`created_at`, `updated_at`, `kanban_status_updated_at`, `observacoes`), reduzindo bytes de resposta em um endpoint chamado por React Query.
+- Decisao: nao aplicar cache publico em respostas autenticadas com dados operacionais; isso reduziria FOT, mas criaria risco de vazar dados entre sessoes. A otimizacao ficou em evitar middleware desnecessario e cortar payload.
+- Arquivos alterados: `src/proxy.ts`, `src/app/api/cloudinary/config/route.ts`, `src/app/api/cloudinary/signature/route.ts`, `src/app/api/cloudinary/image/[...publicId]/route.ts`, `src/app/fichas/pdf/route.ts`, `src/app/relatorios/excel/route.ts`, `src/features/quadro-producao/data.ts`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram.
+
+## 2026-05-08 - Home e timezone operacional de Cuiaba
+
+- Fase/modulo: inicio/dashboard, datas operacionais, fichas e relatorios.
+- Ajuste visual: a home agora mostra um cumprimento curto (`Bom dia`, `Boa tarde` ou `Boa noite`) abaixo do titulo, em italico com Playfair Display via `next/font`.
+- Datas: criado `src/lib/dates.ts` como helper compartilhado para `America/Cuiaba`, cobrindo data atual de negocio, cumprimento por hora local, data longa do dashboard, range da semana atual/proxima e operacoes com inputs `YYYY-MM-DD`.
+- Aplicacao: `/` deixou de manter helpers locais duplicados; atrasadas em `/fichas`, atalhos de semana, modo semanal do PDF operacional e periodos de `/relatorios` passaram a usar a mesma base de timezone.
+- Decisao: o projeto ja tem `date-fns`, mas nao `date-fns-tz` como dependencia direta; por isso o timezone de negocio ficou no helper com `Intl.DateTimeFormat`, sem instalar pacote novo neste ciclo.
+- Caveat: timestamps de auditoria (`created_at`, `updated_at`, `delivered_at`, sessoes) continuam em UTC/ISO, como esperado para persistencia; a mudanca mira calculo e exibicao operacional por Cuiaba.
+- Arquivos alterados: `src/lib/dates.ts`, `src/app/layout.tsx`, `src/app/page.tsx`, `src/styles/globals.css`, `src/features/fichas/data.ts`, `src/features/fichas/fichas-overview.tsx`, `src/features/relatorios/data.ts`, `src/app/fichas/pdf/route.ts`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram; smoke HTTP em `localhost:3000` redirecionou para `/login`, entao a conferencia visual autenticada da home ficou pendente de sessao logada.
+
+## 2026-05-08 - Padronizacao global de datas operacionais
+
+- Fase/modulo: regra duravel de arquitetura, datas operacionais em App Router.
+- Regra: `AGENTS.md` agora exige `src/lib/dates.ts` para qualquer data operacional nova ou alterada, com timezone de negocio `America/Cuiaba`; `toISOString()` fica reservado para auditoria, sessao e persistencia tecnica em UTC.
+- Helper: `src/lib/dates.ts` ganhou formatadores de data de negocio, data/hora em Cuiaba, data compacta, data curta, dia/mes, parse/format para inputs `YYYY-MM-DD`, diferenca de dias e validacao de range por input ISO.
+- Aplicacao: foram migrados formatadores e calculos locais em clientes, fichas, relatorios, usuarios, quadro de producao, impressao/PDF e nome de arquivo do Excel.
+- Decisao: manter datas persistidas como `YYYY-MM-DD` para campos de negocio e timestamps ISO para eventos/auditoria; o helper separa essas duas naturezas para evitar drift de timezone.
+- Arquivos alterados: `AGENTS.md`, `src/lib/dates.ts`, `src/app/relatorios/excel/route.ts`, `src/features/clientes/cliente-detail.tsx`, `src/features/clientes/clientes-overview.tsx`, `src/features/fichas/data.ts`, `src/features/fichas/ficha-form.tsx`, `src/features/fichas/ficha-preview.tsx`, `src/features/fichas/fichas-overview.tsx`, `src/features/fichas/operational-pdf.ts`, `src/features/fichas/print-ficha.tsx`, `src/features/quadro-producao/data.ts`, `src/features/quadro-producao/quadro-producao-client.tsx`, `src/features/relatorios/data.ts`, `src/features/relatorios/relatorios-legado-overview.tsx`, `src/features/relatorios/relatorios-overview.tsx`, `src/features/usuarios/usuarios-overview.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram.

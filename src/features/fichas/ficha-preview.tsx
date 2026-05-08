@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, Copy, Edit, Image as ImageIcon, PackageOpen, Ruler, Shirt, Tag, UserRound, type LucideIcon } from "lucide-react";
 import { Badge, EmptyState } from "@/components/ui";
+import { formatDateInput } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { getFichaById, type FichaDetail, type FichaStatus } from "./data";
 
@@ -204,12 +205,7 @@ function joinValues(...values: Array<null | string>) {
 function formatDate(value: null | string) {
   if (!value) return "Não definido";
 
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    timeZone: "UTC",
-    year: "numeric",
-  }).format(new Date(`${value}T00:00:00.000Z`));
+  return formatDateInput(value);
 }
 
 function formatNumber(value: number) {

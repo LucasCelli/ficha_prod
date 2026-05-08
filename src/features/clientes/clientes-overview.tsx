@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { DataTable, EmptyState, Pagination } from "@/components/ui";
+import { formatCompactDateInput } from "@/lib/dates";
 import { CLIENTES_PAGE_SIZE, type ClienteFilters, type ClienteListItem, type ClientesListResult } from "./data";
 import { ClienteDeleteAction } from "./cliente-delete-action";
 import { ClientesSearchToolbar } from "./clientes-search-toolbar";
@@ -152,15 +153,7 @@ export function buildClientesHref(filters: ClienteFilters, extra: Record<string,
 
 function formatDate(value: string | null) {
   if (!value) return <span className="ui-table__muted">—</span>;
-  const date = new Date(`${value}T00:00:00`);
-
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
-    .format(date)
-    .replace(/ de /g, " ");
+  return formatCompactDateInput(value);
 }
 
 function formatNumber(value: number) {

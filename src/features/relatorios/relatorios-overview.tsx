@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FileText, Search } from "lucide-react";
 import { Badge, Button, DataTable, EmptyState } from "@/components/ui";
+import { formatCompactDateInput } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import type { FichaFilters, FichaListItem, FichaListResult, FichaStatus } from "@/features/fichas/data";
 
@@ -246,15 +247,7 @@ function slugify(value: string) {
 }
 
 function formatDate(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
-    .format(date)
-    .replace(/ de /g, " ");
+  return formatCompactDateInput(value);
 }
 
 function formatNumber(value: number) {

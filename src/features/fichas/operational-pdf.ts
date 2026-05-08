@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { formatBusinessDateTime, formatDateInput, formatDayMonthInput } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { getFichaOverdueDays, isFichaOverdue, type FichaFilters, type FichaListItem, type FichaListResult, type FichaStatus } from "./data";
 
@@ -79,7 +80,6 @@ const COLORS = {
   text: [17, 24, 39] as [number, number, number],
 };
 
-const BUSINESS_TIME_ZONE = "America/Cuiaba";
 const STATUS_LABELS: Record<FichaStatus, string> = {
   cancelado: "Cancelado",
   entregue: "Entregue",
@@ -610,30 +610,19 @@ function sanitizePdfText(value: string) {
 }
 
 function formatLongDate(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-
-  return new Intl.DateTimeFormat("pt-BR", {
+  return formatDateInput(value, {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(date);
+  });
 }
 
 function formatShortDate(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-  }).format(date);
+  return formatDayMonthInput(value);
 }
 
 function formatDateTime(value: Date) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: BUSINESS_TIME_ZONE,
-  }).format(value);
+  return formatBusinessDateTime(value);
 }
 
 function formatFilters(filters: FichaFilters) {
