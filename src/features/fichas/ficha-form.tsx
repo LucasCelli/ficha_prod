@@ -2,6 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync, useFormStatus } from "react-dom";
+import { useRouter } from "next/navigation";
 import { useDragAndDrop } from "fluid-dnd/react";
 import { DayPicker } from "react-day-picker";
 import { ptBR } from "react-day-picker/locale";
@@ -41,8 +42,9 @@ import type { CatalogOptionsByKind } from "@/features/catalogos/data";
 import { useFluidDndEventTargetGuard } from "@/lib/fluid-dnd-event-target-guard";
 import { createFichaAction, updateFichaAction } from "./actions";
 import type { FichaDetail } from "./data";
+import { clearCreateFichaDraftSnapshot, CREATE_FICHA_DRAFT_STORAGE_KEY } from "./ficha-draft-storage";
 import type { FichaFormClientValues, FichaFormInitialData, ImageFormItem, ProductFormItem } from "./ficha-form-seed";
-import { createEmptyProductItem, mapFichaToInitialData } from "./ficha-form-seed";
+import { createEmptyFichaFormInitialData, createEmptyProductItem, mapFichaToInitialData } from "./ficha-form-seed";
 import { getInitialFichaFormState } from "./form-state";
 import type { LegacyFichaImportWarning } from "./legacy-import";
 import { mapLegacyDraftToFichaFormInitialData, parseLegacyFichaJson } from "./legacy-import";
@@ -67,6 +69,14 @@ const SIZE_ORDER = new Map(
 );
 
 type RichTextCommand = "bold" | "italic" | "underline" | "insertUnorderedList" | "insertOrderedList" | "removeFormat";
+
+type FichaDraftSnapshot = {
+  initialData: FichaFormInitialData;
+  savedAt: string;
+  version: 1;
+};
+
+const CREATE_FICHA_DRAFT_TOAST_ID = "ficha-create-draft-restore";
 
 const MATERIAL_OPTIONS = [
   { composicao: "65% Poliéster / 35% Viscose", nome: "Malha Fria (PV)" },
@@ -93,6 +103,7 @@ const FALLBACK_CATALOG_OPTIONS: CatalogOptionsByKind = {
   produto: [],
   tamanho: ["PP", "P", "M", "G", "GG", "XG", "XGG", "EXG"].map(createOption),
   tecido: MATERIAL_OPTIONS.map((option) => ({
+    details: [option.composicao],
     label: option.nome,
     metadata: {
       composition: option.composicao,
@@ -282,6 +293,156 @@ function serializeImageItems(images: ImageFormItem[]) {
   );
 }
 
+function readFichaDraftSnapshot() {
+  try {
+    const rawValue = window.localStorage.getItem(CREATE_FICHA_DRAFT_STORAGE_KEY);
+    if (!rawValue) return null;
+
+    const parsed = JSON.parse(rawValue) as Partial<FichaDraftSnapshot>;
+    if (parsed.version !== 1 || !parsed.initialData) return null;
+
+    return {
+      initialData: normalizeFichaDraftInitialData(parsed.initialData),
+      savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : new Date().toISOString(),
+      version: 1,
+    } satisfies FichaDraftSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function writeFichaDraftSnapshot(snapshot: FichaDraftSnapshot) {
+  try {
+    window.localStorage.setItem(CREATE_FICHA_DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch {
+    toast.warning("Rascunho local indisponível", {
+      description: "Não foi possível salvar uma cópia local desta ficha.",
+      id: "ficha-draft-storage-error",
+    });
+  }
+}
+
+function buildFichaDraftSnapshot(
+  form: HTMLFormElement,
+  values: FichaFormClientValues,
+  imageItems: ImageFormItem[],
+): FichaDraftSnapshot {
+  const formData = new FormData(form);
+
+  return {
+    initialData: {
+      ...createEmptyFichaFormInitialData(),
+      acabamentoGola: values.acabamentoGola,
+      acabamentoManga: values.acabamentoManga,
+      aberturaLateral: values.aberturaLateral,
+      arte: values.arte,
+      bolso: formText(formData, "bolso"),
+      cliente: formText(formData, "cliente"),
+      clienteAuxiliar: formText(formData, "clienteAuxiliar"),
+      comNomes: values.comNomes,
+      composicao: values.composicao,
+      corAberturaLateral: formText(formData, "corAberturaLateral"),
+      corAcabamentoManga: formText(formData, "corAcabamentoManga"),
+      corBotao: formText(formData, "corBotao"),
+      corGola: formText(formData, "corGola"),
+      corMaterial: formText(formData, "corMaterial"),
+      corPeDeGolaExterno: formText(formData, "corPeDeGolaExterno"),
+      corPeDeGolaInterno: formText(formData, "corPeDeGolaInterno"),
+      corPeitilhoExterno: formText(formData, "corPeitilhoExterno"),
+      corPeitilhoInterno: formText(formData, "corPeitilhoInterno"),
+      corReforco: formText(formData, "corReforco"),
+      corSublimacao: formText(formData, "corSublimacao"),
+      dataEntrega: formText(formData, "dataEntrega"),
+      dataInicio: formText(formData, "dataInicio"),
+      evento: Boolean(formData.get("evento")),
+      faixa: values.faixa,
+      faixaCor: formText(formData, "faixaCor"),
+      faixaLocal: formText(formData, "faixaLocal"),
+      filete: values.filete,
+      fileteCor: formText(formData, "fileteCor"),
+      fileteLocal: formText(formData, "fileteLocal"),
+      gola: values.gola,
+      imagens: getSerializableImageItems(imageItems),
+      itens: normalizeProductItems(values.itens),
+      larguraGola: formText(formData, "larguraGola"),
+      larguraManga: formText(formData, "larguraManga"),
+      manga: formText(formData, "manga"),
+      material: values.material,
+      numeroVenda: formText(formData, "numeroVenda"),
+      observacoes: values.observacoes,
+      reforcoGola: values.reforcoGola,
+      vendedor: formText(formData, "vendedor"),
+    },
+    savedAt: new Date().toISOString(),
+    version: 1,
+  };
+}
+
+function formText(formData: FormData, field: string) {
+  return String(formData.get(field) ?? "").trim();
+}
+
+function normalizeProductItems(items: ProductFormItem[]) {
+  const normalizedItems = items.map((item, index) => ({
+    detalhesProduto: item.detalhesProduto,
+    id: item.id || `item-${index}`,
+    produto: item.produto,
+    quantidade: item.quantidade || "1",
+    tamanho: item.tamanho,
+  }));
+
+  return normalizedItems.length ? normalizedItems : [createEmptyProductItem()];
+}
+
+function getSerializableImageItems(images: ImageFormItem[]) {
+  return images
+    .filter((image) => image.publicId && image.secureUrl)
+    .map((image) => ({
+      altText: image.altText,
+      bytes: image.bytes,
+      height: image.height,
+      id: image.publicId ?? image.id,
+      publicId: image.publicId,
+      secureUrl: image.secureUrl,
+      width: image.width,
+    }));
+}
+
+function normalizeFichaDraftInitialData(value: FichaFormInitialData) {
+  return {
+    ...createEmptyFichaFormInitialData(),
+    ...value,
+    imagens: getSerializableImageItems(Array.isArray(value.imagens) ? value.imagens : []),
+    itens: normalizeProductItems(Array.isArray(value.itens) ? value.itens : []),
+  };
+}
+
+function getComparableFichaDraft(initialData: FichaFormInitialData) {
+  const comparableData = normalizeFichaDraftInitialData(initialData);
+  return JSON.stringify({
+    ...comparableData,
+    imagens: comparableData.imagens.map(({ altText, bytes, height, publicId, secureUrl, width }) => ({
+      altText,
+      bytes,
+      height,
+      publicId,
+      secureUrl,
+      width,
+    })),
+    itens: comparableData.itens.map(({ detalhesProduto, produto, quantidade, tamanho }) => ({
+      detalhesProduto,
+      produto,
+      quantidade,
+      tamanho,
+    })),
+  });
+}
+
+function hasMeaningfulFichaDraft(initialData: FichaFormInitialData) {
+  const emptyDraft = getComparableFichaDraft(createEmptyFichaFormInitialData());
+  return getComparableFichaDraft(initialData) !== emptyDraft;
+}
+
 function haveSameItemOrder(left: Array<{ id: string }>, right: Array<{ id: string }>) {
   return left.length === right.length && left.every((item, index) => item.id === right[index]?.id);
 }
@@ -304,12 +465,58 @@ export function FichaForm(props: FichaFormProps) {
 
   const { ficha, initialData, mode = "create" } = props;
   const [importedLegacyState, setImportedLegacyState] = useState<ImportedLegacyState | null>(null);
-  const renderKey = `${mode}-${ficha?.id ?? initialData?.cliente ?? "new"}-${importedLegacyState?.importedAt ?? 0}`;
+  const [restoredDraftData, setRestoredDraftData] = useState<FichaFormInitialData | null>(null);
+  const effectiveInitialData = restoredDraftData ?? initialData;
+  const renderKey = `${mode}-${ficha?.id ?? effectiveInitialData?.cliente ?? "new"}-${importedLegacyState?.importedAt ?? 0}`;
+
+  useEffect(() => {
+    if (mode !== "create" || initialData || restoredDraftData) return;
+
+    const snapshot = readFichaDraftSnapshot();
+    if (!snapshot) return;
+
+    toast.warning("Rascunho local encontrado", {
+      action: {
+        label: "Restaurar",
+        onClick: () => {
+          setRestoredDraftData(snapshot.initialData);
+          toast.dismiss(CREATE_FICHA_DRAFT_TOAST_ID);
+        },
+      },
+      cancel: {
+        label: "Descartar",
+        onClick: () => {
+          clearCreateFichaDraftSnapshot();
+          toast.dismiss(CREATE_FICHA_DRAFT_TOAST_ID);
+        },
+      },
+      closeButton: false,
+      description: "Escolha se deseja continuar a ficha salva neste navegador.",
+      dismissible: false,
+      duration: Infinity,
+      id: CREATE_FICHA_DRAFT_TOAST_ID,
+    });
+
+    return () => {
+      toast.dismiss(CREATE_FICHA_DRAFT_TOAST_ID);
+    };
+  }, [initialData, mode, restoredDraftData]);
+
+  useEffect(() => {
+    if (!restoredDraftData) return;
+
+    window.setTimeout(() => {
+      toast.success("Rascunho restaurado", {
+        description: "Os dados locais foram carregados.",
+      });
+    }, 0);
+  }, [restoredDraftData]);
 
   return (
     <FichaFormInner
       key={renderKey}
       {...props}
+      initialData={effectiveInitialData}
       importedLegacyState={importedLegacyState}
       onApplyImportedLegacyState={setImportedLegacyState}
     />
@@ -332,6 +539,7 @@ function FichaFormInner({
   onApplyImportedLegacyState,
   vendedorOptions = [],
 }: FichaFormInnerProps) {
+  const router = useRouter();
   const initialData = useMemo(
     () => importedLegacyState?.initialData ?? seededInitialData ?? mapFichaToInitialData(ficha),
     [ficha, importedLegacyState, seededInitialData],
@@ -345,11 +553,15 @@ function FichaFormInner({
   const lastToastMessageRef = useRef<string | null>(null);
   const lastImportedLegacyToastRef = useRef<number | null>(null);
   const lastObservacoesAutofillRef = useRef("");
+  const draftAutosaveTimerRef = useRef<number | null>(null);
+  const isSubmittingRef = useRef(false);
+  const initialDraftComparableRef = useRef<string | null>(null);
   const observacoesEditorRef = useRef<HTMLDivElement>(null);
   const observacoesAutoBlockedRef = useRef(Boolean(initialData.observacoes.trim()));
   const applyingObservacoesAutoRef = useRef(false);
   const applyingObservacoesAutoTimerRef = useRef<number | null>(null);
   const [pendingLegacyImport, setPendingLegacyImport] = useState<PendingLegacyImport | null>(null);
+  const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
   const submitAfterUploadRef = useRef(false);
   const sortFeedbackTimerRef = useRef<number | null>(null);
   const autoGolaRef = useRef(false);
@@ -562,6 +774,27 @@ function FichaFormInner({
     };
   }
 
+  const scheduleDraftSnapshotPersist = useCallback(() => {
+    if (mode !== "create") return;
+
+    if (draftAutosaveTimerRef.current) {
+      window.clearTimeout(draftAutosaveTimerRef.current);
+    }
+
+    draftAutosaveTimerRef.current = window.setTimeout(() => {
+      const form = formRef.current;
+      if (!form) return;
+
+      const snapshot = buildFichaDraftSnapshot(form, getValues(), getValues("imagens"));
+      if (hasMeaningfulFichaDraft(snapshot.initialData)) {
+        writeFichaDraftSnapshot(snapshot);
+      } else {
+        clearCreateFichaDraftSnapshot();
+      }
+      draftAutosaveTimerRef.current = null;
+    }, 350);
+  }, [getValues, mode]);
+
   const handleImageFiles = useCallback((files: File[]) => {
     const selectedFiles = files.filter((file) => file.type.startsWith("image/"));
     const availableSlots = 4 - imagens.length;
@@ -597,7 +830,8 @@ function FichaFormInner({
     const currentImages = getValues("imagens");
     appendImageItem(localImages);
     setFluidImageItems([...currentImages, ...localImages]);
-  }, [appendImageItem, getValues, imagens.length, setFluidImageItems]);
+    scheduleDraftSnapshotPersist();
+  }, [appendImageItem, getValues, imagens.length, scheduleDraftSnapshotPersist, setFluidImageItems]);
 
   function handleImageSelection(files: FileList | null) {
     handleImageFiles(Array.from(files ?? []));
@@ -617,6 +851,7 @@ function FichaFormInner({
     if (imageIndex >= 0) {
       removeImageItemAt(imageIndex);
       setFluidImageItems((current) => current.filter((item) => item.id !== image.id));
+      scheduleDraftSnapshotPersist();
     }
 
     if (image.previewUrl) {
@@ -677,6 +912,55 @@ function FichaFormInner({
     return imagens.length > 0;
   }
 
+  function buildCurrentDraftSnapshot(imageItems = imagens) {
+    const form = formRef.current;
+    if (!form) return null;
+
+    return buildFichaDraftSnapshot(form, getValues(), imageItems);
+  }
+
+  function persistCurrentDraftSnapshot(imageItems = imagens) {
+    if (mode !== "create") return;
+
+    const snapshot = buildCurrentDraftSnapshot(imageItems);
+    if (!snapshot) return;
+
+    if (!hasMeaningfulFichaDraft(snapshot.initialData)) {
+      clearCreateFichaDraftSnapshot();
+      return;
+    }
+
+    writeFichaDraftSnapshot(snapshot);
+  }
+
+  function hasUnsavedChanges() {
+    if (isSubmittingRef.current) return false;
+
+    const snapshot = buildCurrentDraftSnapshot();
+    if (!snapshot) return false;
+
+    if (mode === "create") {
+      return hasMeaningfulFichaDraft(snapshot.initialData);
+    }
+
+    return initialDraftComparableRef.current !== getComparableFichaDraft(snapshot.initialData);
+  }
+
+  function closePendingNavigationDialog() {
+    setPendingNavigationHref(null);
+  }
+
+  function confirmPendingNavigation() {
+    const href = pendingNavigationHref;
+    if (!href) return;
+
+    if (mode === "create") {
+      persistCurrentDraftSnapshot();
+    }
+    closePendingNavigationDialog();
+    router.push(href);
+  }
+
   function applyParsedLegacyImport(nextImport: ImportedLegacyState) {
     onApplyImportedLegacyState(nextImport);
   }
@@ -728,9 +1012,12 @@ function FichaFormInner({
       return;
     }
 
+    persistCurrentDraftSnapshot();
+
     const hasBlockedImportedImages = imagens.some((image) => image.saveBlocked);
     if (hasBlockedImportedImages) {
       event.preventDefault();
+      isSubmittingRef.current = false;
       toast.error("Revise as imagens importadas", {
         description: "Remova ou substitua as imagens importadas apenas como rascunho antes de salvar a ficha.",
       });
@@ -739,8 +1026,14 @@ function FichaFormInner({
 
     const hasPendingImages = imagens.some((image) => image.file);
 
-    if (!hasPendingImages) return;
-    if (shouldLetServerValidateBeforeUpload(new FormData(event.currentTarget))) return;
+    if (!hasPendingImages) {
+      isSubmittingRef.current = true;
+      return;
+    }
+    if (shouldLetServerValidateBeforeUpload(new FormData(event.currentTarget))) {
+      isSubmittingRef.current = true;
+      return;
+    }
 
     event.preventDefault();
     setIsUploadingImage(true);
@@ -759,9 +1052,12 @@ function FichaFormInner({
       if (imagensJsonInputRef.current) {
         imagensJsonInputRef.current.value = serializeImageItems(uploadedImages);
       }
+      persistCurrentDraftSnapshot(uploadedImages);
+      isSubmittingRef.current = true;
       submitAfterUploadRef.current = true;
       formRef.current?.requestSubmit();
     } catch (error) {
+      isSubmittingRef.current = false;
       toast.error("Erro no upload", {
         description: error instanceof Error ? error.message : "Falha ao enviar imagens.",
       });
@@ -772,6 +1068,8 @@ function FichaFormInner({
 
   useEffect(() => {
     if (state.status !== "error") return;
+
+    isSubmittingRef.current = false;
 
     if (state.message && lastToastMessageRef.current !== state.message) {
       const message = state.message;
@@ -805,6 +1103,50 @@ function FichaFormInner({
   useEffect(() => {
     imagensRef.current = imagens;
   }, [imagens]);
+
+  useEffect(() => {
+    initialDraftComparableRef.current = getComparableFichaDraft(initialData);
+  }, [initialData]);
+
+  useEffect(() => {
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (!hasUnsavedChanges()) return;
+
+      if (mode === "create") {
+        persistCurrentDraftSnapshot();
+      }
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    function handleDocumentClick(event: MouseEvent) {
+      if (event.defaultPrevented || !hasUnsavedChanges()) return;
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+      const target = event.target instanceof Element ? event.target : null;
+      const anchor = target?.closest<HTMLAnchorElement>("a[href]");
+      if (!anchor) return;
+      if (anchor.target && anchor.target !== "_self") return;
+      if (anchor.hasAttribute("download")) return;
+
+      const url = new URL(anchor.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+
+      event.preventDefault();
+      if (mode === "create") {
+        persistCurrentDraftSnapshot();
+      }
+      setPendingNavigationHref(`${url.pathname}${url.search}${url.hash}`);
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("click", handleDocumentClick, true);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("click", handleDocumentClick, true);
+    };
+  });
 
   useEffect(() => {
     const grid = imageGridRef.current;
@@ -868,6 +1210,9 @@ function FichaFormInner({
       });
       if (sortFeedbackTimerRef.current) {
         window.clearTimeout(sortFeedbackTimerRef.current);
+      }
+      if (draftAutosaveTimerRef.current) {
+        window.clearTimeout(draftAutosaveTimerRef.current);
       }
       if (applyingObservacoesAutoTimerRef.current) {
         window.clearTimeout(applyingObservacoesAutoTimerRef.current);
@@ -933,6 +1278,7 @@ function FichaFormInner({
     if (itemIndex >= 0) {
       setValue(`itens.${itemIndex}.${field}`, value, { shouldDirty: true });
       setFluidProductItems((current) => current.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
+      scheduleDraftSnapshotPersist();
     }
   }
 
@@ -941,6 +1287,7 @@ function FichaFormInner({
     const item = createEmptyProductItem(`item-${Date.now()}-${current.length}`);
     appendProductItem(item);
     setFluidProductItems([...current, item]);
+    scheduleDraftSnapshotPersist();
   }
 
   function duplicateProductItem(id: string) {
@@ -951,6 +1298,7 @@ function FichaFormInner({
     const duplicated = { ...item, id: `item-${Date.now()}-${current.length}` };
     appendProductItem(duplicated);
     setFluidProductItems([...current, duplicated]);
+    scheduleDraftSnapshotPersist();
   }
 
   function removeProductItem(id: string) {
@@ -960,12 +1308,14 @@ function FichaFormInner({
     if (current.length > 1 && itemIndex >= 0) {
       removeProductItemAt(itemIndex);
       setFluidProductItems(current.filter((item) => item.id !== id));
+      scheduleDraftSnapshotPersist();
       return;
     }
 
     const emptyItem = createEmptyProductItem();
     setValue("itens", [emptyItem], { shouldDirty: true });
     setFluidProductItems([emptyItem]);
+    scheduleDraftSnapshotPersist();
   }
 
   function showProductSortFeedback() {
@@ -991,6 +1341,7 @@ function FichaFormInner({
     showProductSortFeedback();
     replaceProductItems(sortedItems);
     setFluidProductItems(sortedItems);
+    scheduleDraftSnapshotPersist();
   }
 
   function applyRichTextCommand(command: RichTextCommand) {
@@ -1008,6 +1359,7 @@ function FichaFormInner({
       observacoesAutoBlockedRef.current = true;
     }
     setValue("observacoes", nextHtml, { shouldDirty: true });
+    scheduleDraftSnapshotPersist();
   }
 
   function handleObservacoesPaste(event: React.ClipboardEvent<HTMLDivElement>) {
@@ -1150,6 +1502,7 @@ function FichaFormInner({
       applyingObservacoesAutoRef.current = false;
       applyingObservacoesAutoTimerRef.current = null;
     }, 0);
+    scheduleDraftSnapshotPersist();
   }
 
   function updateObservacoesAutofill(options: { force?: boolean; notifyEmpty?: boolean; requireConfirmation?: boolean } = {}) {
@@ -1206,6 +1559,7 @@ function FichaFormInner({
 
   function handleFormRealtimeObservacoes(event: React.FormEvent<HTMLFormElement>) {
     if (event.target === observacoesEditorRef.current) return;
+    scheduleDraftSnapshotPersist();
     window.setTimeout(() => updateObservacoesAutofill(), 0);
   }
 
@@ -2187,6 +2541,35 @@ function FichaFormInner({
           </section>
         </AlertDialog>
       ) : null}
+      {pendingNavigationHref ? (
+        <AlertDialog onClose={closePendingNavigationDialog} size="sm" title="Sair sem salvar">
+          <section className="confirm-dialog" aria-describedby="leave-unsaved-ficha-description">
+            <header className="confirm-dialog__header">
+              <div>
+                <span className="confirm-dialog__eyebrow">Confirmação necessária</span>
+                <h2 id="leave-unsaved-ficha-title">Sair sem salvar</h2>
+              </div>
+            </header>
+
+            <p id="leave-unsaved-ficha-description">
+              A ficha possui alterações ainda não salvas.
+            </p>
+
+            <div className="confirm-dialog__actions">
+              <AlertDialogCancel asChild>
+                <button className="ui-button ui-button--ghost" type="button">
+                  Continuar editando
+                </button>
+              </AlertDialogCancel>
+              <AlertDialogAction asChild>
+                <button className="ui-button ui-button--danger" onClick={confirmPendingNavigation} type="button">
+                  Sair sem salvar
+                </button>
+              </AlertDialogAction>
+            </div>
+          </section>
+        </AlertDialog>
+      ) : null}
     </>
   );
 }
@@ -2331,8 +2714,19 @@ function DatePickerField({
 }: DatePickerFieldProps) {
   const [value, setValue] = useState(initialValue ?? "");
   const [isOpen, setIsOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const mountedRef = useRef(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const selectedDate = parseDateValue(value);
+
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+
+    inputRef.current?.dispatchEvent(new Event("change", { bubbles: true }));
+  }, [value]);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -2347,7 +2741,7 @@ function DatePickerField({
 
   return (
     <div className="date-picker" ref={wrapperRef}>
-      <input name={name} type="hidden" value={value} />
+      <input ref={inputRef} name={name} type="hidden" value={value} />
       <button
         id={id}
         aria-describedby={describedBy}

@@ -1,7 +1,12 @@
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
-import { getLegacyKanbanStatusFromSlug, INSUMO_STATUS_LABELS } from "./config";
+import {
+  getKanbanColumnLabel,
+  getLegacyKanbanStatusFromSlug,
+  INSUMO_STATUS_LABELS,
+  isKanbanColumnHiddenForPersonalizacao,
+} from "./config";
 
 type KanbanColumnRow = Database["public"]["Tables"]["kanban_columns"]["Row"];
 type FichaStatus = Database["public"]["Enums"]["ficha_status"];
@@ -64,6 +69,7 @@ export type KanbanCardSummary = {
 
 export type KanbanBoardColumn = KanbanColumnRow & {
   cards: KanbanCardSummary[];
+  displayName: string;
   openCount: number;
 };
 
@@ -255,11 +261,18 @@ export async function getQuadroProducaoSnapshot(
       cardsByColumnId.set(card.kanbanColumnId, columnCards);
     });
 
-    const boardColumns = columns.map<KanbanBoardColumn>((column) => ({
-      ...column,
-      cards: (cardsByColumnId.get(column.id) ?? []).sort((left, right) => left.kanbanOrder - right.kanbanOrder),
-      openCount: cardsByColumnId.get(column.id)?.length ?? 0,
-    }));
+    const boardColumns = columns
+      .filter((column) => !isKanbanColumnHiddenForPersonalizacao(column.slug, filters.arte))
+      .map<KanbanBoardColumn>((column) => {
+        const cards = (cardsByColumnId.get(column.id) ?? []).sort((left, right) => left.kanbanOrder - right.kanbanOrder);
+
+        return {
+          ...column,
+          cards,
+          displayName: getKanbanColumnLabel(column.slug, filters.arte, column.name),
+          openCount: cards.length,
+        };
+      });
 
     const filterOptions = {
       artes: sortText(mappedCards.map((card) => card.arte ?? "")),
@@ -276,7 +289,7 @@ export async function getQuadroProducaoSnapshot(
         columns: boardColumns,
         fetchedAt: new Date().toISOString(),
         filterOptions,
-        totalVisible: filteredCards.length,
+        totalVisible: boardColumns.reduce((total, column) => total + column.openCount, 0),
       },
     };
   } catch (error) {

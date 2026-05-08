@@ -1,6 +1,20 @@
+"use client";
+
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { RouteToast, type RouteToastMessage } from "@/components/ui/route-toast";
+import { clearCreateFichaDraftSnapshot } from "./ficha-draft-storage";
 
 export function FichaSaveToast() {
+  const searchParams = useSearchParams();
+  const saved = searchParams.get("saved");
+
+  useEffect(() => {
+    if (saved === "created") {
+      clearCreateFichaDraftSnapshot();
+    }
+  }, [saved]);
+
   return (
     <>
       <RouteToast messages={savedToastMessages} paramName="saved" />

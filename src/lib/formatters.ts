@@ -7,6 +7,7 @@ export function normalizePersonalizacaoLabel(value: string | null) {
     "serigrafia": "Serigrafia",
     "bordado": "Bordado",
     "patch": "Patch",
+    "dtf": "DTF",
     "sem_personalizacao": "Sem personalização",
     "serigrafia_bordado": "Serigrafia e Bordado",
     "na_costura": "Na costura",

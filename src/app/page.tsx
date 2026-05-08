@@ -1,15 +1,18 @@
 import Link from "next/link";
 import { ArrowRight, BarChart3, CalendarClock, FileText, Layers3, Plus } from "lucide-react";
-import { Badge } from "@/components/ui";
+import { Badge, Card } from "@/components/ui";
+import { getCurrentSession } from "@/features/auth/session";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
+import type { CSSProperties } from "react";
 
 type HomeMetric = {
+  accentVar: string;
   href: string;
   label: string;
-  tone: "info" | "success" | "warning";
   value: string;
+  valueColor: string;
 };
 
 type HomeFicha = Pick<
@@ -55,14 +58,20 @@ const operationalLinks = [
 
 export default async function HomePage() {
   const dashboard = await getHomeDashboardData();
+  const session = await getCurrentSession();
+  const firstName = getFirstName(session?.user.displayName);
+  const todayInput = getBusinessTodayInput();
 
   return (
     <section className="home-dashboard" aria-labelledby="home-title">
       <header className="home-dashboard__hero">
         <div className="home-dashboard__hero-copy">
-          <Badge tone="info">Produção</Badge>
+          <div className="home-dashboard__greeting">
+            <p className="eyebrow">Visão geral</p>
+            <time dateTime={todayInput}>{formatDashboardDate(new Date())}</time>
+          </div>
           <h1 id="home-title" className="home-dashboard__title">
-            Visão geral
+            {firstName ? `Olá, ${firstName}` : "Visão geral"}
           </h1>
           <div className="home-dashboard__actions" aria-label="Ações principais">
             <Link className="ui-button ui-button--primary" href="/fichas/nova">
@@ -79,9 +88,16 @@ export default async function HomePage() {
 
       <div className="home-dashboard__metrics" aria-label="Indicadores principais">
         {dashboard.metrics.map((metric) => (
-          <Link className={`home-metric home-metric--${metric.tone}`} href={metric.href} key={metric.label}>
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
+          <Link
+            className="home-metric__link"
+            href={metric.href}
+            key={metric.label}
+            style={{ "--home-metric-accent": metric.accentVar } as CSSProperties}
+          >
+            <Card className="home-metric">
+              <span>{metric.label}</span>
+              <strong style={{ color: metric.valueColor }}>{metric.value}</strong>
+            </Card>
           </Link>
         ))}
       </div>
@@ -90,7 +106,7 @@ export default async function HomePage() {
         <section className="home-panel" aria-labelledby="home-workflow-title">
           <div className="home-panel__header">
             <div>
-              <Badge tone="success">Atalhos</Badge>
+              <p className="eyebrow">Atalhos</p>
               <h2 id="home-workflow-title">Rotina</h2>
             </div>
           </div>
@@ -119,7 +135,7 @@ export default async function HomePage() {
         <section className="home-panel" aria-labelledby="home-recent-title">
           <div className="home-panel__header">
             <div>
-              <Badge tone="warning">Recentes</Badge>
+              <p className="eyebrow">Recentes</p>
               <h2 id="home-recent-title">Últimas fichas</h2>
             </div>
             <Link className="home-panel__link" href="/fichas">
@@ -133,11 +149,16 @@ export default async function HomePage() {
               {dashboard.recentFichas.map((ficha) => (
                 <li key={ficha.id}>
                   <Link href={`/fichas/${ficha.id}`}>
-                    <span>
+                    <span className="home-recent-list__avatar" aria-hidden="true">
+                      {getInitials(ficha.cliente_nome_snapshot)}
+                    </span>
+                    <span className="home-recent-list__copy">
                       <strong>{ficha.cliente_nome_snapshot}</strong>
                       <small>{ficha.arte || "Sem personalização"}</small>
                     </span>
-                    <Badge tone={ficha.status === "entregue" ? "success" : "warning"}>{formatStatus(ficha.status)}</Badge>
+                    <Badge className="home-recent-list__badge" tone={ficha.status === "entregue" ? "success" : "warning"}>
+                      {formatStatus(ficha.status)}
+                    </Badge>
                   </Link>
                 </li>
               ))}
@@ -220,34 +241,39 @@ async function getHomeDashboardData(): Promise<HomeDashboardData> {
 function buildMetrics(input: { clientes: number; entregues: number; fichas: number; pendentes: number; vencidas: number }) {
   return [
     {
+      accentVar: "var(--color-info)",
       href: "/fichas",
       label: "Fichas",
-      tone: "info",
       value: formatNumber(input.fichas),
+      valueColor: "var(--color-info)",
     },
     {
+      accentVar: "var(--color-warning)",
       href: "/fichas?status=pendente",
       label: "Pendentes",
-      tone: "warning",
       value: formatNumber(input.pendentes),
+      valueColor: "var(--color-warning)",
     },
     {
+      accentVar: "var(--color-success)",
       href: "/fichas?status=entregue",
       label: "Entregues",
-      tone: "success",
       value: formatNumber(input.entregues),
+      valueColor: "var(--color-success)",
     },
     {
+      accentVar: "var(--color-primary)",
       href: "/clientes",
       label: "Clientes",
-      tone: "info",
       value: formatNumber(input.clientes),
+      valueColor: "var(--color-primary)",
     },
     {
+      accentVar: "var(--color-danger)",
       href: "/fichas?status=atrasado",
       label: "Atrasadas",
-      tone: input.vencidas > 0 ? "warning" : "success",
       value: formatNumber(input.vencidas),
+      valueColor: "var(--color-danger)",
     },
   ] satisfies HomeMetric[];
 }
@@ -264,6 +290,28 @@ function formatStatus(status: Database["public"]["Enums"]["ficha_status"]) {
   };
 
   return labels[status];
+}
+
+function getFirstName(displayName: string | undefined) {
+  return displayName?.trim().split(/\s+/)[0] ?? "";
+}
+
+function getInitials(value: string) {
+  const words = value.trim().split(/\s+/).filter(Boolean);
+  const initials = words.length > 1 ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}` : words[0]?.slice(0, 2) ?? "";
+
+  return initials.toLocaleUpperCase("pt-BR");
+}
+
+function formatDashboardDate(date: Date) {
+  const formatted = new Intl.DateTimeFormat("pt-BR", {
+    day: "numeric",
+    month: "long",
+    timeZone: "America/Cuiaba",
+    weekday: "long",
+  }).format(date);
+
+  return formatted.charAt(0).toLocaleUpperCase("pt-BR") + formatted.slice(1);
 }
 
 function getBusinessTodayInput() {

@@ -32,7 +32,7 @@ export function ClientesSearchToolbar({ initialTerm = "" }: ClientesSearchToolba
   return (
     <div className="clientes-toolbar" role="search">
       <div className="field">
-        <label htmlFor="termo">Buscar cliente</label>
+        <label className="sr-only" htmlFor="termo">Buscar cliente</label>
         <div className="clientes-search-field">
           <Search aria-hidden="true" size={18} />
           <input

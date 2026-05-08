@@ -29,7 +29,6 @@ export function AppShell({ children, session, title }: AppShellProps) {
           {session ? (
             <div className="app-user" aria-label="Usuario atual">
               <span className="app-user__name">{session.user.displayName}</span>
-              <span className="app-user__role">{session.user.role === "superadmin" ? "Superadmin" : "Operador"}</span>
             </div>
           ) : null}
           <ThemeToggle />

@@ -1070,7 +1070,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                 >
                   {currentColumns.map((column) => (
                     <option key={column.id} value={column.id}>
-                      {column.name}
+                      {column.displayName}
                     </option>
                   ))}
                 </select>
@@ -1158,7 +1158,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                   <h2>{viewCard.clienteNome}</h2>
                 </div>
                 <div className="quadro-producao-view-modal__tags">
-                  <Badge tone="neutral">{viewCardCurrentColumn?.name ?? "Sem coluna"}</Badge>
+                  <Badge tone="neutral">{viewCardCurrentColumn?.displayName ?? "Sem coluna"}</Badge>
                   <Badge tone="neutral">{formatDateLong(viewCard.dataEntrega)}</Badge>
                   {viewCard.evento ? <Badge tone="info">Evento</Badge> : null}
                 </div>
@@ -1207,9 +1207,9 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                   </select>
                 </label>
 
-                <Tooltip label={viewCardNextColumn ? `Mover para ${viewCardNextColumn.name}` : "Marcar pedido como entregue"}>
+                <Tooltip label={viewCardNextColumn ? `Mover para ${viewCardNextColumn.displayName}` : "Marcar pedido como entregue"}>
                   <button
-                    aria-label={viewCardNextColumn ? `Mover ${viewCard.clienteNome} para ${viewCardNextColumn.name}` : `Marcar pedido de ${viewCard.clienteNome} como entregue`}
+                    aria-label={viewCardNextColumn ? `Mover ${viewCard.clienteNome} para ${viewCardNextColumn.displayName}` : `Marcar pedido de ${viewCard.clienteNome} como entregue`}
                     className={`ui-button ui-button--primary quadro-producao-view-modal__move${viewCardNextColumn ? "" : " quadro-producao-view-modal__move--deliver"}`}
                     disabled={viewCardNextColumn ? moveCardMutation.isPending : deliverCardMutation.isPending}
                     onClick={() => {
@@ -1474,7 +1474,7 @@ function ColumnSurface({
         <div className="quadro-producao-column__topline">
           <div className="quadro-producao-column__heading">
             <GripVertical aria-hidden="true" className="quadro-producao-column__grip" size={14} />
-            <h2>{column.name}</h2>
+            <h2>{column.displayName}</h2>
           </div>
           <Badge tone="neutral">{formatCount(column.openCount)}</Badge>
         </div>

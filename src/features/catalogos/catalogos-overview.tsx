@@ -101,13 +101,13 @@ export function CatalogosOverview({ editId, modalMode, result, selectedKind }: C
                     <td>
                       <span className="ui-table__primary">
                         <strong>{item.name}</strong>
-                        <span className="ui-table__muted">{item.slug}</span>
+                        <span className="ui-table__muted" style={{ fontFamily: "var(--font-family-mono)", fontSize: "var(--font-size-xs)" }}>{item.slug}</span>
                       </span>
                     </td>
-                    <td>{item.aliases.length ? item.aliases.join(", ") : "Sem aliases"}</td>
-                    <td>{getComposition(item.metadata) || item.description || "Sem metadados"}</td>
+                    <td>{item.aliases.length ? item.aliases.join(", ") : <span className="ui-table__muted">—</span>}</td>
+                    <td>{getComposition(item.metadata) || item.description || <span className="ui-table__muted">—</span>}</td>
                     <td>
-                      <Badge tone={item.active ? "success" : "warning"}>{item.active ? "Ativo" : "Inativo"}</Badge>
+                      <Badge tone={item.active ? "success" : "neutral"}>{item.active ? "Ativo" : "Inativo"}</Badge>
                     </td>
                     <td>
                       <CatalogItemActions

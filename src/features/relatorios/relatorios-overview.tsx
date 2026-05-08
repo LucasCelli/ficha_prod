@@ -35,7 +35,7 @@ export function RelatoriosOverview({ filters, result }: RelatoriosOverviewProps)
       <header className="relatorios-view__header">
         <div className="page-heading">
           <div className="page-heading__copy">
-            <Badge tone="info">Relatórios</Badge>
+            <p className="eyebrow">Relatórios</p>
             <h1 id="relatorios-title" className="app-title">
               Relatórios
             </h1>
@@ -154,10 +154,16 @@ function renderRelatorioContent(result: FichaListResult) {
 }
 
 function SummaryCard({ label, tone = "info", value }: { label: string; tone?: "info" | "success" | "warning"; value: number }) {
+  const colorMap = {
+    info: "var(--color-info)",
+    success: "var(--color-success)",
+    warning: "var(--color-warning)",
+  };
+
   return (
     <div className={`relatorios-summary__card relatorios-summary__card--${tone}`}>
       <span>{label}</span>
-      <strong>{formatNumber(value)}</strong>
+      <strong style={{ color: colorMap[tone] }}>{formatNumber(value)}</strong>
     </div>
   );
 }
@@ -170,7 +176,7 @@ function RelatorioRow({ ficha }: { ficha: FichaListItem }) {
           <Link className="ui-table__link" href={`/fichas/${ficha.id}`}>
             {ficha.cliente_nome_snapshot}
           </Link>
-          <span className="ui-table__muted">{ficha.numero_venda ? `Venda ${ficha.numero_venda}` : "Sem número de venda"}</span>
+          <span className="ui-table__muted">{ficha.numero_venda ? `Venda ${ficha.numero_venda}` : "—"}</span>
         </span>
       </td>
       <td>{formatDate(ficha.data_entrega)}</td>
@@ -181,7 +187,7 @@ function RelatorioRow({ ficha }: { ficha: FichaListItem }) {
         </div>
       </td>
       <td>{normalizePersonalizacaoLabel(ficha.arte)}</td>
-      <td>{ficha.vendedor ?? "Sem responsável"}</td>
+      <td>{ficha.vendedor ?? <span className="ui-table__muted">—</span>}</td>
     </tr>
   );
 }
@@ -246,7 +252,9 @@ function formatDate(value: string) {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(date);
+  })
+    .format(date)
+    .replace(/ de /g, " ");
 }
 
 function formatNumber(value: number) {

@@ -24,7 +24,7 @@ const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
 });
 
 function formatDate(value: string | null) {
-  if (!value) return "Nunca acessou";
+  if (!value) return <em className="ui-table__muted">Nunca acessou</em>;
   return dateFormatter.format(new Date(value));
 }
 
@@ -88,7 +88,7 @@ export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverview
                     </span>
                   </td>
                   <td>
-                    <Badge tone={operador.active ? "success" : "warning"}>{operador.active ? "Ativo" : "Inativo"}</Badge>
+                    <Badge tone={operador.active ? "success" : "neutral"}>{operador.active ? "Ativo" : "Inativo"}</Badge>
                   </td>
                   <td>{formatDate(operador.last_login_at)}</td>
                   <td>

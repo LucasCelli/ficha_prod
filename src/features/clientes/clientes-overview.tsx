@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { Badge, DataTable, EmptyState, Pagination } from "@/components/ui";
+import { DataTable, EmptyState, Pagination } from "@/components/ui";
 import { CLIENTES_PAGE_SIZE, type ClienteFilters, type ClienteListItem, type ClientesListResult } from "./data";
 import { ClienteDeleteAction } from "./cliente-delete-action";
 import { ClientesSearchToolbar } from "./clientes-search-toolbar";
@@ -25,7 +25,7 @@ export function ClientesOverview({ filters, result }: ClientesOverviewProps) {
       <header className="clientes-view__header">
         <div className="page-heading">
           <div className="page-heading__copy">
-            <Badge tone="info">Clientes</Badge>
+            <p className="eyebrow">Clientes</p>
             <h1 id="clientes-title" className="app-title">
               Clientes
             </h1>
@@ -79,16 +79,9 @@ function renderClientesContent(result: ClientesListResult, filters: ClienteFilte
 
   return (
     <div className="clientes-results">
-      <div className="clientes-results__summary" aria-label="Resumo de clientes">
-        <div>
-          <span>Registros encontrados</span>
-          <strong>{formatNumber(result.total)}</strong>
-        </div>
-        <div>
-          <span>Total nesta página</span>
-          <strong>{formatNumber(result.clientes.length)}</strong>
-        </div>
-      </div>
+      <p className="results-summary" aria-label="Resumo de clientes">
+        Mostrando <strong style={{ color: "var(--color-text)" }}>{formatNumber(result.clientes.length)}</strong> de <strong style={{ color: "var(--color-text)" }}>{formatNumber(result.total)}</strong> registros
+      </p>
       <DataTable caption={`Lista de clientes com ${result.total} registros encontrados`} columns={columns}>
         {result.clientes.map((cliente) => (
           <ClienteRow cliente={cliente} filters={filters} key={cliente.id} />
@@ -119,8 +112,8 @@ function ClienteRow({ cliente, filters }: { cliente: ClienteListItem; filters: C
       </td>
       <td>
         <span className="ui-table__primary">
-          <span>{cliente.telefone ?? "Sem telefone"}</span>
-          <span className="ui-table__muted">{cliente.email ?? "Sem e-mail"}</span>
+          <span>{cliente.telefone ?? <span className="ui-table__muted">—</span>}</span>
+          <span className="ui-table__muted">{cliente.email ?? "—"}</span>
         </span>
       </td>
       <td>{formatDate(cliente.primeira_ficha)}</td>
@@ -158,14 +151,16 @@ export function buildClientesHref(filters: ClienteFilters, extra: Record<string,
 }
 
 function formatDate(value: string | null) {
-  if (!value) return "Sem data";
+  if (!value) return <span className="ui-table__muted">—</span>;
   const date = new Date(`${value}T00:00:00`);
 
   return new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(date);
+  })
+    .format(date)
+    .replace(/ de /g, " ");
 }
 
 function formatNumber(value: number) {

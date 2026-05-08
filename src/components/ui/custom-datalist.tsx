@@ -4,6 +4,7 @@ import { useId, useMemo, useRef, useState } from "react";
 
 export type CustomDatalistOption = {
   aliases?: string[];
+  details?: string[];
   label: string;
   metadata?: Record<string, string>;
   value?: string;
@@ -138,7 +139,7 @@ export function CustomDatalist({
                 type="button"
               >
                 <span>{option.label}</span>
-                {option.aliases?.length ? <small>{option.aliases.join(", ")}</small> : null}
+                {option.details?.length ? <small>{option.details.join(", ")}</small> : null}
               </button>
             ))
           ) : (

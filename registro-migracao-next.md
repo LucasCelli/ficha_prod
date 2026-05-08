@@ -1,5 +1,24 @@
 # Registro da migracao Next
 
+## 2026-05-08 - Fichas: rascunho local e alerta de saida
+
+- Fase/modulo: fichas / criacao e protecao de dados nao salvos.
+- Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `src/features/fichas/ficha-save-toast.tsx`, `src/features/fichas/ficha-draft-storage.ts`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: a tela `/fichas/nova` agora grava um snapshot local no `localStorage` durante a edicao, ao tentar salvar e tambem antes de sair com alteracoes pendentes. Se o salvamento falhar e a aba for fechada, ao abrir a criacao novamente um toast warning persistente avisa que existe rascunho local e oferece `Restaurar` ou `Descartar`. Imagens locais ainda nao enviadas nao entram no snapshot por limitacao do navegador; imagens ja enviadas ao Cloudinary entram como referencia serializavel.
+- Decisao: nao restaurar rascunho automaticamente, para evitar sobrescrever a intencao do operador quando ele quer comecar uma ficha limpa.
+- Hotfix: apos teste manual sem toast, o rascunho deixou de depender apenas de submit/saida e passou a ser salvo com debounce em alteracoes de campos, produtos, imagens e datas. Se um teste anterior nao chegou a gravar snapshot no `localStorage`, esse rascunho antigo nao e recuperavel; a correcao vale para os novos rascunhos.
+- Protecao de saida: links internos passam por `AlertDialog` quando ha dados nao salvos; fechamento/reload da aba usa `beforeunload`, que so permite o dialogo nativo do navegador.
+- Sucesso: ao voltar para `/fichas?saved=created`, o snapshot local de criacao e removido.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `npm run supabase:check` passaram. Scan de encoding nos arquivos tocados nao encontrou mojibake novo; os matches restantes sao palavras pt-BR validas com acento.
+
+## 2026-05-08 - Inicio: polimento visual da visao geral
+
+- Fase/modulo: inicio / dashboard operacional.
+- Arquivos alterados: `src/app/page.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: a home atual ganhou saudacao baseada no usuario logado, data local em `America/Cuiaba`, KPIs com o primitivo `Card` e acentos semanticos, atalhos mais compactos e lista de ultimas fichas com avatar, `Badge` compartilhado e status alinhado no fim da linha.
+- Decisao: tratar como refinamento da rota `/`, sem recriar `/dashboard` e sem adicionar texto explicativo/onboarding.
+- Validacao: `npm run typecheck`, `npx eslint src/app/page.tsx`, `npm run lint`, `npm run build`, `npm run supabase:check`, `git diff --check` e Edge em `localhost:3000` autenticado como Fernanda. A home exibiu `Olá, Fernanda`, data local, KPIs reais e badges de ultimas fichas alinhados com o mesmo recuo no fim de todas as linhas; console sem erros.
+
 ## 2026-05-08 - Producao: aceite funcional do usuario
 
 - Fase/modulo: producao / aceite funcional.
@@ -1217,3 +1236,40 @@
 - Dados: removido do Supabase o item de catalogo `Teste` em `produto`; corrigido `Dry NBA Soft` de `produto` para `tecido`, mantendo aliases `Falcon NBA` e `Dry NBA Furadinho`, composicao `100% Poliester`, ativo e `sort_order=35`.
 - Arquivos alterados: `src/features/clientes/actions.ts`, `src/features/clientes/form-state.ts`, `src/features/clientes/cliente-delete-action.tsx`, `src/features/clientes/clientes-overview.tsx`, `src/features/clientes/cliente-detail.tsx`, `src/app/clientes/page.tsx`, `src/features/catalogos/actions.ts`, `src/features/catalogos/form-state.ts`, `src/features/catalogos/catalog-item-actions.tsx`, `src/features/catalogos/catalogos-overview.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
 - Validacao: `npm run typecheck` passou; queries Supabase confirmaram que `teste` e `dry-nba-soft` nao aparecem mais em `produto`, e `Dry NBA Soft` aparece em `tecido`.
+
+### Quadro de producao: etapas por personalizacao
+
+- Ajuste: os slugs tecnicos do quadro continuam iguais, mas os nomes visiveis agora sao calculados por personalizacao. Bordado, Patch e DTF mostram `Preparando Arte`, `Exportado PDF` e `PDF Enviado`, ocultando as etapas intermediarias; Serigrafia mostra `Cores Separadas`, `Fotolito Impresso`, `Na Estamparia` e `Estampado`; Sublimacao mostra `Exportado`, `Imprimindo`, `Impresso` e `Sublimado`; Todos/Outros ficam com rotulos combinados.
+- Listagem: a coluna `Etapas` em `/fichas` passou a usar o mesmo helper do quadro com base na `arte` da propria ficha, entao cada linha exibe a etapa operacional correta mesmo fora do filtro do quadro.
+- Dados: criada migration para alinhar os nomes base das colunas de sistema aos rotulos combinados de Todos/Outros sem alterar os slugs usados por movimentacao e compatibilidade.
+- Arquivos alterados: `src/features/quadro-producao/config.ts`, `src/features/quadro-producao/data.ts`, `src/features/quadro-producao/quadro-producao-client.tsx`, `src/features/fichas/fichas-overview.tsx`, `src/lib/formatters.ts`, `supabase/migrations/20260508120000_quadro_producao_personalizacao_labels.sql`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Edge em `localhost:3000` confirmou `/quadro-producao?arte=dtf` com 3 colunas visiveis (`Preparando Arte`, `Exportado PDF`, `PDF Enviado`), `/quadro-producao?arte=serigrafia` com rótulos de cores/fotolito/estamparia, `/quadro-producao?arte=sublimacao` com exportacao/impressao/sublimado e `/fichas?busca=Larissa` exibindo a etapa calculada por ficha; console sem erros.
+
+### Fichas: destaque da etapa na listagem
+
+- Ajuste visual: a célula `Etapas` de `/fichas` agora mantém o tipo de personalização como contexto e mostra a etapa operacional em `Badge` informativo compacto, com `aria-label` específico para a etapa.
+- Decisao: aumentar a leitura do metadado de etapa dentro da tabela existente, sem adicionar coluna, card ou texto explicativo.
+- Arquivos alterados: `src/features/fichas/fichas-overview.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, `npm run lint` e `git diff --check` passaram. Edge em `localhost:3000/fichas?busca=Larissa` confirmou o badge de etapa renderizado para Sublimacao e Serigrafia; console sem erros.
+
+### Fichas: espaçamento dos filtros de data
+
+- Ajuste visual: os controles dentro de `.field` agora usam `min-width: 0`, permitindo que os inputs de data encolham dentro das colunas do grid sem invadir o espaço vizinho.
+- Decisao: manter o espaçamento entre `Entrega inicial` e `Entrega final` pelo `gap` padrão da `.fichas-toolbar`, sem margem local ou classe específica para datas.
+- Arquivos alterados: `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, `npm run lint` e `git diff --check` passaram. Edge em `localhost:3000/fichas?busca=Larissa` mediu `gap` visual de 12px entre os inputs, igual ao `gap` da toolbar; console sem erros.
+
+### Fichas: datalist sem slugs tecnicos
+
+- Ajuste visual/dados: `CustomDatalist` passou a separar aliases pesquisaveis de detalhes renderizados. Os aliases tecnicos continuam entrando no filtro de busca, mas a segunda linha da opção usa apenas `details` curados.
+- Catalogos: `listCatalogOptionsForFichaForm()` agora filtra aliases com `_`, `-` ou token tecnico simples para exibicao, preserva todos em `aliases` para busca/importacao e adiciona composicao como detalhe humano quando existir.
+- Formulario: os materiais fallback tambem passam a exibir composicao como detalhe, mantendo o mesmo padrao quando Supabase nao estiver configurado.
+- Arquivos alterados: `src/components/ui/custom-datalist.tsx`, `src/features/catalogos/data.ts`, `src/features/fichas/ficha-form.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. Edge em `localhost:3000/fichas/nova` confirmou que buscar `malha` mostra nomes com composicao, e buscar `malha_fria_pv` encontra `Malha Fria (PV)` sem exibir o slug; console sem erros.
+
+### Shell: usuario sem perfil visivel
+
+- Ajuste visual: o bloco `.app-user` da sidebar agora mostra apenas `displayName`; a linha `Superadmin`/`Operador` saiu da UI.
+- Decisao: a regra de autorizacao continua baseada em `session.user.role`, mas o papel deixa de aparecer no shell para manter a interface mais silenciosa.
+- Arquivos alterados: `src/components/ui/app-shell.tsx`, `src/styles/globals.css`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Validacao: `npm run typecheck`, `npm run lint` e `git diff --check` passaram. Edge em `localhost:3000/fichas?busca=Larissa` confirmou `.app-user` renderizando somente `Fernanda`; console sem erros.

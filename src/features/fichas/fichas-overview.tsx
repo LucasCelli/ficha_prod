@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarDays, History, ListFilter, Plus } from "lucide-react";
 import { Badge, DataTable, EmptyState, Pagination } from "@/components/ui";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
+import { getKanbanColumnLabel } from "@/features/quadro-producao/config";
 import { FichasFilterToolbar } from "./fichas-filter-toolbar";
 import { FichaRowActions } from "./ficha-row-actions";
 import { FichaRowThumbnail } from "./ficha-row-thumbnail";
@@ -51,7 +52,7 @@ export function FichasOverview({ filters, result }: FichasOverviewProps) {
       <header className="fichas-view__header">
         <div className="page-heading">
           <div className="page-heading__copy">
-            <Badge tone="info">Módulo prioritário</Badge>
+            <p className="eyebrow">Módulo prioritário</p>
             <h1 id="fichas-title" className="app-title">
               Fichas
             </h1>
@@ -71,7 +72,7 @@ export function FichasOverview({ filters, result }: FichasOverviewProps) {
             <Link
               key={shortcut.label}
               aria-current={matchesShortcut(filters, shortcut.filters) ? "page" : undefined}
-              className="quick-filter"
+              className={`quick-filter${shortcut.label === "Atrasadas" ? " quick-filter--overdue" : ""}`}
               href={hrefForFilters(filters, shortcut.filters)}
             >
               <Icon aria-hidden="true" size={18} />
@@ -284,7 +285,9 @@ function formatDate(value: string) {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(date);
+  })
+    .format(date)
+    .replace(/ de /g, " ");
 }
 
 function formatOverdueDays(days: number) {
@@ -306,6 +309,11 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
   const overdueDays = getFichaOverdueDays(ficha);
   const statusLabel = isOverdue ? "Atrasado" : statusLabels[ficha.status];
   const statusTone = isOverdue ? "danger" : statusTones[ficha.status];
+  const kanbanStageLabel = getKanbanColumnLabel(
+    ficha.kanban_column?.slug ?? ficha.kanban_status,
+    ficha.arte,
+    ficha.kanban_column?.name,
+  );
 
   const searchParams = new URLSearchParams();
   const paramsObj = getFichaPaginationParams(currentFilters);
@@ -349,12 +357,14 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
         </div>
       </td>
       <td>
-        <span className="ui-table__primary">
-          <strong>{normalizePersonalizacaoLabel(ficha.arte)}</strong>
-          <span className="ui-table__muted">{ficha.kanban_column?.name ?? normalizePersonalizacaoLabel(ficha.kanban_status)}</span>
+        <span className="ui-table__primary ficha-stage-cell">
+          <strong className="ficha-stage-cell__type">{normalizePersonalizacaoLabel(ficha.arte)}</strong>
+          <Badge aria-label={`Etapa: ${kanbanStageLabel}`} className="ficha-stage-cell__badge" tone="info">
+            {kanbanStageLabel}
+          </Badge>
         </span>
       </td>
-      <td>{ficha.vendedor ?? "Sem responsável"}</td>
+      <td>{ficha.vendedor ?? <span className="ui-table__muted">—</span>}</td>
       <td>
         <FichaRowActions
           fichaId={ficha.id}
