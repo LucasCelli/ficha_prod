@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { AlertDialog, FloatingMenu, FloatingMenuButton, FloatingMenuLink } from "@/components/ui";
+import { AlertDialog } from "@/components/ui";
 import { deleteCatalogItemAction } from "./actions";
 import { getInitialCatalogoDeleteActionState } from "./form-state";
 
@@ -28,17 +29,13 @@ export function CatalogItemActions({ editHref, itemId, itemName, returnTo }: Cat
   }, [state.message, state.status]);
 
   return (
-    <>
-      <FloatingMenu label={`Ações do item ${itemName}`} trigger={<MoreHorizontal aria-hidden="true" size={18} />}>
-        <FloatingMenuLink href={editHref}>
-          <Pencil aria-hidden="true" size={16} />
-          Editar
-        </FloatingMenuLink>
-        <FloatingMenuButton danger onClick={() => setOpen(true)}>
-          <Trash2 aria-hidden="true" size={16} />
-          Excluir
-        </FloatingMenuButton>
-      </FloatingMenu>
+    <div className="catalog-item-actions">
+      <Link aria-label={`Editar ${itemName}`} className="catalog-item-actions__button" href={editHref}>
+        <Pencil aria-hidden="true" size={14} />
+      </Link>
+      <button aria-label={`Excluir ${itemName}`} className="catalog-item-actions__button catalog-item-actions__button--danger" onClick={() => setOpen(true)} type="button">
+        <Trash2 aria-hidden="true" size={14} />
+      </button>
 
       {open ? (
         <DeleteCatalogItemDialog
@@ -49,7 +46,7 @@ export function CatalogItemActions({ editHref, itemId, itemName, returnTo }: Cat
           returnTo={returnTo}
         />
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -63,7 +60,12 @@ type DeleteCatalogItemDialogProps = {
 
 function DeleteCatalogItemDialog({ formAction, itemId, itemName, onClose, returnTo }: DeleteCatalogItemDialogProps) {
   return (
-    <AlertDialog onClose={onClose} size="sm" title="Excluir item">
+    <AlertDialog
+      description={`${itemName} será removido do catálogo.`}
+      onClose={onClose}
+      size="sm"
+      title="Excluir item"
+    >
       <section className="confirm-dialog" aria-describedby="delete-catalog-item-description">
         <header className="confirm-dialog__header">
           <div>

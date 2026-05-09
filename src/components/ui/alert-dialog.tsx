@@ -7,12 +7,13 @@ import type { ReactNode } from "react";
 
 type AlertDialogProps = {
   children: ReactNode;
+  description: string;
   onClose: () => void;
   size?: "sm" | "md";
   title: string;
 };
 
-export function AlertDialog({ children, onClose, size = "sm", title }: AlertDialogProps) {
+export function AlertDialog({ children, description, onClose, size = "sm", title }: AlertDialogProps) {
   const reduceMotion = useReducedMotion();
 
   return (
@@ -44,6 +45,7 @@ export function AlertDialog({ children, onClose, size = "sm", title }: AlertDial
             </button>
           </AlertDialogPrimitive.Cancel>
           <AlertDialogPrimitive.Title className="sr-only">{title}</AlertDialogPrimitive.Title>
+          <AlertDialogPrimitive.Description className="sr-only">{description}</AlertDialogPrimitive.Description>
           {children}
           </motion.div>
         </AlertDialogPrimitive.Content>

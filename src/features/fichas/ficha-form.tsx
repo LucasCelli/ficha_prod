@@ -489,13 +489,19 @@ export function FichaForm(props: FichaFormProps) {
           toast.dismiss(CREATE_FICHA_DRAFT_TOAST_ID);
         },
       },
-      cancel: {
-        label: "Descartar",
-        onClick: () => {
-          clearCreateFichaDraftSnapshot();
-          toast.dismiss(CREATE_FICHA_DRAFT_TOAST_ID);
-        },
-      },
+      cancel: (
+        <button
+          data-button=""
+          data-cancel=""
+          onClick={() => {
+            clearCreateFichaDraftSnapshot();
+            toast.dismiss(CREATE_FICHA_DRAFT_TOAST_ID);
+          }}
+          type="button"
+        >
+          Descartar
+        </button>
+      ),
       closeButton: false,
       className: "ficha-draft-toast",
       description: "Escolha se deseja continuar a ficha salva neste navegador.",
@@ -2467,7 +2473,12 @@ function FichaFormInner({
       </form>
 
       {observacoesConfirmationValue ? (
-        <AlertDialog onClose={closeObservacoesConfirmation} size="sm" title="Substituir observações">
+        <AlertDialog
+          description="As observações foram editadas manualmente. Confirme se deseja substituir o conteúdo atual pelo texto preenchido automaticamente."
+          onClose={closeObservacoesConfirmation}
+          size="sm"
+          title="Substituir observações"
+        >
           <section className="confirm-dialog" aria-describedby="observacoes-autofill-description">
             <header className="confirm-dialog__header">
               <div>
@@ -2496,7 +2507,12 @@ function FichaFormInner({
         </AlertDialog>
       ) : null}
       {pendingLegacyImport ? (
-        <AlertDialog onClose={cancelPendingLegacyImport} size="sm" title="Substituir rascunho atual">
+        <AlertDialog
+          description={`O formulário já possui dados preenchidos. Confirme se deseja descartar o rascunho atual e carregar ${pendingLegacyImport.fileName}.`}
+          onClose={cancelPendingLegacyImport}
+          size="sm"
+          title="Substituir rascunho atual"
+        >
           <section className="confirm-dialog" aria-describedby="legacy-import-overwrite-description">
             <header className="confirm-dialog__header">
               <div>
@@ -2526,7 +2542,12 @@ function FichaFormInner({
         </AlertDialog>
       ) : null}
       {pendingNavigationHref ? (
-        <AlertDialog onClose={closePendingNavigationDialog} size="sm" title="Sair sem salvar">
+        <AlertDialog
+          description="A ficha possui alterações ainda não salvas."
+          onClose={closePendingNavigationDialog}
+          size="sm"
+          title="Sair sem salvar"
+        >
           <section className="confirm-dialog" aria-describedby="leave-unsaved-ficha-description">
             <header className="confirm-dialog__header">
               <div>

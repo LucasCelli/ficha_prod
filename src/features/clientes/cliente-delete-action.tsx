@@ -104,7 +104,12 @@ type DeleteClienteDialogProps = {
 
 function DeleteClienteDialog({ clienteId, clienteNome, formAction, onClose, returnTo }: DeleteClienteDialogProps) {
   return (
-    <AlertDialog onClose={onClose} size="sm" title="Excluir cliente">
+    <AlertDialog
+      description={`O cadastro de ${clienteNome} será removido. Fichas existentes mantêm o nome registrado.`}
+      onClose={onClose}
+      size="sm"
+      title="Excluir cliente"
+    >
       <section className="confirm-dialog" aria-describedby="delete-cliente-description">
         <header className="confirm-dialog__header">
           <div>

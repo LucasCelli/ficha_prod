@@ -8,7 +8,7 @@ import { Button, Tooltip } from "@/components/ui";
 import { saveCatalogItemAction } from "./actions";
 import { getInitialCatalogoFormState } from "./form-state";
 import type { CatalogItem, CatalogKind } from "./types";
-import { catalogKindLabels } from "./types";
+import { catalogKindLabels, catalogKinds } from "./types";
 
 type CatalogoFormProps = {
   item?: CatalogItem;
@@ -53,13 +53,26 @@ export function CatalogoForm({ item, returnTo, selectedKind }: CatalogoFormProps
   return (
     <form action={formAction} className="catalog-form">
       {item ? <input name="id" type="hidden" value={item.id} /> : null}
-      <input name="kind" type="hidden" value={item?.kind ?? selectedKind} />
+      {item ? <input name="sortOrder" type="hidden" value={item.sort_order} /> : null}
       {returnTo ? <input name="returnTo" type="hidden" value={returnTo} /> : null}
 
       <div className="catalog-form__grid">
         <div className="field">
-          <FieldLabel info="Define em qual campo da ficha este item aparece." label="Categoria" />
-          <div className="readonly-field">{catalogKindLabels[item?.kind ?? selectedKind]}</div>
+          <FieldLabel htmlFor="catalog-kind" info="Define em qual campo da ficha este item aparece." label="Categoria" />
+          {item ? (
+            <>
+              <input name="kind" type="hidden" value={item.kind} />
+              <div className="readonly-field">{catalogKindLabels[item.kind]}</div>
+            </>
+          ) : (
+            <select id="catalog-kind" name="kind" defaultValue={selectedKind}>
+              {catalogKinds.map((kind) => (
+                <option key={kind} value={kind}>
+                  {catalogKindLabels[kind]}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div className="field">
@@ -92,10 +105,6 @@ export function CatalogoForm({ item, returnTo, selectedKind }: CatalogoFormProps
           <input id="catalog-composition" defaultValue={getMetadataText(item, "composition")} name="composition" placeholder="100% poliéster…" />
         </div>
 
-        <div className="field">
-          <FieldLabel htmlFor="catalog-sort" info="Define a posição do item no catálogo e nas sugestões da ficha." label="Ordem" />
-          <input id="catalog-sort" defaultValue={item?.sort_order ?? 0} inputMode="numeric" name="sortOrder" placeholder="0…" type="number" />
-        </div>
         <label className="checkbox-field catalog-form__active">
           <input defaultChecked={item?.active ?? true} name="active" type="checkbox" />
           <span>Ativo</span>

@@ -230,7 +230,12 @@ function DeleteFichaDialog({
   const canDelete = useMemo(() => typedCode.trim().toUpperCase() === confirmationCode, [confirmationCode, typedCode]);
 
   return (
-    <AlertDialog onClose={onClose} size="sm" title="Remover ficha">
+    <AlertDialog
+      description={`Esta ação remove a ficha de ${fichaLabel} e seus itens vinculados. Digite o código para confirmar.`}
+      onClose={onClose}
+      size="sm"
+      title="Remover ficha"
+    >
       <section className="confirm-dialog" aria-describedby="delete-ficha-description">
         <header className="confirm-dialog__header">
           <div>
@@ -281,7 +286,12 @@ function DeleteFichaDialog({
 
 function RevertFichaDialog({ fichaId, fichaLabel, formAction, onClose, returnTo }: RevertFichaDialogProps) {
   return (
-    <AlertDialog onClose={onClose} size="sm" title="Reverter para pendente">
+    <AlertDialog
+      description={`A ficha de ${fichaLabel} voltará para o status pendente e sairá da lista de entregues.`}
+      onClose={onClose}
+      size="sm"
+      title="Reverter para pendente"
+    >
       <section className="confirm-dialog" aria-describedby="revert-ficha-description">
         <header className="confirm-dialog__header">
           <div>

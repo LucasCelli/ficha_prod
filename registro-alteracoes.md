@@ -1,11 +1,35 @@
 # Registro de alteracoes
 
+## 2026-05-09 - TODO: rascunho e AlertDialog
+
+- Fase/modulo: fichas / rascunho local e primitivo de dialog.
+- Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `src/components/ui/alert-dialog.tsx`, `src/features/clientes/cliente-delete-action.tsx`, `src/features/catalogos/catalog-item-actions.tsx`, `src/features/catalogos/catalog-items-table.tsx`, `src/features/fichas/ficha-row-actions.tsx`, `TODO.md`, `registro-alteracoes.md`.
+- Resultado: o botão `Descartar` do toast de rascunho local voltou a remover o snapshot do `localStorage` e fechar o toast persistente.
+- Acessibilidade: o primitivo compartilhado `AlertDialog` agora exige uma descrição e renderiza `AlertDialogDescription` em `sr-only`, eliminando o warning do Radix sem adicionar texto visual redundante aos dialogs atuais.
+- Backlog: as pendências correspondentes em `TODO.md` foram marcadas como concluídas e o texto longo do warning foi encurtado.
+- Decisão: manter o toast de rascunho não descartável por clique externo/tempo; apenas o botão explícito `Descartar` executa a limpeza.
+- Validação: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Edge em `localhost:3000/fichas/nova` confirmou que `Descartar` remove o draft e fecha o toast; o dialog de saída renderizou `aria-describedby` apontando para uma descrição existente e não gerou novo warning do Radix.
+
+## 2026-05-09 - Catalogos: ordenacao por arrastar
+
+- Fase/modulo: catalogos / ordenacao de itens.
+- Arquivos alterados: `src/components/ui/data-table.tsx`, `src/features/catalogos/actions.ts`, `src/features/catalogos/catalog-items-table.tsx`, `src/features/catalogos/catalogo-form.tsx`, `src/features/catalogos/catalogos-overview.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: a lista de itens do catalogo passou a aceitar reordenacao por drag-and-drop; ao soltar um item, a ordem visivel e salva em `catalog_items.sort_order` para a categoria atual.
+- Correcao: a tabela passou a deduplicar os itens por `id` durante o render e a normalizar o estado interno do `fluid-dnd` quando o drop gera duplicata transitoria, evitando erro de React por keys repetidas ao reordenar.
+- Correcao: o corpo nativo de tabela foi substituido por uma grade compacta com semantica ARIA de tabela, porque `fluid-dnd` aplica posicionamento fixo durante o arraste e isso deixava `<tr>` instavel, alterava o CSS durante o movimento e bloqueava novo arraste do item movido.
+- Correcao: a ordem salva deixou de depender do array interno do `fluid-dnd` apos o drop. O componente agora guarda o item arrastado e calcula explicitamente a nova sequencia a partir do indice de destino, evitando POSTs que reenviavam a ordem antiga.
+- UX: o campo numerico `Ordem` saiu do formulario. Itens novos entram no fim da categoria e podem ser reposicionados diretamente na lista. A tabela de itens foi compactada com linhas mais baixas, alca de arraste menor, badges reduzidos e aliases/metadados truncados em uma linha.
+- Bulk actions: a tabela ganhou selecao por linha, selecao geral da lista visivel, limpar selecao e exclusao em massa com confirmacao. As acoes de linha deixaram de usar menu e passaram a mostrar editar/excluir como botoes icon-only diretos.
+- Criacao: o modal `Novo item` passou a permitir escolher a categoria no formulario, independente da categoria atualmente exibida. Na edicao, a categoria permanece travada.
+- Decisao: manter `DataTable` como primitivo visual e usar `fluid-dnd` para a interacao, sem migrar esta superficie simples para `@tanstack/react-table`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. O app local respondeu, mas a sessao aberta no navegador nao era `superadmin` e redirecionou `/catalogos` para `/`, entao a validacao visual ficou limitada ao carregamento sem erro de console da sessao existente.
+
 ## 2026-05-09 - Catalogos: limpeza de descricao e ajuda de campos
 
 - Fase/modulo: catalogos / formulario de itens.
 - Arquivos alterados: `src/features/catalogos/actions.ts`, `src/features/catalogos/catalogo-form.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
 - Resultado: salvar um item de catalogo com `Descricao` vazia agora envia `null` para `catalog_items.description`, permitindo remover uma descricao preenchida por engano em vez de preservar o valor antigo.
-- UX: campos tecnicos do formulario receberam botao de informacao com `Tooltip` para explicar o impacto na montagem da ficha: categoria, aliases, composicao, ordem e descricao.
+- UX: campos tecnicos do formulario receberam botao de informacao com `Tooltip` para explicar o impacto na montagem da ficha: categoria, aliases, composicao e descricao.
 - Decisao: manter a ajuda contextual em tooltip, sem texto fixo adicional na tela, para preservar a UI silenciosa do modulo.
 - Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. O app local respondeu em `localhost:3000`; a sessao atual nao tinha acesso direto a `/catalogos`, entao a validacao visual ficou limitada ao carregamento autenticado existente.
 

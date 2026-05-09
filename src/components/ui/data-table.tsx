@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 
 type DataTableColumn = {
   key: string;
@@ -8,15 +8,19 @@ type DataTableColumn = {
 };
 
 type DataTableProps = {
+  bodyRef?: RefObject<HTMLTableSectionElement | null>;
+  className?: string;
   columns: DataTableColumn[];
   children: ReactNode;
   caption: string;
 };
 
-export function DataTable({ caption, children, columns }: DataTableProps) {
+export function DataTable({ bodyRef, caption, children, className, columns }: DataTableProps) {
+  const tableClassName = ["ui-table", className].filter(Boolean).join(" ");
+
   return (
     <div className="ui-table-wrap">
-      <table className="ui-table">
+      <table className={tableClassName}>
         <caption>{caption}</caption>
         <thead>
           <tr>
@@ -34,7 +38,7 @@ export function DataTable({ caption, children, columns }: DataTableProps) {
             ))}
           </tr>
         </thead>
-        <tbody>{children}</tbody>
+        <tbody ref={bodyRef}>{children}</tbody>
       </table>
     </div>
   );

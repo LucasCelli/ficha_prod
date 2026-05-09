@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { ChevronDown, ListPlus, SlidersHorizontal } from "lucide-react";
-import { Badge, DataTable, EmptyState, FloatingMenu, FloatingMenuLink, Modal } from "@/components/ui";
+import { Badge, EmptyState, FloatingMenu, FloatingMenuLink, Modal } from "@/components/ui";
 import { RouteToast, type RouteToastMessage } from "@/components/ui/route-toast";
 import type { CatalogosResult } from "./data";
+import { CatalogItemsTable } from "./catalog-items-table";
 import { CatalogoForm } from "./catalogo-form";
-import { CatalogItemActions } from "./catalog-item-actions";
 import type { CatalogKind } from "./types";
 import { catalogKindLabels, catalogKinds } from "./types";
 
@@ -14,20 +14,6 @@ type CatalogosOverviewProps = {
   result: CatalogosResult;
   selectedKind: CatalogKind;
 };
-
-const columns = [
-  { key: "name", label: "Nome" },
-  { key: "aliases", label: "Aliases" },
-  { key: "metadata", label: "Metadados" },
-  { key: "status", label: "Status" },
-  { key: "actions", label: "Ações" },
-];
-
-function getComposition(metadata: unknown) {
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return "";
-  const value = (metadata as Record<string, unknown>).composition;
-  return typeof value === "string" ? value : "";
-}
 
 export function CatalogosOverview({ editId, modalMode, result, selectedKind }: CatalogosOverviewProps) {
   const items = result.itemsByKind[selectedKind];
@@ -95,42 +81,18 @@ export function CatalogosOverview({ editId, modalMode, result, selectedKind }: C
               <Badge>{items.length}</Badge>
             </div>
             {items.length ? (
-              <DataTable caption={`Itens de ${catalogKindLabels[selectedKind]}`} columns={columns}>
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <span className="ui-table__primary">
-                        <strong>{item.name}</strong>
-                        <span className="ui-table__muted" style={{ fontFamily: "var(--font-family-mono)", fontSize: "var(--font-size-xs)" }}>{item.slug}</span>
-                      </span>
-                    </td>
-                    <td>{item.aliases.length ? item.aliases.join(", ") : <span className="ui-table__muted">—</span>}</td>
-                    <td>{getComposition(item.metadata) || item.description || <span className="ui-table__muted">—</span>}</td>
-                    <td>
-                      <Badge tone={item.active ? "success" : "neutral"}>{item.active ? "Ativo" : "Inativo"}</Badge>
-                    </td>
-                    <td>
-                      <CatalogItemActions
-                        editHref={`/catalogos?tipo=${selectedKind}&edit=${item.id}`}
-                        itemId={item.id}
-                        itemName={item.name}
-                        returnTo={closeHref}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </DataTable>
+              <CatalogItemsTable closeHref={closeHref} items={items} selectedKind={selectedKind} />
             ) : (
               <EmptyState description="Nenhum item cadastrado para este tipo ainda." title="Catálogo vazio" />
             )}
           </section>
 
           {modalMode === "novo" ? (
-            <Modal onCloseHref={closeHref} size="md" title={`Adicionar em ${catalogKindLabels[selectedKind]}`}>
+            <Modal onCloseHref={closeHref} size="md" title="Novo item">
               <div className="modal-form">
                 <div className="modal-form__header">
                   <span className="eyebrow">Catálogos</span>
-                  <h2>Adicionar em {catalogKindLabels[selectedKind]}</h2>
+                  <h2>Novo item</h2>
                 </div>
                 <CatalogoForm returnTo={closeHref} selectedKind={selectedKind} />
               </div>

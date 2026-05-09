@@ -7,6 +7,7 @@ import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { CatalogoDeleteActionState, CatalogoFieldErrors, CatalogoFormState } from "./form-state";
 import { catalogItemSchema, type CatalogItemValues } from "./schema";
+import { catalogKinds, type CatalogKind } from "./types";
 
 function slugify(value: string) {
   return value
@@ -40,6 +41,10 @@ function getCatalogItemPayload(values: CatalogItemValues) {
     slug: slugify(values.name),
     sort_order: values.sortOrder,
   };
+}
+
+function parseCatalogKind(value: unknown): CatalogKind | undefined {
+  return catalogKinds.includes(value as CatalogKind) ? (value as CatalogKind) : undefined;
 }
 
 function getValidationState(fieldErrors: CatalogoFieldErrors): CatalogoFormState {
@@ -92,6 +97,19 @@ export async function saveCatalogItemAction(_previousState: CatalogoFormState, f
   const id = String(formData.get("id") ?? "").trim();
   const supabase = createServerSupabaseClient();
   const payload = getCatalogItemPayload(parsed.data);
+
+  if (!id && payload.sort_order <= 0) {
+    const { data } = await supabase
+      .from("catalog_items")
+      .select("sort_order")
+      .eq("kind", payload.kind)
+      .order("sort_order", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    payload.sort_order = (data?.sort_order ?? 0) + 1;
+  }
+
   const result = id
     ? await supabase.from("catalog_items").update(payload).eq("id", id)
     : await supabase.from("catalog_items").insert(payload);
@@ -150,4 +168,129 @@ export async function deleteCatalogItemAction(
   revalidatePath("/catalogos");
   revalidatePath("/fichas");
   redirect(withToastParam(getReturnTo(formData) ?? "/catalogos", "catalog-item-deleted"));
+}
+
+export async function deleteCatalogItemsAction(kind: CatalogKind, itemIds: string[]) {
+  await requireSuperadmin();
+
+  const parsedKind = parseCatalogKind(kind);
+  const ids = itemIds.map((id) => id.trim()).filter(Boolean);
+
+  if (!parsedKind || ids.length === 0 || ids.length !== itemIds.length || new Set(ids).size !== ids.length) {
+    return {
+      message: "Itens invalidos para exclusao.",
+      status: "error" as const,
+    };
+  }
+
+  if (!getSupabaseConfigStatus().hasServerConfig) {
+    return {
+      message: "Catalogos indisponiveis.",
+      status: "error" as const,
+    };
+  }
+
+  const supabase = createServerSupabaseClient();
+  const { data: existingItems, error: existingError } = await supabase
+    .from("catalog_items")
+    .select("id")
+    .eq("kind", parsedKind)
+    .in("id", ids);
+
+  if (existingError) {
+    return {
+      message: existingError.message,
+      status: "error" as const,
+    };
+  }
+
+  if ((existingItems?.length ?? 0) !== ids.length) {
+    return {
+      message: "Itens invalidos para esta categoria.",
+      status: "error" as const,
+    };
+  }
+
+  const { error } = await supabase.from("catalog_items").delete().eq("kind", parsedKind).in("id", ids);
+
+  if (error) {
+    return {
+      message: error.message,
+      status: "error" as const,
+    };
+  }
+
+  revalidatePath("/catalogos");
+  revalidatePath("/fichas");
+
+  return {
+    deletedCount: ids.length,
+    status: "success" as const,
+  };
+}
+
+export async function saveCatalogItemOrderAction(kind: CatalogKind, itemIds: string[]) {
+  await requireSuperadmin();
+
+  const parsedKind = parseCatalogKind(kind);
+  const ids = itemIds.map((id) => id.trim()).filter(Boolean);
+
+  if (!parsedKind || ids.length !== itemIds.length || new Set(ids).size !== ids.length) {
+    return {
+      message: "Ordem invalida.",
+      status: "error" as const,
+    };
+  }
+
+  if (!getSupabaseConfigStatus().hasServerConfig) {
+    return {
+      message: "Catalogos indisponiveis.",
+      status: "error" as const,
+    };
+  }
+
+  const supabase = createServerSupabaseClient();
+  const { data: existingItems, error: existingError } = await supabase
+    .from("catalog_items")
+    .select("id")
+    .eq("kind", parsedKind)
+    .in("id", ids);
+
+  if (existingError) {
+    return {
+      message: existingError.message,
+      status: "error" as const,
+    };
+  }
+
+  if ((existingItems?.length ?? 0) !== ids.length) {
+    return {
+      message: "Itens invalidos para esta categoria.",
+      status: "error" as const,
+    };
+  }
+
+  const updates = ids.map((id, index) =>
+    supabase
+      .from("catalog_items")
+      .update({ sort_order: index + 1 })
+      .eq("id", id)
+      .eq("kind", parsedKind),
+  );
+  const results = await Promise.all(updates);
+  const failed = results.find((result) => result.error);
+
+  if (failed?.error) {
+    return {
+      message: failed.error.message,
+      status: "error" as const,
+    };
+  }
+
+  revalidatePath("/catalogos");
+  revalidatePath("/fichas");
+
+  return {
+    status: "success" as const,
+  };
 }
