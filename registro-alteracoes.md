@@ -1,5 +1,41 @@
 # Registro de alteracoes
 
+## 2026-05-09 - Catalogos: limpeza de descricao e ajuda de campos
+
+- Fase/modulo: catalogos / formulario de itens.
+- Arquivos alterados: `src/features/catalogos/actions.ts`, `src/features/catalogos/catalogo-form.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: salvar um item de catalogo com `Descricao` vazia agora envia `null` para `catalog_items.description`, permitindo remover uma descricao preenchida por engano em vez de preservar o valor antigo.
+- UX: campos tecnicos do formulario receberam botao de informacao com `Tooltip` para explicar o impacto na montagem da ficha: categoria, aliases, composicao, ordem e descricao.
+- Decisao: manter a ajuda contextual em tooltip, sem texto fixo adicional na tela, para preservar a UI silenciosa do modulo.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. O app local respondeu em `localhost:3000`; a sessao atual nao tinha acesso direto a `/catalogos`, entao a validacao visual ficou limitada ao carregamento autenticado existente.
+
+## 2026-05-08 - Fichas: padrao tecnico das observacoes
+
+- Fase/modulo: fichas / auto-preenchimento de observacoes.
+- Arquivos alterados: `src/components/ui/custom-datalist.tsx`, `src/features/fichas/actions.ts`, `src/features/fichas/ficha-form.tsx`, `src/features/fichas/ficha-form-seed.ts`, `src/features/fichas/form-state.ts`, `src/features/fichas/legacy-import.ts`, `src/features/fichas/observacoes-autofill.ts`, `src/features/fichas/print-ficha.tsx`, `src/features/fichas/schema.ts`, `src/lib/supabase/database.types.ts`, `src/styles/globals.css`, `supabase/migrations/202605090001_fichas_cor_detalhe_gola.sql`, `registro-alteracoes.md`.
+- Resultado: a escrita automatica das observacoes saiu do componente e passou para helper dedicado. O texto deixou de listar itens, quantidades e tamanhos do pedido como detalhe de produtos e agora compoe somente a descricao tecnica de producao em blocos separados por `/`: produto-base quando aplicavel, malha/cor, manga/acabamento, gola/acabamento/largura/cor e personalizacao.
+- Casos sociais: o helper passou a tratar `Camisa Social` e `Camisete Social` como produto-base sem repetir a manga no primeiro bloco. Gola social nao gera bloco `GOLA SOCIAL`; em vez disso entram `BOTÃO`, `PÉ DE GOLA` interno/externo, bolso e personalizacao conforme preenchidos.
+- Produto-base: o primeiro bloco nao descreve mais manga, porque essa informacao aparece no bloco tecnico de manga. Exemplo: `CAMISETA / MALHA DRY FIT / MANGA CURTA EM BARRA / SEM PERSONALIZAÇÃO`.
+- Casos polo: gola polo passou a usar a mesma logica de composicao tecnica separada, mantendo `GOLA POLO` com cor quando preenchida e adicionando blocos independentes de `BOTÃO`, `PEITILHO` interno/externo e `ABERTURA LATERAL`.
+- Casos de punho/vies: o bloco de manga agora recebe `larguraManga` e cor do acabamento quando o acabamento e `PUNHO` ou `VIÉS`, compondo exemplos como `MANGA CURTA COM PUNHO 5.0 AZUL ROYAL` e `MANGA CURTA COM VIÉS 3.0 VERMELHO`. `BARRA` permanece sem detalhe adicional: `MANGA CURTA EM BARRA`.
+- Extras: bolso, filete e faixa refletiva permanecem como blocos tecnicos quando preenchidos; `Nomes / números` agora entra como `COM NOMES`, `COM NOMES E NÚMEROS` ou `SOMENTE NÚMEROS`; quando houver cor da sublimacao, a personalizacao inclui `COR <valor>`.
+- Gola padre esportiva: foi criado o campo `Cor do detalhe`, persistido em `cor_detalhe_gola`, para compor `COM DETALHE NA COR <cor>` antes do reforco quando preenchido.
+- Refinos de frase: cor `Sublimacao` no acabamento de manga com punho/vies passa a sair como `SUBLIMADO`, e filete passa a ordenar cor antes do local: `FILETE PRETO NA BARRA DA MANGA`.
+- Materiais sociais: `Tecido de Camisaria`, `Profit Camisaria` e `Tricoline Camisaria` agora saem como `TECIDO DE CAMISARIA`, `TECIDO PROFIT` e `TECIDO TRICOLINE`.
+- Padrao visual/dados: o editor TipTap passou a forcar letras maiusculas no HTML salvo e no texto digitado manualmente. A superficie de edicao usa texto preto.
+- Recalculo imediato: o `CustomDatalist` passou a emitir eventos nativos de `input`/`change` ao selecionar sugestoes por clique, e o auto-preenchimento agora le os valores atuais via `getValues()` no momento do recalculo. Isso evita o atraso em que a observacao so atualizava na escolha seguinte.
+- Exemplos validados: `CAMISETA MANGA CURTA / MALHA DRY FIT SUBLIMADA / MANGA CURTA EM BARRA / GOLA REDONDA DE RIBANA 5.0 SUBLIMADA / PERSONALIZADO EM SUBLIMAÇÃO`; `CAMISA SOCIAL / TECIDO DE CAMISARIA MARINHO MESCLA / MANGA LONGA / BOTÃO TRANSPARENTE / PÉ DE GOLA INTERNO E EXTERNO AZUL ROYAL / COM BOLSO NO PEITO / PERSONALIZAÇÃO EM BORDADO`; `CAMISA SOCIAL / TECIDO PROFIT PRETO / MANGA CURTA EM BARRA / BOTÃO PRETO / PÉ DE GOLA INTERNO CINZA MÉDIO E EXTERNO CINZA CHUMBO / SEM BOLSO / PERSONALIZAÇÃO EM DTF TÊXTIL`; `CAMISETE SOCIAL / TECIDO TRICOLINE AMARELO / MANGA CURTA / BOTÃO AMARELO / PÉ DE GOLA EXTERNO LARANJA / SEM BOLSO / PERSONALIZAÇÃO EM SERIGRAFIA`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. O helper foi executado diretamente com os tres casos sociais, dois casos polo, casos de manga curta com barra, punho e viés, a remocao da redundancia de manga no bloco de produto, os extras de bolso/filete/faixa/nomes/cor da sublimacao e o caso de gola padre esportiva com detalhe, retornando as saidas esperadas. Edge em `localhost:3000/fichas/nova` confirmou recalculo imediato ao selecionar sugestoes de material, manga e acabamento da manga, alem da exibicao do campo `Cor do detalhe` ao preencher `Gola Padre Esportiva`.
+
+## 2026-05-08 - Fichas: observacoes com Tiptap e auto-preenchimento curto
+
+- Fase/modulo: fichas / formulario e observacoes.
+- Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `package.json`, `package-lock.json`, `TODO.md`, `registro-alteracoes.md`.
+- Resultado: o editor de observacoes foi migrado de `contentEditable` manual para Tiptap, mantendo toolbar de negrito, italico, sublinhado, listas, limpar formatacao e auto-preenchimento. O auto-preenchimento passou a gerar um resumo curto em frases naturais, incluindo produtos/tamanhos/quantidades/detalhes, tecido/cor, manga, gola, bolso, filete, faixa, personalizacao e cor de sublimacao quando aplicavel.
+- Preservacao manual: o recalculo automatico agora compara o trecho gerado anteriormente com o conteudo atual. Se o operador apenas acrescentou texto ao fim do bloco automatico, o complemento manual e preservado; se o conteudo foi reescrito de forma independente, o auto-preenchimento continuo fica bloqueado ate confirmacao explicita.
+- Decisao: usar `@tiptap/extension-underline` como dependencia direta porque o controle de sublinhado ja existia na toolbar e deve continuar suportado no editor novo.
+- Validacao: `npm run typecheck`, `npm run lint` e `npm run build` passaram. Edge em `localhost:3000/fichas/nova` confirmou renderizacao da superficie Tiptap e auto-preenchimento gerando `Produção: Camiseta Dry Fit tam. M. Tecido Dry Fit Azul Marinho.` no campo oculto salvo.
+
 ## 2026-05-08 - Workspace: limpeza de temporarios e gitignore
 
 - Fase/modulo: higiene do workspace / arquivos locais.

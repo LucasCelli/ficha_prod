@@ -33,7 +33,7 @@ function getCatalogItemPayload(values: CatalogItemValues) {
   return {
     active: values.active,
     aliases: values.aliases,
-    description: values.description,
+    description: values.description ?? null,
     kind: values.kind,
     metadata: values.composition ? { composition: values.composition } : {},
     name: values.name,

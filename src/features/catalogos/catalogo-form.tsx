@@ -2,9 +2,9 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
-import { Save } from "lucide-react";
+import { CircleHelp, Save } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import { saveCatalogItemAction } from "./actions";
 import { getInitialCatalogoFormState } from "./form-state";
 import type { CatalogItem, CatalogKind } from "./types";
@@ -21,6 +21,19 @@ function getMetadataText(item: CatalogItem | undefined, key: string) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return "";
   const value = metadata[key];
   return typeof value === "string" ? value : "";
+}
+
+function FieldLabel({ htmlFor, info, label }: { htmlFor?: string; info: string; label: string }) {
+  return (
+    <div className="field-label-row">
+      <label htmlFor={htmlFor}>{label}</label>
+      <Tooltip label={info}>
+        <button aria-label={`Info: ${label}`} className="field-info-button" type="button">
+          <CircleHelp aria-hidden="true" size={14} />
+        </button>
+      </Tooltip>
+    </div>
+  );
 }
 
 export function CatalogoForm({ item, returnTo, selectedKind }: CatalogoFormProps) {
@@ -45,7 +58,7 @@ export function CatalogoForm({ item, returnTo, selectedKind }: CatalogoFormProps
 
       <div className="catalog-form__grid">
         <div className="field">
-          <label>Categoria</label>
+          <FieldLabel info="Define em qual campo da ficha este item aparece." label="Categoria" />
           <div className="readonly-field">{catalogKindLabels[item?.kind ?? selectedKind]}</div>
         </div>
 
@@ -62,17 +75,25 @@ export function CatalogoForm({ item, returnTo, selectedKind }: CatalogoFormProps
         </div>
 
         <div className="field">
-          <label htmlFor="catalog-aliases">Aliases</label>
+          <FieldLabel
+            htmlFor="catalog-aliases"
+            info="Variações pesquisáveis: apelidos, grafias antigas ou códigos importados que apontam para este nome na ficha."
+            label="Aliases"
+          />
           <input id="catalog-aliases" defaultValue={item?.aliases.join(", ")} name="aliases" placeholder="Variação 1, variação 2…" />
         </div>
 
         <div className="field">
-          <label htmlFor="catalog-composition">Composição</label>
+          <FieldLabel
+            htmlFor="catalog-composition"
+            info="Aparece como detalhe nas sugestões da ficha, principalmente para tecidos e materiais."
+            label="Composição"
+          />
           <input id="catalog-composition" defaultValue={getMetadataText(item, "composition")} name="composition" placeholder="100% poliéster…" />
         </div>
 
         <div className="field">
-          <label htmlFor="catalog-sort">Ordem</label>
+          <FieldLabel htmlFor="catalog-sort" info="Define a posição do item no catálogo e nas sugestões da ficha." label="Ordem" />
           <input id="catalog-sort" defaultValue={item?.sort_order ?? 0} inputMode="numeric" name="sortOrder" placeholder="0…" type="number" />
         </div>
         <label className="checkbox-field catalog-form__active">
@@ -81,7 +102,11 @@ export function CatalogoForm({ item, returnTo, selectedKind }: CatalogoFormProps
         </label>
 
         <div className="field catalog-form__description">
-          <label htmlFor="catalog-description">Descrição</label>
+          <FieldLabel
+            htmlFor="catalog-description"
+            info="Nota interna do catálogo. Não entra como detalhe automático na ficha."
+            label="Descrição"
+          />
           <textarea id="catalog-description" defaultValue={item?.description ?? ""} name="description" placeholder="Notas internas…" rows={3} />
         </div>
       </div>

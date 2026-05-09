@@ -69,9 +69,15 @@ export function CustomDatalist({
   }
 
   function selectOption(option: CustomDatalistOption) {
-    setValue(option.value ?? option.label, option);
+    const nextValue = option.value ?? option.label;
+    setValue(nextValue, option);
     setIsOpen(false);
-    inputRef.current?.focus();
+    if (inputRef.current) {
+      inputRef.current.value = nextValue;
+      inputRef.current.dispatchEvent(new Event("input", { bubbles: true }));
+      inputRef.current.dispatchEvent(new Event("change", { bubbles: true }));
+      inputRef.current.focus();
+    }
   }
 
   return (

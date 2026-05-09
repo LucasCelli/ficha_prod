@@ -55,6 +55,7 @@ export type FichaFormInitialData = {
   corAberturaLateral: string;
   corAcabamentoManga: string;
   corBotao: string;
+  corDetalheGola: string;
   corGola: string;
   corMaterial: string;
   corPeDeGolaExterno: string;
@@ -109,6 +110,7 @@ export function createEmptyFichaFormInitialData(): FichaFormInitialData {
     corAberturaLateral: "",
     corAcabamentoManga: "",
     corBotao: "",
+    corDetalheGola: "",
     corGola: "",
     corMaterial: "",
     corPeDeGolaExterno: "",
@@ -158,6 +160,7 @@ export function mapFichaToInitialData(ficha?: FichaDetail): FichaFormInitialData
     corAberturaLateral: ficha.cor_abertura_lateral ?? "",
     corAcabamentoManga: ficha.cor_acabamento_manga ?? "",
     corBotao: ficha.cor_botao ?? "",
+    corDetalheGola: ficha.cor_detalhe_gola ?? "",
     corGola: ficha.cor_gola ?? "",
     corMaterial: ficha.cor_material ?? "",
     corPeDeGolaExterno: ficha.cor_pe_de_gola_externo ?? "",

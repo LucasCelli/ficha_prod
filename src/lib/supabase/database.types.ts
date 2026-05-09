@@ -179,6 +179,7 @@ export type Database = {
           largura_manga: string | null;
           gola: string | null;
           acabamento_gola: string | null;
+          cor_detalhe_gola: string | null;
           cor_gola: string | null;
           largura_gola: string | null;
           cor_peitilho_interno: string | null;
@@ -234,6 +235,7 @@ export type Database = {
           largura_manga?: string | null;
           gola?: string | null;
           acabamento_gola?: string | null;
+          cor_detalhe_gola?: string | null;
           cor_gola?: string | null;
           largura_gola?: string | null;
           cor_peitilho_interno?: string | null;

@@ -12,6 +12,7 @@ export type FieldErrors = Partial<
     | "corAberturaLateral"
     | "corAcabamentoManga"
     | "corBotao"
+    | "corDetalheGola"
     | "corGola"
     | "corMaterial"
     | "corPeDeGolaExterno"

@@ -147,6 +147,7 @@ export function PrintFicha({ ficha, printedBy }: PrintFichaProps) {
 
               <PrintField icon={Circle} label="Tipo Gola" value={ficha.gola} />
               {ficha.gola && !isSocial && ficha.cor_gola ? <PrintField icon={Palette} label="Cor da Gola" value={ficha.cor_gola} /> : null}
+              {ficha.gola && !isSocial && ficha.cor_detalhe_gola ? <PrintField icon={Palette} label="Cor Detalhe Gola" value={ficha.cor_detalhe_gola} /> : null}
               {!isPolo && !isSocial && ficha.acabamento_gola ? <PrintField icon={SlidersHorizontal} label="Acab. Gola" value={ficha.acabamento_gola} /> : null}
               {!isPolo && !isSocial && ficha.largura_gola ? <PrintField icon={Ruler} label="Largura Acab. Gola" value={ficha.largura_gola} /> : null}
               {hasReforco ? <PrintField icon={ShieldHalf} label="Reforço na Gola" value="Sim" /> : null}

@@ -79,6 +79,7 @@ export const fichaFormSchema = z.object({
   gola: optionalText,
   acabamentoGola: optionalText,
   corGola: optionalText,
+  corDetalheGola: optionalText,
   larguraGola: optionalText,
   corPeitilhoInterno: optionalText,
   corPeitilhoExterno: optionalText,

@@ -40,6 +40,7 @@ export type ImportedLegacyFichaDraft = {
   corAberturaLateral: string;
   corAcabamentoManga: string;
   corBotao: string;
+  corDetalheGola: string;
   corGola: string;
   corMaterial: string;
   corPeDeGolaExterno: string;
@@ -130,6 +131,7 @@ export function parseLegacyFichaJson(input: unknown, catalogOptions?: CatalogOpt
     corAberturaLateral: normalizeLegacyFieldValue("cor", readText(ficha, "corAberturaLateral", "cor_abertura_lateral"), catalogLookups),
     corAcabamentoManga: normalizeLegacyFieldValue("cor", readText(ficha, "corAcabamentoManga", "cor_acabamento_manga"), catalogLookups),
     corBotao: normalizeLegacyFieldValue("cor", readText(ficha, "corBotao", "cor_botao"), catalogLookups),
+    corDetalheGola: normalizeLegacyFieldValue("cor", readText(ficha, "corDetalheGola", "cor_detalhe_gola"), catalogLookups),
     corGola: normalizeLegacyFieldValue("cor", readText(ficha, "corGola", "cor_gola"), catalogLookups),
     corMaterial: normalizeLegacyFieldValue("cor", readText(ficha, "corMaterial", "cor_material"), catalogLookups),
     corPeDeGolaExterno: normalizeLegacyFieldValue("cor", readText(ficha, "corPeDeGolaExterno", "cor_pe_de_gola_externo"), catalogLookups),

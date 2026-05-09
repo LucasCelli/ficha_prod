@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import { useDragAndDrop } from "fluid-dnd/react";
 import { DayPicker } from "react-day-picker";
 import { ptBR } from "react-day-picker/locale";
+import { EditorContent, useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import UnderlineExtension from "@tiptap/extension-underline";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import {
@@ -49,6 +52,7 @@ import { createEmptyFichaFormInitialData, createEmptyProductItem, mapFichaToInit
 import { getInitialFichaFormState } from "./form-state";
 import type { LegacyFichaImportWarning } from "./legacy-import";
 import { mapLegacyDraftToFichaFormInitialData, parseLegacyFichaJson } from "./legacy-import";
+import { buildObservacoesTecnicas, uppercaseObservationHtml } from "./observacoes-autofill";
 import { PrintFicha } from "./print-ficha";
 import { PrintTriggerButton } from "./print-trigger-button";
 
@@ -206,6 +210,42 @@ function normalizeObservationComparison(value: string) {
   return getPlainTextFromHtml(value).replace(/\s+/g, " ").trim().toLowerCase();
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function toObservationHtml(value: string) {
+  const normalized = value.replace(/\s+/g, " ").trim().toLocaleUpperCase("pt-BR");
+  return normalized ? `<p>${escapeHtml(normalized)}</p>` : "";
+}
+
+function stripTrailingPunctuation(value: string) {
+  return value.trim().replace(/[.;,\s]+$/g, "");
+}
+
+function appendManualObservationText(generatedText: string, manualText: string) {
+  const generated = stripTrailingPunctuation(generatedText);
+  const manual = manualText.trim().toLocaleUpperCase("pt-BR");
+
+  if (!manual) return generatedText;
+  if (!generated) return manual;
+  return `${generated} / ${manual}`;
+}
+
+function getManualObservationSuffix(currentHtml: string, lastAutoHtml: string) {
+  const currentText = getPlainTextFromHtml(currentHtml).replace(/\s+/g, " ").trim();
+  const lastAutoText = getPlainTextFromHtml(lastAutoHtml).replace(/\s+/g, " ").trim();
+
+  if (!currentText || !lastAutoText) return "";
+  if (currentText === lastAutoText) return "";
+  if (!currentText.toLowerCase().startsWith(lastAutoText.toLowerCase())) return "";
+  return currentText.slice(lastAutoText.length).replace(/^[\s.;:,-]+/, "").trim();
+}
+
 function getFormText(form: HTMLFormElement | null, field: string) {
   if (!form) return "";
   return String(new FormData(form).get(field) ?? "").trim();
@@ -222,29 +262,6 @@ function getControlLabel(form: HTMLFormElement | null, field: string) {
   }
 
   return getFormText(form, field);
-}
-
-function isAcabamentoMangaComExtras(value: string) {
-  const normalized = normalizeProductForRule(value);
-  return ["punho", "vies", "punho de ribana", "punho sublimado", "vies sublimado"].some((item) =>
-    normalized.includes(item),
-  );
-}
-
-function getDescricaoAcabamentoManga(value: string) {
-  const normalized = normalizeProductForRule(value);
-  if (normalized.includes("punho") && normalized.includes("sublimado")) return "PUNHO SUBLIMADO";
-  if (normalized.includes("punho")) return "PUNHO DE RIBANA";
-  if (normalized.includes("vies") && normalized.includes("sublimado")) return "VIÉS SUBLIMADO";
-  if (normalized.includes("vies")) return "VIÉS";
-  return value.toUpperCase();
-}
-
-function marcadorComNomesPorValor(value: string) {
-  if (value === "1") return "COM NOMES";
-  if (value === "2") return "COM NOMES E NÚMEROS";
-  if (value === "3") return "SOMENTE NÚMEROS";
-  return "";
 }
 
 function isRegataProduct(value: string) {
@@ -332,6 +349,7 @@ function buildFichaDraftSnapshot(
       corAberturaLateral: formText(formData, "corAberturaLateral"),
       corAcabamentoManga: formText(formData, "corAcabamentoManga"),
       corBotao: formText(formData, "corBotao"),
+      corDetalheGola: formText(formData, "corDetalheGola"),
       corGola: formText(formData, "corGola"),
       corMaterial: formText(formData, "corMaterial"),
       corPeDeGolaExterno: formText(formData, "corPeDeGolaExterno"),
@@ -545,7 +563,6 @@ function FichaFormInner({
   const draftAutosaveTimerRef = useRef<number | null>(null);
   const isSubmittingRef = useRef(false);
   const initialDraftComparableRef = useRef<string | null>(null);
-  const observacoesEditorRef = useRef<HTMLDivElement>(null);
   const observacoesAutoBlockedRef = useRef(Boolean(initialData.observacoes.trim()));
   const applyingObservacoesAutoRef = useRef(false);
   const applyingObservacoesAutoTimerRef = useRef<number | null>(null);
@@ -621,6 +638,48 @@ function FichaFormInner({
   const [draftPrintFicha, setDraftPrintFicha] = useState<FichaDetail | null>(null);
   const [observacoesConfirmationValue, setObservacoesConfirmationValue] = useState<string | null>(null);
   const [sortFeedbackVisible, setSortFeedbackVisible] = useState(false);
+  const observacoesEditor = useEditor({
+    content: observacoes || "",
+    editorProps: {
+      attributes: {
+        "aria-describedby": state.fieldErrors?.observacoes ? "observacoes-error" : "",
+        "aria-invalid": String(Boolean(state.fieldErrors?.observacoes)),
+        "aria-label": "Observações",
+        class: "rich-editor__surface",
+        id: "observacoes",
+        lang: "pt-BR",
+      },
+    },
+    extensions: [
+      StarterKit.configure({
+        blockquote: false,
+        code: false,
+        codeBlock: false,
+        heading: false,
+        horizontalRule: false,
+        underline: false,
+      }),
+      UnderlineExtension,
+    ],
+    immediatelyRender: false,
+    onUpdate: ({ editor }) => {
+      const rawHtml = editor.isEmpty ? "" : editor.getHTML();
+      const nextHtml = uppercaseObservationHtml(rawHtml);
+      const nextText = normalizeObservationComparison(nextHtml);
+      const lastText = normalizeObservationComparison(lastObservacoesAutofillRef.current);
+
+      if (rawHtml !== nextHtml) {
+        editor.commands.setContent(nextHtml, { emitUpdate: false });
+      }
+
+      if (!applyingObservacoesAutoRef.current && nextText && nextText !== lastText) {
+        observacoesAutoBlockedRef.current = true;
+      }
+
+      setValue("observacoes", nextHtml, { shouldDirty: true });
+      scheduleDraftSnapshotPersist();
+    },
+  });
   const productOptions = getOptions(catalogOptions, "produto");
   const sizeOptions = getOptions(catalogOptions, "tamanho");
   const materialOptions = getOptions(catalogOptions, "tecido");
@@ -636,6 +695,7 @@ function FichaFormInner({
   const normalizedAcabamentoManga = normalizeProductForRule(acabamentoManga);
   const isPolo = normalizedGola.includes("polo");
   const isSocial = normalizedGola.includes("social");
+  const isPadreEsportiva = normalizedGola.includes("padre") && normalizedGola.includes("esportiva");
   const temGola = Boolean(gola);
   const acabamentoMangaValue = isRegataMode ? (viesRegata === "sim" ? "vies" : "") : acabamentoManga;
   const showMangaExtras = isRegataMode
@@ -890,6 +950,7 @@ function FichaFormInner({
       "corAcabamentoManga",
       "gola",
       "corGola",
+      "corDetalheGola",
       "larguraGola",
       "corBotao",
       "observacoes",
@@ -1346,145 +1407,58 @@ function FichaFormInner({
   }
 
   function applyRichTextCommand(command: RichTextCommand) {
-    observacoesEditorRef.current?.focus();
-    document.execCommand(command);
-    setValue("observacoes", observacoesEditorRef.current?.innerHTML ?? "", { shouldDirty: true });
-  }
+    if (!observacoesEditor) return;
 
-  function handleObservacoesInput() {
-    const nextHtml = observacoesEditorRef.current?.innerHTML ?? "";
-    const nextText = normalizeObservationComparison(nextHtml);
-    const lastText = normalizeObservationComparison(lastObservacoesAutofillRef.current);
-
-    if (!applyingObservacoesAutoRef.current && nextText && nextText !== lastText) {
-      observacoesAutoBlockedRef.current = true;
-    }
-    setValue("observacoes", nextHtml, { shouldDirty: true });
-    scheduleDraftSnapshotPersist();
-  }
-
-  function handleObservacoesPaste(event: React.ClipboardEvent<HTMLDivElement>) {
-    const text = event.clipboardData.getData("text/plain");
-
-    if (!text) return;
-
-    event.preventDefault();
-    document.execCommand("insertText", false, text);
-    observacoesAutoBlockedRef.current = true;
-    setValue("observacoes", observacoesEditorRef.current?.innerHTML ?? "", { shouldDirty: true });
+    const chain = observacoesEditor.chain().focus();
+    if (command === "bold") chain.toggleBold().run();
+    if (command === "italic") chain.toggleItalic().run();
+    if (command === "underline") chain.toggleUnderline().run();
+    if (command === "insertUnorderedList") chain.toggleBulletList().run();
+    if (command === "insertOrderedList") chain.toggleOrderedList().run();
+    if (command === "removeFormat") chain.unsetAllMarks().clearNodes().run();
   }
 
   function buildObservacoesAutofill() {
     const form = formRef.current;
-    const produtoPrincipal = itens.find((item) => item.produto.trim());
-    const produto = produtoPrincipal?.produto.trim() ?? "";
-    const corMaterial = getControlLabel(form, "corMaterial");
-    const manga = getControlLabel(form, "manga");
-    const bolso = getControlLabel(form, "bolso");
-    const arte = getFormText(form, "arte");
-    const arteLabel = getControlLabel(form, "arte");
-    const partes: string[] = [];
+    const currentValues = getValues();
+    const produtoPrincipal = currentValues.itens.find((item) => item.produto.trim())?.produto ?? "";
+    const currentAcabamentoManga = isRegataMode
+      ? (currentValues.viesRegata === "sim" ? "vies" : "")
+      : currentValues.acabamentoManga;
 
-    if (produto) {
-      partes.push(produto);
-    }
-
-    if (material || corMaterial) {
-      const detalhes = [material];
-      const corLower = normalizeProductForRule(corMaterial);
-      if (corMaterial && corLower !== "sublimacao" && corLower !== "sublimado") {
-        detalhes.push(corMaterial);
-      }
-      partes.push(["TECIDO", ...detalhes.filter(Boolean)].join(" ").trim());
-    }
-
-    if (manga) {
-      const detalhes = [manga];
-      const larguraManga = getControlLabel(form, "larguraManga");
-      const corAcabManga = getControlLabel(form, "corAcabamentoManga");
-
-      if (isAcabamentoMangaComExtras(acabamentoMangaValue)) {
-        const tipo = getDescricaoAcabamentoManga(acabamentoMangaValue);
-        detalhes.push(["COM", tipo, larguraManga, corAcabManga].filter(Boolean).join(" "));
-      } else if (acabamentoMangaValue) {
-        detalhes.push(`EM ${acabamentoMangaValue}`);
-      }
-
-      partes.push(`MANGA ${detalhes.join(", ")}`);
-    }
-
-    if (gola) {
-      const detalhes = [gola];
-      const corGola = getControlLabel(form, "corGola");
-      const larguraGola = getControlLabel(form, "larguraGola");
-      const corBotao = getControlLabel(form, "corBotao");
-      const normalizedGolaValue = normalizeProductForRule(gola);
-
-      if (!normalizedGolaValue.includes("polo") && !normalizedGolaValue.includes("social") && acabamentoGola) {
-        detalhes.push(["EM", acabamentoGola, larguraGola].filter(Boolean).join(" "));
-        if (corGola) detalhes.push(corGola);
-      } else if (normalizedGolaValue.includes("polo")) {
-        if (corGola) detalhes.push(corGola);
-
-        const corPeitilhoInterno = getControlLabel(form, "corPeitilhoInterno");
-        const corPeitilhoExterno = getControlLabel(form, "corPeitilhoExterno");
-        if (corPeitilhoInterno && corPeitilhoExterno) {
-          detalhes.push(`PEITILHO INTERNO ${corPeitilhoInterno} E EXTERNO ${corPeitilhoExterno}`);
-        } else if (corPeitilhoInterno) {
-          detalhes.push(`PEITILHO INTERNO ${corPeitilhoInterno}`);
-        } else if (corPeitilhoExterno) {
-          detalhes.push(`PEITILHO EXTERNO ${corPeitilhoExterno}`);
-        }
-
-        if (corBotao) detalhes.push(`BOTÃO ${corBotao}`);
-
-        if (aberturaLateral === "sim") {
-          const corAbertura = getControlLabel(form, "corAberturaLateral");
-          detalhes.push(["COM ABERTURA LATERAL", corAbertura].filter(Boolean).join(" "));
-        }
-      } else if (normalizedGolaValue.includes("social")) {
-        const corPeDeGolaInterno = getControlLabel(form, "corPeDeGolaInterno");
-        const corPeDeGolaExterno = getControlLabel(form, "corPeDeGolaExterno");
-        if (corPeDeGolaInterno && corPeDeGolaExterno) {
-          detalhes.push(`PÉ DE GOLA INTERNO ${corPeDeGolaInterno} E EXTERNO ${corPeDeGolaExterno}`);
-        } else if (corPeDeGolaInterno) {
-          detalhes.push(`PÉ DE GOLA INTERNO ${corPeDeGolaInterno}`);
-        } else if (corPeDeGolaExterno) {
-          detalhes.push(`PÉ DE GOLA EXTERNO ${corPeDeGolaExterno}`);
-        }
-        if (corBotao) detalhes.push(`BOTÃO ${corBotao}`);
-      }
-
-      if (reforcoGola === "sim") {
-        const corReforco = getControlLabel(form, "corReforco");
-        detalhes.push(["COM REFORÇO", corReforco].filter(Boolean).join(" "));
-      }
-
-      partes.push(detalhes.join(", "));
-    }
-
-    if (bolso && normalizeProductForRule(bolso) !== "sem bolso") partes.push(`COM ${bolso}`);
-
-    if (filete === "sim") {
-      partes.push(["FILETE", getControlLabel(form, "fileteLocal"), getControlLabel(form, "fileteCor")]
-        .filter(Boolean)
-        .join(", "));
-    }
-
-    if (faixa === "sim") {
-      partes.push(["FAIXA REFLETIVA", getControlLabel(form, "faixaLocal"), getControlLabel(form, "faixaCor")]
-        .filter(Boolean)
-        .join(", "));
-    }
-
-    if (arte) {
-      partes.push(arte === "sem_personalizacao" ? "SEM PERSONALIZAÇÃO" : `PERSONALIZADO EM ${arteLabel || arte}`);
-    }
-
-    const marcadorComNomes = marcadorComNomesPorValor(comNomes || getFormText(form, "comNomes"));
-    if (marcadorComNomes) partes.push(marcadorComNomes);
-
-    return partes.length > 0 ? partes.join(" / ").toUpperCase() : "";
+    return buildObservacoesTecnicas({
+      acabamentoGola: currentValues.acabamentoGola,
+      acabamentoManga: currentAcabamentoManga,
+      arte: currentValues.arte,
+      arteLabel: getControlLabel(form, "arte"),
+      bolso: getControlLabel(form, "bolso"),
+      comNomes: currentValues.comNomes,
+      corBotao: getControlLabel(form, "corBotao"),
+      corAberturaLateral: getControlLabel(form, "corAberturaLateral"),
+      corAcabamentoManga: getControlLabel(form, "corAcabamentoManga"),
+      corFaixa: getControlLabel(form, "faixaCor"),
+      corFilete: getControlLabel(form, "fileteCor"),
+      corDetalheGola: getControlLabel(form, "corDetalheGola"),
+      corGola: getControlLabel(form, "corGola"),
+      corMaterial: getControlLabel(form, "corMaterial"),
+      corPeDeGolaExterno: getControlLabel(form, "corPeDeGolaExterno"),
+      corPeDeGolaInterno: getControlLabel(form, "corPeDeGolaInterno"),
+      corPeitilhoExterno: getControlLabel(form, "corPeitilhoExterno"),
+      corPeitilhoInterno: getControlLabel(form, "corPeitilhoInterno"),
+      corReforco: getControlLabel(form, "corReforco"),
+      corSublimacao: getControlLabel(form, "corSublimacao"),
+      faixa: currentValues.faixa,
+      faixaLocal: getControlLabel(form, "faixaLocal"),
+      filete: currentValues.filete,
+      fileteLocal: getControlLabel(form, "fileteLocal"),
+      gola: currentValues.gola,
+      larguraGola: getControlLabel(form, "larguraGola"),
+      larguraManga: getControlLabel(form, "larguraManga"),
+      manga: getControlLabel(form, "manga"),
+      material: currentValues.material,
+      produto: produtoPrincipal,
+      reforcoGola: currentValues.reforcoGola,
+    });
   }
 
   function setGeneratedObservacoes(nextObservacoes: string) {
@@ -1492,11 +1466,12 @@ function FichaFormInner({
       window.clearTimeout(applyingObservacoesAutoTimerRef.current);
     }
 
+    const nextHtml = toObservationHtml(nextObservacoes);
     applyingObservacoesAutoRef.current = true;
-    lastObservacoesAutofillRef.current = nextObservacoes;
-    setValue("observacoes", nextObservacoes, { shouldDirty: true });
-    if (observacoesEditorRef.current && observacoesEditorRef.current.innerHTML !== nextObservacoes) {
-      observacoesEditorRef.current.innerHTML = nextObservacoes;
+    lastObservacoesAutofillRef.current = nextHtml;
+    setValue("observacoes", nextHtml, { shouldDirty: true });
+    if (observacoesEditor && observacoesEditor.getHTML() !== nextHtml) {
+      observacoesEditor.commands.setContent(nextHtml, { emitUpdate: false });
     }
 
     applyingObservacoesAutoTimerRef.current = window.setTimeout(() => {
@@ -1507,13 +1482,16 @@ function FichaFormInner({
   }
 
   function updateObservacoesAutofill(options: { force?: boolean; notifyEmpty?: boolean; requireConfirmation?: boolean } = {}) {
-    const nextObservacoes = buildObservacoesAutofill();
-    const currentText = normalizeObservationComparison(observacoes);
+    const generatedObservacoes = buildObservacoesAutofill();
+    const currentObservacoes = getValues("observacoes");
+    const manualSuffix = getManualObservationSuffix(currentObservacoes, lastObservacoesAutofillRef.current);
+    const nextObservacoes = appendManualObservationText(generatedObservacoes, manualSuffix);
+    const currentText = normalizeObservationComparison(currentObservacoes);
     const lastText = normalizeObservationComparison(lastObservacoesAutofillRef.current);
     const nextText = normalizeObservationComparison(nextObservacoes);
     const isManualText = Boolean(currentText) && currentText !== lastText && currentText !== nextText;
 
-    if (!nextObservacoes) {
+    if (!generatedObservacoes) {
       if (options.notifyEmpty) {
         toast.warning("Observações", {
           description: "Preencha pelo menos um produto antes de auto-preencher as observações.",
@@ -1559,9 +1537,10 @@ function FichaFormInner({
   }
 
   function handleFormRealtimeObservacoes(event: React.FormEvent<HTMLFormElement>) {
-    if (event.target === observacoesEditorRef.current) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest(".rich-editor")) return;
     scheduleDraftSnapshotPersist();
-    window.setTimeout(() => updateObservacoesAutofill(), 0);
+    window.requestAnimationFrame(() => updateObservacoesAutofill());
   }
 
   function handleDraftPrint() {
@@ -1587,10 +1566,12 @@ function FichaFormInner({
   });
 
   useEffect(() => {
-    if (!observacoesEditorRef.current) return;
-    if (observacoesEditorRef.current.innerHTML === observacoes) return;
-    observacoesEditorRef.current.innerHTML = observacoes;
-  }, [observacoes]);
+    if (!observacoesEditor) return;
+    const nextContent = observacoes || "";
+    const currentContent = observacoesEditor.isEmpty ? "" : observacoesEditor.getHTML();
+    if (currentContent === nextContent) return;
+    observacoesEditor.commands.setContent(nextContent, { emitUpdate: false });
+  }, [observacoes, observacoesEditor]);
 
   return (
     <>
@@ -2010,6 +1991,19 @@ function FichaFormInner({
               />
             </Field>
           ) : null}
+          {isPadreEsportiva ? (
+            <Field label="Cor do detalhe" name="corDetalheGola" error={state.fieldErrors?.corDetalheGola}>
+              <CustomDatalist
+                id="corDetalheGola"
+                name="corDetalheGola"
+                aria-describedby={state.fieldErrors?.corDetalheGola ? "corDetalheGola-error" : undefined}
+                aria-invalid={Boolean(state.fieldErrors?.corDetalheGola)}
+                defaultValue={initialData.corDetalheGola || undefined}
+                options={colorOptions}
+                placeholder="Cor do detalhe..."
+              />
+            </Field>
+          ) : null}
           {temGola && !isSocial ? (
             <Field label="Reforço de gola" name="reforcoGola" error={state.fieldErrors?.reforcoGola}>
               <select
@@ -2321,21 +2315,10 @@ function FichaFormInner({
                   Auto-preencher
                 </button>
               </div>
-              <div
-                id="observacoes"
-                aria-describedby={state.fieldErrors?.observacoes ? "observacoes-error" : undefined}
-                aria-invalid={Boolean(state.fieldErrors?.observacoes)}
-                className="rich-editor__surface"
-                contentEditable
+              <EditorContent
+                className="rich-editor__content"
                 data-empty={getPlainTextFromHtml(observacoes) ? "false" : "true"}
-                dir="ltr"
-                lang="pt-BR"
-                onInput={handleObservacoesInput}
-                onPaste={handleObservacoesPaste}
-                ref={observacoesEditorRef}
-                role="textbox"
-                suppressContentEditableWarning
-                tabIndex={0}
+                editor={observacoesEditor}
               />
             </div>
           </Field>
@@ -2620,6 +2603,7 @@ function buildDraftPrintFicha(form: HTMLFormElement, values: FichaFormClientValu
     cor_abertura_lateral: text("corAberturaLateral") || null,
     cor_acabamento_manga: text("corAcabamentoManga") || null,
     cor_botao: text("corBotao") || null,
+    cor_detalhe_gola: text("corDetalheGola") || null,
     cor_gola: text("corGola") || null,
     cor_material: text("corMaterial") || null,
     cor_pe_de_gola_externo: text("corPeDeGolaExterno") || null,

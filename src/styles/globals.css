@@ -2698,18 +2698,39 @@ html[data-theme="dark"] .app-nav__link[aria-current="page"] .app-nav__icon {
   margin-inline-start: auto;
 }
 
+.rich-editor__content {
+  display: block;
+}
+
 .rich-editor__surface {
   min-height: 132px;
   outline: none;
   padding: 12px;
-  color: var(--color-text);
+  color: var(--print-product-black);
   line-height: 1.55;
   direction: ltr;
   text-align: left;
+  text-transform: uppercase;
   unicode-bidi: plaintext;
 }
 
-.rich-editor__surface[data-empty="true"]::before {
+.rich-editor__surface p {
+  margin: 0;
+}
+
+.rich-editor__surface p + p,
+.rich-editor__surface ul + p,
+.rich-editor__surface ol + p {
+  margin-top: 8px;
+}
+
+.rich-editor__surface ul,
+.rich-editor__surface ol {
+  margin: 0;
+  padding-inline-start: 22px;
+}
+
+.rich-editor__content[data-empty="true"] .rich-editor__surface::before {
   content: "Detalhes importantes para producao...";
   color: var(--color-muted);
   pointer-events: none;
@@ -3213,6 +3234,49 @@ html[data-theme="dark"] .app-nav__link[aria-current="page"] .app-nav__icon {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+.field-label-row {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-label-row > label {
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.field-info-button {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: help;
+  padding: 0;
+  transition: background-color var(--duration-fast) var(--easing-standard), color var(--duration-fast) var(--easing-standard), box-shadow var(--duration-fast) var(--easing-standard);
+}
+
+.field-info-button:hover,
+.field-info-button:focus-visible {
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+
+.field-info-button:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
 }
 
 .catalog-form__active {
