@@ -1028,11 +1028,16 @@ function FichaFormInner({
     setIsUploadingImage(true);
 
     try {
-      const uploadedImages: ImageFormItem[] = [];
-
-      for (const image of imagens) {
-        uploadedImages.push(await uploadImageToCloudinary(image));
-      }
+      const pendingUploadCount = imagens.filter((image) => image.file).length;
+      const uploadToast = toast.promise(
+        Promise.all(imagens.map((image) => uploadImageToCloudinary(image))),
+        {
+          error: (error) => error instanceof Error ? error.message : "Falha ao enviar imagens.",
+          loading: pendingUploadCount === 1 ? "Enviando imagem" : "Enviando imagens",
+          success: pendingUploadCount === 1 ? "Imagem enviada" : "Imagens enviadas",
+        },
+      );
+      const uploadedImages = await uploadToast.unwrap();
 
       flushSync(() => {
         replaceImageItems(uploadedImages);
@@ -1045,11 +1050,8 @@ function FichaFormInner({
       isSubmittingRef.current = true;
       submitAfterUploadRef.current = true;
       formRef.current?.requestSubmit();
-    } catch (error) {
+    } catch {
       isSubmittingRef.current = false;
-      toast.error("Erro no upload", {
-        description: error instanceof Error ? error.message : "Falha ao enviar imagens.",
-      });
     } finally {
       setIsUploadingImage(false);
     }

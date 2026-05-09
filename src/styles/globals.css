@@ -1883,18 +1883,15 @@ html[data-theme="dark"] .app-nav__link[aria-current="page"] .app-nav__icon {
   border-start-end-radius: 0;
 }
 
-.dashboard-actions {
+.relatorios-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
 }
 
-.dashboard-muted {
+.relatorios-muted {
   color: var(--color-muted);
-}
-
-.dashboard-muted {
   margin: 0;
   line-height: 1.55;
 }

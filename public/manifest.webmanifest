@@ -33,7 +33,7 @@
     {
       "name": "Nova Ficha",
       "short_name": "Nova",
-      "url": "/ficha",
+      "url": "/fichas/nova",
       "icons": [
         {
           "src": "/favicon.ico",
@@ -43,9 +43,9 @@
       ]
     },
     {
-      "name": "Dashboard",
-      "short_name": "Painel",
-      "url": "/dashboard",
+      "name": "Fichas",
+      "short_name": "Fichas",
+      "url": "/fichas",
       "icons": [
         {
           "src": "/favicon.ico",

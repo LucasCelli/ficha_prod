@@ -1,6 +1,6 @@
 # Ficha Prod
 
-Aplicacao Next.js App Router para operacao de fichas tecnicas, em migracao do legado HTML/CSS/JS para Next.js + TypeScript + Supabase + Vercel.
+Aplicacao Next.js App Router para operacao de fichas tecnicas em Next.js + TypeScript + Supabase + Vercel.
 
 ## Stack atual
 
@@ -20,7 +20,6 @@ npm run build
 npm run lint
 npm run typecheck
 npm run supabase:check
-npm run cutover:check
 npm run prod:check
 ```
 
@@ -34,7 +33,7 @@ src/lib/                utilitarios server/domain
 src/styles/             globals e tokens
 src/lib/supabase/       clientes e tipos do Supabase
 supabase/               migrations e artefatos de banco
-public/                 legado mantido apenas como referencia funcional
+public/                 assets estaticos atuais
 ```
 
 ## Documentacao ativa na raiz
@@ -44,10 +43,9 @@ public/                 legado mantido apenas como referencia funcional
   - stack, comandos e mapa rapido dos docs
 - `AGENTS.md`
   - regras de implementacao, UX, tokens, acessibilidade e continuidade
-- `plano-migracao-next-supabase.md`
-  - checklist executivo vivo da migracao
-  - tambem concentra homologacao pendente e trilha de adocao de bibliotecas
-- `registro-migracao-next.md`
+- `TODO.md`
+  - backlog vivo de features, refinos e decisoes futuras
+- `registro-alteracoes.md`
   - diario de execucao com arquivos alterados, validacoes, decisoes e caveats
 
 ## Consolidacao aplicada
@@ -58,13 +56,12 @@ public/                 legado mantido apenas como referencia funcional
 
 ## Estado atual da migracao
 
-- A base Next/Supabase ja cobre os fluxos centrais do app.
-- O legado em `public/` ainda existe como referencia funcional e rollback, nao como fonte de UI nova.
-- O corte final ainda depende de fechamento operacional em producao, conforme o plano principal.
+- A base Next/Supabase cobre os fluxos centrais do app e ja foi publicada em producao.
+- O runtime Express e os assets HTML/CSS/JS legados foram removidos do checkout ativo.
+- A migracao foi encerrada. Novas features e refinos entram no `TODO.md`.
 
 ## Como continuar
 
 1. Ler `AGENTS.md`.
-2. Ler `plano-migracao-next-supabase.md`.
-3. Consultar `registro-migracao-next.md` para o historico recente.
-4. Tratar `public/` apenas como referencia funcional quando houver duvida de paridade.
+2. Ler `TODO.md`.
+3. Consultar `registro-alteracoes.md` para o historico recente.

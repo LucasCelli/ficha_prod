@@ -1,17 +1,53 @@
+# Dependencies
 node_modules/
+
+# Next.js / build output
 .next/
-tsconfig.tsbuildinfo
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Vercel local state
+.vercel/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local databases and cutover artifacts
 data/*.db
 data/*.db-wal
 data/*.db-shm
+data/*.sqlite
+data/*.sqlite3
 data/backups/
-.env
-*.log
-.DS_Store
-agents.md
-refactor-plan.md
+
+# Test and coverage output
+coverage/
+test-results/
+playwright-report/
+blob-report/
+
+# Local visual test harness
 playwright.config.js
 tests/
 
-.vercel
+# OS and editor noise
+.DS_Store
+Thumbs.db
+
+# Historical local scratch files
+agents.md
+refactor-plan.md
+
+# Supabase local cache
 supabase/.temp/

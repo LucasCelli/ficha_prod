@@ -1,4 +1,4 @@
-import legacyCatalog from "../../../public/data/catalogo.json";
+import legacyCatalog from "./data/legacy-catalog-fallback.json";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
 import type { FichaFormInitialData, ImageFormItem, ProductFormItem } from "./ficha-form-seed";
 import { createEmptyFichaFormInitialData, createEmptyProductItem } from "./ficha-form-seed";

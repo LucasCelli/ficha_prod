@@ -1,4 +1,46 @@
-# Registro da migracao Next
+# Registro de alteracoes
+
+## 2026-05-08 - Workspace: limpeza de temporarios e gitignore
+
+- Fase/modulo: higiene do workspace / arquivos locais.
+- Arquivos alterados/removidos: `.gitignore`, `registro-alteracoes.md`; removidos logs locais `.next-*.log`, `.next-auth-dev.log`, `tsconfig.tsbuildinfo`, `data/fichas.db` e snapshots locais em `data/backups/`.
+- Resultado: o workspace ficou sem logs soltos e sem artefato de build TypeScript na raiz. O `.gitignore` foi reorganizado por categoria e passou a cobrir dependencias, build output, estado local da Vercel, envs locais, logs, bancos locais, artefatos de cutover, coverage e relatorios de teste.
+- Decisao: manter `node_modules/`, `.next/` e `.vercel/` ignorados, mas nao apagar esses diretorios automaticamente porque sao caches/estado local uteis para desenvolvimento e deploy.
+- Caveat: `node_modules/`, `.next/` e `.vercel/` continuam presentes localmente, mas ignorados.
+
+## 2026-05-08 - Migração encerrada e backlog futuro criado
+
+- Fase/modulo: documentação operacional / encerramento de migração.
+- Arquivos alterados/removidos: `README.md`, `AGENTS.md`, `TODO.md`, `registro-alteracoes.md`; removido `plano-migracao-next-supabase.md`; `registro-migracao-next.md` foi renomeado para `registro-alteracoes.md`.
+- Resultado: a migração foi encerrada como frente ativa. As pendências futuras saíram do plano de migração e passaram para `TODO.md`, usando esse arquivo como backlog vivo de features, refinos e decisões.
+- Decisão: manter na raiz apenas `README.md`, `AGENTS.md`, `TODO.md` e `registro-alteracoes.md` como documentos operacionais. O registro continua sendo o diário cronológico de mudanças, validações, decisões e caveats.
+- Caveat: entradas históricas antigas dentro deste registro ainda mencionam nomes de arquivos removidos/renomeados porque fazem parte do histórico da migração.
+
+## 2026-05-08 - Legado: limpeza fisica pos-corte
+
+- Fase/modulo: corte / limpeza controlada do legado.
+- Arquivos alterados/removidos: `package.json`, `package-lock.json`, `scripts/check-production-readiness.mjs`, `scripts/seed-catalog-items.mjs`, `src/features/fichas/legacy-import.ts`, `src/features/fichas/data/legacy-catalog-fallback.json`, `public/manifest.webmanifest`, `README.md`, `AGENTS.md`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`; removidos `server.js`, scripts Turso de import/backup/check de corte, `src/config`, `src/controllers`, `src/middlewares`, `src/repositories`, `src/routes`, `src/services`, `src/validators`, `public/css`, `public/data`, `public/img`, `public/index_files`, `public/js`, HTMLs legados e `public/sw.js`.
+- Resultado: apos autorizacao explicita do usuario, a limpeza fisica do legado foi executada. `public/` ficou restrito a assets atuais (`favicon`, `robots`, `manifest` e `icons`); o fallback de catalogo versionado ficou em `src/features/fichas/data/legacy-catalog-fallback.json`.
+- Dependencias/scripts: removidos `express`, `cors`, `@libsql/client`, `dev:legacy`, `start:legacy`, `migrate:legacy`, `backup:cutover` e `cutover:check`. `prod:check` deixou de exigir `TURSO_DATABASE_URL` e `TURSO_AUTH_TOKEN`.
+- Decisao: `html2canvas` e `jspdf` continuam porque ainda sao usados pelo fluxo Next de impressao/PDF (`src/features/fichas/print-pdf.ts` e `src/features/fichas/operational-pdf.ts`). Se surgir duvida historica, a referencia passa a ser a branch `main` intacta ou o commit pre-migracao, nao arquivos legados neste branch.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check`, `npm run prod:check`, `node scripts/seed-catalog-items.mjs` e `git diff --check` passaram depois da limpeza. O `prod:check` agora retorna `ready-for-production`.
+- Continuidade: a Fase 10/Fase 11 do plano foi marcada como fechada, `RelatoriosLegadoOverview` foi renomeado para `RelatoriosOverview`, o arquivo antigo sem uso de relatorios foi substituido e a regra obsoleta do shim `window.toast` legado saiu do `AGENTS.md`.
+
+## 2026-05-08 - Fichas/Upload: feedback assincromo com Sonner
+
+- Fase/modulo: fichas / salvamento com imagens.
+- Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: o envio de imagens pendentes ao Cloudinary antes do submit da ficha passou a usar `toast.promise`, com estados de carregamento, sucesso e erro no mesmo feedback. O fluxo continua submetendo a ficha somente depois de atualizar o payload serializado de imagens.
+- Validacao inicial: eslint dirigido em `src/features/fichas/ficha-form.tsx`, `src/app/relatorios/page.tsx` e `src/features/relatorios/relatorios-overview.tsx` passou; `npm run typecheck` passou.
+
+## 2026-05-08 - Vercel: deploy direto em producao a partir da branch de migracao
+
+- Fase/modulo: producao / publicacao Vercel.
+- Arquivos alterados: `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
+- Resultado: a branch local `next-supabase-migration` estava gerando preview pela integracao Git da Vercel, como esperado para branch que nao e a Production Branch. Para publicar o estado atual diretamente em producao, foi executado `npx vercel --prod --yes`.
+- Deployment: `dpl_7fxx5jRCF8ApGMgTYGfTgZ4PUUp9` ficou `READY` em `target production`; o alias `https://fichaprimalhas.vercel.app` foi atualizado para essa versao.
+- Build remoto: Vercel executou `npm run build`, compilou Next/App Router com sucesso, rodou TypeScript e gerou 21 paginas estaticas sem erro bloqueante. Caveat: o aviso sobre `engines.node >=20.9.0` continua recomendando fixar uma major de Node para evitar upgrade automatico futuro.
+- Decisao: para commits futuros subirem automaticamente como producao, ainda e preciso trocar a Production Branch do projeto Vercel para `next-supabase-migration` ou mergear/pushar em `main`; `--prod` resolve a publicacao imediata, nao a politica da integracao Git.
 
 ## 2026-05-08 - Inicio: cumprimento inline com Playfair
 

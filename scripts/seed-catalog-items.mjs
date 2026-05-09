@@ -60,7 +60,7 @@ function createItem(kind, name, index, extra = {}) {
 }
 
 function loadLegacyCatalog() {
-  const filePath = path.join(process.cwd(), "public", "data", "catalogo.json");
+  const filePath = path.join(process.cwd(), "src", "features", "fichas", "data", "legacy-catalog-fallback.json");
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 

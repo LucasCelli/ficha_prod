@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { RelatoriosLegadoOverview } from "@/features/relatorios/relatorios-legado-overview";
+import { RelatoriosOverview } from "@/features/relatorios/relatorios-overview";
 import {
   getRelatorioData,
   normalizeRelatorioDate,
@@ -27,5 +27,5 @@ export default async function RelatoriosPage({ searchParams }: RelatoriosPagePro
   };
   const result = await getRelatorioData(filters);
 
-  return <RelatoriosLegadoOverview filters={filters} result={result} />;
+  return <RelatoriosOverview filters={filters} result={result} />;
 }

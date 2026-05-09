@@ -13,7 +13,6 @@ const RUNTIME_ENV = [
   "CLOUDINARY_CLOUD_NAME",
 ];
 
-const CUTOVER_ENV = ["TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN"];
 const TABLES = ["clientes", "fichas", "ficha_itens", "ficha_imagens", "catalog_items", "app_users", "app_sessions"];
 const IS_WINDOWS = platform() === "win32";
 
@@ -133,11 +132,10 @@ async function checkSupabase() {
 }
 
 checkEnvGroup("Runtime env required in Vercel production", RUNTIME_ENV);
-checkEnvGroup("Cutover env required for final legacy import", CUTOVER_ENV);
 checkPublicSecretLeaks();
 checkGitignoredEnv();
 checkVercelLink();
 await checkSupabase();
 
-console.log(`\nStatus: ${hasBlocker ? "action-required" : "ready-for-production-cutover"}`);
+console.log(`\nStatus: ${hasBlocker ? "action-required" : "ready-for-production"}`);
 process.exitCode = hasBlocker ? 1 : 0;
