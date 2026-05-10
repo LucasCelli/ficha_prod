@@ -20,6 +20,10 @@ export const mainNavigation: readonly NavigationItem[] = [
     label: "Quadro de Produção",
   },
   {
+    href: "/ia",
+    label: "IA",
+  },
+  {
     href: "/clientes",
     label: "Clientes",
   },

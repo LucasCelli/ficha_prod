@@ -1,5 +1,158 @@
 # Registro de alteracoes
 
+## 2026-05-10 - IA: modelos OpenRouter adicionais
+
+- Fase/modulo: IA interna / modelos.
+- Arquivos alterados: `src/lib/ai/model-options.ts`, `registro-alteracoes.md`.
+- Resultado: o seletor de `/ia` passou a oferecer `OpenRouter - GPT-4o mini` e `OpenRouter - Qwen 2.5 72B` alem do `OpenRouter - Llama 3.3 70B`.
+- Decisao: adicionar uma alternativa OpenAI barata/estavel e uma alternativa Qwen com bom suporte a JSON/saidas estruturadas. A variante gratuita do Llama foi testada, mas retornou rate-limit upstream no provedor gratuito.
+
+## 2026-05-10 - IA: Gemini Pro no seletor
+
+- Fase/modulo: IA interna / modelos.
+- Arquivos alterados: `src/lib/ai/model-options.ts`, `registro-alteracoes.md`.
+- Resultado: o seletor de `/ia` passou a oferecer `Gemini - 2.5 Flash-Lite` e `Gemini - 2.5 Pro` alem de `Gemini - 2.5 Flash`.
+- Decisao: manter `gemini-2.5-flash` como padrao do provider Gemini e expor `gemini-2.5-pro` como alternativa manual para casos que precisem de mais qualidade.
+- Caveat: limites do Gemini dependem do modelo e do tier do projeto Google AI, entao Flash, Flash-Lite e Pro nao devem ser tratados como equivalentes. O teste local de `gemini-2.5-pro` retornou quota 0 para o projeto atual.
+
+## 2026-05-10 - IA: rotulo de exportacao
+
+- Fase/modulo: IA interna / exportacao.
+- Arquivos alterados: `src/components/ai/uniform-list-parser-demo.tsx`, `registro-alteracoes.md`.
+- Resultado: o botao `XLSX` passou a exibir `Exportar para Excel`, mantendo o mesmo comportamento de exportacao.
+
+## 2026-05-10 - IA: estado vazio da tabela
+
+- Fase/modulo: IA interna / tabela de revisao.
+- Arquivos alterados: `src/components/ai/uniform-list-parser-demo.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: o estado vazio passou a exibir `Tabela vazia :/` em destaque e a instrucao curta abaixo.
+- Refinamento visual: reduziu o espaco entre as linhas, suavizou a cor do titulo e aumentou levemente o tamanho dos textos.
+- Copy: a instrucao passou a usar `Use o campo de texto ao lado para organizar uma lista.`.
+
+## 2026-05-10 - IA: regras de tamanho sem pendencias
+
+- Fase/modulo: IA interna / organizacao de listas.
+- Arquivos alterados: `src/lib/ai/schemas/uniform-list.ts`, `src/lib/ai/prompts/uniform-list.ts`, `src/app/api/ai/parse-uniform-list/route.ts`, `src/components/ai/uniform-list-parser-demo.tsx`, `registro-alteracoes.md`.
+- Resultado: a saida estruturada deixou de pedir/exibir `pendencias`, mantendo apenas os itens revisaveis na tabela.
+- Decisao: o prompt passou a tratar idade seguida de tamanho par como tamanho infantil arredondado, a reconhecer `XXG`, `XXXG` e `XXXGG`, e a preservar iniciais coladas ao nome como em `gabriel g. num 12 tam`.
+- Refinamento: letra de tamanho solta entre nome e numero, como `joao g 10`, passou a ser interpretada como tamanho; inicial de nome precisa estar marcada com ponto, como `g.`.
+- Refinamento: termos operacionais como `confirmado`, `aprovado`, `aceito`, `adulto`, `infantil`, `de criança` e `modelo feminino` foram explicitamente proibidos no campo nome.
+- Refinamento: termos de modelo como `babylook`, `baby look`, `bl`, `regata` e `polo` tambem foram proibidos no campo nome, com exemplo especifico para `Amanda babylook`.
+- Decisao: `adulto`, `infantil` e `de criança` passaram a ser apenas contexto de grade/tamanho; sem indicacao de baby look, regata ou polo, o modelo fica `tradicional`.
+- UX: a tabela de resultado agora abre na ordem retornada pela IA, sem ordenar por nome automaticamente; os cabecalhos continuam disponiveis para ordenacao manual.
+- Compatibilidade Groq: `observacao` deixou de ser opcional no schema e passou a ser nullable, evitando campos omitidos em Structured Outputs.
+- Resiliencia Groq: quando `Output.object` falhar no Groq, o endpoint tenta uma segunda chamada em JSON puro e valida a resposta com o mesmo schema antes de retornar.
+- Limite Groq: chamadas Groq passaram a usar teto de saida menor e chunks menores para respeitar o limite atual de 8000 TPM do plano on-demand, evitando recusa por `Request too large`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram; busca por `pendencias` nos arquivos de IA nao encontrou mais usos. Chamadas diretas pequenas com Groq `openai/gpt-oss-20b` e `openai/gpt-oss-120b` retornaram objeto valido no schema novo.
+- Caveat: a interpretacao de tamanho continua sendo recomendacao operacional para IA; casos ambiguos devem usar `observacao` e confianca menor.
+
+## 2026-05-10 - IA: seletor de modelo
+
+- Fase/modulo: IA interna / organizacao de listas.
+- Arquivos alterados: `src/lib/ai/model-options.ts`, `src/lib/ai/providers.ts`, `src/lib/ai/models.ts`, `src/lib/ai/google.ts`, `src/app/ia/page.tsx`, `src/app/api/ai/parse-uniform-list/route.ts`, `src/components/ai/uniform-list-parser-demo.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: `/ia` ganhou seletor de modelo por requisicao, validado no server contra allowlist antes de acionar o provider.
+- Decisao: Groq ficou restrito no seletor aos modelos `openai/gpt-oss-120b` e `openai/gpt-oss-20b`, que sao os modelos indicados pela documentacao atual para Structured Outputs; OpenRouter e Gemini continuam disponiveis como alternativas.
+- Refinamento visual: select de modelo e botao de organizar passaram a empilhar dentro do painel lateral, evitando overflow horizontal em largura estreita.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Browser em `localhost:3000/ia` redirecionou para `/login` por sessao expirada, entao a validacao visual autenticada ficou pendente.
+- Caveat: chaves seguem server-side; o seletor so envia o identificador permitido do modelo.
+
+## 2026-05-10 - IA: multiplos providers
+
+- Fase/modulo: IA interna / providers.
+- Arquivos alterados: `package.json`, `package-lock.json`, `src/lib/ai/providers.ts`, `src/lib/ai/models.ts`, `src/lib/ai/google.ts`, `src/app/api/ai/parse-uniform-list/route.ts`, `src/app/api/ai/generate-technical-description/route.ts`, `registro-alteracoes.md`.
+- Resultado: a camada de IA passou a suportar Groq, OpenRouter e Gemini via Vercel AI SDK, selecionados por `AI_PROVIDER`.
+- Decisao: `groq` e o provider padrao; modelos padrao centralizados em `src/lib/ai/models.ts` (`llama-3.3-70b-versatile`, `meta-llama/llama-3.3-70b-instruct`, `gemini-2.5-flash`).
+- Segurança: endpoints continuam server-side, sem expor chaves no client; cada provider valida sua propria variavel (`GROQ_API_KEY`, `OPENROUTER_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`).
+
+## 2026-05-10 - IA: erros de listas extensas
+
+- Fase/modulo: IA interna / organizacao de listas.
+- Arquivos alterados: `src/app/api/ai/parse-uniform-list/route.ts`, `src/components/ai/uniform-list-parser-demo.tsx`, `registro-alteracoes.md`.
+- Resultado: o endpoint passou a classificar erros controlados de timeout, limite de saida, schema invalido, rate limit e falha do provedor, retornando mensagem especifica sem stack trace.
+- UX: a pagina `/ia` agora exibe o erro no painel de resultado e dispara toast de falha, evitando erro silencioso quando a lista extensa nao conclui.
+- Ajuste operacional: o processamento de listas ganhou timeout de 120s, `maxDuration` de 120s e limite explicito de saida para reduzir cortes em listas maiores.
+- Refinamento: listas extensas agora sao divididas em blocos menores no server-side, processadas em chamadas estruturadas separadas e reunidas no JSON final validado.
+
+## 2026-05-10 - TODO: lista IA vinculada a ficha
+
+- Fase/modulo: IA interna / fichas.
+- Arquivos alterados: `TODO.md`, `registro-alteracoes.md`.
+- Resultado: registrada a pendencia futura para permitir vincular uma lista organizada pela IA a uma ficha.
+- Decisao: a lista deve ser salva como JSON revisado junto da ficha, permitindo consulta, reexportacao e auditoria posterior, sem acoplar a tela atual de revisao a uma persistencia automatica.
+
+## 2026-05-10 - IA: ordenacao por cabecalho
+
+- Fase/modulo: IA interna / tabela de revisao.
+- Arquivos alterados: `src/components/ui/data-table.tsx`, `src/components/ai/uniform-list-parser-demo.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: os cabecalhos da tabela em `/ia` agora ordenam alfabeticamente os itens por coluna, alternando crescente e decrescente a cada clique.
+- Exportacao: o XLSX usa a mesma ordenacao ativa na tela.
+- Acessibilidade: `DataTable` passou a aceitar ordenacao opcional por coluna com `aria-sort`, sem mudar as tabelas que nao usam esse recurso.
+- Ajuste visual: as colunas `Número` e `Tamanho` ficaram mais largas para evitar quebra do cabecalho.
+
+## 2026-05-10 - IA: score visual e celula copiavel
+
+- Fase/modulo: IA interna / tabela de revisao.
+- Arquivos alterados: `src/components/ai/uniform-list-parser-demo.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: a coluna `Confiança` passou a exibir um score visual com barra colorida por nivel; celulas de `Nome` e `Número` agora usam botao preenchendo toda a celula para copia.
+- UX: o hover/foco das celulas copiaveis continua em cor primaria, mas a area clicavel deixa de depender apenas do texto.
+- Refinamento: o texto de confianca foi compactado dentro da barra para nao aumentar a altura das linhas da tabela.
+- Active: a ultima celula copiavel clicada passa a manter uma borda discreta ate outra celula de nome ou numero ser clicada.
+- Refinamento visual: a coluna `Confianca` deixou de usar barra de score e passou a usar badge compacto colorido por nivel.
+
+## 2026-05-10 - IA: XLSX unico e hover por celula
+
+- Fase/modulo: IA interna / tabela e exportacao.
+- Arquivos alterados: `package.json`, `package-lock.json`, `src/components/ai/uniform-list-parser-demo.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: removida a exportacao em PDF da pagina `/ia`; a tela agora mantem apenas XLSX.
+- UX: o hover da tabela de resultado passou de linha inteira para celula individual, e as celulas copiaveis de `Nome` e `Numero` ocupam toda a celula, nao apenas o texto.
+- Copy: termos visiveis da UI da ferramenta foram corrigidos para PT-BR com acentuacao, incluindo `Número`, `Confiança`, `Observação`, `Pendências`, `Média` e `revisão`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. A sessao do navegador atual estava expirada e `/ia` redirecionou para `/login`.
+
+## 2026-05-09 - IA: schema enxuto para lista
+
+- Fase/modulo: IA interna / custo e schema de extracao.
+- Arquivos alterados: `src/lib/ai/schemas/uniform-list.ts`, `src/lib/ai/prompts/uniform-list.ts`, `src/components/ai/uniform-list-parser-demo.tsx`, `registro-alteracoes.md`.
+- Resultado: a IA deixou de processar e retornar `status`, `tipo` e `linhaOriginal` na organizacao de listas, mantendo apenas os campos usados pela tela e exportacao.
+- Decisao: preservar a checagem mental de nome contra a linha de origem no prompt, mas sem pedir a linha original como campo de saida para evitar gasto de tokens sem utilidade operacional.
+
+## 2026-05-09 - IA: copia rapida na tabela
+
+- Fase/modulo: IA interna / revisao de lista.
+- Arquivos alterados: `src/components/ai/uniform-list-parser-demo.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: os paineis de entrada e resultado agora esticam com a mesma altura na grade da pagina `/ia`; valores reais nas colunas `Nome` e `Numero` podem ser copiados diretamente para a area de transferencia.
+- UX: nome e numero ganharam hover com cor primaria, cursor pointer, foco visivel e toast de sucesso via `sonner` ao copiar.
+- Ajuste visual: a coluna de entrada ficou mais estreita, o painel de resultado passou a ocupar mais largura e a tabela recebeu larguras fixas por coluna para evitar sobreposicao de status, confianca e observacao dentro do wrapper.
+- Refinamento de tabela: removidas as colunas `Status`, `Tipo` e `Linha original`; `tradicional` aparece como `Camiseta`, `baby_look` como `Baby Look`, e a confianca passa a ser exibida capitalizada. A celula de nome voltou ao comportamento nativo de tabela para acompanhar a altura da linha quando houver observacao longa.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. A rota `/ia` segue protegida; a sessao do navegador atual estava expirada e voltou para `/login`.
+
+## 2026-05-09 - IA: tabela lateral e exportacao
+
+- Fase/modulo: IA interna / revisao e exportacao de listas.
+- Arquivos alterados: `package.json`, `package-lock.json`, `src/components/ai/uniform-list-parser-demo.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: a pagina `/ia` passou a organizar o campo de texto e a tabela em duas colunas, com painel de resultado ao lado e botoes para exportar a lista revisada em XLSX e PDF.
+- Exportacao: `exceljs` gera `.xlsx` com cabecalho azul, texto branco, bordas, linhas alternadas, larguras definidas, quebra de linha, autofiltro e primeira linha congelada; `jspdf-autotable` gera PDF em paisagem com tabela gradeada, cabecalho destacado e linhas alternadas.
+- Decisao: manter exportacao client-side porque os dados ja estao em revisao local e nao devem ser salvos no banco neste ciclo.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Edge em `localhost:3000/ia` confirmou a pagina em duas colunas, atalho ativo no shell e botoes de exportacao visiveis.
+- Caveat: ao tentar executar uma extracao real pelo navegador, a sessao local expirou e voltou para `/login`; a geracao efetiva de arquivos depende de uma resposta de IA autenticada com itens na tabela.
+
+## 2026-05-09 - IA: pagina e atalho no shell
+
+- Fase/modulo: IA interna / acesso operacional.
+- Arquivos alterados: `src/app/ia/page.tsx`, `src/lib/navigation.ts`, `src/components/ui/app-navigation.tsx`, `registro-alteracoes.md`.
+- Resultado: criada a rota autenticada `/ia` com o demo de organizacao de listas e adicionado o atalho `IA` na navegacao principal do shell.
+- Decisao: manter a ferramenta acessivel para usuarios autenticados em geral, sem restringir a `superadmin`, porque a rota usa apenas IA server-side e nao grava dados.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. O build listou `/ia` entre as rotas App Router.
+
+## 2026-05-09 - IA: camada server-side Gemini
+
+- Fase/modulo: IA interna / listas de uniformes e descricoes tecnicas.
+- Arquivos alterados: `package.json`, `package-lock.json`, `.env.local`, `src/lib/ai/google.ts`, `src/lib/ai/schemas/uniform-list.ts`, `src/lib/ai/prompts/uniform-list.ts`, `src/lib/ai/schemas/technical-description.ts`, `src/lib/ai/prompts/technical-description.ts`, `src/app/api/ai/parse-uniform-list/route.ts`, `src/app/api/ai/generate-technical-description/route.ts`, `src/components/ai/uniform-list-parser-demo.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: criada a infraestrutura server-side para Gemini com saidas estruturadas por Zod, endpoints protegidos por sessao e demo isolado para revisar listas antes de qualquer persistencia.
+- Decisao: usar `generateText` com `Output.object` no AI SDK v6, mantendo o comportamento de objeto validado e evitando a API `generateObject` marcada como deprecated.
+- Seguranca: a chave fica apenas em `GOOGLE_GENERATIVE_AI_API_KEY`, sem `NEXT_PUBLIC`, sem chamada client-side para Gemini e sem escrita em banco.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. O build reconheceu `/api/ai/parse-uniform-list` e `/api/ai/generate-technical-description`; `git check-ignore -v .env.local` confirmou que a chave local nao entra no Git; buscas direcionadas confirmaram que nao ha `generateObject`, `NEXT_PUBLIC_GOOGLE_GENERATIVE_AI_API_KEY` nem normalizacao de nome em codigo.
+- Caveat: os testes reais de extracao com Gemini dependem de preencher uma chave Google valida em `.env.local` e usar uma sessao autenticada.
+
 ## 2026-05-09 - TODO: rascunho e AlertDialog
 
 - Fase/modulo: fichas / rascunho local e primitivo de dialog.

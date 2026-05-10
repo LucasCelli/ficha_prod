@@ -5,6 +5,8 @@ type DataTableColumn = {
   label: string;
   width?: string;
   align?: "left" | "center" | "right";
+  onSort?: () => void;
+  sortDirection?: "ascending" | "descending";
 };
 
 type DataTableProps = {
@@ -26,6 +28,7 @@ export function DataTable({ bodyRef, caption, children, className, columns }: Da
           <tr>
             {columns.map((column) => (
               <th
+                aria-sort={column.sortDirection}
                 key={column.key}
                 scope="col"
                 style={{
@@ -33,7 +36,14 @@ export function DataTable({ bodyRef, caption, children, className, columns }: Da
                   textAlign: column.align,
                 }}
               >
-                {column.label}
+                {column.onSort ? (
+                  <button className="ui-table__sort-button" onClick={column.onSort} type="button">
+                    <span>{column.label}</span>
+                    <span aria-hidden="true">{column.sortDirection === "ascending" ? "↑" : column.sortDirection === "descending" ? "↓" : "↕"}</span>
+                  </button>
+                ) : (
+                  column.label
+                )}
               </th>
             ))}
           </tr>
