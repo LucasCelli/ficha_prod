@@ -7,7 +7,7 @@ Backlog vivo para features, refinos e decisoes futuras. Itens concluídos devem 
 - [x] Fechar paridade fina do auto-preenchimento de observações contra exemplos reais da versão anterior.
 - [x] Decidir se o editor de observações deve migrar de `contentEditable` para Tiptap.
 - [x] Botão "Descartar" rascunho no toast não está funcionando. Nada acontece ao clicar nele.
-- [ ] Permitir vincular uma lista organizada pela IA a uma ficha, salvando o JSON revisado junto da ficha para consulta, reexportação e auditoria posterior.
+- [x] Permitir vincular uma lista organizada pela IA a uma ficha, salvando o JSON revisado junto da ficha para consulta, reexportação e auditoria posterior.
 
 ## Bibliotecas e arquitetura
 

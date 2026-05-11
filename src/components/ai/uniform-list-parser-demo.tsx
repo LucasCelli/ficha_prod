@@ -1,11 +1,11 @@
 "use client";
 
 import { useId, useMemo, useState, type FormEvent } from "react";
-import { ClipboardList, FileSpreadsheet } from "lucide-react";
+import { Check, ClipboardList, FileSpreadsheet, Link2, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
-import { Button, DataTable } from "@/components/ui";
+import { Button, CustomDatalist, DataTable, type CustomDatalistOption } from "@/components/ui";
 import { AI_MODEL_OPTIONS } from "@/lib/ai/model-options";
-import { getBusinessTodayInput } from "@/lib/dates";
+import { formatShortDateInput, getBusinessTodayInput } from "@/lib/dates";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
 
 type ApiSuccess = {
@@ -21,11 +21,50 @@ type ApiError = {
 
 type ApiResponse = ApiSuccess | ApiError;
 
+type SavedUniformList = UniformList & {
+  aiModel?: string | null;
+  linkedAt: string;
+  linkedBy?: {
+    displayName: string;
+    id: string;
+    username: string;
+  };
+  source: "organizar-nomes-ia";
+  sourceText?: string;
+  version: 1;
+};
+
+type LinkedFicha = {
+  cliente: string;
+  dataEntrega: string;
+  id: string;
+  listaIa?: SavedUniformList | null;
+  numeroVenda: string | null;
+};
+
+type LinkApiSuccess = {
+  success: true;
+  ficha?: LinkedFicha;
+  fichas?: LinkedFicha[];
+};
+
+type LinkApiError = {
+  success: false;
+  error: string;
+};
+
+type LinkApiResponse = LinkApiSuccess | LinkApiError;
+
 const MAX_TEXT_LENGTH = 10_000;
 const REVIEW_MESSAGE = "Revise antes de salvar.";
+const MODEL_OPTIONS = ["tradicional", "baby_look", "infantil", "regata", "polo", "desconhecido"] as const;
+const CONFIDENCE_OPTIONS = ["alta", "media", "baixa"] as const;
 
 type SortDirection = "ascending" | "descending";
 type SortKey = "confianca" | "modelo" | "nome" | "numero" | "observacao" | "tamanho";
+type EditableUniformListItem = UniformListItem & { rowId: string };
+type EditableUniformList = { items: EditableUniformListItem[] };
+type EditableTextField = "nome" | "numero" | "observacao" | "tamanho";
 type ActiveCopyCell = {
   field: "nome" | "numero";
   rowKey: string;
@@ -86,7 +125,7 @@ function getSortValue(item: UniformListItem, key: SortKey) {
   return values[key];
 }
 
-function sortItems(items: UniformListItem[], key: SortKey, direction: SortDirection) {
+function sortItems<T extends UniformListItem>(items: T[], key: SortKey, direction: SortDirection) {
   return [...items].sort((first, second) => {
     const result = sortCollator.compare(getSortValue(first, key), getSortValue(second, key));
     return direction === "ascending" ? result : -result;
@@ -115,6 +154,44 @@ function saveBlob(blob: Blob, filename: string) {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function createRowId(index: number) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `item-${Date.now()}-${index}`;
+}
+
+function createEditableList(list: UniformList): EditableUniformList {
+  return {
+    items: list.items.map((item, index) => ({
+      ...item,
+      rowId: createRowId(index),
+    })),
+  };
+}
+
+function stripEditableList(list: EditableUniformList): UniformList {
+  return {
+    items: list.items.map((item) => ({
+      confianca: item.confianca,
+      modelo: item.modelo,
+      nome: item.nome,
+      numero: item.numero,
+      observacao: item.observacao,
+      tamanho: item.tamanho,
+    })),
+  };
+}
+
+function getFichaOptionLabel(ficha: LinkedFicha) {
+  return `${ficha.numeroVenda ? `Venda ${ficha.numeroVenda}` : "Sem venda"} - ${ficha.cliente}`;
+}
+
+function getFichaOptionDetails(ficha: LinkedFicha) {
+  return [`Entrega ${formatShortDateInput(ficha.dataEntrega)}`];
 }
 
 async function copyToClipboard(value: string, label: string) {
@@ -181,16 +258,40 @@ function getApiErrorMessage(response: Response, payload: ApiResponse | null) {
 
 export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue: string }) {
   const textareaId = useId();
+  const pedidoInputId = useId();
+  const fichaInputId = useId();
   const modelSelectId = useId();
   const [text, setText] = useState("");
   const [selectedModel, setSelectedModel] = useState(defaultModelValue);
-  const [result, setResult] = useState<UniformList | null>(null);
+  const [result, setResult] = useState<EditableUniformList | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isLoadingLink, setIsLoadingLink] = useState(false);
+  const [isLoadingLinkedList, setIsLoadingLinkedList] = useState(false);
+  const [isSavingLink, setIsSavingLink] = useState(false);
+  const [isEditingResult, setIsEditingResult] = useState(false);
   const [activeCopyCell, setActiveCopyCell] = useState<ActiveCopyCell | null>(null);
+  const [pedido, setPedido] = useState("");
+  const [linkedFichas, setLinkedFichas] = useState<LinkedFicha[]>([]);
+  const [selectedFichaId, setSelectedFichaId] = useState("");
+  const [selectedFichaLabel, setSelectedFichaLabel] = useState("");
   const [sortConfig, setSortConfig] = useState<{ direction: SortDirection; key: SortKey } | null>(null);
   const hasItems = Boolean(result?.items.length);
+  const selectedFicha = linkedFichas.find((ficha) => ficha.id === selectedFichaId) ?? null;
+  const fichaOptions = useMemo<CustomDatalistOption[]>(
+    () =>
+      linkedFichas.map((ficha) => ({
+        aliases: [ficha.cliente, ficha.numeroVenda, ficha.dataEntrega, ficha.id].filter(Boolean) as string[],
+        details: getFichaOptionDetails(ficha),
+        label: getFichaOptionLabel(ficha),
+        metadata: {
+          id: ficha.id,
+        },
+        value: getFichaOptionLabel(ficha),
+      })),
+    [linkedFichas],
+  );
   const sortedItems = useMemo(
     () => (result ? (sortConfig ? sortItems(result.items, sortConfig.key, sortConfig.direction) : result.items) : []),
     [result, sortConfig],
@@ -209,10 +310,49 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
     [sortConfig],
   );
 
+  function updateTextItem(rowId: string, field: EditableTextField, value: string) {
+    setResult((current) =>
+      current
+        ? {
+            items: current.items.map((item) => (item.rowId === rowId ? { ...item, [field]: value.trim() ? value : null } : item)),
+          }
+        : current,
+    );
+  }
+
+  function updateModelItem(rowId: string, value: string) {
+    if (!MODEL_OPTIONS.includes(value as (typeof MODEL_OPTIONS)[number])) return;
+
+    setResult((current) =>
+      current
+        ? {
+            items: current.items.map((item) =>
+              item.rowId === rowId ? { ...item, modelo: value as UniformListItem["modelo"] } : item,
+            ),
+          }
+        : current,
+    );
+  }
+
+  function updateConfidenceItem(rowId: string, value: string) {
+    if (!CONFIDENCE_OPTIONS.includes(value as (typeof CONFIDENCE_OPTIONS)[number])) return;
+
+    setResult((current) =>
+      current
+        ? {
+            items: current.items.map((item) =>
+              item.rowId === rowId ? { ...item, confianca: value as UniformListItem["confianca"] } : item,
+            ),
+          }
+        : current,
+    );
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setResult(null);
+    setIsEditingResult(false);
 
     if (!text.trim()) {
       setError("Cole uma lista para organizar.");
@@ -247,7 +387,8 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
       }
 
       setActiveCopyCell(null);
-      setResult(payload.data);
+      setIsEditingResult(false);
+      setResult(createEditableList(payload.data));
     } catch {
       const message = "Não foi possível organizar a lista.";
       setError(message);
@@ -256,6 +397,105 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
       });
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleLoadFichas() {
+    setIsLoadingLink(true);
+
+    try {
+      const query = pedido.trim();
+      const response = await fetch(`/api/ai/uniform-list-ficha${query ? `?q=${encodeURIComponent(query)}` : ""}`);
+      const payload = (await response.json().catch(() => null)) as LinkApiResponse | null;
+
+      if (!response.ok || !payload?.success) {
+        toast.error(payload && !payload.success ? payload.error : "Não foi possível carregar os pedidos.");
+        return;
+      }
+
+      const fichas = payload.fichas ?? [];
+      setLinkedFichas(fichas);
+
+      if (fichas.length === 0) {
+        setSelectedFichaId("");
+        setSelectedFichaLabel("");
+        toast.warning("Nenhum pedido encontrado.");
+        return;
+      }
+
+      const nextFicha = fichas.find((ficha) => ficha.id === selectedFichaId) ?? fichas[0];
+      setSelectedFichaId(nextFicha.id);
+      setSelectedFichaLabel(getFichaOptionLabel(nextFicha));
+      toast.success("Pedidos carregados.");
+    } finally {
+      setIsLoadingLink(false);
+    }
+  }
+
+  async function handleLoadSelectedList() {
+    if (!selectedFichaId) return;
+
+    setIsLoadingLinkedList(true);
+
+    try {
+      const response = await fetch(`/api/ai/uniform-list-ficha?fichaId=${encodeURIComponent(selectedFichaId)}`);
+      const payload = (await response.json().catch(() => null)) as LinkApiResponse | null;
+
+      if (!response.ok || !payload?.success || !payload.ficha) {
+        toast.error(payload && !payload.success ? payload.error : "Não foi possível carregar a lista.");
+        return;
+      }
+
+      setLinkedFichas((current) => current.map((ficha) => (ficha.id === payload.ficha?.id ? payload.ficha : ficha)));
+      setSelectedFichaId(payload.ficha.id);
+      setSelectedFichaLabel(getFichaOptionLabel(payload.ficha));
+
+      if (payload.ficha.listaIa) {
+        setActiveCopyCell(null);
+        setIsEditingResult(false);
+        setResult(createEditableList({ items: payload.ficha.listaIa.items }));
+        setSortConfig(null);
+        toast.success("Lista vinculada carregada.");
+      } else {
+        toast.info("Ficha sem lista vinculada.");
+      }
+    } finally {
+      setIsLoadingLinkedList(false);
+    }
+  }
+
+  async function handleSaveLinkedList() {
+    if (!result?.items.length || !selectedFichaId) return;
+
+    setIsSavingLink(true);
+
+    try {
+      const response = await fetch("/api/ai/uniform-list-ficha", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          aiModel: selectedModel,
+          fichaId: selectedFichaId,
+          list: stripEditableList(result),
+          sourceText: text.trim() || undefined,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as LinkApiResponse | null;
+
+      if (!response.ok || !payload?.success || !payload.ficha) {
+        toast.error(payload && !payload.success ? payload.error : "Não foi possível vincular a lista.");
+        return;
+      }
+
+      setLinkedFichas((current) => current.map((ficha) => (ficha.id === payload.ficha?.id ? payload.ficha : ficha)));
+      setSelectedFichaId(payload.ficha.id);
+      setSelectedFichaLabel(getFichaOptionLabel(payload.ficha));
+      toast.success("Lista vinculada à ficha.");
+    } finally {
+      setIsSavingLink(false);
     }
   }
 
@@ -376,7 +616,6 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
               value={text}
             />
           </div>
-
         </form>
 
         <div className="ai-demo__result" aria-live="polite">
@@ -385,7 +624,65 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
               <h2>Resultado</h2>
               <p>{hasItems ? `${result?.items.length} itens` : "Nenhum item"}</p>
             </div>
-            <div className="ai-demo__exports" aria-label="Exportar lista organizada">
+            <div className="ai-demo__exports" aria-label="Ações da lista organizada">
+              <div className="ai-demo__link">
+                <label htmlFor={pedidoInputId}>Pedidos</label>
+                <div className="ai-demo__link-row">
+                  <input
+                    id={pedidoInputId}
+                    onChange={(event) => setPedido(event.target.value)}
+                    placeholder="Cliente ou venda"
+                    value={pedido}
+                  />
+                  <Button aria-disabled={isLoadingLink} disabled={isLoadingLink} onClick={handleLoadFichas} type="button" variant="secondary">
+                    {isLoadingLink ? <span className="button-spinner" aria-hidden="true" /> : <Search aria-hidden="true" size={16} />}
+                    Buscar
+                  </Button>
+                </div>
+                {fichaOptions.length > 0 ? (
+                  <CustomDatalist
+                    aria-label="Ficha vinculada"
+                    id={fichaInputId}
+                    onValueChange={(value, option) => {
+                      setSelectedFichaLabel(value);
+                      setSelectedFichaId(option?.metadata?.id ?? "");
+                    }}
+                    options={fichaOptions}
+                    placeholder="Selecionar ficha"
+                    value={selectedFichaLabel}
+                  />
+                ) : null}
+              </div>
+              <Button
+                aria-disabled={!selectedFicha || isLoadingLinkedList}
+                disabled={!selectedFicha || isLoadingLinkedList}
+                onClick={handleLoadSelectedList}
+                type="button"
+                variant="secondary"
+              >
+                {isLoadingLinkedList ? <span className="button-spinner" aria-hidden="true" /> : <ClipboardList aria-hidden="true" size={17} />}
+                Carregar lista
+              </Button>
+              <Button
+                aria-disabled={!hasItems || !selectedFicha || isSavingLink}
+                disabled={!hasItems || !selectedFicha || isSavingLink}
+                onClick={handleSaveLinkedList}
+                type="button"
+                variant="secondary"
+              >
+                {isSavingLink ? <span className="button-spinner" aria-hidden="true" /> : <Link2 aria-hidden="true" size={17} />}
+                Vincular
+              </Button>
+              <Button
+                aria-disabled={!hasItems}
+                disabled={!hasItems}
+                onClick={() => setIsEditingResult((current) => !current)}
+                type="button"
+                variant="secondary"
+              >
+                {isEditingResult ? <Check aria-hidden="true" size={17} /> : <Pencil aria-hidden="true" size={17} />}
+                {isEditingResult ? "Concluir" : "Editar"}
+              </Button>
               <Button
                 aria-disabled={!hasItems || isExporting}
                 disabled={!hasItems || isExporting}
@@ -408,23 +705,88 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
           {result ? (
             <DataTable caption="Lista organizada para revisão" columns={columns}>
               {sortedItems.map((item, index) => {
-                const rowKey = `${item.nome ?? "sem-nome"}-${item.numero ?? "sem-numero"}-${item.tamanho ?? "sem-tamanho"}-${index}`;
+                if (isEditingResult) {
+                  return (
+                    <tr key={item.rowId}>
+                      <td className="ui-table__primary">
+                        <input
+                          aria-label={`Nome ${index + 1}`}
+                          className="ai-demo__cell-input"
+                          onChange={(event) => updateTextItem(item.rowId, "nome", event.target.value)}
+                          value={item.nome ?? ""}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          aria-label={`Número ${index + 1}`}
+                          className="ai-demo__cell-input"
+                          onChange={(event) => updateTextItem(item.rowId, "numero", event.target.value)}
+                          value={item.numero ?? ""}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          aria-label={`Tamanho ${index + 1}`}
+                          className="ai-demo__cell-input"
+                          onChange={(event) => updateTextItem(item.rowId, "tamanho", event.target.value)}
+                          value={item.tamanho ?? ""}
+                        />
+                      </td>
+                      <td>
+                        <select
+                          aria-label={`Modelo ${index + 1}`}
+                          className="ai-demo__cell-select"
+                          onChange={(event) => updateModelItem(item.rowId, event.target.value)}
+                          value={item.modelo}
+                        >
+                          {MODEL_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {formatModel(option)}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <select
+                          aria-label={`Confiança ${index + 1}`}
+                          className="ai-demo__cell-select"
+                          onChange={(event) => updateConfidenceItem(item.rowId, event.target.value)}
+                          value={item.confianca}
+                        >
+                          {CONFIDENCE_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {formatConfidence(option)}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          aria-label={`Observação ${index + 1}`}
+                          className="ai-demo__cell-input"
+                          onChange={(event) => updateTextItem(item.rowId, "observacao", event.target.value)}
+                          value={item.observacao ?? ""}
+                        />
+                      </td>
+                    </tr>
+                  );
+                }
 
                 return (
-                  <tr key={rowKey}>
+                  <tr key={item.rowId}>
                     <td className="ui-table__primary ai-demo__copy-td">
                       <CopyCell
-                        isActive={activeCopyCell?.rowKey === rowKey && activeCopyCell.field === "nome"}
+                        isActive={activeCopyCell?.rowKey === item.rowId && activeCopyCell.field === "nome"}
                         label="Nome"
-                        onActivate={() => setActiveCopyCell({ field: "nome", rowKey })}
+                        onActivate={() => setActiveCopyCell({ field: "nome", rowKey: item.rowId })}
                         value={item.nome}
                       />
                     </td>
                     <td className="ai-demo__copy-td">
                       <CopyCell
-                        isActive={activeCopyCell?.rowKey === rowKey && activeCopyCell.field === "numero"}
+                        isActive={activeCopyCell?.rowKey === item.rowId && activeCopyCell.field === "numero"}
                         label="Número"
-                        onActivate={() => setActiveCopyCell({ field: "numero", rowKey })}
+                        onActivate={() => setActiveCopyCell({ field: "numero", rowKey: item.rowId })}
                         value={item.numero}
                       />
                     </td>

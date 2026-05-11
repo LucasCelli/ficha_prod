@@ -203,6 +203,7 @@ export type Database = {
           com_nomes: number | null;
           observacoes: string | null;
           observacoes_html: string | null;
+          lista_ia: Json | null;
           metadados: Json;
           created_at: string;
           updated_at: string;
@@ -259,6 +260,7 @@ export type Database = {
           com_nomes?: number | null;
           observacoes?: string | null;
           observacoes_html?: string | null;
+          lista_ia?: Json | null;
           metadados?: Json;
           created_at?: string;
           updated_at?: string;

@@ -2679,6 +2679,7 @@ function buildDraftPrintFicha(form: HTMLFormElement, values: FichaFormClientValu
     largura_gola: text("larguraGola") || null,
     largura_manga: text("larguraManga") || null,
     legacy_ficha_id: null,
+    lista_ia: null,
     manga: text("manga") || null,
     material: values.material || null,
     metadados: null,

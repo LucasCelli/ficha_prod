@@ -1,5 +1,18 @@
 # Registro de alteracoes
 
+## 2026-05-11 - Lista IA vinculada a ficha
+
+- Modulo: ferramentas de IA e fichas.
+- Arquivos alterados: `src/components/ai/uniform-list-parser-demo.tsx`, `src/app/api/ai/uniform-list-ficha/route.ts`, `src/lib/supabase/database.types.ts`, `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `supabase/migrations/20260511162401_fichas_lista_ia.sql`, `TODO.md`, `registro-alteracoes.md`.
+- Resultado: `/ferramentas/organizar-nomes-ia` agora permite revisar a tabela gerada pela IA em campos editaveis, localizar uma ficha pelo `Nº venda`/pedido, vincular a lista revisada e carregar uma lista ja vinculada ao mesmo pedido.
+- Refinamento posterior: a busca deixou de depender de `numero_venda`; agora carrega uma lista enxuta de pedidos/fichas por cliente ou venda, limitada a 30 registros, sem trazer `lista_ia` nessa consulta. O JSON vinculado so e carregado em uma chamada separada quando uma ficha especifica e selecionada.
+- Refinamento posterior: o resultado da IA voltou a abrir em modo leitura, preservando o comportamento anterior de copia em `Nome` e `Numero`; os campos editaveis so aparecem ao acionar `Editar`.
+- Refinamento posterior: o seletor da ficha encontrada passou a usar `CustomDatalist`, mantendo o UUID apenas como metadata interna e exibindo venda/cliente/entrega para selecao.
+- Persistencia: criada a coluna `fichas.lista_ia` (`jsonb`) para salvar o JSON revisado junto da ficha com `items`, modelo usado, timestamp de vinculo, usuario responsavel e texto original quando disponivel.
+- API: adicionada `src/app/api/ai/uniform-list-ficha/route.ts` com `GET` por pedido e `POST` por ficha, ambos protegidos por sessao atual.
+- Decisao: manter o JSON em coluna dedicada, em vez de misturar em `metadados`, para facilitar consulta, reexportacao e auditoria posterior; o pedido operacional continua sendo `numero_venda`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram apos os refinamentos de payload minimo e modo de edicao. `npm run supabase:check` falhou por ausencia de `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` no ambiente do script. Edge em `localhost:3000/ferramentas/organizar-nomes-ia` redirecionou corretamente para `/login`, sem overlay e sem erros de console; a validacao autenticada da ferramenta ficou pendente de sessao logada.
+
 ## 2026-05-10 - Ferramentas: hub e rota de IA
 
 - Fase/modulo: Ferramentas / organizacao de nomes com IA.
