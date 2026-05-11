@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
-import { formatBusinessDateTime, formatDateInput, formatDayMonthInput } from "@/lib/dates";
+import { getKanbanColumnLabel } from "@/features/quadro-producao/config";
+import { formatBusinessDateTime, formatDayMonthInput } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { getFichaOverdueDays, isFichaOverdue, type FichaFilters, type FichaListItem, type FichaListResult, type FichaStatus } from "./data";
 
@@ -14,6 +15,7 @@ type PdfRow = {
   cliente: string;
   dataEntrega: string;
   dataInicio: string;
+  etapa: string;
   isOverdue: boolean;
   personalizacao: string;
   statusBadgeLabel: string;
@@ -53,11 +55,12 @@ const PAGE = {
 const TABLE = {
   rowHeight: 24,
   widths: {
-    cliente: 198,
-    dataEntrega: 54,
-    dataInicio: 54,
-    status: 137,
-    vendedor: 104,
+    cliente: 186,
+    dataEntrega: 46,
+    dataInicio: 46,
+    etapa: 112,
+    status: 70,
+    vendedor: 87,
   },
 };
 
@@ -119,7 +122,7 @@ function generateWeeklyStyledPdf(weeklyResult: FichaListResult, filters: FichaFi
 
   drawPageHeader(doc, {
     filters: formatFilters(filters),
-    subtitle: "Compacto por personalização, com atrasados em prioridade e espaço de status para anotação.",
+    subtitle: "Compacto por personalização, com atrasados em prioridade e status de produção.",
     title: modeMeta.title,
   });
 
@@ -152,7 +155,7 @@ function buildWeeklySections(overdueFichas: FichaListItem[], weeklyFichas: Ficha
     sections.push({
       groups: groupRowsByPersonalizacao(overdueFichas, "overdue"),
       summary: `${formatNumber(overdueFichas.length)} ficha(s) atrasada(s) pedindo ação imediata.`,
-      title: "Atrasados com prioridade",
+      title: "Atrasadas com prioridade",
       tone: "danger",
     });
   }
@@ -216,6 +219,7 @@ function toPdfRow(ficha: FichaListItem): PdfRow {
     cliente: overdue ? `${clienteBase} · ${getFichaOverdueDays(ficha)}d atrasada` : clienteBase,
     dataEntrega: formatShortDate(ficha.data_entrega),
     dataInicio: ficha.data_inicio ? formatShortDate(ficha.data_inicio) : "—",
+    etapa: getKanbanColumnLabel(ficha.kanban_column?.slug ?? ficha.kanban_status, ficha.arte, ficha.kanban_column?.name),
     isOverdue: overdue,
     personalizacao: normalizePersonalizacaoLabel(ficha.arte),
     statusBadgeLabel: overdue ? "Atrasado" : STATUS_LABELS[ficha.status],
@@ -260,8 +264,10 @@ function drawPageHeader(doc: jsPDF, content: { filters: string; subtitle: string
 }
 
 function drawSummaryStrip(doc: jsPDF, overdueRows: FichaListItem[], weeklyRows: FichaListItem[], sections: PdfSection[], weeklyLabel: string) {
+  const previousOverdueCount = overdueRows.length + weeklyRows.filter((ficha) => isFichaOverdue(ficha)).length;
   const summaryItems: PdfSummaryItem[] = [
-    { label: "Atrasados", tone: "danger" as const, value: overdueRows.length },
+    { label: "Atrasadas anteriores", tone: previousOverdueCount > 0 ? "danger" : "info", value: previousOverdueCount },
+    { label: "Atrasadas atuais", tone: "info", value: 0 },
     { label: weeklyLabel, tone: "info" as const, value: weeklyRows.length },
     { label: "Personalizações", tone: "info" as const, value: sections.reduce((total, section) => total + section.groups.length, 0) },
   ];
@@ -333,11 +339,10 @@ function drawGroupHeader(doc: jsPDF, topY: number, label: string, count: number,
 
 function drawPaginatedGroup(doc: jsPDF, cursorY: number, group: PdfGroup, tone: SectionTone) {
   let rowIndex = 0;
-  let chunkIndex = 0;
 
   while (rowIndex < group.rows.length) {
     cursorY = ensureSectionSpace(doc, cursorY, 28 + 20 + TABLE.rowHeight);
-    cursorY = drawGroupHeader(doc, cursorY, chunkIndex === 0 ? group.label : `${group.label} · continua`, group.rows.length, tone);
+    cursorY = drawGroupHeader(doc, cursorY, group.label, group.rows.length, tone);
     cursorY = drawTableHeader(doc, cursorY);
 
     while (rowIndex < group.rows.length && cursorY + TABLE.rowHeight <= PAGE.height - PAGE.marginBottom) {
@@ -349,7 +354,6 @@ function drawPaginatedGroup(doc: jsPDF, cursorY: number, group: PdfGroup, tone: 
       doc.addPage("a4", "portrait");
       drawContinuationHeader(doc);
       cursorY = 50;
-      chunkIndex += 1;
       continue;
     }
 
@@ -374,6 +378,7 @@ function drawTableHeader(doc: jsPDF, topY: number) {
   const columns = getColumnPositions();
   doc.text("Cliente", columns.cliente + 8, topY + 13);
   doc.text("Vendedor", columns.vendedor + 8, topY + 13);
+  doc.text("Etapa", columns.etapa + 8, topY + 13);
   doc.text("Início", columns.dataInicio + 8, topY + 13);
   doc.text("Entrega", columns.dataEntrega + 8, topY + 13);
   doc.text("Status", columns.status + 8, topY + 13);
@@ -400,6 +405,7 @@ function drawCompactRow(doc: jsPDF, topY: number, row: PdfRow, index: number) {
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.text);
   doc.text(truncateText(doc, row.vendedor, TABLE.widths.vendedor - 14), columns.vendedor + 8, topY + 15);
+  doc.text(truncateText(doc, row.etapa, TABLE.widths.etapa - 14), columns.etapa + 8, topY + 15);
   doc.text(row.dataInicio, columns.dataInicio + 8, topY + 15);
   doc.text(row.dataEntrega, columns.dataEntrega + 8, topY + 15);
 
@@ -421,7 +427,6 @@ function drawStatusCell(doc: jsPDF, x: number, y: number, label: string, tone: B
   doc.text(sanitizePdfText(label), x + badgeWidth / 2, y + 8.8, { align: "center" });
 
   doc.setDrawColor(...COLORS.border);
-  doc.roundedRect(x + badgeWidth + 6, y - 0.5, 68, 14, 4, 4, "S");
 }
 
 function drawEmptyState(doc: jsPDF, topY: number, message: string) {
@@ -450,20 +455,17 @@ function ensureSectionSpace(doc: jsPDF, cursorY: number, requiredHeight: number)
 function drawContinuationHeader(doc: jsPDF) {
   doc.setDrawColor(...COLORS.border);
   doc.line(PAGE.marginHorizontal, 34, PAGE.width - PAGE.marginHorizontal, 34);
-  doc.setTextColor(...COLORS.muted);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text("Planejamento de produção · continuação", PAGE.marginHorizontal, 22);
 }
 
 function getColumnPositions() {
   const cliente = PAGE.marginHorizontal;
   const vendedor = cliente + TABLE.widths.cliente;
-  const dataInicio = vendedor + TABLE.widths.vendedor;
+  const etapa = vendedor + TABLE.widths.vendedor;
+  const dataInicio = etapa + TABLE.widths.etapa;
   const dataEntrega = dataInicio + TABLE.widths.dataInicio;
   const status = dataEntrega + TABLE.widths.dataEntrega;
 
-  return { cliente, dataEntrega, dataInicio, status, vendedor };
+  return { cliente, dataEntrega, dataInicio, etapa, status, vendedor };
 }
 
 function truncateText(doc: jsPDF, value: string, maxWidth: number) {
@@ -473,11 +475,11 @@ function truncateText(doc: jsPDF, value: string, maxWidth: number) {
   }
 
   let text = sanitized;
-  while (text.length > 1 && doc.getTextWidth(`${text}…`) > maxWidth) {
+  while (text.length > 1 && doc.getTextWidth(`${text}...`) > maxWidth) {
     text = text.slice(0, -1);
   }
 
-  return `${text}…`;
+  return `${text}...`;
 }
 
 function getStatusTone(status: FichaStatus): BadgeTone {
@@ -510,7 +512,7 @@ function generateDefaultOperationalPdf(result: FichaListResult, filters: FichaFi
 
   drawPageHeader(doc, {
     filters: formatFilters(filters),
-    subtitle: "Visão operacional agrupada por data de entrega e personalização, mantendo a mesma leitura compacta dos recortes semanais.",
+    subtitle: "Visão operacional simples do recorte atual, agrupada por personalização.",
     title: "Relatório Operacional de Fichas",
   });
 
@@ -535,56 +537,30 @@ function generateDefaultOperationalPdf(result: FichaListResult, filters: FichaFi
   return Buffer.from(doc.output("arraybuffer"));
 }
 
-function groupByDateAndPersonalizacao(fichas: FichaListItem[]) {
-  const dateGroups = new Map<string, Map<string, FichaListItem[]>>();
-
-  for (const ficha of fichas) {
-    const dateLabel = formatLongDate(ficha.data_entrega);
-    const personalization = normalizePersonalizacaoLabel(ficha.arte);
-    const personalizationGroups = dateGroups.get(dateLabel) ?? new Map<string, FichaListItem[]>();
-    const current = personalizationGroups.get(personalization) ?? [];
-    current.push(ficha);
-    personalizationGroups.set(personalization, current);
-    dateGroups.set(dateLabel, personalizationGroups);
+function buildDefaultOperationalSections(fichas: FichaListItem[]) {
+  if (fichas.length === 0) {
+    return [];
   }
 
-  return Array.from(dateGroups.entries()).map(([dateLabel, personalizationGroups]) => ({
-    dateLabel,
-    groups: Array.from(personalizationGroups.entries())
-      .map(([label, groupFichas]) => ({
-        fichas: groupFichas,
-        label,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
-  }));
-}
+  const overdueCount = fichas.filter((ficha) => isFichaOverdue(ficha)).length;
+  const groups = groupRowsByPersonalizacao(fichas, "upcoming");
+  const summaryParts = [
+    `${formatNumber(fichas.length)} ficha(s)`,
+    `${formatNumber(groups.length)} personalização(ões)`,
+  ];
 
-function buildDefaultOperationalSections(fichas: FichaListItem[]) {
-  return groupByDateAndPersonalizacao(fichas).map((group) => {
-    const overdueCount = group.groups.reduce(
-      (total, personalizationGroup) => total + personalizationGroup.fichas.filter((ficha) => isFichaOverdue(ficha)).length,
-      0,
-    );
-    const rowCount = group.groups.reduce((total, personalizationGroup) => total + personalizationGroup.fichas.length, 0);
-    const summaryParts = [
-      `${formatNumber(group.groups.length)} personalização(ões)`,
-      `${formatNumber(rowCount)} ficha(s)`,
-    ];
+  if (overdueCount > 0) {
+    summaryParts.push(`${formatNumber(overdueCount)} atrasada(s)`);
+  }
 
-    if (overdueCount > 0) {
-      summaryParts.push(`${formatNumber(overdueCount)} atrasada(s)`);
-    }
-
-    return {
-      groups: group.groups.map((personalizationGroup) => ({
-        label: personalizationGroup.label,
-        rows: personalizationGroup.fichas.map(toPdfRow).sort((a, b) => comparePdfRows(a, b, "upcoming")),
-      })),
+  return [
+    {
+      groups,
       summary: summaryParts.join(" · "),
-      title: group.dateLabel,
+      title: "Fichas do recorte",
       tone: overdueCount > 0 ? "danger" : "info",
-    } satisfies PdfSection;
-  });
+    } satisfies PdfSection,
+  ];
 }
 
 function renderFallbackPdf(doc: jsPDF, title: string, message: string) {
@@ -598,23 +574,17 @@ function renderFallbackPdf(doc: jsPDF, title: string, message: string) {
 }
 
 function buildDefaultOperationalSummaryItems(fichas: FichaListItem[], sections: PdfSection[]): PdfSummaryItem[] {
+  const overdueCount = fichas.filter((ficha) => isFichaOverdue(ficha)).length;
+
   return [
     { label: "Fichas", tone: "info", value: fichas.length },
-    { label: "Datas", tone: "info", value: sections.length },
+    { label: "Atrasadas", tone: overdueCount > 0 ? "danger" : "info", value: overdueCount },
     { label: "Personalizações", tone: "info", value: sections.reduce((total, section) => total + section.groups.length, 0) },
   ];
 }
 
 function sanitizePdfText(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-function formatLongDate(value: string) {
-  return formatDateInput(value, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return value;
 }
 
 function formatShortDate(value: string) {
@@ -627,14 +597,58 @@ function formatDateTime(value: Date) {
 
 function formatFilters(filters: FichaFilters) {
   const entries = [
-    filters.busca ? `busca=${filters.busca}` : "",
-    filters.status ? `status=${filters.status}` : "",
-    typeof filters.evento === "boolean" ? `evento=${filters.evento ? "sim" : "não"}` : "",
-    filters.dataInicio ? `inicio=${filters.dataInicio}` : "",
-    filters.dataFim ? `fim=${filters.dataFim}` : "",
+    formatPeriodFilter(filters.dataInicio, filters.dataFim),
+    filters.busca ? `Busca: ${filters.busca}` : "",
+    filters.status ? `Status: ${formatStatusFilter(filters.status)}` : "",
+    typeof filters.evento === "boolean" ? `Evento: ${filters.evento ? "sim" : "não"}` : "",
   ].filter(Boolean);
 
   return entries.length ? entries.join(", ") : "sem filtros";
+}
+
+function formatPeriodFilter(dataInicio?: string, dataFim?: string) {
+  if (dataInicio && dataFim) {
+    return `Período: ${formatDateInputLong(dataInicio)} a ${formatDateInputLong(dataFim)}`;
+  }
+
+  if (dataInicio) {
+    return `A partir de ${formatDateInputLong(dataInicio)}`;
+  }
+
+  if (dataFim) {
+    return `Até ${formatDateInputLong(dataFim)}`;
+  }
+
+  return "";
+}
+
+function formatDateInputLong(value: string) {
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) {
+    return value;
+  }
+
+  return `${day}/${month}/${year}`;
+}
+
+function formatStatusFilter(status: FichaFilters["status"]) {
+  if (status === "atrasado") {
+    return "Atrasadas";
+  }
+
+  if (status === "pendente") {
+    return "Pendentes";
+  }
+
+  if (status === "entregue") {
+    return "Entregues";
+  }
+
+  if (status === "cancelado") {
+    return "Canceladas";
+  }
+
+  return status ?? "";
 }
 
 function formatNumber(value: number) {

@@ -1,10 +1,11 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { CalendarDays, FileSpreadsheet, FileText, Search } from "lucide-react";
-import { Badge, Button, EmptyState } from "@/components/ui";
+import { Button, EmptyState, Tooltip } from "@/components/ui";
 import { formatDateInput } from "@/lib/dates";
 import type { RelatorioData, RelatorioFilters, RelatorioRankItem, RelatorioResult, RelatorioVendedor } from "./data";
 import { buildRelatorioSearchParams } from "./data";
+import { RelatorioMotionBar, RelatorioMotionBlock, RelatorioMotionListItem, RelatorioMotionSection } from "./relatorios-motion";
 
 type RelatoriosOverviewProps = {
   filters: RelatorioFilters;
@@ -17,6 +18,8 @@ const periodOptions = [
   { label: "Este Ano", value: "ano" },
   { label: "Personalizado", value: "customizado" },
 ] as const;
+
+const RANK_VISIBLE_LIMIT = 8;
 
 export function RelatoriosOverview({ filters, result }: RelatoriosOverviewProps) {
   if (result.kind === "not-configured") {
@@ -57,13 +60,13 @@ function RelatoriosHeader({ filters }: { filters: RelatorioFilters }) {
     <header className="relatorios-view__header">
       <div className="page-heading">
         <div className="page-heading__copy">
-          <Badge tone="info">Relatórios</Badge>
+          <p className="eyebrow">Relatórios</p>
           <h1 id="relatorios-title" className="app-title">
-            Relatórios e Estatísticas
+            Relatórios
           </h1>
         </div>
         <div className="relatorios-actions">
-          <Link className="ui-button ui-button--secondary" href={`/fichas/pdf${suffix}`}>
+          <Link className="ui-button ui-button--secondary" href={`/relatorios/pdf${suffix}`}>
             <FileText aria-hidden="true" size={18} />
             Exportar PDF
           </Link>
@@ -131,30 +134,27 @@ function RelatoriosContent({ data }: { data: RelatorioData }) {
       </div>
 
       <div className="relatorios-summary" aria-label="Estatísticas principais">
-        <SummaryCard label="Fichas Entregues" value={data.resumo.fichasEntregues} tone="success" />
-        <SummaryCard label="Fichas Pendentes" value={data.resumo.fichasPendentes} tone="warning" />
-        <SummaryCard label="Itens Confeccionados" value={data.resumo.itensConfeccionados} />
-        <SummaryCard label="Novos Clientes" value={data.resumo.novosClientes} />
+        <SummaryCard delay={0} label="Fichas Entregues" value={data.resumo.fichasEntregues} tone="success" />
+        <SummaryCard delay={0.04} label="Fichas Pendentes" value={data.resumo.fichasPendentes} tone="warning" />
+        <SummaryCard delay={0.08} label="Itens Confeccionados" value={data.resumo.itensConfeccionados} />
+        <SummaryCard delay={0.12} label="Novos Clientes" value={data.resumo.novosClientes} />
       </div>
 
       <div className="relatorios-panels">
-        <section className="relatorios-panel" aria-labelledby="atividade-title">
+        <RelatorioMotionSection className="relatorios-panel" aria-labelledby="atividade-title">
           <PanelTitle id="atividade-title" title="Atividade de Criação de Fichas" />
           <ActivityHeatmap data={data.atividade} />
-        </section>
+        </RelatorioMotionSection>
 
-        <section className="relatorios-panel" aria-labelledby="taxa-entrega-title">
-          <PanelTitle id="taxa-entrega-title" title="Taxa de Entrega" />
-          <div className="relatorios-rate">
-            <strong>{formatNumber(data.resumo.taxaEntrega)}%</strong>
-            <span>
-              {formatNumber(data.resumo.fichasEntregues)} entregues de {formatNumber(data.resumo.totalFichas)} fichas no período
-            </span>
+        <RelatorioMotionSection className="relatorios-panel" aria-labelledby="taxa-entrega-title" delay={0.06}>
+          <PanelTitle id="taxa-entrega-title" title="Entrega" />
+          <div className="relatorios-context">
+            <DeliveryRateSummary data={data} />
           </div>
-        </section>
+        </RelatorioMotionSection>
       </div>
 
-      <section className="relatorios-panel" aria-labelledby="comparativo-title">
+      <RelatorioMotionSection className="relatorios-panel" aria-labelledby="comparativo-title">
         <PanelTitle id="comparativo-title" title="Comparativo com Período Anterior" />
         <div className="relatorios-comparison">
           <ComparisonItem label="Fichas" value={data.comparativo.fichas} />
@@ -162,22 +162,12 @@ function RelatoriosContent({ data }: { data: RelatorioData }) {
           <ComparisonItem label="Clientes" value={data.comparativo.clientes} />
           <ComparisonItem label="Taxa de entrega" suffix="%" value={data.comparativo.taxaEntrega} />
         </div>
-      </section>
+      </RelatorioMotionSection>
 
-      <div className="relatorios-panels">
-        <section className="relatorios-panel" aria-labelledby="top-vendedor-title">
-          <PanelTitle id="top-vendedor-title" title="Top Vendedor" />
-          <div className="relatorios-featured">
-            <strong>{data.resumo.topVendedor ?? "Nenhum"}</strong>
-            <span>{formatNumber(data.resumo.topVendedorTotal)} fichas no período</span>
-          </div>
-        </section>
-      </div>
-
-      <section className="relatorios-panel" aria-labelledby="vendedores-title">
+      <RelatorioMotionSection className="relatorios-panel" aria-labelledby="vendedores-title">
         <PanelTitle id="vendedores-title" title="Resumo por Vendedor" />
         <VendedoresList vendedores={data.rankings.vendedores} />
-      </section>
+      </RelatorioMotionSection>
 
       <div className="relatorios-panels">
         <RankPanel id="materiais-title" items={data.rankings.materiais} title="Análise por Material" />
@@ -196,20 +186,81 @@ function RelatoriosContent({ data }: { data: RelatorioData }) {
 
 function ActivityHeatmap({ data }: { data: RelatorioData["atividade"] }) {
   const total = data.reduce((sum, day) => sum + day.count, 0);
+  const leadingCells = data[0] ? getBusinessWeekdayIndex(data[0].date) : 0;
+  const columns = Math.max(1, Math.ceil((leadingCells + data.length) / 5));
+  const monthLabels = getActivityMonthLabels(data, leadingCells);
 
   return (
     <div className="relatorios-activity">
-      <div className="relatorios-activity__grid" aria-label={`Atividade dos últimos 365 dias com ${formatNumber(total)} fichas`}>
-        {data.map((day) => (
-          <span
-            aria-label={`${formatDate(day.date)}: ${formatNumber(day.count)} ficha(s)`}
-            className={`relatorios-activity__cell relatorios-activity__cell--${day.level}`}
-            key={day.date}
-            title={`${formatDate(day.date)}: ${formatNumber(day.count)} ficha(s)`}
-          />
+      <div className="relatorios-activity__months" style={{ "--activity-columns": columns } as CSSProperties} aria-hidden="true">
+        {monthLabels.map((month) => (
+          <span key={`${month.label}-${month.column}`} style={{ gridColumn: `${month.column} / span 4` }}>
+            {month.label}
+          </span>
         ))}
       </div>
-      <p>{formatNumber(total)} fichas criadas nos últimos 365 dias.</p>
+      <div className="relatorios-activity__body">
+        <div className="relatorios-activity__weekdays" aria-hidden="true">
+          <span>Seg</span>
+          <span>Qua</span>
+          <span>Sex</span>
+        </div>
+        <div
+          className="relatorios-activity__grid"
+          style={{ "--activity-columns": columns } as CSSProperties}
+          aria-label={`Atividade dos últimos 365 dias úteis com ${formatNumber(total)} fichas`}
+        >
+          {Array.from({ length: leadingCells }).map((_, index) => (
+            <span aria-hidden="true" className="relatorios-activity__cell relatorios-activity__cell--empty" key={`empty-${index}`} />
+          ))}
+          {data.map((day) => (
+            <Tooltip label={`${formatDate(day.date)}: ${formatNumber(day.count)} ficha(s)`} key={day.date}>
+              <span
+                aria-label={`${formatDate(day.date)}: ${formatNumber(day.count)} ficha(s)`}
+                className={`relatorios-activity__cell relatorios-activity__cell--${day.level}`}
+                tabIndex={0}
+              />
+            </Tooltip>
+          ))}
+        </div>
+      </div>
+      <p>{formatNumber(total)} fichas criadas nos últimos 365 dias úteis.</p>
+    </div>
+  );
+}
+
+function DeliveryRateSummary({ data }: { data: RelatorioData }) {
+  const taxaEntrega = data.resumo.taxaEntrega;
+  const style = {
+    "--delivery-angle": `${Math.max(0, Math.min(taxaEntrega, 100)) * 3.6}deg`,
+    "--delivery-color": getDeliveryColor(taxaEntrega),
+  } as CSSProperties;
+
+  return (
+    <div className="relatorios-delivery">
+      <div
+        aria-label={`${formatNumber(taxaEntrega)}% de taxa de entrega`}
+        className="relatorios-delivery__meter"
+        style={style}
+      >
+        <span>{formatNumber(taxaEntrega)}%</span>
+      </div>
+      <div className="relatorios-delivery__copy">
+        <div>
+          <strong>{formatNumber(data.resumo.fichasEntregues)}</strong>
+          <span>entregues no período</span>
+        </div>
+        <dl>
+          <div>
+            <dt>Recorte anterior</dt>
+            <dd>{formatNumber(data.resumo.entregasRecorteAnterior)}</dd>
+          </div>
+          <div>
+            <dt>Recorte anual</dt>
+            <dd>{formatNumber(data.resumo.entregasAnoAtual)}</dd>
+          </div>
+        </dl>
+      </div>
     </div>
   );
 }
@@ -222,6 +273,7 @@ function ComparisonItem({ label, suffix = "", value }: { label: string; suffix?:
     <div className={`relatorios-comparison__item relatorios-comparison__item--${tone}`}>
       <span>{label}</span>
       <strong>
+        <span aria-hidden="true" className="relatorios-comparison__trend" />
         {sign}
         {formatNumber(value)}
         {suffix}
@@ -230,12 +282,22 @@ function ComparisonItem({ label, suffix = "", value }: { label: string; suffix?:
   );
 }
 
-function SummaryCard({ label, tone = "info", value }: { label: string; tone?: "info" | "success" | "warning"; value: number }) {
+function SummaryCard({
+  delay,
+  label,
+  tone = "info",
+  value,
+}: {
+  delay: number;
+  label: string;
+  tone?: "info" | "success" | "warning";
+  value: number;
+}) {
   return (
-    <div className={`relatorios-summary__card relatorios-summary__card--${tone}`}>
+    <RelatorioMotionBlock className={`relatorios-summary__card relatorios-summary__card--${tone}`} delay={delay}>
       <span>{label}</span>
       <strong>{formatNumber(value)}</strong>
-    </div>
+    </RelatorioMotionBlock>
   );
 }
 
@@ -250,52 +312,70 @@ function VendedoresList({ vendedores }: { vendedores: RelatorioVendedor[] }) {
 
   return (
     <ol className="relatorios-rank-list">
-      {vendedores.map((vendedor) => (
-        <li key={vendedor.label}>
-          <div className="relatorios-rank-list__header">
-            <strong>{vendedor.label}</strong>
-            <span>{formatNumber(vendedor.totalFichas)} fichas</span>
-          </div>
-          <span
-            aria-label={`${vendedor.percent}% do maior volume de fichas por vendedor`}
-            className="relatorios-rank-bar"
-            style={{ "--bar-size": `${vendedor.percent}%` } as CSSProperties}
+      {vendedores.slice(0, RANK_VISIBLE_LIMIT).map((vendedor, index) => (
+        <RelatorioMotionListItem delay={index * 0.025} key={vendedor.label}>
+          <RankHeader
+            label={vendedor.label}
+            value={`${formatNumber(vendedor.totalFichas)} fichas`}
           />
-          <p>
+          <RankBar ariaLabel={`${vendedor.percent}% do maior volume de fichas por vendedor`} percent={vendedor.percent} />
+          <p className="relatorios-rank-list__meta">
             {formatNumber(vendedor.totalItens)} itens · {formatNumber(vendedor.entregues)} entregues · {formatNumber(vendedor.pendentes)} pendentes
           </p>
-        </li>
+        </RelatorioMotionListItem>
       ))}
+      <RankOverflow total={vendedores.length} />
     </ol>
   );
 }
 
 function RankPanel({ id, items, title }: { id: string; items: RelatorioRankItem[]; title: string }) {
   return (
-    <section className="relatorios-panel" aria-labelledby={id}>
+    <RelatorioMotionSection className="relatorios-panel" aria-labelledby={id}>
       <PanelTitle id={id} title={title} />
       {items.length === 0 ? (
         <p className="relatorios-muted">Nenhum dado encontrado no período.</p>
       ) : (
         <ol className="relatorios-rank-list">
-          {items.map((item) => (
-            <li key={item.label}>
-              <div className="relatorios-rank-list__header">
-                <strong>{item.label}</strong>
-                <span>{formatNumber(item.totalItens)} itens</span>
-              </div>
-              <span
-                aria-label={`${item.percent}% do maior volume do ranking`}
-                className="relatorios-rank-bar"
-                style={{ "--bar-size": `${item.percent}%` } as CSSProperties}
-              />
-              <p>{formatNumber(item.totalFichas)} fichas</p>
-            </li>
+          {items.slice(0, RANK_VISIBLE_LIMIT).map((item, index) => (
+            <RelatorioMotionListItem delay={index * 0.025} key={item.label}>
+              <RankHeader label={item.label} value={`${formatNumber(item.totalItens)} itens`} />
+              <RankBar ariaLabel={`${item.percent}% do maior volume da lista`} percent={item.percent} />
+              <p className="relatorios-rank-list__meta">{formatNumber(item.totalFichas)} fichas</p>
+            </RelatorioMotionListItem>
           ))}
+          <RankOverflow total={items.length} />
         </ol>
       )}
-    </section>
+    </RelatorioMotionSection>
   );
+}
+
+function RankHeader({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="relatorios-rank-list__header">
+      <strong>{label}</strong>
+      <span>{value}</span>
+    </div>
+  );
+}
+
+function RankBar({ ariaLabel, percent }: { ariaLabel: string; percent: number }) {
+  return (
+    <span aria-label={ariaLabel} className="relatorios-rank-bar">
+      <RelatorioMotionBar className="relatorios-rank-bar__fill" percent={percent} />
+    </span>
+  );
+}
+
+function RankOverflow({ total }: { total: number }) {
+  const hidden = total - RANK_VISIBLE_LIMIT;
+
+  if (hidden <= 0) {
+    return null;
+  }
+
+  return <li className="relatorios-rank-list__overflow">e mais {formatNumber(hidden)}</li>;
 }
 
 function formatNumber(value: number) {
@@ -304,4 +384,40 @@ function formatNumber(value: number) {
 
 function formatDate(value: string) {
   return formatDateInput(value);
+}
+
+function getBusinessWeekdayIndex(value: string) {
+  const day = new Date(`${value}T00:00:00.000Z`).getUTCDay();
+  return Math.max(0, Math.min((day + 6) % 7, 4));
+}
+
+function getActivityMonthLabels(data: RelatorioData["atividade"], leadingCells: number) {
+  let currentMonth = "";
+
+  return data.reduce<Array<{ column: number; label: string }>>((labels, day, index) => {
+    const month = day.date.slice(0, 7);
+
+    if (month === currentMonth) {
+      return labels;
+    }
+
+    currentMonth = month;
+    labels.push({
+      column: Math.floor((leadingCells + index) / 5) + 1,
+      label: formatMonth(day.date),
+    });
+    return labels;
+  }, []);
+}
+
+function formatMonth(value: string) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return new Intl.DateTimeFormat("pt-BR", { month: "short", timeZone: "UTC" }).format(date).replace(".", "");
+}
+
+function getDeliveryColor(value: number) {
+  if (value >= 90) return "#237804";
+  if (value >= 70) return "#d4a106";
+  if (value >= 40) return "#d46b08";
+  return "#cf1322";
 }

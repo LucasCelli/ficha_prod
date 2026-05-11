@@ -34,14 +34,25 @@ export async function GET(request: NextRequest) {
   };
   const result = await listFichasForOperationalPdf(filters);
   const weeklyMode = resolveWeeklyPdfMode(filters.dataInicio, filters.dataFim, filters.id, filters.status);
+  const includeOverdue = request.nextUrl.searchParams.get("incluirAtrasadas") === "true";
+  const overdueResult = weeklyMode && includeOverdue
+    ? await listFichasForOperationalPdf({
+        ...filters,
+        dataFim: undefined,
+        dataInicio: undefined,
+        page: undefined,
+        status: "atrasado",
+      })
+    : undefined;
   const pdf = generateOperationalFichasPdf(result, filters, {
+    overdueResult,
     weeklyMode,
   });
 
   return new Response(pdf, {
     headers: {
       "Cache-Control": "no-store",
-      "Content-Disposition": `attachment; filename="${buildFileName(filters, weeklyMode)}"`,
+      "Content-Disposition": `attachment; filename="${buildFileName(filters, weeklyMode, includeOverdue)}"`,
       "Content-Type": "application/pdf",
     },
   });
@@ -57,11 +68,13 @@ function buildFileName(
     status?: string;
   },
   weeklyMode?: WeeklyPdfMode,
+  includeOverdue = false,
 ) {
   const parts = [
     "fichas",
     "operacional",
     weeklyMode === "current-week" ? "esta-semana" : weeklyMode === "next-week" ? "proxima-semana" : "",
+    includeOverdue ? "com-atrasadas" : "",
     filters.status ? sanitizeFileSegment(filters.status) : "",
     filters.evento === true ? "evento" : "",
     filters.busca ? sanitizeFileSegment(filters.busca) : "",

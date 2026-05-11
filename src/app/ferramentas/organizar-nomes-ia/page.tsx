@@ -4,9 +4,9 @@ import { getDefaultAiModelOption } from "@/lib/ai/model-options";
 import { getAiProvider } from "@/lib/ai/providers";
 
 export const metadata: Metadata = {
-  title: "IA | Fichas Tecnicas",
+  title: "Organizar nomes com IA | Fichas Tecnicas",
 };
 
-export default function IaPage() {
+export default function OrganizarNomesIaPage() {
   return <UniformListParserDemo defaultModelValue={getDefaultAiModelOption(getAiProvider()).value} />;
 }

@@ -1,5 +1,46 @@
 # Registro de alteracoes
 
+## 2026-05-10 - Ferramentas: hub e rota de IA
+
+- Fase/modulo: Ferramentas / organizacao de nomes com IA.
+- Arquivos alterados: `src/app/ferramentas/page.tsx`, `src/app/ferramentas/organizar-nomes-ia/page.tsx`, `src/lib/navigation.ts`, `src/components/ui/app-navigation.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: a antiga entrada `/ia` foi substituida por `/ferramentas`; a ferramenta de organizar nomes com IA passou a viver em `/ferramentas/organizar-nomes-ia`.
+- Resultado: `/ferramentas` virou um hub simples para futuras microfuncoes internas.
+- Decisao: manter a ferramenta acessivel para usuarios autenticados em geral, preservando o comportamento anterior de acesso.
+- Validacao: `npm run lint`, `npm run build`, `npm run typecheck` e `git diff --check` passaram; `npm run supabase:check` falhou por ausencia de `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` no ambiente atual.
+
+## 2026-05-10 - Fichas: PDF operacional simplificado
+
+- Fase/modulo: Fichas / exportacao PDF operacional.
+- Arquivos alterados: `src/app/fichas/pdf/route.ts`, `src/features/fichas/fichas-filter-toolbar.tsx`, `src/features/fichas/operational-pdf.ts`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: o PDF de `/fichas/pdf` deixou de separar a lista por datas dentro do proprio filtro; agora usa uma secao unica `Fichas do recorte`, com grupos por personalizacao.
+- Resultado: o campo vazio especial de anotacao ao lado do status foi removido, deixando a tabela mais direta.
+- Correcao posterior: o PDF deixou de remover acentos dos textos antes de desenhar, preservando `Sublimação`, `Produção`, `Personalizações` e demais labels em PT-BR.
+- Correcao posterior: removidos os sufixos/cabecalhos redundantes de continuidade como `continua` e `continuação` nas quebras de pagina.
+- Refinamento: a coluna de cliente ganhou mais largura, a coluna de status foi reduzida e o resumo trocou `Datas` por `Atrasadas`.
+- Correcao posterior: no PDF semanal, o resumo passou a separar `Atrasadas anteriores` e `Atrasadas atuais`, tratando como anteriores as fichas da propria lista que ja venceram antes do dia atual.
+- Correcao posterior: o PDF de `Proxima semana` passou a incluir tambem o bloco de atrasadas com prioridade, a tabela ganhou a coluna `Etapa` com label ajustado pela personalizacao, e o cabecalho passou a exibir o periodo em formato legivel.
+- Decisao: o botao `Exportar PDF` virou um menu com `Somente periodo selecionado` e `Incluir atrasadas`; a rota so inclui atrasadas quando recebe `incluirAtrasadas=true`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e varredura dirigida por termos sem acento/continuidade redundante passaram.
+
+## 2026-05-10 - Relatorios: reforma visual do overview
+
+- Fase/modulo: Relatorios / overview e exportacao.
+- Arquivos alterados: `src/features/relatorios/data.ts`, `src/features/relatorios/relatorios-overview.tsx`, `src/features/relatorios/relatorios-motion.tsx`, `src/app/relatorios/excel/route.ts`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: `/relatorios` passou a usar `eyebrow` no header, titulo curto, toolbar com os cinco filtros alinhados, cards de resumo com acento visual, comparativo com contraste melhor, heatmap com orientacao por meses/dias e tooltips, ranking numerado com destaque para top 3, limite visual de 8 itens e indicador de excedentes.
+- Correcao posterior: removido qualquer destaque de vendedor no overview e na exportacao; os campos derivados de top vendedor tambem sairam de `RelatorioData`.
+- Correcao posterior: removidos icones de medalha e marcadores visuais de podium das listas, mantendo leitura analitica simples.
+- Correcao posterior: o heatmap foi aumentado, preso ao overflow horizontal interno do painel e passou a usar escala propria de verde em light/dark mode.
+- Correcao posterior: a animacao dos paineis passou a disparar no mount com duracao mais perceptivel, as barras ganharam preenchimento animado e os blocos foram alinhados pelo inicio em vez de aparentarem centralizacao.
+- Correcao posterior: o disparo de animacao foi trocado para `useInView`, mantendo paineis fora da dobra em estado inicial ate o scroll acionar a entrada; o gatilho foi antecipado para evitar entrada tardia demais.
+- Correcao posterior: o heatmap foi recomposto em tamanho compacto sem overflow horizontal e os labels de personalizacao passaram a sair humanizados, como `Sublimação`, `Serigrafia` e `Bordado`.
+- Correcao posterior: o heatmap passou a renderizar apenas dias uteis, removendo sabados e domingos da grade.
+- Correcao posterior: o bloco `Entrega` ganhou medidor circular com escala vermelho/laranja/amarelo/verde conforme a taxa, contagem de entregues no periodo e comparativos de mes anterior e ano todo.
+- Correcao posterior: o comparativo de entrega passou a usar `recorte atual`, `recorte anterior` e `recorte anual`; o PDF de `/relatorios` agora tem rota propria em `/relatorios/pdf`, e o XLSX ganhou uma secao `Entrega` com esses mesmos dados.
+- Decisao: usar `motion` em um leaf client dedicado para micro-animacoes da tela e `exceljs` na rota `/relatorios/excel`, substituindo o HTML `.xls` por workbook `.xlsx` real.
+- Validacao: `npm run typecheck`, `npm run lint` e `npm run build` passaram. Browser em `localhost:3000/relatorios` validado em light e dark mode sem destaque de vendedor, sem medalhas e sem overflow externo no heatmap.
+- Caveat: `npm run supabase:check` falhou porque o ambiente atual nao expôs `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` para o script. Na validacao final desta rodada, o `next dev` em foreground chegou a `Ready`, mas o processo local nao permaneceu ativo em background para nova captura visual.
+
 ## 2026-05-10 - IA: modelos OpenRouter adicionais
 
 - Fase/modulo: IA interna / modelos.

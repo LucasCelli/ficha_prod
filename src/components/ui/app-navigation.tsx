@@ -10,7 +10,7 @@ import {
   Database,
   BarChart3,
   Columns3,
-  WandSparkles,
+  Wrench,
 } from "lucide-react";
 import { mainNavigation } from "@/lib/navigation";
 import type { AppUserRole } from "@/features/auth/types";
@@ -19,7 +19,7 @@ const iconMap: Record<string, typeof Home> = {
   "/": Home,
   "/fichas": FileText,
   "/quadro-producao": Columns3,
-  "/ia": WandSparkles,
+  "/ferramentas": Wrench,
   "/clientes": Users,
   "/catalogos": Database,
   "/usuarios": UserCog,

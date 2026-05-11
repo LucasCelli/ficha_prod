@@ -65,11 +65,11 @@ export type RelatorioData = {
   resumo: {
     fichasEntregues: number;
     fichasPendentes: number;
+    entregasAnoAtual: number;
+    entregasRecorteAnterior: number;
     itensConfeccionados: number;
     novosClientes: number;
     taxaEntrega: number;
-    topVendedor: string | null;
-    topVendedorTotal: number;
     totalFichas: number;
   };
   rankings: {
@@ -110,9 +110,17 @@ export async function getRelatorioData(filters: RelatorioFilters): Promise<Relat
     const range = getPeriodRange(filters);
     const previousRange = getPreviousPeriodRange(range);
     const activityRange = getActivityRange();
+    const deliveryYearRange = getYearToDateRange();
     const supabase = createServerSupabaseClient();
 
-    const [fichasResult, clientesResult, previousFichasResult, previousClientesResult, activityFichasResult] = await Promise.all([
+    const [
+      fichasResult,
+      clientesResult,
+      previousFichasResult,
+      previousClientesResult,
+      activityFichasResult,
+      deliveryYearResult,
+    ] = await Promise.all([
       fetchFichas(range, filters),
       supabase.from("clientes").select("primeira_ficha").gte("primeira_ficha", range.start).lte("primeira_ficha", range.end).limit(MAX_ROWS),
       fetchFichas(previousRange, filters),
@@ -123,6 +131,7 @@ export async function getRelatorioData(filters: RelatorioFilters): Promise<Relat
         .lte("primeira_ficha", previousRange.end)
         .limit(MAX_ROWS),
       fetchFichas(activityRange),
+      fetchFichas(deliveryYearRange, filters),
     ]);
 
     const error =
@@ -130,7 +139,8 @@ export async function getRelatorioData(filters: RelatorioFilters): Promise<Relat
       clientesResult.error ??
       previousFichasResult.error ??
       previousClientesResult.error ??
-      activityFichasResult.error;
+      activityFichasResult.error ??
+      deliveryYearResult.error;
 
     if (error) {
       return {
@@ -168,6 +178,7 @@ export async function getRelatorioData(filters: RelatorioFilters): Promise<Relat
       range,
       activityFichas: activityFichasResult.fichas,
       activityRange,
+      deliveryYearFichas: deliveryYearResult.fichas,
     });
 
     return {
@@ -274,6 +285,7 @@ function buildRelatorioData(input: {
   previousFichas: FichaRow[];
   previousItens: FichaItemRow[];
   range: { end: string; start: string };
+  deliveryYearFichas: FichaRow[];
 }): RelatorioData {
   const itensPorFicha = groupItensByFicha(input.itens);
   const totalFichas = input.fichas.length;
@@ -285,7 +297,6 @@ function buildRelatorioData(input: {
   );
   const taxaEntrega = getPercent(fichasEntregues, fichasEntregues + fichasPendentes);
   const vendedores = buildVendedores(input.fichas, itensPorFicha);
-  const topVendedor = vendedores[0] ?? null;
 
   return {
     atividade: buildActivity(input.activityFichas, input.activityRange),
@@ -309,7 +320,7 @@ function buildRelatorioData(input: {
     })),
     filtros: input.filters,
     periodoLabel: formatPeriodLabel(input.filters.periodo, input.range),
-    personalizacoes: buildRank(input.fichas, itensPorFicha, (ficha) => ficha.arte ?? "Sem tipo definido"),
+    personalizacoes: buildRank(input.fichas, itensPorFicha, (ficha) => formatPersonalizacaoLabel(ficha.arte)),
     rankings: {
       clientes: buildRank(input.fichas, itensPorFicha, (ficha) => ficha.cliente_nome_snapshot),
       materiais: buildRank(input.fichas, itensPorFicha, (ficha) => ficha.material ?? "Não especificado"),
@@ -320,11 +331,11 @@ function buildRelatorioData(input: {
     resumo: {
       fichasEntregues,
       fichasPendentes,
+      entregasAnoAtual: countDelivered(input.deliveryYearFichas),
+      entregasRecorteAnterior: countDelivered(input.previousFichas),
       itensConfeccionados,
       novosClientes: input.clientes.length,
       taxaEntrega,
-      topVendedor: topVendedor?.label ?? null,
-      topVendedorTotal: topVendedor?.totalFichas ?? 0,
       totalFichas,
     },
   };
@@ -343,12 +354,14 @@ function buildActivity(fichas: FichaRow[], range: { end: string; start: string }
   let cursor = range.start;
 
   while (cursor <= range.end) {
-    const count = counts.get(cursor) ?? 0;
-    days.push({
-      count,
-      date: cursor,
-      level: count === 0 ? 0 : Math.max(1, Math.ceil((count / max) * 4)),
-    });
+    if (isBusinessWeekday(cursor)) {
+      const count = counts.get(cursor) ?? 0;
+      days.push({
+        count,
+        date: cursor,
+        level: count === 0 ? 0 : Math.max(1, Math.ceil((count / max) * 4)),
+      });
+    }
     cursor = addDays(cursor, 1);
   }
 
@@ -420,6 +433,37 @@ function buildItemRank(itens: FichaItemRow[], getLabel: (item: FichaItemRow) => 
     }))
     .sort((a, b) => b.totalItens - a.totalItens || a.label.localeCompare(b.label, "pt-BR"))
     .slice(0, 12);
+}
+
+function formatPersonalizacaoLabel(value: string | null) {
+  const normalized = value?.replaceAll("_", " ").replaceAll("-", " ").trim().toLocaleLowerCase("pt-BR");
+
+  if (!normalized) {
+    return "Sem tipo definido";
+  }
+
+  const labels = new Map([
+    ["bordado", "Bordado"],
+    ["dtf", "DTF"],
+    ["dtf textil", "DTF Têxtil"],
+    ["serigrafia", "Serigrafia"],
+    ["silk", "Silk"],
+    ["silk screen", "Silk Screen"],
+    ["sublimacao", "Sublimação"],
+    ["sublimação", "Sublimação"],
+  ]);
+
+  return labels.get(normalized) ?? toTitleCase(normalized);
+}
+
+function toTitleCase(value: string) {
+  return value.replace(/\p{L}[\p{L}\p{M}]*/gu, (word) => {
+    if (word.length <= 3 && word === word.toLocaleUpperCase("pt-BR").toLocaleLowerCase("pt-BR")) {
+      return word.toLocaleUpperCase("pt-BR");
+    }
+
+    return word.charAt(0).toLocaleUpperCase("pt-BR") + word.slice(1);
+  });
 }
 
 function groupItensByFicha(itens: FichaItemRow[]) {
@@ -495,6 +539,16 @@ function getActivityRange() {
   };
 }
 
+function getYearToDateRange() {
+  const today = getBusinessTodayInput();
+  const current = createDateFromInput(today);
+
+  return {
+    end: today,
+    start: `${current.getUTCFullYear()}-01-01`,
+  };
+}
+
 function monthRange(date: Date) {
   const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
   const end = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
@@ -518,6 +572,15 @@ function addDays(value: string, amount: number) {
 
 function createDateFromInput(value: string) {
   return createUtcDateFromInput(value);
+}
+
+function countDelivered(fichas: FichaRow[]) {
+  return fichas.filter((ficha) => ficha.status === "entregue").length;
+}
+
+function isBusinessWeekday(value: string) {
+  const day = createDateFromInput(value).getUTCDay();
+  return day >= 1 && day <= 5;
 }
 
 function formatDate(value: string) {

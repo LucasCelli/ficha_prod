@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { FileText } from "lucide-react";
+import { ChevronDown, FileText } from "lucide-react";
 import type { FichaFilters } from "./data";
 
 type FichasFilterToolbarProps = {
@@ -20,7 +20,9 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const exportTimeoutRef = useRef<number | null>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const externalSearchValue = filters.busca ?? "";
   const [isEditingSearch, setIsEditingSearch] = useState(false);
   const [searchDraftValue, setSearchDraftValue] = useState(externalSearchValue);
@@ -47,7 +49,34 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
     };
   }, [pdfHref]);
 
-  function handleExportPdf() {
+  useEffect(() => {
+    if (!isExportMenuOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (event.target instanceof Node && !exportMenuRef.current?.contains(event.target)) {
+        setIsExportMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsExportMenuOpen(false);
+        exportMenuRef.current?.querySelector<HTMLButtonElement>(".fichas-toolbar__export-trigger")?.focus();
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isExportMenuOpen]);
+
+  function handleExportPdf(includeOverdue: boolean) {
     if (!canExportPdf || isExportingPdf) {
       return;
     }
@@ -57,12 +86,13 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
     }
 
     setIsExportingPdf(true);
+    setIsExportMenuOpen(false);
     exportTimeoutRef.current = window.setTimeout(() => {
       setIsExportingPdf(false);
       exportTimeoutRef.current = null;
     }, PDF_EXPORT_TIMEOUT_MS);
 
-    window.location.assign(pdfHref);
+    window.location.assign(getPdfHref(pdfHref, includeOverdue));
   }
 
   return (
@@ -147,18 +177,47 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
           </>
         ) : null}
       </div>
-      <button
-        aria-disabled={!canExportPdf || isExportingPdf}
-        className="ui-button ui-button--secondary"
-        disabled={!canExportPdf || isExportingPdf}
-        onClick={handleExportPdf}
-        type="button"
-      >
-        {isExportingPdf ? <span className="button-spinner" aria-hidden="true" /> : <FileText aria-hidden="true" size={18} />}
-        {isExportingPdf ? "Exportando" : "Exportar PDF"}
-      </button>
+      <div className="fichas-toolbar__export" ref={exportMenuRef}>
+        <button
+          aria-disabled={!canExportPdf || isExportingPdf}
+          aria-expanded={isExportMenuOpen}
+          aria-haspopup="menu"
+          className="ui-button ui-button--secondary fichas-toolbar__export-trigger"
+          disabled={!canExportPdf || isExportingPdf}
+          onClick={() => setIsExportMenuOpen((current) => !current)}
+          type="button"
+        >
+          {isExportingPdf ? <span className="button-spinner" aria-hidden="true" /> : <FileText aria-hidden="true" size={18} />}
+          {isExportingPdf ? "Exportando" : "Exportar PDF"}
+          <ChevronDown aria-hidden="true" size={16} />
+        </button>
+        {isExportMenuOpen ? (
+          <div className="fichas-toolbar__export-menu" role="menu">
+            <button onClick={() => handleExportPdf(false)} role="menuitem" type="button">
+              Somente período selecionado
+            </button>
+            <button onClick={() => handleExportPdf(true)} role="menuitem" type="button">
+              Incluir atrasadas
+            </button>
+          </div>
+        ) : null}
+      </div>
     </form>
   );
+}
+
+function getPdfHref(pdfHref: string, includeOverdue: boolean) {
+  const [pathname, query = ""] = pdfHref.split("?");
+  const params = new URLSearchParams(query);
+
+  if (includeOverdue) {
+    params.set("incluirAtrasadas", "true");
+  } else {
+    params.delete("incluirAtrasadas");
+  }
+
+  const nextQuery = params.toString();
+  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
 }
 
 function updateFilter(

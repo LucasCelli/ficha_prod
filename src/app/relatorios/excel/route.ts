@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import ExcelJS from "exceljs";
 import { getCurrentSession } from "@/features/auth/session";
 import {
   getRelatorioData,
@@ -7,6 +8,7 @@ import {
   normalizeRelatorioPeriodo,
   normalizeRelatorioStatus,
 } from "@/features/relatorios/data";
+import type { RelatorioData } from "@/features/relatorios/data";
 import { getBusinessTodayInput } from "@/lib/dates";
 
 export async function GET(request: NextRequest) {
@@ -34,65 +36,135 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const body = buildExcelHtml(result.data);
-  const fileName = `relatorio-producao-${result.data.filtros.periodo}-${getBusinessTodayInput()}.xls`;
+  const body = await buildExcelWorkbook(result.data);
+  const fileName = `relatorio-producao-${result.data.filtros.periodo}-${getBusinessTodayInput()}.xlsx`;
 
   return new Response(body, {
     headers: {
       "Cache-Control": "no-store",
       "Content-Disposition": `attachment; filename="${fileName}"`,
-      "Content-Type": "application/vnd.ms-excel; charset=utf-8",
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     },
   });
 }
 
-function buildExcelHtml(data: NonNullable<Awaited<ReturnType<typeof getRelatorioData>>["data"]>) {
-  const rows = [
-    ["Relatório de Produção"],
+async function buildExcelWorkbook(data: RelatorioData) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Ficha Primalhas";
+  workbook.created = new Date();
+
+  const worksheet = workbook.addWorksheet("Relatório", {
+    views: [{ state: "frozen", ySplit: 2 }],
+  });
+
+  worksheet.columns = [
+    { header: "Campo", key: "a", width: 28 },
+    { header: "Valor", key: "b", width: 34 },
+    { header: "Extra 1", key: "c", width: 18 },
+    { header: "Extra 2", key: "d", width: 18 },
+    { header: "Extra 3", key: "e", width: 18 },
+    { header: "Extra 4", key: "f", width: 18 },
+    { header: "Extra 5", key: "g", width: 18 },
+  ];
+
+  const title = worksheet.addRow(["Relatório de Produção"]);
+  title.font = { bold: true, size: 16 };
+  worksheet.mergeCells(title.number, 1, title.number, 7);
+
+  addSection(worksheet, "Resumo", [
     ["Período", data.periodoLabel],
     ["Fichas Entregues", data.resumo.fichasEntregues],
     ["Fichas Pendentes", data.resumo.fichasPendentes],
     ["Itens Confeccionados", data.resumo.itensConfeccionados],
     ["Novos Clientes", data.resumo.novosClientes],
-    ["Taxa de Entrega", `${data.resumo.taxaEntrega}%`],
-    ["Top Vendedor", data.resumo.topVendedor ?? "-"],
-    [],
-    ["Dados Detalhados"],
-    ["ID", "Cliente", "Vendedor", "Material", "Quantidade", "Status", "Data"],
-    ...data.detalhes.map((item) => [item.id, item.cliente, item.vendedor, item.material, item.quantidade, item.status, item.data ?? ""]),
-    [],
-    ["Resumo por Vendedor"],
+  ]);
+
+  addSection(worksheet, "Entrega", [
+    ["Recorte atual", `${data.resumo.fichasEntregues} entregues no período`],
+    ["Taxa de entrega", `${data.resumo.taxaEntrega}%`],
+    ["Recorte anterior", `${data.resumo.entregasRecorteAnterior} entregues`],
+    ["Recorte anual", `${data.resumo.entregasAnoAtual} entregues`],
+  ]);
+
+  addSection(worksheet, "Comparativo", [
+    ["Fichas", data.comparativo.fichas],
+    ["Itens", data.comparativo.itens],
+    ["Clientes", data.comparativo.clientes],
+    ["Taxa de entrega", `${data.comparativo.taxaEntrega}%`],
+  ]);
+
+  addSection(
+    worksheet,
+    "Dados Detalhados",
+    [
+      ["ID", "Cliente", "Vendedor", "Material", "Quantidade", "Status", "Data"],
+      ...data.detalhes.map((item) => [item.id, item.cliente, item.vendedor, item.material, item.quantidade, item.status, item.data ?? ""]),
+    ],
+    true,
+  );
+
+  addSection(worksheet, "Resumo por Vendedor", [
     ["Vendedor", "Fichas", "Itens", "Entregues", "Pendentes"],
     ...data.rankings.vendedores.map((item) => [item.label, item.totalFichas, item.totalItens, item.entregues, item.pendentes]),
-    [],
-    ["Materiais"],
-    ["Material", "Fichas", "Itens"],
-    ...data.rankings.materiais.map((item) => [item.label, item.totalFichas, item.totalItens]),
-    [],
-    ["Produtos"],
-    ["Produto", "Fichas", "Itens"],
-    ...data.rankings.produtos.map((item) => [item.label, item.totalFichas, item.totalItens]),
-    [],
-    ["Tamanhos"],
-    ["Tamanho", "Fichas", "Itens"],
-    ...data.rankings.tamanhos.map((item) => [item.label, item.totalFichas, item.totalItens]),
-  ];
+  ], true);
 
-  return [
-    "<!doctype html>",
-    '<html lang="pt-BR">',
-    "<head>",
-    '<meta charset="utf-8" />',
-    "</head>",
-    "<body>",
-    "<table>",
-    ...rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(String(cell))}</td>`).join("")}</tr>`),
-    "</table>",
-    "</body>",
-    "</html>",
-  ].join("");
+  addRankSection(worksheet, "Materiais", "Material", data.rankings.materiais);
+  addRankSection(worksheet, "Produtos", "Produto", data.rankings.produtos);
+  addRankSection(worksheet, "Clientes", "Cliente", data.rankings.clientes);
+  addRankSection(worksheet, "Tamanhos", "Tamanho", data.rankings.tamanhos);
+  addRankSection(worksheet, "Personalizações", "Tipo", data.personalizacoes);
+
+  worksheet.eachRow((row) => {
+    row.eachCell((cell) => {
+      cell.alignment = { vertical: "middle" };
+      cell.border = {
+        bottom: { color: { argb: "FFE8EDF5" }, style: "thin" },
+      };
+    });
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return buffer as BodyInit;
 }
 
-function escapeHtml(value: string) {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+function addRankSection(
+  worksheet: ExcelJS.Worksheet,
+  title: string,
+  label: string,
+  items: Array<{ label: string; totalFichas: number; totalItens: number }>,
+) {
+  addSection(
+    worksheet,
+    title,
+    [
+      [label, "Fichas", "Itens"],
+      ...items.map((item) => [item.label, item.totalFichas, item.totalItens]),
+    ],
+    true,
+  );
+}
+
+function addSection(worksheet: ExcelJS.Worksheet, title: string, rows: Array<Array<number | string>>, hasHeader = false) {
+  worksheet.addRow([]);
+  const titleRow = worksheet.addRow([title]);
+  titleRow.font = { bold: true, size: 12 };
+  titleRow.fill = {
+    fgColor: { argb: "FFEAF4FF" },
+    pattern: "solid",
+    type: "pattern",
+  };
+  worksheet.mergeCells(titleRow.number, 1, titleRow.number, 7);
+
+  rows.forEach((row, index) => {
+    const excelRow = worksheet.addRow(row);
+
+    if (hasHeader && index === 0) {
+      excelRow.font = { bold: true };
+      excelRow.fill = {
+        fgColor: { argb: "FFF7FAFC" },
+        pattern: "solid",
+        type: "pattern",
+      };
+    }
+  });
 }
