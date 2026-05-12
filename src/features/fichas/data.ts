@@ -25,6 +25,8 @@ export type FichaListItem = Pick<
   ficha_imagens?: { url: string }[];
   ficha_itens?: { quantidade: number | null }[];
   kanban_column?: { name: string; slug: string } | null;
+  lista_ia_anexada?: boolean;
+  lista_nomes_raw_anexada?: boolean;
 };
 
 export type FichaOverdueCandidate = Pick<Database["public"]["Tables"]["fichas"]["Row"], "data_entrega" | "status">;
@@ -96,7 +98,7 @@ export async function listFichas(filters: FichaFilters = {}): Promise<FichaListR
       supabase
         .from("fichas")
         .select(
-          "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, ficha_itens(quantidade), ficha_imagens(url), kanban_column:kanban_columns(name,slug)",
+          "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, lista_ia_anexada, lista_nomes_raw_anexada, ficha_itens(quantidade), ficha_imagens(url), kanban_column:kanban_columns(name,slug)",
           { count: "exact" },
         )
         .order("created_at", { ascending: false })

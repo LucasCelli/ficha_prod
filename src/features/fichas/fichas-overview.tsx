@@ -6,6 +6,7 @@ import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { getKanbanColumnLabel } from "@/features/quadro-producao/config";
 import { FichasFilterToolbar } from "./fichas-filter-toolbar";
 import { FichaRowActions } from "./ficha-row-actions";
+import { FichaNameListBadge } from "./ficha-name-list-badge";
 import { FichaRowThumbnail } from "./ficha-row-thumbnail";
 import { FichaSaveToast } from "./ficha-save-toast";
 import {
@@ -309,6 +310,12 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
               <Badge className="ficha-row__meta-badge" tone="neutral">
                 {ficha.numero_venda ? `Venda ${ficha.numero_venda}` : "Sem venda"}
               </Badge>
+              {ficha.lista_ia_anexada ? (
+                <FichaNameListBadge fichaId={ficha.id} tipo="organizada" />
+              ) : null}
+              {ficha.lista_nomes_raw_anexada && !ficha.lista_ia_anexada ? (
+                <FichaNameListBadge fichaId={ficha.id} tipo="bruta" />
+              ) : null}
             </span>
           </span>
         </div>
@@ -338,7 +345,10 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
         <FichaRowActions
           fichaId={ficha.id}
           fichaLabel={ficha.cliente_nome_snapshot}
+          canOrganizeNameList={Boolean(ficha.lista_nomes_raw_anexada)}
           fullDeliverButton={currentFilters.status === "atrasado"}
+          hasOrganizedNameList={Boolean(ficha.lista_ia_anexada)}
+          hasRawNameList={Boolean(ficha.lista_nomes_raw_anexada)}
           printHref={printHref}
           previewHref={href}
           returnTo={getReturnTo(currentFilters)}

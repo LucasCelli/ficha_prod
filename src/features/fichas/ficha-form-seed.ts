@@ -37,6 +37,7 @@ export type FichaFormClientValues = {
   imagens: ImageFormItem[];
   itens: ProductFormItem[];
   material: string;
+  listaNomesRaw: string;
   observacoes: string;
   reforcoGola: string;
   viesRegata: string;
@@ -81,6 +82,7 @@ export type FichaFormInitialData = {
   manga: string;
   material: string;
   numeroVenda: string;
+  listaNomesRaw: string;
   observacoes: string;
   reforcoGola: string;
   vendedor: string;
@@ -136,6 +138,7 @@ export function createEmptyFichaFormInitialData(): FichaFormInitialData {
     manga: "",
     material: "",
     numeroVenda: "",
+    listaNomesRaw: "",
     observacoes: "",
     reforcoGola: "nao",
     vendedor: "",
@@ -208,6 +211,7 @@ export function mapFichaToInitialData(ficha?: FichaDetail): FichaFormInitialData
     manga: ficha.manga ?? "",
     material: ficha.material ?? "",
     numeroVenda: ficha.numero_venda ?? "",
+    listaNomesRaw: ficha.lista_nomes_raw ?? "",
     observacoes: ficha.observacoes ?? "",
     reforcoGola: ficha.reforco_gola ?? "nao",
     vendedor: ficha.vendedor ?? "",

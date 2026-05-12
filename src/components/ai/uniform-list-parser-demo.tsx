@@ -1,9 +1,9 @@
 "use client";
 
-import { useId, useMemo, useState, type FormEvent } from "react";
-import { Check, ClipboardList, FileSpreadsheet, Link2, Pencil, Search } from "lucide-react";
+import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
+import { Check, ClipboardList, FileSpreadsheet, Link2, Pencil, Play, Search } from "lucide-react";
 import { toast } from "sonner";
-import { Button, CustomDatalist, DataTable, type CustomDatalistOption } from "@/components/ui";
+import { Badge, Button, CustomDatalist, DataTable, type CustomDatalistOption } from "@/components/ui";
 import { AI_MODEL_OPTIONS } from "@/lib/ai/model-options";
 import { formatShortDateInput, getBusinessTodayInput } from "@/lib/dates";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
@@ -38,6 +38,7 @@ type LinkedFicha = {
   cliente: string;
   dataEntrega: string;
   id: string;
+  listaIaAnexada: boolean;
   listaIa?: SavedUniformList | null;
   numeroVenda: string | null;
 };
@@ -54,6 +55,12 @@ type LinkApiError = {
 };
 
 type LinkApiResponse = LinkApiSuccess | LinkApiError;
+
+type UniformListParserDemoProps = {
+  defaultModelValue: string;
+  initialFicha?: LinkedFicha | null;
+  initialText?: string;
+};
 
 const MAX_TEXT_LENGTH = 10_000;
 const REVIEW_MESSAGE = "Revise antes de salvar.";
@@ -191,7 +198,7 @@ function getFichaOptionLabel(ficha: LinkedFicha) {
 }
 
 function getFichaOptionDetails(ficha: LinkedFicha) {
-  return [`Entrega ${formatShortDateInput(ficha.dataEntrega)}`];
+  return [`Entrega ${formatShortDateInput(ficha.dataEntrega)}`, ficha.listaIaAnexada ? "Lista organizada" : "Sem lista"];
 }
 
 async function copyToClipboard(value: string, label: string) {
@@ -240,6 +247,73 @@ function ConfidenceBadge({ value }: { value: string }) {
   );
 }
 
+function TableGenerationAnimation({ animated = true }: { animated?: boolean }) {
+  const items = [
+    { id: "item-1", y: 200, titleWidth: 180, subtitleWidth: 100 },
+    { id: "item-2", y: 275, titleWidth: 220, subtitleWidth: 120 },
+    { id: "item-3", y: 350, titleWidth: 150, subtitleWidth: 80 },
+    { id: "item-4", y: 425, titleWidth: 190, subtitleWidth: 110 },
+    { id: "item-5", y: 500, titleWidth: 130, subtitleWidth: 70 },
+  ];
+
+  return (
+    <div
+      className={["ai-demo__loading-table", animated ? null : "ai-demo__loading-table--static"].filter(Boolean).join(" ")}
+      aria-label={animated ? "Organizando a sua lista" : "Tabela vazia"}
+      role={animated ? "status" : "img"}
+    >
+      <svg aria-hidden="true" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid meet">
+        <rect className="ai-demo__loading-panel" x="350" y="100" width="500" height="500" rx="20" />
+        <g className="ai-demo__loading-header">
+          <foreignObject x="390" y="124" width="430" height="64">
+            <div className="ai-demo__loading-typing">
+              {animated ? (
+                "Organizando a sua lista..."
+              ) : (
+                <>
+                  Use o campo ao lado para
+                  <br />
+                  organizar a lista de nomes...
+                </>
+              )}
+            </div>
+          </foreignObject>
+          <rect x="390" y="192" width="200" height="2" rx="1" opacity="0.45" />
+        </g>
+        <g className="ai-demo__loading-list">
+          {items.map((item, index) => (
+            <g
+              className="ai-demo__loading-item"
+              key={item.id}
+              style={{
+                animationDelay: `${index * 680}ms`,
+              }}
+            >
+              <rect className="ai-demo__loading-card" x="380" y={item.y} width="440" height="60" rx="12" />
+              <rect className="ai-demo__loading-checkbox" x="405" y={item.y + 18} width="24" height="24" rx="4" />
+              <path
+                className="ai-demo__loading-check"
+                d={`M410 ${item.y + 30} L415 ${item.y + 35} L424 ${item.y + 23}`}
+                pathLength="20"
+              />
+              <rect className="ai-demo__loading-line" x="445" y={item.y + 22} width={item.titleWidth} height="6" rx="3" />
+              <rect
+                className="ai-demo__loading-line"
+                x="445"
+                y={item.y + 34}
+                width={item.subtitleWidth}
+                height="4"
+                rx="2"
+                opacity="0.55"
+              />
+            </g>
+          ))}
+        </g>
+      </svg>
+    </div>
+  );
+}
+
 function getApiErrorMessage(response: Response, payload: ApiResponse | null) {
   if (payload && !payload.success) {
     return payload.error;
@@ -256,12 +330,11 @@ function getApiErrorMessage(response: Response, payload: ApiResponse | null) {
   return "Não foi possível organizar a lista.";
 }
 
-export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue: string }) {
+export function UniformListParserDemo({ defaultModelValue, initialFicha = null, initialText = "" }: UniformListParserDemoProps) {
   const textareaId = useId();
-  const pedidoInputId = useId();
   const fichaInputId = useId();
   const modelSelectId = useId();
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   const [selectedModel, setSelectedModel] = useState(defaultModelValue);
   const [result, setResult] = useState<EditableUniformList | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -270,14 +343,15 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
   const [isLoadingLink, setIsLoadingLink] = useState(false);
   const [isLoadingLinkedList, setIsLoadingLinkedList] = useState(false);
   const [isSavingLink, setIsSavingLink] = useState(false);
+  const [isTestingAnimation, setIsTestingAnimation] = useState(false);
   const [isEditingResult, setIsEditingResult] = useState(false);
   const [activeCopyCell, setActiveCopyCell] = useState<ActiveCopyCell | null>(null);
-  const [pedido, setPedido] = useState("");
-  const [linkedFichas, setLinkedFichas] = useState<LinkedFicha[]>([]);
-  const [selectedFichaId, setSelectedFichaId] = useState("");
-  const [selectedFichaLabel, setSelectedFichaLabel] = useState("");
+  const [linkedFichas, setLinkedFichas] = useState<LinkedFicha[]>(initialFicha ? [initialFicha] : []);
+  const [selectedFichaId, setSelectedFichaId] = useState(initialFicha?.id ?? "");
+  const [selectedFichaLabel, setSelectedFichaLabel] = useState(initialFicha ? getFichaOptionLabel(initialFicha) : "");
   const [sortConfig, setSortConfig] = useState<{ direction: SortDirection; key: SortKey } | null>(null);
   const hasItems = Boolean(result?.items.length);
+  const showTableGenerationAnimation = isLoading || isTestingAnimation;
   const selectedFicha = linkedFichas.find((ficha) => ficha.id === selectedFichaId) ?? null;
   const fichaOptions = useMemo<CustomDatalistOption[]>(
     () =>
@@ -296,6 +370,7 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
     () => (result ? (sortConfig ? sortItems(result.items, sortConfig.key, sortConfig.direction) : result.items) : []),
     [result, sortConfig],
   );
+  const selectedFichaHasLinkedList = Boolean(selectedFicha?.listaIaAnexada || selectedFicha?.listaIa);
   const columns = useMemo(
     () =>
       baseColumns.map((column) => ({
@@ -309,6 +384,16 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
       })),
     [sortConfig],
   );
+
+  useEffect(() => {
+    if (!isTestingAnimation) return;
+
+    const timer = window.setTimeout(() => {
+      setIsTestingAnimation(false);
+    }, 10000);
+
+    return () => window.clearTimeout(timer);
+  }, [isTestingAnimation]);
 
   function updateTextItem(rowId: string, field: EditableTextField, value: string) {
     setResult((current) =>
@@ -404,7 +489,7 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
     setIsLoadingLink(true);
 
     try {
-      const query = pedido.trim();
+      const query = selectedFichaLabel.trim();
       const response = await fetch(`/api/ai/uniform-list-ficha${query ? `?q=${encodeURIComponent(query)}` : ""}`);
       const payload = (await response.json().catch(() => null)) as LinkApiResponse | null;
 
@@ -626,20 +711,8 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
             </div>
             <div className="ai-demo__exports" aria-label="Ações da lista organizada">
               <div className="ai-demo__link">
-                <label htmlFor={pedidoInputId}>Pedidos</label>
+                <label htmlFor={fichaInputId}>Ficha</label>
                 <div className="ai-demo__link-row">
-                  <input
-                    id={pedidoInputId}
-                    onChange={(event) => setPedido(event.target.value)}
-                    placeholder="Cliente ou venda"
-                    value={pedido}
-                  />
-                  <Button aria-disabled={isLoadingLink} disabled={isLoadingLink} onClick={handleLoadFichas} type="button" variant="secondary">
-                    {isLoadingLink ? <span className="button-spinner" aria-hidden="true" /> : <Search aria-hidden="true" size={16} />}
-                    Buscar
-                  </Button>
-                </div>
-                {fichaOptions.length > 0 ? (
                   <CustomDatalist
                     aria-label="Ficha vinculada"
                     id={fichaInputId}
@@ -647,10 +720,22 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
                       setSelectedFichaLabel(value);
                       setSelectedFichaId(option?.metadata?.id ?? "");
                     }}
+                    onEnterKey={() => {
+                      void handleLoadFichas();
+                    }}
                     options={fichaOptions}
-                    placeholder="Selecionar ficha"
+                    placeholder="Cliente ou venda"
                     value={selectedFichaLabel}
                   />
+                  <Button aria-disabled={isLoadingLink} disabled={isLoadingLink} onClick={handleLoadFichas} type="button" variant="secondary">
+                    {isLoadingLink ? <span className="button-spinner" aria-hidden="true" /> : <Search aria-hidden="true" size={16} />}
+                    Buscar
+                  </Button>
+                </div>
+                {selectedFicha ? (
+                  <Badge tone={selectedFichaHasLinkedList ? "success" : "neutral"}>
+                    {selectedFichaHasLinkedList ? "Lista organizada" : "Sem lista"}
+                  </Badge>
                 ) : null}
               </div>
               <Button
@@ -684,6 +769,16 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
                 {isEditingResult ? "Concluir" : "Editar"}
               </Button>
               <Button
+                aria-disabled={showTableGenerationAnimation}
+                disabled={showTableGenerationAnimation}
+                onClick={() => setIsTestingAnimation(true)}
+                type="button"
+                variant="secondary"
+              >
+                {isTestingAnimation ? <span className="button-spinner" aria-hidden="true" /> : <Play aria-hidden="true" size={17} />}
+                Testar animação
+              </Button>
+              <Button
                 aria-disabled={!hasItems || isExporting}
                 disabled={!hasItems || isExporting}
                 onClick={handleExportXlsx}
@@ -702,7 +797,9 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
             </p>
           ) : null}
 
-          {result ? (
+          {showTableGenerationAnimation ? (
+            <TableGenerationAnimation />
+          ) : result ? (
             <DataTable caption="Lista organizada para revisão" columns={columns}>
               {sortedItems.map((item, index) => {
                 if (isEditingResult) {
@@ -801,10 +898,7 @@ export function UniformListParserDemo({ defaultModelValue }: { defaultModelValue
               })}
             </DataTable>
           ) : (
-            <div className="ai-demo__empty">
-              <strong>Tabela vazia :/</strong>
-              <span>Use o campo de texto ao lado para organizar uma lista.</span>
-            </div>
+            <TableGenerationAnimation animated={false} />
           )}
         </div>
       </div>

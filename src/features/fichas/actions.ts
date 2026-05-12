@@ -50,6 +50,7 @@ function getFichaFormInput(formData: FormData) {
     comNomes: formData.get("comNomes"),
     imagens: formData.get("imagensJson"),
     itens: formData.get("itensJson"),
+    listaNomesRaw: formData.get("listaNomesRaw"),
     observacoes: formData.get("observacoes"),
     evento: formData.get("evento"),
   };
@@ -164,6 +165,7 @@ export async function createFichaAction(_previousState: FichaFormState, formData
       kanban_status: "pendente",
       kanban_status_updated_at: new Date().toISOString(),
       numero_venda: parsed.data.numeroVenda,
+      lista_nomes_raw: parsed.data.listaNomesRaw,
       observacoes: parsed.data.observacoes,
       vendedor: parsed.data.vendedor,
     })
@@ -263,6 +265,7 @@ export async function updateFichaAction(_previousState: FichaFormState, formData
       data_entrega: parsed.data.dataEntrega,
       evento: parsed.data.evento,
       numero_venda: parsed.data.numeroVenda,
+      lista_nomes_raw: parsed.data.listaNomesRaw,
       observacoes: parsed.data.observacoes,
       vendedor: parsed.data.vendedor,
     })
@@ -414,6 +417,20 @@ export async function revertFichaToPendenteFormAction(formData: FormData): Promi
   await revertFichaToPendenteAction({ status: "idle" }, formData);
 }
 
+export async function removeFichaListaIaAction(
+  _previousState: FichaStatusActionState,
+  formData: FormData,
+): Promise<FichaStatusActionState> {
+  return removeFichaListaField(formData, "lista_ia", "lista-ia-removed");
+}
+
+export async function removeFichaListaNomesRawAction(
+  _previousState: FichaStatusActionState,
+  formData: FormData,
+): Promise<FichaStatusActionState> {
+  return removeFichaListaField(formData, "lista_nomes_raw", "lista-raw-removed");
+}
+
 export async function deleteFichaAction(
   _previousState: FichaDeleteActionState,
   formData: FormData,
@@ -477,6 +494,45 @@ export async function deleteFichaAction(
   revalidatePath("/fichas");
   revalidatePath("/relatorios");
   redirect(withToastParam(returnTo ?? "/fichas", "ficha-deleted"));
+}
+
+async function removeFichaListaField(
+  formData: FormData,
+  field: "lista_ia" | "lista_nomes_raw",
+  toast: "lista-ia-removed" | "lista-raw-removed",
+): Promise<FichaStatusActionState> {
+  await requireAppSession();
+
+  const id = String(formData.get("id") ?? "").trim();
+  const returnTo = getSafeReturnPath(formData.get("returnTo"));
+
+  if (!id) {
+    return {
+      message: "Ficha invÃ¡lida.",
+      status: "error",
+    };
+  }
+
+  if (!getSupabaseConfigStatus().hasServerConfig) {
+    return {
+      message: "Fichas indisponÃ­veis.",
+      status: "error",
+    };
+  }
+
+  const updatePayload = field === "lista_ia" ? { lista_ia: null } : { lista_nomes_raw: null };
+  const { error } = await createServerSupabaseClient().from("fichas").update(updatePayload).eq("id", id);
+
+  if (error) {
+    return {
+      message: error.message,
+      status: "error",
+    };
+  }
+
+  revalidatePath("/fichas");
+  revalidatePath(`/fichas/${id}`);
+  redirect(withToastParam(returnTo ?? "/fichas", toast));
 }
 
 function getSafeReturnPath(value: FormDataEntryValue | null) {

@@ -21,6 +21,7 @@ import {
   Italic,
   List,
   ListOrdered,
+  ClipboardList,
   PackageOpen,
   Plus,
   Printer,
@@ -38,6 +39,7 @@ import {
   AlertDialogCancel,
   Button,
   CustomDatalist,
+  Modal,
   Tooltip,
   type CustomDatalistOption,
 } from "@/components/ui";
@@ -372,6 +374,7 @@ function buildFichaDraftSnapshot(
       itens: normalizeProductItems(values.itens),
       larguraGola: formText(formData, "larguraGola"),
       larguraManga: formText(formData, "larguraManga"),
+      listaNomesRaw: values.listaNomesRaw,
       manga: formText(formData, "manga"),
       material: values.material,
       numeroVenda: formText(formData, "numeroVenda"),
@@ -593,6 +596,7 @@ function FichaFormInner({
       imagens: getInitialImageItems(initialData),
       itens: getInitialProductItems(initialData),
       material: initialData.material,
+      listaNomesRaw: initialData.listaNomesRaw,
       observacoes: initialData.observacoes,
       reforcoGola: initialData.reforcoGola,
       viesRegata: initialData.acabamentoManga === "vies" ? "sim" : "",
@@ -618,7 +622,7 @@ function FichaFormInner({
     keyName: "fieldId",
     name: "imagens",
   });
-  const [gola, material, composicao, acabamentoGola, acabamentoManga, reforcoGola, aberturaLateral, filete, faixa, viesRegata, arte, comNomes, observacoes, itens, imagens] =
+  const [gola, material, composicao, acabamentoGola, acabamentoManga, reforcoGola, aberturaLateral, filete, faixa, viesRegata, arte, comNomes, listaNomesRaw, observacoes, itens, imagens] =
     useWatch({
       control,
       name: [
@@ -634,6 +638,7 @@ function FichaFormInner({
         "viesRegata",
         "arte",
         "comNomes",
+        "listaNomesRaw",
         "observacoes",
         "itens",
         "imagens",
@@ -642,6 +647,8 @@ function FichaFormInner({
   const [imageGridWidth, setImageGridWidth] = useState(0);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [draftPrintFicha, setDraftPrintFicha] = useState<FichaDetail | null>(null);
+  const [listaNomesModalOpen, setListaNomesModalOpen] = useState(false);
+  const [listaNomesDraft, setListaNomesDraft] = useState(initialData.listaNomesRaw);
   const [observacoesConfirmationValue, setObservacoesConfirmationValue] = useState<string | null>(null);
   const [sortFeedbackVisible, setSortFeedbackVisible] = useState(false);
   const observacoesEditor = useEditor({
@@ -959,6 +966,7 @@ function FichaFormInner({
       "corDetalheGola",
       "larguraGola",
       "corBotao",
+      "listaNomesRaw",
       "observacoes",
     ];
 
@@ -987,6 +995,16 @@ function FichaFormInner({
     }
 
     writeFichaDraftSnapshot(snapshot);
+  }
+
+  function openListaNomesModal() {
+    setListaNomesDraft(getValues("listaNomesRaw"));
+    setListaNomesModalOpen(true);
+  }
+
+  function saveListaNomesRaw() {
+    setValue("listaNomesRaw", listaNomesDraft, { shouldDirty: true });
+    setListaNomesModalOpen(false);
   }
 
   function hasUnsavedChanges() {
@@ -2296,6 +2314,14 @@ function FichaFormInner({
             <h3>Observações</h3>
           <Field label="Observações" name="observacoes" error={state.fieldErrors?.observacoes} full>
             <input name="observacoes" type="hidden" value={observacoes} />
+            <input name="listaNomesRaw" type="hidden" value={listaNomesRaw ?? ""} />
+            <div className="name-list-attachment">
+              <Button className="name-list-attachment__button" onClick={openListaNomesModal} type="button" variant="secondary">
+                <ClipboardList aria-hidden="true" size={16} />
+                {listaNomesRaw?.trim() ? "Editar lista de nomes" : "Adicionar lista de nomes"}
+              </Button>
+              {listaNomesRaw?.trim() ? <span>Lista pendente anexada</span> : null}
+            </div>
             <div className="rich-editor">
               <div className="rich-editor__toolbar" aria-label="Ferramentas de observacoes" role="toolbar">
                 <button aria-label="Negrito" onClick={() => applyRichTextCommand("bold")} type="button">
@@ -2471,6 +2497,36 @@ function FichaFormInner({
       </div>
         {draftPrintFicha ? <DraftPrintLayer ficha={draftPrintFicha} onPrinted={() => setDraftPrintFicha(null)} /> : null}
       </form>
+
+      {listaNomesModalOpen ? (
+        <Modal onClose={() => setListaNomesModalOpen(false)} size="md" title="Lista de nomes">
+          <section className="name-list-modal">
+            <header className="name-list-modal__header">
+              <h2>Lista de nomes</h2>
+            </header>
+            <label className="field" htmlFor="listaNomesRawModal">
+              <span>Lista recebida</span>
+              <textarea
+                id="listaNomesRawModal"
+                maxLength={10000}
+                onChange={(event) => setListaNomesDraft(event.currentTarget.value)}
+                placeholder="Cole a lista aqui..."
+                rows={14}
+                value={listaNomesDraft}
+              />
+            </label>
+            <div className="name-list-modal__actions">
+              <Button onClick={() => setListaNomesModalOpen(false)} type="button" variant="ghost">
+                Cancelar
+              </Button>
+              <Button onClick={saveListaNomesRaw} type="button">
+                <ClipboardList aria-hidden="true" size={16} />
+                Salvar lista
+              </Button>
+            </div>
+          </section>
+        </Modal>
+      ) : null}
 
       {observacoesConfirmationValue ? (
         <AlertDialog
@@ -2680,6 +2736,9 @@ function buildDraftPrintFicha(form: HTMLFormElement, values: FichaFormClientValu
     largura_manga: text("larguraManga") || null,
     legacy_ficha_id: null,
     lista_ia: null,
+    lista_ia_anexada: false,
+    lista_nomes_raw: values.listaNomesRaw || null,
+    lista_nomes_raw_anexada: Boolean(values.listaNomesRaw?.trim()),
     manga: text("manga") || null,
     material: values.material || null,
     metadados: null,

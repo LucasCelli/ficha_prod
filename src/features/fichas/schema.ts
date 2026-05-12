@@ -101,6 +101,7 @@ export const fichaFormSchema = z.object({
   comNomes: optionalComNomes,
   imagens: imagensJsonSchema,
   itens: itensJsonSchema,
+  listaNomesRaw: optionalText,
   observacoes: optionalText,
   evento: z.preprocess((value) => value === "on" || value === "sim", z.boolean()),
 });

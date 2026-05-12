@@ -9,13 +9,14 @@ import { motion, useReducedMotion } from "motion/react";
 
 type ModalProps = {
   children: ReactNode;
+  description?: string;
   onClose?: () => void;
   onCloseHref?: string;
   size?: "sm" | "md" | "lg" | "print";
   title?: string;
 };
 
-export function Modal({ children, onClose, onCloseHref, size = "md", title }: ModalProps) {
+export function Modal({ children, description, onClose, onCloseHref, size = "md", title }: ModalProps) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
 
@@ -59,6 +60,7 @@ export function Modal({ children, onClose, onCloseHref, size = "md", title }: Mo
             </button>
           </Dialog.Close>
           {title ? <Dialog.Title className="sr-only">{title}</Dialog.Title> : null}
+          {title ? <Dialog.Description className="sr-only">{description ?? title}</Dialog.Description> : null}
           {children}
           </motion.div>
         </Dialog.Content>

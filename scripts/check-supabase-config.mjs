@@ -1,5 +1,8 @@
-import "dotenv/config";
+import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+
+config({ path: ".env.local", quiet: true });
+config({ path: ".env", quiet: true });
 
 const REQUIRED_ENV = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"];
 const TABLES = ["clientes", "fichas", "ficha_itens", "ficha_imagens", "catalog_items"];
@@ -42,7 +45,7 @@ async function main() {
 
   if (!hasRequiredEnv()) {
     console.log("\nStatus: missing-env");
-    console.log("Add the missing Supabase variables to .env before running seed/import scripts.");
+    console.log("Add the missing Supabase variables to .env.local before running seed/import scripts.");
     process.exitCode = 1;
     return;
   }

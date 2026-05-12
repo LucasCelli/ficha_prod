@@ -18,6 +18,7 @@ type CustomDatalistProps = {
   id: string;
   inputMode?: "text" | "numeric";
   name?: string;
+  onEnterKey?: (value: string) => void;
   onValueChange?: (value: string, option?: CustomDatalistOption) => void;
   options: CustomDatalistOption[];
   placeholder?: string;
@@ -40,6 +41,7 @@ export function CustomDatalist({
   id,
   inputMode = "text",
   name,
+  onEnterKey,
   onValueChange,
   options,
   placeholder,
@@ -118,6 +120,12 @@ export function CustomDatalist({
           if (event.key === "Enter" && isOpen && filteredOptions[activeIndex]) {
             event.preventDefault();
             selectOption(filteredOptions[activeIndex]);
+          }
+
+          if (event.key === "Enter" && (!isOpen || !filteredOptions[activeIndex])) {
+            event.preventDefault();
+            onEnterKey?.(currentValue);
+            setIsOpen(false);
           }
 
           if (event.key === "Escape") {

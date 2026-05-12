@@ -33,6 +33,7 @@ type FichaListLinkRow = {
   data_entrega: string;
   id: string;
   lista_ia: unknown;
+  lista_ia_anexada: boolean;
   numero_venda: string | null;
 };
 
@@ -52,6 +53,7 @@ function mapFicha(row: FichaListLinkRow) {
     cliente: row.cliente_nome_snapshot,
     dataEntrega: row.data_entrega,
     id: row.id,
+    listaIaAnexada: row.lista_ia_anexada,
     listaIa: normalizeSavedList(row.lista_ia),
     numeroVenda: row.numero_venda,
   };
@@ -62,6 +64,7 @@ function mapFichaOption(row: FichaListOptionRow) {
     cliente: row.cliente_nome_snapshot,
     dataEntrega: row.data_entrega,
     id: row.id,
+    listaIaAnexada: row.lista_ia_anexada,
     numeroVenda: row.numero_venda,
   };
 }
@@ -89,7 +92,7 @@ export async function GET(request: Request) {
   if (fichaId) {
     const { data, error } = await createServerSupabaseClient()
       .from("fichas")
-      .select("id, numero_venda, cliente_nome_snapshot, data_entrega, lista_ia")
+      .select("id, numero_venda, cliente_nome_snapshot, data_entrega, lista_ia_anexada, lista_ia")
       .eq("id", fichaId)
       .maybeSingle<FichaListLinkRow>();
 
@@ -109,7 +112,7 @@ export async function GET(request: Request) {
 
   let supabaseQuery = createServerSupabaseClient()
     .from("fichas")
-    .select("id, numero_venda, cliente_nome_snapshot, data_entrega")
+    .select("id, numero_venda, cliente_nome_snapshot, data_entrega, lista_ia_anexada")
     .order("created_at", { ascending: false })
     .limit(30);
 
@@ -170,7 +173,7 @@ export async function POST(request: Request) {
     .from("fichas")
     .update({ lista_ia: savedList })
     .eq("id", parsed.data.fichaId)
-    .select("id, numero_venda, cliente_nome_snapshot, data_entrega, lista_ia")
+    .select("id, numero_venda, cliente_nome_snapshot, data_entrega, lista_ia_anexada, lista_ia")
     .maybeSingle<FichaListLinkRow>();
 
   if (error) {

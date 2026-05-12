@@ -8,10 +8,34 @@
 - Refinamento posterior: a busca deixou de depender de `numero_venda`; agora carrega uma lista enxuta de pedidos/fichas por cliente ou venda, limitada a 30 registros, sem trazer `lista_ia` nessa consulta. O JSON vinculado so e carregado em uma chamada separada quando uma ficha especifica e selecionada.
 - Refinamento posterior: o resultado da IA voltou a abrir em modo leitura, preservando o comportamento anterior de copia em `Nome` e `Numero`; os campos editaveis so aparecem ao acionar `Editar`.
 - Refinamento posterior: o seletor da ficha encontrada passou a usar `CustomDatalist`, mantendo o UUID apenas como metadata interna e exibindo venda/cliente/entrega para selecao.
+- Refinamento posterior: a busca e a selecao da ficha foram unificadas em um unico `CustomDatalist`, com indicador `Lista anexada`/`Sem lista`.
+- Refinamento posterior: o campo de ficha ficou mais largo/alinhado na barra de acoes, e `Enter` no `CustomDatalist` dispara a busca quando nao ha sugestao ativa para selecionar.
+- Listagem: `/fichas` passou a mostrar os badges `Lista organizada` e `Lista pendente` junto aos metadados da ficha somente quando os respectivos indicadores leves forem true.
+- Fichas: o formulario passou a aceitar uma lista de nomes ainda nao organizada em modal abaixo de `Observacoes`; a lista bruta fica salva na ficha e a listagem mostra a acao `Organizar Lista de Nomes` no menu de contexto somente quando esse texto pendente existe.
+- Ferramentas: `/ferramentas/organizar-nomes-ia?fichaId=<uuid>` carrega a lista bruta da ficha no campo de texto e ja deixa a ficha selecionada para organizar e vincular o JSON revisado depois.
+- Persistencia posterior: adicionadas `fichas.lista_nomes_raw` e a coluna gerada `fichas.lista_nomes_raw_anexada`, mantendo payload minimo em `/fichas` para indicar lista pendente sem carregar o texto completo.
+- Persistencia posterior: adicionada a coluna gerada `fichas.lista_ia_anexada` para listar o estado do vinculo sem carregar o JSON completo de `lista_ia`.
+- Check Supabase: `scripts/check-supabase-config.mjs` passou a carregar `.env.local` antes de `.env`, sem sobrescrever os valores locais e sem logs auxiliares do `dotenv`.
+- UI posterior: o menu de contexto das fichas ficou mais largo para evitar quebra em `Organizar Lista de Nomes`, e o botao de lista abaixo de `Observacoes` ganhou destaque visual.
+- UI posterior: quando a ficha ja possui lista organizada, o badge `Lista pendente` deixa de aparecer mesmo que a lista bruta original ainda esteja salva.
+- UI posterior: `FloatingMenu` passou a renderizar o menu em portal no `document.body`, com posicionamento fixo ancorado ao botao, evitando corte, deslocamento e overflow dentro do wrapper de `/fichas`.
+- Listas: o menu de contexto das fichas ganhou `Remover lista de nomes (organizada)` e `Remover lista de nomes (bruta)`, limpando respectivamente `lista_ia` ou `lista_nomes_raw` e revalidando a listagem.
+- UI posterior: o modal de adicionar lista de nomes no editor de ficha recebeu padding, cabecalho e rodape de acoes mais refinados.
+- Fix posterior: `FloatingMenu` deixou de fechar imediatamente ao clicar em botoes `submit`, evitando desmontar o formulario antes da server action de remover lista executar.
+- Consulta posterior: os badges `Lista organizada` e `Lista pendente` em `/fichas` passaram a ser clicaveis e abrir modal sob demanda; a listagem continua carregando apenas os booleanos leves, enquanto o modal busca somente `lista_ia` ou somente `lista_nomes_raw` da ficha clicada.
+- Fix posterior: o modal de consulta da lista organizada recebeu regras especificas para alinhar as colunas da tabela e o `Modal` passou a renderizar `Dialog.Description`, removendo warnings de acessibilidade do Radix.
+- UI posterior: a tabela da lista organizada no modal passou a marcar como ativa a ultima celula de nome/numero clicada, igual a tabela da ferramenta de IA.
+- UI posterior: no modal da lista organizada, hover e estado ativo passaram a destacar a celula inteira, nao apenas o texto do nome/numero.
+- Ordenacao posterior: o cabecalho `Tamanho` da lista organizada no modal passou a ordenar por blocos, com tamanhos numericos antes dos alfabeticos, sequencia operacional de `P` ate extensoes `EEGG`, e Baby Look em bloco separado.
+- UI posterior: a ferramenta `/ferramentas/organizar-nomes-ia` passou a mostrar uma animacao SVG de geracao no lugar da tabela enquanto a IA processa a lista, adaptada aos tokens de cor do app.
+- UI posterior: adicionada acao temporaria `Testar animacao` por 10 segundos na ferramenta de IA; a animacao ficou flat, sem sombra/brilho/wrapper visual extra, e o status passou para `Organizando a sua lista`.
+- UI posterior: o texto `Organizando a sua lista...` foi movido para o cabecalho do SVG da animacao e recebeu efeito de typing com cursor.
+- UI posterior: o estado vazio da tabela da ferramenta de IA passou a usar uma versao estatica do mesmo SVG como placeholder.
+- UI posterior: o placeholder estatico passou a usar texto orientativo no cabecalho, cores neutras e sem frase auxiliar inferior.
 - Persistencia: criada a coluna `fichas.lista_ia` (`jsonb`) para salvar o JSON revisado junto da ficha com `items`, modelo usado, timestamp de vinculo, usuario responsavel e texto original quando disponivel.
 - API: adicionada `src/app/api/ai/uniform-list-ficha/route.ts` com `GET` por pedido e `POST` por ficha, ambos protegidos por sessao atual.
 - Decisao: manter o JSON em coluna dedicada, em vez de misturar em `metadados`, para facilitar consulta, reexportacao e auditoria posterior; o pedido operacional continua sendo `numero_venda`.
-- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram apos os refinamentos de payload minimo e modo de edicao. `npm run supabase:check` falhou por ausencia de `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` no ambiente do script. Edge em `localhost:3000/ferramentas/organizar-nomes-ia` redirecionou corretamente para `/login`, sem overlay e sem erros de console; a validacao autenticada da ferramenta ficou pendente de sessao logada.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --check` e `npm run supabase:check` passaram apos os refinamentos de payload minimo, modo de edicao, `CustomDatalist` unico, indicador de lista anexada, alinhamento, busca por Enter, badge em `/fichas`, lista bruta pendente e carregamento correto de `.env.local`. Edge em `localhost:3000/ferramentas/organizar-nomes-ia` redirecionou corretamente para `/login`, sem overlay e sem erros de console; a validacao autenticada da ferramenta ficou pendente de sessao logada.
 
 ## 2026-05-10 - Ferramentas: hub e rota de IA
 

@@ -204,6 +204,9 @@ export type Database = {
           observacoes: string | null;
           observacoes_html: string | null;
           lista_ia: Json | null;
+          lista_ia_anexada: boolean;
+          lista_nomes_raw: string | null;
+          lista_nomes_raw_anexada: boolean;
           metadados: Json;
           created_at: string;
           updated_at: string;
@@ -261,6 +264,9 @@ export type Database = {
           observacoes?: string | null;
           observacoes_html?: string | null;
           lista_ia?: Json | null;
+          lista_ia_anexada?: never;
+          lista_nomes_raw?: string | null;
+          lista_nomes_raw_anexada?: never;
           metadados?: Json;
           created_at?: string;
           updated_at?: string;

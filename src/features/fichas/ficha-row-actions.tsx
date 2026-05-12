@@ -3,10 +3,16 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { CheckCircle2, Eye, MoreHorizontal, Pencil, Printer, RotateCcw, Trash2 } from "lucide-react";
+import { CheckCircle2, ClipboardList, Eye, MoreHorizontal, Pencil, Printer, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, FloatingMenu, FloatingMenuButton, FloatingMenuLink, Tooltip } from "@/components/ui";
-import { deleteFichaAction, markFichaEntregueFormAction, revertFichaToPendenteAction } from "./actions";
+import {
+  deleteFichaAction,
+  markFichaEntregueFormAction,
+  removeFichaListaIaAction,
+  removeFichaListaNomesRawAction,
+  revertFichaToPendenteAction,
+} from "./actions";
 import type { FichaStatus } from "./data";
 import { getInitialFichaDeleteActionState, getInitialFichaStatusActionState } from "./form-state";
 import { PrintTriggerButton } from "./print-trigger-button";
@@ -14,7 +20,10 @@ import { PrintTriggerButton } from "./print-trigger-button";
 type FichaRowActionsProps = {
   fichaId: string;
   fichaLabel: string;
+  canOrganizeNameList?: boolean;
   fullDeliverButton?: boolean;
+  hasRawNameList?: boolean;
+  hasOrganizedNameList?: boolean;
   printHref: string;
   previewHref: string;
   returnTo: string;
@@ -28,7 +37,10 @@ function createConfirmationCode() {
 export function FichaRowActions({
   fichaId,
   fichaLabel,
+  canOrganizeNameList = false,
   fullDeliverButton = false,
+  hasRawNameList = false,
+  hasOrganizedNameList = false,
   previewHref,
   printHref,
   returnTo,
@@ -38,8 +50,11 @@ export function FichaRowActions({
   const [revertOpen, setRevertOpen] = useState(false);
   const [confirmationCode, setConfirmationCode] = useState(() => createConfirmationCode());
   const [deleteState, deleteFormAction] = useActionState(deleteFichaAction, getInitialFichaDeleteActionState());
+  const [removeListaIaState, removeListaIaFormAction] = useActionState(removeFichaListaIaAction, getInitialFichaStatusActionState());
+  const [removeListaRawState, removeListaRawFormAction] = useActionState(removeFichaListaNomesRawAction, getInitialFichaStatusActionState());
   const [revertState, revertFormAction] = useActionState(revertFichaToPendenteAction, getInitialFichaStatusActionState());
   const editHref = `/fichas/${fichaId}`;
+  const organizeNameListHref = `/ferramentas/organizar-nomes-ia?fichaId=${encodeURIComponent(fichaId)}`;
 
   useEffect(() => {
     if (deleteState.status === "error" && deleteState.message) {
@@ -48,6 +63,15 @@ export function FichaRowActions({
       });
     }
   }, [deleteState.message, deleteState.status]);
+
+  useEffect(() => {
+    const errorMessage = removeListaIaState.message ?? removeListaRawState.message;
+    if ((removeListaIaState.status === "error" || removeListaRawState.status === "error") && errorMessage) {
+      toast.error("NÃ£o foi possÃ­vel remover lista", {
+        description: errorMessage,
+      });
+    }
+  }, [removeListaIaState.message, removeListaIaState.status, removeListaRawState.message, removeListaRawState.status]);
 
   useEffect(() => {
     if (revertState.status === "error" && revertState.message) {
@@ -88,6 +112,20 @@ export function FichaRowActions({
               <Pencil aria-hidden="true" size={16} />
               Editar
             </FloatingMenuLink>
+            {canOrganizeNameList ? (
+              <FloatingMenuLink href={organizeNameListHref}>
+                <ClipboardList aria-hidden="true" size={16} />
+                Organizar Lista de Nomes
+              </FloatingMenuLink>
+            ) : null}
+            <NameListRemoveMenuItems
+              fichaId={fichaId}
+              hasOrganizedNameList={hasOrganizedNameList}
+              hasRawNameList={hasRawNameList}
+              removeListaIaFormAction={removeListaIaFormAction}
+              removeListaRawFormAction={removeListaRawFormAction}
+              returnTo={returnTo}
+            />
             <FloatingMenuButton danger onClick={openDeleteModal}>
               <Trash2 aria-hidden="true" size={16} />
               Deletar
@@ -170,6 +208,20 @@ export function FichaRowActions({
             <Pencil aria-hidden="true" size={16} />
             Editar
           </FloatingMenuLink>
+          {canOrganizeNameList ? (
+            <FloatingMenuLink href={organizeNameListHref}>
+              <ClipboardList aria-hidden="true" size={16} />
+              Organizar Lista de Nomes
+            </FloatingMenuLink>
+          ) : null}
+          <NameListRemoveMenuItems
+            fichaId={fichaId}
+            hasOrganizedNameList={hasOrganizedNameList}
+            hasRawNameList={hasRawNameList}
+            removeListaIaFormAction={removeListaIaFormAction}
+            removeListaRawFormAction={removeListaRawFormAction}
+            returnTo={returnTo}
+          />
           <FloatingMenuButton danger onClick={openDeleteModal}>
             <Trash2 aria-hidden="true" size={16} />
             Deletar
@@ -217,6 +269,54 @@ type RevertFichaDialogProps = {
   onClose: () => void;
   returnTo: string;
 };
+
+type NameListRemoveMenuItemsProps = {
+  fichaId: string;
+  hasOrganizedNameList: boolean;
+  hasRawNameList: boolean;
+  removeListaIaFormAction: (payload: FormData) => void;
+  removeListaRawFormAction: (payload: FormData) => void;
+  returnTo: string;
+};
+
+function NameListRemoveMenuItems({
+  fichaId,
+  hasOrganizedNameList,
+  hasRawNameList,
+  removeListaIaFormAction,
+  removeListaRawFormAction,
+  returnTo,
+}: NameListRemoveMenuItemsProps) {
+  return (
+    <>
+      {hasOrganizedNameList ? (
+        <form action={removeListaIaFormAction} className="floating-menu__form">
+          <input name="id" type="hidden" value={fichaId} />
+          <input name="returnTo" type="hidden" value={returnTo} />
+          <RemoveNameListSubmitButton label="Remover lista de nomes (organizada)" />
+        </form>
+      ) : null}
+      {hasRawNameList ? (
+        <form action={removeListaRawFormAction} className="floating-menu__form">
+          <input name="id" type="hidden" value={fichaId} />
+          <input name="returnTo" type="hidden" value={returnTo} />
+          <RemoveNameListSubmitButton label="Remover lista de nomes (bruta)" />
+        </form>
+      ) : null}
+    </>
+  );
+}
+
+function RemoveNameListSubmitButton({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button aria-disabled={pending} className="floating-menu__item floating-menu__item--danger" disabled={pending} role="menuitem" type="submit">
+      {pending ? <span className="button-spinner" aria-hidden="true" /> : <Trash2 aria-hidden="true" size={16} />}
+      {pending ? "Removendo..." : label}
+    </button>
+  );
+}
 
 function DeleteFichaDialog({
   confirmationCode,

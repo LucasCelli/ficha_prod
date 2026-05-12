@@ -35,6 +35,7 @@ export type FieldErrors = Partial<
     | "itensJson"
     | "larguraGola"
     | "larguraManga"
+    | "listaNomesRaw"
     | "manga"
     | "material"
     | "numeroVenda"

@@ -52,4 +52,14 @@ const fichaActionToastMessages: Record<string, RouteToastMessage> = {
     title: "Ficha reaberta",
     tone: "warning",
   },
+  "lista-ia-removed": {
+    description: "A lista organizada foi removida da ficha.",
+    title: "Lista removida",
+    tone: "success",
+  },
+  "lista-raw-removed": {
+    description: "A lista bruta foi removida da ficha.",
+    title: "Lista removida",
+    tone: "success",
+  },
 };
