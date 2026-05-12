@@ -4,6 +4,8 @@ import Link from "next/link";
 import type { ButtonHTMLAttributes, ComponentProps, CSSProperties, MouseEvent, ReactNode } from "react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motionTransition, popoverMotion, transitionForReducedMotion } from "./motion-presets";
 
 type FloatingMenuProps = {
   children: ReactNode;
@@ -24,6 +26,7 @@ type FloatingMenuButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 export function FloatingMenu({ children, label, trigger }: FloatingMenuProps) {
   const [open, setOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<CSSProperties | null>(null);
+  const reduceMotion = useReducedMotion();
   const menuId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -111,18 +114,27 @@ export function FloatingMenu({ children, label, trigger }: FloatingMenuProps) {
       >
         {trigger}
       </button>
-      {open && typeof document !== "undefined"
+      {typeof document !== "undefined" && (open || menuPosition)
         ? createPortal(
-            <div
-              className="floating-menu__content"
-              id={menuId}
-              onClick={handleMenuClick}
-              ref={menuRef}
-              role="menu"
-              style={menuPosition ?? undefined}
-            >
-              {children}
-            </div>,
+            <AnimatePresence initial={false}>
+              {open ? (
+                <motion.div
+                  animate="visible"
+                  className="floating-menu__content"
+                  exit="exit"
+                  id={menuId}
+                  initial={reduceMotion ? false : "hidden"}
+                  onClick={handleMenuClick}
+                  ref={menuRef}
+                  role="menu"
+                  style={menuPosition ?? undefined}
+                  transition={transitionForReducedMotion(reduceMotion, motionTransition.fast)}
+                  variants={popoverMotion}
+                >
+                  {children}
+                </motion.div>
+              ) : null}
+            </AnimatePresence>,
             document.body,
           )
         : null}

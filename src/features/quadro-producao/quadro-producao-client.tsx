@@ -1597,7 +1597,6 @@ function ColumnSurface({
                 >
                 <div className="quadro-producao-card__body">
                   <div className="quadro-producao-card__identity">
-                    <Tooltip label="Abrir detalhes do cartão">
                       <button
                         aria-label={`Abrir detalhes de ${card.clienteNome}`}
                         className="quadro-producao-card__title"
@@ -1611,7 +1610,6 @@ function ColumnSurface({
                         ) : null}
                         <span className="quadro-producao-card__title-text">{card.clienteNome}</span>
                       </button>
-                    </Tooltip>
                   </div>
 
                   <div className="quadro-producao-card__meta">

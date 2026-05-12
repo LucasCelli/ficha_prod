@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
-import { Check, ClipboardList, FileSpreadsheet, Link2, Pencil, Play, Search } from "lucide-react";
+import { useId, useMemo, useState, type FormEvent } from "react";
+import { Check, ClipboardList, FileSpreadsheet, Link2, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, Button, CustomDatalist, DataTable, type CustomDatalistOption } from "@/components/ui";
 import { AI_MODEL_OPTIONS } from "@/lib/ai/model-options";
@@ -343,7 +343,6 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
   const [isLoadingLink, setIsLoadingLink] = useState(false);
   const [isLoadingLinkedList, setIsLoadingLinkedList] = useState(false);
   const [isSavingLink, setIsSavingLink] = useState(false);
-  const [isTestingAnimation, setIsTestingAnimation] = useState(false);
   const [isEditingResult, setIsEditingResult] = useState(false);
   const [activeCopyCell, setActiveCopyCell] = useState<ActiveCopyCell | null>(null);
   const [linkedFichas, setLinkedFichas] = useState<LinkedFicha[]>(initialFicha ? [initialFicha] : []);
@@ -351,7 +350,6 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
   const [selectedFichaLabel, setSelectedFichaLabel] = useState(initialFicha ? getFichaOptionLabel(initialFicha) : "");
   const [sortConfig, setSortConfig] = useState<{ direction: SortDirection; key: SortKey } | null>(null);
   const hasItems = Boolean(result?.items.length);
-  const showTableGenerationAnimation = isLoading || isTestingAnimation;
   const selectedFicha = linkedFichas.find((ficha) => ficha.id === selectedFichaId) ?? null;
   const fichaOptions = useMemo<CustomDatalistOption[]>(
     () =>
@@ -384,16 +382,6 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
       })),
     [sortConfig],
   );
-
-  useEffect(() => {
-    if (!isTestingAnimation) return;
-
-    const timer = window.setTimeout(() => {
-      setIsTestingAnimation(false);
-    }, 10000);
-
-    return () => window.clearTimeout(timer);
-  }, [isTestingAnimation]);
 
   function updateTextItem(rowId: string, field: EditableTextField, value: string) {
     setResult((current) =>
@@ -769,16 +757,6 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
                 {isEditingResult ? "Concluir" : "Editar"}
               </Button>
               <Button
-                aria-disabled={showTableGenerationAnimation}
-                disabled={showTableGenerationAnimation}
-                onClick={() => setIsTestingAnimation(true)}
-                type="button"
-                variant="secondary"
-              >
-                {isTestingAnimation ? <span className="button-spinner" aria-hidden="true" /> : <Play aria-hidden="true" size={17} />}
-                Testar animação
-              </Button>
-              <Button
                 aria-disabled={!hasItems || isExporting}
                 disabled={!hasItems || isExporting}
                 onClick={handleExportXlsx}
@@ -797,7 +775,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
             </p>
           ) : null}
 
-          {showTableGenerationAnimation ? (
+          {isLoading ? (
             <TableGenerationAnimation />
           ) : result ? (
             <DataTable caption="Lista organizada para revisão" columns={columns}>

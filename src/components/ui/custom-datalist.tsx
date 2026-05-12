@@ -1,6 +1,8 @@
 "use client";
 
 import { useId, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motionTransition, popoverMotion, transitionForReducedMotion } from "./motion-presets";
 
 export type CustomDatalistOption = {
   aliases?: string[];
@@ -48,6 +50,7 @@ export function CustomDatalist({
   value,
 }: CustomDatalistProps) {
   const listboxId = useId();
+  const reduceMotion = useReducedMotion();
   const inputRef = useRef<HTMLInputElement>(null);
   const [internalValue, setInternalValue] = useState(defaultValue);
   const [isOpen, setIsOpen] = useState(false);
@@ -137,8 +140,18 @@ export function CustomDatalist({
         role="combobox"
         value={currentValue}
       />
-      {isOpen ? (
-        <div className="custom-datalist__menu" id={listboxId} role="listbox">
+      <AnimatePresence initial={false}>
+        {isOpen ? (
+          <motion.div
+            animate="visible"
+            className="custom-datalist__menu"
+            exit="exit"
+            id={listboxId}
+            initial={reduceMotion ? false : "hidden"}
+            role="listbox"
+            transition={transitionForReducedMotion(reduceMotion, motionTransition.fast)}
+            variants={popoverMotion}
+          >
           {filteredOptions.length ? (
             filteredOptions.map((option, index) => (
               <button
@@ -159,8 +172,9 @@ export function CustomDatalist({
           ) : (
             <div className="custom-datalist__empty">Nenhuma sugestão</div>
           )}
-        </div>
-      ) : null}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

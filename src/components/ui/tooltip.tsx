@@ -3,6 +3,13 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import {
+  motionTransition,
+  tooltipBottomMotion,
+  tooltipMotion,
+  transitionForReducedMotion,
+} from "./motion-presets";
 
 type TooltipProps = {
   children: ReactNode;
@@ -19,6 +26,7 @@ export function Tooltip({ children, label }: TooltipProps) {
   } | null>(null);
   const triggerRef = useRef<HTMLSpanElement | null>(null);
   const tooltipRef = useRef<HTMLSpanElement | null>(null);
+  const reduceMotion = useReducedMotion();
 
   function handleOpen() {
     setDismissed(false);
@@ -84,7 +92,7 @@ export function Tooltip({ children, label }: TooltipProps) {
       left = Math.min(Math.max(left, minLeft), maxLeft);
 
       let side: "bottom" | "top" = "top";
-      let top = triggerRect.top - 10;
+      let top = triggerRect.top - 40;
 
       if (triggerRect.top - tooltipRect.height - 10 < viewportPadding) {
         side = "bottom";
@@ -137,18 +145,27 @@ export function Tooltip({ children, label }: TooltipProps) {
       onPointerLeave={handleClose}
     >
       {children}
-      {typeof document !== "undefined" && open
+      {typeof document !== "undefined" && (open || position)
         ? createPortal(
-            <span
-              className="ui-tooltip__content"
-              data-open="true"
-              data-side={position?.side ?? "top"}
-              ref={tooltipRef}
-              role="tooltip"
-              style={tooltipStyle}
-            >
-              {label}
-            </span>,
+            <AnimatePresence initial={false}>
+              {open ? (
+                <motion.span
+                  animate="visible"
+                  className="ui-tooltip__content"
+                  data-open="true"
+                  data-side={position?.side ?? "top"}
+                  exit="exit"
+                  initial={reduceMotion ? false : "hidden"}
+                  ref={tooltipRef}
+                  role="tooltip"
+                  style={tooltipStyle}
+                  transition={transitionForReducedMotion(reduceMotion, motionTransition.fast)}
+                  variants={position?.side === "bottom" ? tooltipBottomMotion : tooltipMotion}
+                >
+                  {label}
+                </motion.span>
+              ) : null}
+            </AnimatePresence>,
             document.body,
           )
         : null}

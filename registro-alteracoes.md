@@ -1,5 +1,29 @@
 # Registro de alteracoes
 
+## 2026-05-12 - UI compartilhada: base Motion
+
+- Modulo: UI compartilhada e Motion.
+- Arquivos alterados: `src/components/ui/motion-presets.ts`, `src/components/ui/button.tsx`, `src/components/ui/modal.tsx`, `src/components/ui/alert-dialog.tsx`, `src/components/ui/motion-page.tsx`, `src/components/ui/loading-bar.tsx`, `src/components/ui/custom-datalist.tsx`, `src/components/ui/floating-menu.tsx`, `src/components/ui/tooltip.tsx`, `src/components/ui/index.ts`, `src/styles/globals.css`, `TODO.md`, `registro-alteracoes.md`.
+- Resultado: criada uma base compartilhada de presets de Motion para dialog, pagina, popover, tooltip, collapse, lista e loading. `Button`, `MotionPage`, `Modal`, `AlertDialog`, `LoadingBar`, `CustomDatalist`, `FloatingMenu` e `Tooltip` passaram a usar os mesmos timings/easings e respeitar `prefers-reduced-motion`.
+- Resultado: modais e alert dialogs agora usam `AnimatePresence` para entrada e saida real; popovers pequenos renderizados em portal mantem foco, teclado, clique fora e posicionamento, mas com animacao curta via Motion.
+- Limpeza: a barra de loading deixou de depender de animacao CSS propria, tooltips perderam transicoes manuais de transform/opacity e keyframes antigos sem uso (`fadeIn`, `modalOverlayIn`, `modalScaleIn`, `fichaPreviewSkeleton`) foram removidos.
+- Decisao: nao instalar bibliotecas novas. As referencias externas ficaram como repertorio visual, enquanto a implementacao usa `motion` ja presente no projeto.
+- Caveat: saida de linhas em `/fichas`, refinamento de reordenacao no quadro e feedback Motion no editor de produtos/observacoes ficaram registrados no `TODO.md` como etapas seguintes. A regra do quadro permanece: nao animar `transform` do card enquanto `fluid-dnd` controla o drag.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Edge em `localhost:3000` confirmou menu de contexto em `/fichas`, tooltip por foco, modal de previa abrindo/fechando, `CustomDatalist` em `/fichas/nova`, ausencia de erros de console e cards do `/quadro-producao` sem `transform` em `transition`.
+
+## 2026-05-12 - Relatorios: Recharts localizado
+
+- Modulo: relatorios e bibliotecas.
+- Arquivos alterados: `src/features/relatorios/relatorios-overview.tsx`, `src/features/relatorios/relatorios-charts.tsx`, `src/features/relatorios/relatorios-motion.tsx`, `src/styles/globals.css`, `TODO.md`, `registro-alteracoes.md`.
+- Resultado: `/relatorios` passou a usar `recharts` em um leaf client dedicado para o comparativo do periodo e rankings de vendedor, materiais, produtos, clientes, tamanhos e personalizacoes. O loader server-side e o heatmap manual foram preservados.
+- Refinamento posterior: removidas as listas repetidas abaixo dos rankings, deixando os graficos como representacao principal; os labels dos eixos passaram a usar truncamento em uma linha e os valores aparecem no fim das barras.
+- UI posterior: os containers internos dos graficos perderam borda/fundo proprios para evitar card dentro de card e reduzir poluicao visual.
+- Animacao posterior: os graficos passaram a usar o primitivo Motion da tela, e as funcoes antigas de animacao de lista/barra sem uso foram removidas de `relatorios-motion`.
+- Regra do projeto: `AGENTS.md` orienta usar `motion` para animacoes de UI quando a biblioteca ja resolver o caso, evitando keyframes, timers ou transicoes manuais locais sem necessidade clara.
+- Decisao: manter `@tanstack/react-query` no quadro de producao, nao migrar `DataTable` para `@tanstack/react-table` neste ciclo e nao criar store `zustand`, porque as superficies atuais seguem cobertas por dados server-side, URL state, React Query e estado local.
+- Caveat: o medidor de entrega permaneceu no CSS atual por estar aderente ao layout e nao exigir client-side adicional.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Edge local em `/relatorios` confirmou os graficos em light/dark mode sem erro de console; Playwright headless validou 1366x768 e 390x844 com 7 SVGs de Recharts, 0 listas duplicadas, labels sem quebra, sem overflow horizontal e com links PDF/Excel preservando os parametros do recorte.
+
 ## 2026-05-11 - Lista IA vinculada a ficha
 
 - Modulo: ferramentas de IA e fichas.
@@ -28,7 +52,7 @@
 - UI posterior: no modal da lista organizada, hover e estado ativo passaram a destacar a celula inteira, nao apenas o texto do nome/numero.
 - Ordenacao posterior: o cabecalho `Tamanho` da lista organizada no modal passou a ordenar por blocos, com tamanhos numericos antes dos alfabeticos, sequencia operacional de `P` ate extensoes `EEGG`, e Baby Look em bloco separado.
 - UI posterior: a ferramenta `/ferramentas/organizar-nomes-ia` passou a mostrar uma animacao SVG de geracao no lugar da tabela enquanto a IA processa a lista, adaptada aos tokens de cor do app.
-- UI posterior: adicionada acao temporaria `Testar animacao` por 10 segundos na ferramenta de IA; a animacao ficou flat, sem sombra/brilho/wrapper visual extra, e o status passou para `Organizando a sua lista`.
+- UI posterior: a animacao da ferramenta de IA ficou flat, sem sombra/brilho/wrapper visual extra, e o status passou para `Organizando a sua lista`.
 - UI posterior: o texto `Organizando a sua lista...` foi movido para o cabecalho do SVG da animacao e recebeu efeito de typing com cursor.
 - UI posterior: o estado vazio da tabela da ferramenta de IA passou a usar uma versao estatica do mesmo SVG como placeholder.
 - UI posterior: o placeholder estatico passou a usar texto orientativo no cabecalho, cores neutras e sem frase auxiliar inferior.

@@ -12,6 +12,20 @@ export { FloatingMenu, FloatingMenuButton, FloatingMenuLink } from "./floating-m
 export { Modal } from "./modal";
 export { ModuleOverview } from "./module-overview";
 export { MotionPage } from "./motion-page";
+export {
+  collapseMotion,
+  dialogContentMotion,
+  dialogOverlayMotion,
+  listItemMotion,
+  motionDuration,
+  motionEase,
+  motionTransition,
+  pageMotion,
+  popoverMotion,
+  tooltipBottomMotion,
+  tooltipMotion,
+  transitionForReducedMotion,
+} from "./motion-presets";
 export { Pagination } from "./pagination";
 export { StatusPanel } from "./status-panel";
 export { Tooltip } from "./tooltip";

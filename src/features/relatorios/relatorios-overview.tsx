@@ -3,9 +3,10 @@ import Link from "next/link";
 import { CalendarDays, FileSpreadsheet, FileText, Search } from "lucide-react";
 import { Button, EmptyState, Tooltip } from "@/components/ui";
 import { formatDateInput } from "@/lib/dates";
-import type { RelatorioData, RelatorioFilters, RelatorioRankItem, RelatorioResult, RelatorioVendedor } from "./data";
+import type { RelatorioData, RelatorioFilters, RelatorioRankItem, RelatorioResult } from "./data";
 import { buildRelatorioSearchParams } from "./data";
-import { RelatorioMotionBar, RelatorioMotionBlock, RelatorioMotionListItem, RelatorioMotionSection } from "./relatorios-motion";
+import { RelatorioComparisonChart, RelatorioRankChart } from "./relatorios-charts";
+import { RelatorioMotionBlock, RelatorioMotionSection } from "./relatorios-motion";
 
 type RelatoriosOverviewProps = {
   filters: RelatorioFilters;
@@ -18,8 +19,6 @@ const periodOptions = [
   { label: "Este Ano", value: "ano" },
   { label: "Personalizado", value: "customizado" },
 ] as const;
-
-const RANK_VISIBLE_LIMIT = 8;
 
 export function RelatoriosOverview({ filters, result }: RelatoriosOverviewProps) {
   if (result.kind === "not-configured") {
@@ -156,17 +155,18 @@ function RelatoriosContent({ data }: { data: RelatorioData }) {
 
       <RelatorioMotionSection className="relatorios-panel" aria-labelledby="comparativo-title">
         <PanelTitle id="comparativo-title" title="Comparativo com Período Anterior" />
-        <div className="relatorios-comparison">
-          <ComparisonItem label="Fichas" value={data.comparativo.fichas} />
-          <ComparisonItem label="Itens" value={data.comparativo.itens} />
-          <ComparisonItem label="Clientes" value={data.comparativo.clientes} />
-          <ComparisonItem label="Taxa de entrega" suffix="%" value={data.comparativo.taxaEntrega} />
-        </div>
+        <RelatorioComparisonChart comparativo={data.comparativo} />
       </RelatorioMotionSection>
 
-      <RelatorioMotionSection className="relatorios-panel" aria-labelledby="vendedores-title">
+      <RelatorioMotionSection className="relatorios-panel relatorios-panel--wide" aria-labelledby="vendedores-title">
         <PanelTitle id="vendedores-title" title="Resumo por Vendedor" />
-        <VendedoresList vendedores={data.rankings.vendedores} />
+        <RankChartOrEmpty
+          ariaLabel="Volume de fichas por vendedor"
+          emptyText="Nenhum vendedor encontrado no período."
+          items={data.rankings.vendedores}
+          valueKey="totalFichas"
+          valueLabel="fichas"
+        />
       </RelatorioMotionSection>
 
       <div className="relatorios-panels">
@@ -265,23 +265,6 @@ function DeliveryRateSummary({ data }: { data: RelatorioData }) {
   );
 }
 
-function ComparisonItem({ label, suffix = "", value }: { label: string; suffix?: string; value: number }) {
-  const tone = value > 0 ? "up" : value < 0 ? "down" : "flat";
-  const sign = value > 0 ? "+" : "";
-
-  return (
-    <div className={`relatorios-comparison__item relatorios-comparison__item--${tone}`}>
-      <span>{label}</span>
-      <strong>
-        <span aria-hidden="true" className="relatorios-comparison__trend" />
-        {sign}
-        {formatNumber(value)}
-        {suffix}
-      </strong>
-    </div>
-  );
-}
-
 function SummaryCard({
   delay,
   label,
@@ -305,77 +288,33 @@ function PanelTitle({ id, title }: { id: string; title: string }) {
   return <h2 id={id}>{title}</h2>;
 }
 
-function VendedoresList({ vendedores }: { vendedores: RelatorioVendedor[] }) {
-  if (vendedores.length === 0) {
-    return <p className="relatorios-muted">Nenhum vendedor encontrado no período.</p>;
-  }
-
-  return (
-    <ol className="relatorios-rank-list">
-      {vendedores.slice(0, RANK_VISIBLE_LIMIT).map((vendedor, index) => (
-        <RelatorioMotionListItem delay={index * 0.025} key={vendedor.label}>
-          <RankHeader
-            label={vendedor.label}
-            value={`${formatNumber(vendedor.totalFichas)} fichas`}
-          />
-          <RankBar ariaLabel={`${vendedor.percent}% do maior volume de fichas por vendedor`} percent={vendedor.percent} />
-          <p className="relatorios-rank-list__meta">
-            {formatNumber(vendedor.totalItens)} itens · {formatNumber(vendedor.entregues)} entregues · {formatNumber(vendedor.pendentes)} pendentes
-          </p>
-        </RelatorioMotionListItem>
-      ))}
-      <RankOverflow total={vendedores.length} />
-    </ol>
-  );
-}
-
 function RankPanel({ id, items, title }: { id: string; items: RelatorioRankItem[]; title: string }) {
   return (
     <RelatorioMotionSection className="relatorios-panel" aria-labelledby={id}>
       <PanelTitle id={id} title={title} />
-      {items.length === 0 ? (
-        <p className="relatorios-muted">Nenhum dado encontrado no período.</p>
-      ) : (
-        <ol className="relatorios-rank-list">
-          {items.slice(0, RANK_VISIBLE_LIMIT).map((item, index) => (
-            <RelatorioMotionListItem delay={index * 0.025} key={item.label}>
-              <RankHeader label={item.label} value={`${formatNumber(item.totalItens)} itens`} />
-              <RankBar ariaLabel={`${item.percent}% do maior volume da lista`} percent={item.percent} />
-              <p className="relatorios-rank-list__meta">{formatNumber(item.totalFichas)} fichas</p>
-            </RelatorioMotionListItem>
-          ))}
-          <RankOverflow total={items.length} />
-        </ol>
-      )}
+      <RankChartOrEmpty ariaLabel={title} emptyText="Nenhum dado encontrado no período." items={items} valueKey="totalItens" valueLabel="itens" />
     </RelatorioMotionSection>
   );
 }
 
-function RankHeader({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="relatorios-rank-list__header">
-      <strong>{label}</strong>
-      <span>{value}</span>
-    </div>
-  );
-}
-
-function RankBar({ ariaLabel, percent }: { ariaLabel: string; percent: number }) {
-  return (
-    <span aria-label={ariaLabel} className="relatorios-rank-bar">
-      <RelatorioMotionBar className="relatorios-rank-bar__fill" percent={percent} />
-    </span>
-  );
-}
-
-function RankOverflow({ total }: { total: number }) {
-  const hidden = total - RANK_VISIBLE_LIMIT;
-
-  if (hidden <= 0) {
-    return null;
+function RankChartOrEmpty({
+  ariaLabel,
+  emptyText,
+  items,
+  valueKey,
+  valueLabel,
+}: {
+  ariaLabel: string;
+  emptyText: string;
+  items: RelatorioRankItem[];
+  valueKey: "totalFichas" | "totalItens";
+  valueLabel: "fichas" | "itens";
+}) {
+  if (items.length === 0) {
+    return <p className="relatorios-muted">{emptyText}</p>;
   }
 
-  return <li className="relatorios-rank-list__overflow">e mais {formatNumber(hidden)}</li>;
+  return <RelatorioRankChart ariaLabel={ariaLabel} items={items} valueKey={valueKey} valueLabel={valueLabel} />;
 }
 
 function formatNumber(value: number) {

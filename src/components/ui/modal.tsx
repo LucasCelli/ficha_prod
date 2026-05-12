@@ -2,10 +2,16 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import {
+  dialogContentMotion,
+  dialogOverlayMotion,
+  motionTransition,
+  transitionForReducedMotion,
+} from "./motion-presets";
 
 type ModalProps = {
   children: ReactNode;
@@ -19,6 +25,7 @@ type ModalProps = {
 export function Modal({ children, description, onClose, onCloseHref, size = "md", title }: ModalProps) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
+  const [visible, setVisible] = useState(true);
 
   const closeModal = useCallback(() => {
     if (onClose) {
@@ -31,39 +38,53 @@ export function Modal({ children, description, onClose, onCloseHref, size = "md"
     }
   }, [onClose, onCloseHref, router]);
 
+  const requestClose = useCallback(() => {
+    setVisible(false);
+  }, []);
+
   return (
     <Dialog.Root
       open
       onOpenChange={(open) => {
-        if (!open) closeModal();
+        if (!open) requestClose();
       }}
     >
       <Dialog.Portal>
-        <Dialog.Overlay asChild>
-          <motion.div
-            className="modal-overlay"
-            initial={reduceMotion ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
-          />
-        </Dialog.Overlay>
-        <Dialog.Content asChild>
-          <motion.div
-            className={`modal-content modal-content--${size}`}
-            initial={reduceMotion ? false : { opacity: 0, scale: 0.98, x: "-50%", y: "-48%" }}
-            animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
-            transition={{ duration: reduceMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
-          >
-          <Dialog.Close asChild>
-            <button className="modal-close" aria-label="Fechar" type="button">
-              <X aria-hidden="true" size={20} />
-            </button>
-          </Dialog.Close>
-          {title ? <Dialog.Title className="sr-only">{title}</Dialog.Title> : null}
-          {title ? <Dialog.Description className="sr-only">{description ?? title}</Dialog.Description> : null}
-          {children}
-          </motion.div>
-        </Dialog.Content>
+        <AnimatePresence initial={false} onExitComplete={closeModal}>
+          {visible ? (
+            <>
+              <Dialog.Overlay asChild forceMount>
+                <motion.div
+                  animate="visible"
+                  className="modal-overlay"
+                  exit="exit"
+                  initial={reduceMotion ? false : "hidden"}
+                  transition={transitionForReducedMotion(reduceMotion, motionTransition.fast)}
+                  variants={dialogOverlayMotion}
+                />
+              </Dialog.Overlay>
+              <Dialog.Content asChild forceMount>
+                <motion.div
+                  animate="visible"
+                  className={`modal-content modal-content--${size}`}
+                  exit="exit"
+                  initial={reduceMotion ? false : "hidden"}
+                  transition={transitionForReducedMotion(reduceMotion, motionTransition.normal)}
+                  variants={dialogContentMotion}
+                >
+                  <Dialog.Close asChild>
+                    <button className="modal-close" aria-label="Fechar" type="button">
+                      <X aria-hidden="true" size={20} />
+                    </button>
+                  </Dialog.Close>
+                  {title ? <Dialog.Title className="sr-only">{title}</Dialog.Title> : null}
+                  {title ? <Dialog.Description className="sr-only">{description ?? title}</Dialog.Description> : null}
+                  {children}
+                </motion.div>
+              </Dialog.Content>
+            </>
+          ) : null}
+        </AnimatePresence>
       </Dialog.Portal>
     </Dialog.Root>
   );

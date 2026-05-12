@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { motion, type HTMLMotionProps } from "motion/react";
+import { motionTransition } from "./motion-presets";
 
 type ButtonProps = HTMLMotionProps<"button"> & {
   children: ReactNode;
@@ -17,7 +18,7 @@ export function Button({ children, className, type = "button", variant = "primar
       className={classes}
       type={type}
       whileTap={isDisabled ? undefined : { scale: 0.985 }}
-      transition={{ duration: 0.12, ease: "easeOut" }}
+      transition={motionTransition.fast}
       {...props}
     >
       {children}

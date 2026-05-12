@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motionTransition, pageMotion, transitionForReducedMotion } from "./motion-presets";
 
 type MotionPageProps = {
   children: ReactNode;
@@ -18,11 +19,11 @@ export function MotionPage({ children }: MotionPageProps) {
         <motion.div
           key={pathname}
           className="app-main__motion"
-          initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
-          layout={!reduceMotion}
-          transition={{ duration: reduceMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
+          variants={pageMotion}
+          initial={reduceMotion ? false : "hidden"}
+          animate="visible"
+          exit={reduceMotion ? undefined : "exit"}
+          transition={transitionForReducedMotion(reduceMotion, motionTransition.normal)}
         >
           {children}
         </motion.div>
