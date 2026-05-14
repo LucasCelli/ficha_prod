@@ -11,6 +11,9 @@ type PrintFichaPageProps = {
   params: Promise<{
     id: string;
   }>;
+  searchParams?: Promise<{
+    listaNomesRaw?: string | string[];
+  }>;
 };
 
 export async function generateMetadata({ params }: PrintFichaPageProps): Promise<Metadata> {
@@ -28,8 +31,9 @@ export async function generateMetadata({ params }: PrintFichaPageProps): Promise
   };
 }
 
-export default async function PrintFichaPage({ params }: PrintFichaPageProps) {
+export default async function PrintFichaPage({ params, searchParams }: PrintFichaPageProps) {
   const { id } = await params;
+  const query = searchParams ? await searchParams : {};
   const result = await getFichaById(id);
   const session = await getCurrentSession();
 
@@ -72,7 +76,12 @@ export default async function PrintFichaPage({ params }: PrintFichaPageProps) {
   return (
     <>
       <PrintOnLoad />
-      <PrintFicha ficha={result.ficha} printedBy={session?.user.displayName.split(" ")[0]} />
+      <PrintFicha ficha={result.ficha} includeRawNameList={isTruthyQueryValue(query.listaNomesRaw)} printedBy={session?.user.displayName.split(" ")[0]} />
     </>
   );
+}
+
+function isTruthyQueryValue(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw === "1" || raw === "true" || raw === "sim" || raw === "on";
 }

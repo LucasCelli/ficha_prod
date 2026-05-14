@@ -1,4 +1,5 @@
 import type { FichaDetail } from "./data";
+import { getBusinessTodayInput } from "@/lib/dates";
 
 export type ProductFormItem = {
   detalhesProduto: string;
@@ -122,7 +123,7 @@ export function createEmptyFichaFormInitialData(): FichaFormInitialData {
     corReforco: "",
     corSublimacao: "",
     dataEntrega: "",
-    dataInicio: "",
+    dataInicio: getBusinessTodayInput(),
     evento: false,
     faixa: "nao",
     faixaCor: "",

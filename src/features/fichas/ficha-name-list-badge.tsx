@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, Modal } from "@/components/ui";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
@@ -15,6 +15,7 @@ type NameListApiResponse =
   | {
       success: true;
       ficha: {
+        clienteNome: string;
         id: string;
         label: string;
       };
@@ -48,25 +49,28 @@ type SizeSortDirection = "ascending" | "descending";
 
 const SIZE_ORDER = new Map(
   [
-    "P",
-    "M",
-    "G",
-    "GG",
-    "XG",
-    "XGG",
-    "EXG",
-    "EG",
-    "EGG",
-    "EGGG",
-    "EEG",
-    "EEGG",
-    "EEGGG",
-    "G1",
-    "G2",
-    "G3",
-    "G4",
-    "G5",
-  ].map((size, index) => [size, index]),
+    ["RN"],
+    ["1"],
+    ["2"],
+    ["4"],
+    ["6"],
+    ["8"],
+    ["10"],
+    ["12"],
+    ["14"],
+    ["16", "PP"],
+    ["P"],
+    ["M"],
+    ["G"],
+    ["GG"],
+    ["52", "XG", "G1"],
+    ["54", "EG", "G2"],
+    ["56", "EGG", "XGG", "G3"],
+    ["58", "EEGG", "XXGG", "G4"],
+    ["60", "ESP1", "G5"],
+    ["62", "ESP2", "G6"],
+    ["64", "ESP3", "G7"],
+  ].flatMap((sizes, index) => sizes.map((size) => [size, index] as const)),
 );
 
 const baseOrganizedColumns = [
@@ -116,22 +120,32 @@ function normalizeSize(value: string | null | undefined) {
 
 function getSizeSortParts(item: UniformListItem) {
   const size = normalizeSize(item.tamanho);
+  const explicitOrder = SIZE_ORDER.get(size);
   const numericSize = /^\d+$/.test(size) ? Number(size) : null;
   const modelBlock = item.modelo === "baby_look" ? 1 : 0;
+
+  if (explicitOrder !== undefined) {
+    return {
+      modelBlock,
+      order: explicitOrder,
+      section: 0,
+      text: size,
+    };
+  }
 
   if (numericSize !== null) {
     return {
       modelBlock,
       order: numericSize,
-      section: 0,
+      section: 1,
       text: size,
     };
   }
 
   return {
     modelBlock,
-    order: SIZE_ORDER.get(size) ?? 999,
-    section: 1,
+    order: 999,
+    section: 2,
     text: size,
   };
 }
@@ -197,6 +211,132 @@ function isOrganizedList(value: LoadedList["lista"]): value is SavedUniformList 
   return typeof value === "object" && value !== null && "items" in value;
 }
 
+function getFichaContextLabel(label: string) {
+  const context = label.split(" - ")[0]?.trim() || label;
+  return context === "Sem venda" ? "-" : context;
+}
+
+function getFichaClientName(ficha: LoadedList["ficha"]) {
+  return ficha.clienteNome?.trim() || ficha.label.split(" - ").slice(1).join(" - ").trim() || ficha.label;
+}
+
+function escapeHtml(value: string | null | undefined) {
+  return displayValue(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildNameListPrintHtml(input: {
+  items: UniformListItem[];
+  label: string;
+  rawText: string;
+  title: string;
+  tipo: LoadedList["tipo"];
+}) {
+  const body =
+    input.tipo === "organizada"
+      ? `
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Numero</th>
+              <th>Tamanho</th>
+              <th>Modelo</th>
+              <th>Confianca</th>
+              <th>Observacao</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${input.items
+              .map(
+                (item) => `
+                  <tr>
+                    <td>${escapeHtml(item.nome)}</td>
+                    <td>${escapeHtml(item.numero)}</td>
+                    <td>${escapeHtml(item.tamanho)}</td>
+                    <td>${escapeHtml(formatModel(item.modelo))}</td>
+                    <td>${escapeHtml(formatConfidence(item.confianca))}</td>
+                    <td>${escapeHtml(item.observacao)}</td>
+                  </tr>
+                `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      `
+      : `<pre>${escapeHtml(input.rawText)}</pre>`;
+
+  return `<!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(input.title)}</title>
+        <style>
+          @page { margin: 12mm; }
+          * { box-sizing: border-box; }
+          body { color: #111827; font-family: Arial, sans-serif; font-size: 12px; margin: 0; }
+          header { display: grid; gap: 4px; margin-bottom: 12px; }
+          header span { color: #4b5563; font-size: 11px; font-weight: 700; }
+          h1 { font-size: 18px; line-height: 1.2; margin: 0; }
+          table { border-collapse: collapse; width: 100%; }
+          th, td { border: 1px solid #d1d5db; padding: 6px 7px; text-align: left; vertical-align: top; }
+          th { background: #f3f4f6; font-size: 10px; text-transform: uppercase; }
+          td:nth-child(2), td:nth-child(3), td:nth-child(5) { text-align: center; }
+          pre { border: 1px solid #d1d5db; font-family: "Courier New", monospace; font-size: 12px; line-height: 1.45; margin: 0; padding: 10px; white-space: pre-wrap; word-break: break-word; }
+        </style>
+      </head>
+      <body>
+        <header>
+          <span>${escapeHtml(input.label)}</span>
+          <h1>${escapeHtml(input.title)}</h1>
+        </header>
+        ${body}
+      </body>
+    </html>`;
+}
+
+function printNameList(input: Parameters<typeof buildNameListPrintHtml>[0]) {
+  const frame = document.createElement("iframe");
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.position = "fixed";
+  frame.style.inset = "0";
+  frame.style.width = "0";
+  frame.style.height = "0";
+  frame.style.border = "0";
+  frame.style.opacity = "0";
+  frame.style.pointerEvents = "none";
+
+  document.body.appendChild(frame);
+  const printDocument = frame.contentDocument;
+  const printWindow = frame.contentWindow;
+
+  if (!printDocument || !printWindow) {
+    frame.remove();
+    toast.error("Nao foi possivel abrir a impressao", {
+      description: "Tente novamente.",
+    });
+    return;
+  }
+
+  printDocument.open();
+  printDocument.write(buildNameListPrintHtml(input));
+  printDocument.close();
+
+  const cleanup = () => {
+    window.setTimeout(() => frame.remove(), 500);
+  };
+
+  window.setTimeout(() => {
+    printWindow.focus();
+    printWindow.print();
+    cleanup();
+  }, 50);
+}
+
 export function FichaNameListBadge({ fichaId, tipo }: FichaNameListBadgeProps) {
   const [activeCopyCell, setActiveCopyCell] = useState<ActiveCopyCell | null>(null);
   const [loadedList, setLoadedList] = useState<LoadedList | null>(null);
@@ -205,6 +345,8 @@ export function FichaNameListBadge({ fichaId, tipo }: FichaNameListBadgeProps) {
   const tone = tipo === "organizada" ? "success" : "warning";
   const label = tipo === "organizada" ? "Lista organizada" : "Lista pendente";
   const title = tipo === "organizada" ? "Lista organizada" : "Lista bruta";
+  const displayTitle = loadedList ? `Lista - ${getFichaClientName(loadedList.ficha)}` : title;
+  const contextLabel = loadedList ? getFichaContextLabel(loadedList.ficha.label) : "";
   const organizedColumns = useMemo(
     () =>
       baseOrganizedColumns.map((column) =>
@@ -260,13 +402,29 @@ export function FichaNameListBadge({ fichaId, tipo }: FichaNameListBadgeProps) {
       </button>
 
       {loadedList ? (
-        <Modal description={`Consulta da ${title.toLowerCase()} vinculada a ficha.`} onClose={() => setLoadedList(null)} size="lg" title={title}>
+        <Modal description="Consulta da lista vinculada a ficha." onClose={() => setLoadedList(null)} size="lg" title={displayTitle}>
           <section className="name-list-view-modal">
             <header className="name-list-view-modal__header">
               <div>
-                <span>{loadedList.ficha.label}</span>
-                <h2>{title}</h2>
+                <span className="ui-badge ui-badge--info name-list-view-modal__context">{contextLabel}</span>
+                <h2>{displayTitle}</h2>
               </div>
+              <button
+                className="ui-button ui-button--secondary name-list-view-modal__print"
+                onClick={() =>
+                  printNameList({
+                    items: organizedItems,
+                    label: contextLabel,
+                    rawText: typeof loadedList.lista === "string" ? loadedList.lista : "",
+                    title: displayTitle,
+                    tipo: loadedList.tipo,
+                  })
+                }
+                type="button"
+              >
+                <Printer aria-hidden="true" size={17} />
+                Imprimir lista
+              </button>
             </header>
 
             {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (

@@ -89,6 +89,13 @@ export function ClienteForm({ cliente, mode = "create", returnTo }: ClienteFormP
             type="email"
           />
         </Field>
+
+        {mode === "edit" ? (
+          <label className="checkbox-field cliente-form__linked-fichas">
+            <input name="renomearFichasVinculadas" type="checkbox" />
+            <span>Renomear fichas vinculadas</span>
+          </label>
+        ) : null}
       </div>
 
       <div className="form-actions">

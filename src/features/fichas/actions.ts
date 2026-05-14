@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAppSession } from "@/features/auth/session";
 import { resolveDefaultKanbanColumnId } from "@/features/quadro-producao/data";
+import { normalizeNameOrCompany } from "@/lib/name-normalizer";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FichaDeleteActionState, FichaFormState, FichaStatusActionState, FieldErrors } from "./form-state";
@@ -147,7 +148,8 @@ export async function createFichaAction(_previousState: FichaFormState, formData
   }
 
   const supabase = createServerSupabaseClient();
-  const clienteId = await resolveClienteId(parsed.data.cliente, parsed.data.dataEntrega, "create");
+  const clienteNome = normalizeNameOrCompany(parsed.data.cliente);
+  const clienteId = await resolveClienteId(clienteNome, parsed.data.dataEntrega, "create");
   const defaultKanbanColumnId = await resolveDefaultKanbanColumnId("pendente");
   const { data: fichaCriada, error } = await supabase
     .from("fichas")
@@ -156,7 +158,7 @@ export async function createFichaAction(_previousState: FichaFormState, formData
       arte: parsed.data.arte,
       cliente_id: clienteId,
       cliente_auxiliar: parsed.data.clienteAuxiliar,
-      cliente_nome_snapshot: parsed.data.cliente,
+      cliente_nome_snapshot: clienteNome,
       data_inicio: parsed.data.dataInicio,
       data_entrega: parsed.data.dataEntrega,
       evento: parsed.data.evento,
@@ -252,7 +254,8 @@ export async function updateFichaAction(_previousState: FichaFormState, formData
   }
 
   const supabase = createServerSupabaseClient();
-  const clienteId = await resolveClienteId(parsed.data.cliente, parsed.data.dataEntrega, "update");
+  const clienteNome = normalizeNameOrCompany(parsed.data.cliente);
+  const clienteId = await resolveClienteId(clienteNome, parsed.data.dataEntrega, "update");
   const { error } = await supabase
     .from("fichas")
     .update({
@@ -260,7 +263,7 @@ export async function updateFichaAction(_previousState: FichaFormState, formData
       arte: parsed.data.arte,
       cliente_id: clienteId,
       cliente_auxiliar: parsed.data.clienteAuxiliar,
-      cliente_nome_snapshot: parsed.data.cliente,
+      cliente_nome_snapshot: clienteNome,
       data_inicio: parsed.data.dataInicio,
       data_entrega: parsed.data.dataEntrega,
       evento: parsed.data.evento,
@@ -552,7 +555,8 @@ function withToastParam(path: string, value: string) {
 
 async function resolveClienteId(nome: string, dataEntrega: string, mode: "create" | "update") {
   const supabase = createServerSupabaseClient();
-  const nomeNormalizado = nome.trim().toLowerCase();
+  const nomeCliente = normalizeNameOrCompany(nome);
+  const nomeNormalizado = nomeCliente.toLocaleLowerCase("pt-BR");
   const { data: cliente } = await supabase
     .from("clientes")
     .select("id, total_fichas, primeira_ficha")
@@ -576,7 +580,7 @@ async function resolveClienteId(nome: string, dataEntrega: string, mode: "create
   const { data: novoCliente } = await supabase
     .from("clientes")
     .insert({
-      nome,
+      nome: nomeCliente,
       primeira_ficha: dataEntrega,
       ultima_ficha: dataEntrega,
       total_fichas: 1,

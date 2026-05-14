@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, FileText } from "lucide-react";
+import { ChevronDown, FileText, X } from "lucide-react";
 import type { FichaFilters } from "./data";
 
 type FichasFilterToolbarProps = {
@@ -95,6 +95,12 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
     window.location.assign(getPdfHref(pdfHref, includeOverdue));
   }
 
+  function clearSearch() {
+    setSearchDraftValue("");
+    setIsEditingSearch(false);
+    updateFilter(searchParams, pathname, router, startTransition, "busca", "");
+  }
+
   return (
     <form
       className="fichas-toolbar"
@@ -104,18 +110,31 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
     >
       <div className="field fichas-toolbar__search">
         <label htmlFor="busca">Busca</label>
-        <input
-          id="busca"
-          name="busca"
-          onBlur={() => setIsEditingSearch(false)}
-          onChange={(event) => setSearchDraftValue(event.target.value)}
-          onFocus={() => {
-            setSearchDraftValue(externalSearchValue);
-            setIsEditingSearch(true);
-          }}
+        <div className="fichas-toolbar__search-control">
+          <input
+            id="busca"
+            name="busca"
+            onBlur={() => setIsEditingSearch(false)}
+            onChange={(event) => setSearchDraftValue(event.target.value)}
+            onFocus={() => {
+              setSearchDraftValue(externalSearchValue);
+              setIsEditingSearch(true);
+            }}
           placeholder="Cliente, alias, tecido, personalização, venda ou vendedor…"
-          value={searchValue}
-        />
+            value={searchValue}
+          />
+          {searchValue.trim() ? (
+            <button
+              aria-label="Limpar busca"
+              className="fichas-toolbar__search-clear"
+              onClick={clearSearch}
+              onMouseDown={(event) => event.preventDefault()}
+              type="button"
+            >
+              <X aria-hidden="true" size={16} />
+            </button>
+          ) : null}
+        </div>
       </div>
       <div className="field">
         <label htmlFor="status">Status</label>

@@ -1,5 +1,72 @@
 # Registro de alteracoes
 
+## 2026-05-14 - Fichas: impressao de listas no modal
+
+- Modulo: fichas / listas de nomes.
+- Arquivos alterados: `src/features/fichas/ficha-name-list-badge.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: o modal aberto pelos badges de lista bruta ou organizada ganhou o botao `Imprimir lista`.
+- Resultado: a impressao usa um `iframe` temporario invisivel, sem abrir janela ou popup; listas organizadas saem como tabela e listas brutas saem como texto pre-formatado, sem incluir a pagina de `/fichas`.
+- Refinamento posterior: o titulo do modal e da impressao passou a usar `Lista - NOMEDOCLIENTE`, deixando a venda/contexto em badge separado acima; tambem foi adicionado fallback para evitar `Lista - undefined` quando o payload vier sem `clienteNome`.
+- Refinamento posterior: quando nao houver numero de venda, o contexto passa a renderizar `-` em vez de `Sem venda`, tanto no modal quanto na impressao.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. Playwright em `localhost:3000/fichas` abriu um badge de lista, confirmou o botao `Imprimir lista`, validou que nenhum popup foi aberto, que o iframe temporario foi removido apos a chamada de impressao e que o cabecalho do modal e da impressao renderiza `-` + `Lista - Crislaine Freitas`.
+
+## 2026-05-14 - Fichas: limpar busca
+
+- Modulo: fichas / filtros.
+- Arquivos alterados: `src/features/fichas/fichas-filter-toolbar.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: o campo `Busca` em `/fichas` ganhou um botao iconico `Limpar busca`, exibido apenas quando houver texto.
+- Resultado: ao acionar o botao, o texto local e o parametro `busca` da URL sao limpos imediatamente, sem aguardar debounce.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. Playwright em `localhost:3000/fichas?busca=teste` confirmou o botao visivel, clique limpando o input e URL voltando para `/fichas`.
+
+## 2026-05-14 - Clientes: renomear fichas vinculadas
+
+- Modulo: clientes / fichas.
+- Arquivos alterados: `src/features/clientes/cliente-form.tsx`, `src/features/clientes/actions.ts`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: o editor de cliente ganhou o checkbox `Renomear fichas vinculadas`, disponivel somente em modo de edicao.
+- Resultado: quando marcado, salvar o cliente tambem atualiza `fichas.cliente_nome_snapshot` em todas as fichas com `cliente_id` do cliente editado, usando o nome ja normalizado.
+- Decisao: a opcao fica desligada por padrao para preservar snapshots historicos quando o operador quiser corrigir apenas o cadastro do cliente.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. Playwright em `localhost:3000/clientes/<id>/editar` confirmou o checkbox `Renomear fichas vinculadas` visivel e desligado por padrao.
+
+## 2026-05-14 - Fichas: calendario e data inicial
+
+- Modulo: fichas / formulario.
+- Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `src/features/fichas/ficha-form-seed.ts`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: o calendario do `DayPicker` passou a iniciar a semana no domingo, alinhado ao uso brasileiro.
+- Refinamento posterior: sabados e domingos do calendario passaram a ser exibidos em cinza, sem destaque de fim de semana.
+- Resultado: fichas novas passam a preencher `Data de Inicio` com a data operacional atual por padrao, usando `getBusinessTodayInput()` e o timezone `America/Cuiaba`.
+- Resultado: o bloco de cliente ganhou um alerta de prazo baseado na data de entrega, usando verde acima de 14 dias, laranja com 14 dias ou menos e vermelho com 7 dias ou menos.
+- Refinamento posterior: o alerta manteve a regra de cor baseada em dias corridos, mas passou a exibir tambem os dias uteis restantes em parenteses e negrito, descontando sabados e domingos.
+- Decisao: fichas editadas continuam usando a data salva; duplicacoes continuam recebendo os dados mapeados da ficha de origem.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. Playwright em `localhost:3000/fichas/nova` confirmou `Data de Inicio` preenchida com `14 de mai. de 2026`, calendario de entrega abrindo, fim de semana visivel com classe `rdp-day--weekend` e cor cinza, e alerta laranja com `Prazo Moderado. Restam 14 dias para a entrega desse pedido! (10 dias úteis!)`.
+
+## 2026-05-14 - Clientes: normalizacao de nomes
+
+- Modulo: clientes / fichas / quadro de producao / Supabase.
+- Arquivos alterados: `src/lib/name-normalizer.ts`, `src/features/clientes/actions.ts`, `src/features/fichas/actions.ts`, `src/features/fichas/ficha-form.tsx`, `src/features/quadro-producao/data.ts`, `supabase/migrations/20260514044306_normalize_client_names.sql`, `registro-alteracoes.md`.
+- Resultado: criado normalizador compartilhado para nomes de pessoas e empresas, preservando conectores em minusculo, sufixos empresariais e siglas conhecidas.
+- Refinamento posterior: adicionadas as siglas `SESI`, `FIEMS`, `GOV` e `SENAI`; termos curtos conectados por `&`, como `M&M` e `R&B`, tambem passam a ser preservados em maiusculas.
+- Refinamento posterior: siglas desconhecidas em maiusculas agora so sao preservadas automaticamente ate 3 caracteres, evitando que nomes como `Supermercado THOME LTDA` sejam mantidos como `THOME`.
+- Resultado: criacao/edicao de clientes, criacao/edicao de fichas, cards manuais do quadro e impressao de rascunho passam a usar o nome normalizado antes de gravar ou renderizar snapshot tecnico.
+- Banco: adicionada migration com funcao SQL, backfill de `clientes.nome` e `fichas.cliente_nome_snapshot`, alem de triggers para normalizar inserts/updates futuros nessas colunas.
+- Caveat: `npx supabase db push --linked --dry-run` nao chegou a consultar o projeto porque a CLI esta sem `SUPABASE_ACCESS_TOKEN`/login nesta sessao; a migration ficou pronta, mas ainda precisa ser aplicada no banco autenticado.
+- Validacao parcial: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. `supabase:check` retornou `ready` com 218 clientes, 363 fichas, 2036 itens, 461 imagens e 185 catalogos. O helper tambem foi conferido diretamente com `Supermercado THOME LTDA`, `SUPERMERCADO THOME LTDA`, `sesi`, `FIEMS`, `gov`, `senai`, `m&m`, `R&B`, `MJ Feo`, `ABC comercio` e `Loja ABC LTDA`.
+
+## 2026-05-14 - Fichas: total de produtos e lista bruta na impressao
+
+- Modulo: fichas / formulario e impressao individual.
+- Arquivos alterados: `src/features/fichas/ficha-form.tsx`, `src/features/fichas/print-ficha.tsx`, `src/app/fichas/[id]/imprimir/page.tsx`, `src/styles/globals.css`, `TODO.md`, `registro-alteracoes.md`.
+- Resultado: o editor de produtos passou a mostrar o total somado das quantidades ao fim da lista, atualizando conforme o operador edita, duplica, remove ou reordena itens.
+- Resultado: a tela de criacao/edicao ganhou o checkbox `Imprimir lista bruta` ao lado do botao de impressao; quando marcado e houver lista bruta anexada, a impressao inclui uma secao monoespacada com o texto original.
+- Refinamento posterior: o checkbox passou a exibir `Imprimir Lista de Nomes`, e a ordenacao por tamanho foi alinhada para `RN, 1, 2, 4, 6, 8, 10, 12, 14, 16, P, M, G, GG, 52, 54, 56, 58, 60, 62, 64` no editor de produtos e no modal da lista organizada.
+- Refinamento posterior: a mesma ordenacao passou a tratar equivalencias operacionais de tamanho: `16=PP`, `52=XG/G1`, `54=EG/G2`, `56=EGG/XGG/G3`, `58=EEGG/XXGG/G4`, `60=ESP1/G5`, `62=ESP2/G6` e `64=ESP3/G7`.
+- Refinamento posterior: a lista de nomes anexada deixou de entrar no corpo da ficha; quando selecionada para impressao, agora renderiza como pagina 2 propria e o gerador rasterizado cria uma pagina PDF por bloco `.print-page`.
+- Refinamento posterior: a fonte da lista de nomes na pagina 2 foi ampliada de `12px` para `14px`.
+- Refinamento posterior: listas de nomes extensas passam a quebrar em 3 colunas somente quando ultrapassam 51 linhas preenchidas, preservando listas medias em uma coluna para evitar espaco em branco excessivo.
+- UI posterior: o botao `Imprimir ficha` no formulario recebeu borda na cor primaria.
+- Decisao: a lista bruta continua fora da impressao por padrao e entra somente por parametro (`listaNomesRaw=1`) ou no rascunho quando o checkbox estiver marcado, sem alterar persistencia.
+- Caveat: listas brutas muito longas podem aumentar o tamanho final da ficha impressa.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Edge em `localhost:3000/fichas/nova` confirmou o total reagindo a alteracao de quantidade e o checkbox habilitando apos adicionar lista bruta; `/fichas/39d84756-3038-4865-a7da-4f925d9754d1/imprimir?autoprint=0&listaNomesRaw=1` renderizou a secao `Lista de nomes bruta`, enquanto a mesma rota sem `listaNomesRaw=1` nao renderizou a secao.
+
 ## 2026-05-12 - UI compartilhada: base Motion
 
 - Modulo: UI compartilhada e Motion.

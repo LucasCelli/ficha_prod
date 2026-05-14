@@ -21,44 +21,53 @@ export async function printElementToPdf(element: HTMLElement) {
 }
 
 async function renderElementToPdfUrl(element: HTMLElement) {
-  const canvas = await capturePrintCanvas(element);
   const pdf = new jsPDF({
     compress: true,
     format: "a4",
     orientation: "portrait",
     unit: "mm",
   });
+  const pages = getPrintPages(element);
 
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const contentWidth = pageWidth - PRINT_PAGE_MARGIN_MM * 2;
   const contentHeight = pageHeight - PRINT_PAGE_MARGIN_MM * 2;
   const pxToMm = 25.4 / 96;
+  let hasRenderedPage = false;
 
-  let renderWidth = canvas.width * pxToMm;
-  let renderHeight = canvas.height * pxToMm;
-  const fitScale = Math.min(contentWidth / renderWidth, contentHeight / renderHeight, 1);
+  for (const page of pages) {
+    const canvas = await capturePrintCanvas(page);
+    let renderWidth = canvas.width * pxToMm;
+    let renderHeight = canvas.height * pxToMm;
+    const fitScale = Math.min(contentWidth / renderWidth, contentHeight / renderHeight, 1);
 
-  renderWidth *= fitScale;
-  renderHeight *= fitScale;
+    renderWidth *= fitScale;
+    renderHeight *= fitScale;
 
-  if (renderWidth > 0 && renderHeight > 0) {
+    if (renderWidth <= 0 || renderHeight <= 0) {
+      continue;
+    }
+
+    if (hasRenderedPage) {
+      pdf.addPage();
+    }
+
     const offsetX = (pageWidth - renderWidth) / 2;
-    pdf.addImage(
-      canvas.toDataURL("image/jpeg", 0.9),
-      "JPEG",
-      offsetX,
-      PRINT_PAGE_MARGIN_MM,
-      renderWidth,
-      renderHeight,
-      undefined,
-      "FAST",
-    );
-  } else {
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.9), "JPEG", offsetX, PRINT_PAGE_MARGIN_MM, renderWidth, renderHeight, undefined, "FAST");
+    hasRenderedPage = true;
+  }
+
+  if (!hasRenderedPage) {
     pdf.text("Ficha em branco ou sem conteúdo para imprimir", 10, 20);
   }
 
   return URL.createObjectURL(pdf.output("blob"));
+}
+
+function getPrintPages(element: HTMLElement) {
+  const pages = Array.from(element.querySelectorAll<HTMLElement>(":scope > .print-page"));
+  return pages.length > 0 ? pages : [element];
 }
 
 async function capturePrintCanvas(element: HTMLElement) {

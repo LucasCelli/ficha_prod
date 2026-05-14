@@ -11,9 +11,13 @@ import StarterKit from "@tiptap/starter-kit";
 import UnderlineExtension from "@tiptap/extension-underline";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
+import { normalizeNameOrCompany } from "@/lib/name-normalizer";
 import {
   Bold,
   CalendarDays,
+  CheckCircle2,
+  CircleAlert,
+  CircleX,
   Cog,
   Copy,
   GripVertical,
@@ -44,7 +48,15 @@ import {
   type CustomDatalistOption,
 } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
-import { formatDateInput, formatLocalDateInput, parseDateInputToLocalDate } from "@/lib/dates";
+import {
+  addDaysToInput,
+  createUtcDateFromInput,
+  formatDateInput,
+  formatLocalDateInput,
+  getBusinessTodayInput,
+  getDateInputDifferenceInDays,
+  parseDateInputToLocalDate,
+} from "@/lib/dates";
 import { useFluidDndEventTargetGuard } from "@/lib/fluid-dnd-event-target-guard";
 import { createFichaAction, updateFichaAction } from "./actions";
 import type { FichaDetail } from "./data";
@@ -69,10 +81,29 @@ type FichaFormProps = {
 };
 
 const SIZE_ORDER = new Map(
-  ["RN", "PP", "P", "M", "G", "GG", "XG", "XGG", "EXG", "G1", "G2", "G3", "G4", "G5"].map((size, index) => [
-    size,
-    index,
-  ]),
+  [
+    ["RN"],
+    ["1"],
+    ["2"],
+    ["4"],
+    ["6"],
+    ["8"],
+    ["10"],
+    ["12"],
+    ["14"],
+    ["16", "PP"],
+    ["P"],
+    ["M"],
+    ["G"],
+    ["GG"],
+    ["52", "XG", "G1"],
+    ["54", "EG", "G2"],
+    ["56", "EGG", "XGG", "G3"],
+    ["58", "EEGG", "XXGG", "G4"],
+    ["60", "ESP1", "G5"],
+    ["62", "ESP2", "G6"],
+    ["64", "ESP3", "G7"],
+  ].flatMap((sizes, index) => sizes.map((size) => [size, index] as const)),
 );
 
 type RichTextCommand = "bold" | "italic" | "underline" | "insertUnorderedList" | "insertOrderedList" | "removeFormat";
@@ -719,6 +750,14 @@ function FichaFormInner({
   const showCorAbertura = isPolo && aberturaLateral === "sim";
   const showCorSublimacao = arte === "sublimacao";
   const primeiroProduto = itens.find((item) => item.produto.trim())?.produto ?? "";
+  const productTotal = useMemo(() => sumProductQuantities(itens), [itens]);
+  const hasListaNomesRaw = Boolean(listaNomesRaw?.trim());
+  const [includeRawNameListOnPrint, setIncludeRawNameListOnPrint] = useState(false);
+  const [deliveryDate, setDeliveryDate] = useState(initialData.dataEntrega);
+  const printFichaHref =
+    mode === "edit" && ficha?.id
+      ? `/fichas/${ficha.id}/imprimir${includeRawNameListOnPrint && hasListaNomesRaw ? "?listaNomesRaw=1" : ""}`
+      : "";
   const productDragConfig = useMemo(() => ({
     animationDuration: 90,
     delayBeforeInsert: 0,
@@ -1707,6 +1746,7 @@ function FichaFormInner({
               aria-describedby={state.fieldErrors?.dataEntrega ? "dataEntrega-error" : undefined}
               aria-invalid={Boolean(state.fieldErrors?.dataEntrega)}
               initialValue={initialData.dataEntrega}
+              onValueChange={setDeliveryDate}
               required
             />
           </Field>
@@ -1727,6 +1767,8 @@ function FichaFormInner({
             <input defaultChecked={initialData.evento} name="evento" type="checkbox" />
             <span>Pedido para evento?</span>
           </label>
+
+          <DeliveryDeadlineAlert deliveryDate={deliveryDate} />
         </fieldset>
 
         <fieldset className="form-section form-section--products">
@@ -1846,6 +1888,10 @@ function FichaFormInner({
                 </div>
                 </div>
               ))}
+            </div>
+            <div className="products-editor__total" aria-live="polite">
+              <span>Total de produtos</span>
+              <strong>{productTotal}</strong>
             </div>
             {state.fieldErrors?.itensJson ? (
               <p className="field-error" id="itensJson-error">
@@ -2477,15 +2523,24 @@ function FichaFormInner({
         </fieldset>
       </div>
       <div className="form-actions">
+        <label className="checkbox-field checkbox-field--print">
+          <input
+            checked={includeRawNameListOnPrint && hasListaNomesRaw}
+            disabled={!hasListaNomesRaw}
+            onChange={(event) => setIncludeRawNameListOnPrint(event.currentTarget.checked)}
+            type="checkbox"
+          />
+          <span>Imprimir Lista de Nomes</span>
+        </label>
         {mode === "edit" && ficha?.id ? (
-          <PrintTriggerButton className="ui-button ui-button--secondary" href={`/fichas/${ficha.id}/imprimir`} label={`Imprimir ficha ${ficha.cliente_nome_snapshot}`}>
+          <PrintTriggerButton className="ui-button ui-button--secondary ficha-print-action" href={printFichaHref} label={`Imprimir ficha ${ficha.cliente_nome_snapshot}`}>
             <Printer aria-hidden="true" size={18} />
             Imprimir ficha
           </PrintTriggerButton>
         ) : (
           <button
             aria-label="Imprimir rascunho da ficha"
-            className="ui-button ui-button--secondary"
+            className="ui-button ui-button--secondary ficha-print-action"
             onClick={handleDraftPrint}
             type="button"
           >
@@ -2495,7 +2550,7 @@ function FichaFormInner({
         )}
         <SubmitButton isUploading={isUploadingImage} label={mode === "edit" ? "Salvar alterações" : "Salvar ficha"} />
       </div>
-        {draftPrintFicha ? <DraftPrintLayer ficha={draftPrintFicha} onPrinted={() => setDraftPrintFicha(null)} /> : null}
+        {draftPrintFicha ? <DraftPrintLayer ficha={draftPrintFicha} includeRawNameList={includeRawNameListOnPrint} onPrinted={() => setDraftPrintFicha(null)} /> : null}
       </form>
 
       {listaNomesModalOpen ? (
@@ -2635,7 +2690,7 @@ function FichaFormInner({
   );
 }
 
-function DraftPrintLayer({ ficha, onPrinted }: { ficha: FichaDetail; onPrinted: () => void }) {
+function DraftPrintLayer({ ficha, includeRawNameList, onPrinted }: { ficha: FichaDetail; includeRawNameList: boolean; onPrinted: () => void }) {
   useEffect(() => {
     function handleAfterPrint() {
       onPrinted();
@@ -2654,7 +2709,7 @@ function DraftPrintLayer({ ficha, onPrinted }: { ficha: FichaDetail; onPrinted: 
 
   return createPortal(
     <div className="draft-print-root" aria-hidden="true">
-      <PrintFicha ficha={ficha} />
+      <PrintFicha ficha={ficha} includeRawNameList={includeRawNameList} />
     </div>,
     document.body,
   );
@@ -2674,7 +2729,7 @@ function buildDraftPrintFicha(form: HTMLFormElement, values: FichaFormClientValu
     bolso: text("bolso") || null,
     cliente_auxiliar: text("clienteAuxiliar") || null,
     cliente_id: null,
-    cliente_nome_snapshot: text("cliente") || "Ficha sem cliente",
+    cliente_nome_snapshot: normalizeNameOrCompany(text("cliente")) || "Ficha sem cliente",
     com_nomes: values.comNomes ? Number(values.comNomes) : null,
     composicao: values.composicao || null,
     cor_abertura_lateral: text("corAberturaLateral") || null,
@@ -2767,8 +2822,85 @@ type DatePickerFieldProps = {
   id: string;
   initialValue?: string | null;
   name: string;
+  onValueChange?: (value: string) => void;
   required?: boolean;
 };
+
+function DeliveryDeadlineAlert({ deliveryDate }: { deliveryDate: string }) {
+  const daysRemaining = getDateInputDifferenceInDays(deliveryDate);
+
+  if (!deliveryDate || daysRemaining === null) return null;
+
+  const tone = getDeadlineTone(daysRemaining);
+  const Icon = tone === "success" ? CheckCircle2 : tone === "warning" ? CircleAlert : CircleX;
+  const message = getDeadlineMessage(daysRemaining, tone);
+  const businessDaysRemaining = daysRemaining >= 0 ? getBusinessDaysRemaining(deliveryDate) : null;
+
+  return (
+    <div className="delivery-deadline-alert" data-tone={tone} role="status">
+      <Icon aria-hidden="true" size={18} />
+      <span>
+        {message}
+        {businessDaysRemaining !== null ? (
+          <>
+            {" "}
+            <strong>({formatBusinessDayCount(businessDaysRemaining)}!)</strong>
+          </>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+function getDeadlineTone(daysRemaining: number) {
+  if (daysRemaining <= 7) return "danger";
+  if (daysRemaining <= 14) return "warning";
+  return "success";
+}
+
+function getDeadlineMessage(daysRemaining: number, tone: "danger" | "success" | "warning") {
+  if (daysRemaining < 0) {
+    return `Prazo vencido! Entrega atrasada há ${formatDayCount(Math.abs(daysRemaining))}.`;
+  }
+
+  const remaining = formatDayCount(daysRemaining);
+
+  if (tone === "danger") {
+    return `Prazo curto! Restam ${remaining} para a entrega desse pedido!`;
+  }
+
+  if (tone === "warning") {
+    return `Prazo Moderado. Restam ${remaining} para a entrega desse pedido!`;
+  }
+
+  return `Restam ${remaining} para a entrega desse pedido!`;
+}
+
+function formatDayCount(value: number) {
+  return `${value} ${value === 1 ? "dia" : "dias"}`;
+}
+
+function formatBusinessDayCount(value: number) {
+  return `${value} ${value === 1 ? "dia útil" : "dias úteis"}`;
+}
+
+function getBusinessDaysRemaining(target: string) {
+  const calendarDays = getDateInputDifferenceInDays(target);
+  if (calendarDays === null || calendarDays < 0) return null;
+
+  let businessDays = 0;
+  const today = getBusinessTodayInput();
+
+  for (let offset = 1; offset <= calendarDays; offset += 1) {
+    const date = createUtcDateFromInput(addDaysToInput(today, offset));
+    const day = date.getUTCDay();
+    if (day !== 0 && day !== 6) {
+      businessDays += 1;
+    }
+  }
+
+  return businessDays;
+}
 
 function DatePickerField({
   "aria-describedby": describedBy,
@@ -2776,6 +2908,7 @@ function DatePickerField({
   id,
   initialValue,
   name,
+  onValueChange,
   required = false,
 }: DatePickerFieldProps) {
   const [value, setValue] = useState(initialValue ?? "");
@@ -2829,10 +2962,18 @@ function DatePickerField({
             selected={selectedDate}
             onSelect={(date) => {
               if (!date && required) return;
-              setValue(formatDateValue(date));
+              const nextValue = formatDateValue(date);
+              setValue(nextValue);
+              onValueChange?.(nextValue);
               setIsOpen(false);
             }}
-            weekStartsOn={1}
+            modifiers={{
+              weekend: { dayOfWeek: [0, 6] },
+            }}
+            modifiersClassNames={{
+              weekend: "rdp-day--weekend",
+            }}
+            weekStartsOn={0}
           />
         </div>
       ) : null}
@@ -2872,4 +3013,11 @@ function SubmitButton({ isUploading, label }: { isUploading: boolean; label: str
       {isPending ? pendingLabel : label}
     </Button>
   );
+}
+
+function sumProductQuantities(items: ProductFormItem[]) {
+  return items.reduce((total, item) => {
+    const quantity = Number.parseInt(String(item.quantidade ?? "").trim(), 10);
+    return total + (Number.isFinite(quantity) ? quantity : 0);
+  }, 0);
 }

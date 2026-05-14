@@ -33,6 +33,7 @@ import type { FichaDetail } from "./data";
 
 type PrintFichaProps = {
   ficha: FichaDetail;
+  includeRawNameList?: boolean;
   printedBy?: string;
 };
 
@@ -45,10 +46,14 @@ type PrintProductRow = {
 };
 
 const MAX_PRINT_IMAGES = 4;
+const RAW_NAME_LIST_SINGLE_COLUMN_LINE_LIMIT = 51;
 
-export function PrintFicha({ ficha, printedBy }: PrintFichaProps) {
+export function PrintFicha({ ficha, includeRawNameList = false, printedBy }: PrintFichaProps) {
   const products = buildProductRows(ficha);
   const productSummary = buildProductSummary(products);
+  const rawNameList = ficha.lista_nomes_raw?.trim() ?? "";
+  const shouldPrintRawNameList = includeRawNameList && Boolean(rawNameList);
+  const rawNameListColumns = getRawNameListColumnCount(rawNameList);
   const hasDetails = products.some((p) => p.detalhes && p.detalhes.trim() !== "-" && p.detalhes.trim() !== "");
   const imageClassNames = getImagesClassNames(ficha.imagens.length);
   const shortId = String(parseInt(ficha.id.split("-")[0], 16) % 10000).padStart(4, "0");
@@ -66,14 +71,15 @@ export function PrintFicha({ ficha, printedBy }: PrintFichaProps) {
 
   return (
     <section className="ficha-print-page" aria-label={`Ficha imprimível de ${ficha.cliente_nome_snapshot}`}>
-      <div id="print-version" className="print-container">
-        <header id="printHeader" className="print-header">
+      <div id="print-version" className="print-document">
+        <div className="print-container print-page">
+          <header id="printHeader" className="print-header">
           <h1>Ficha Técnica | Priscila Confecções & Uniformes</h1>
           <p>
             Data de Emissão: <span>{formatDateTime(new Date())}</span>
             <span> | {idText}</span>
           </p>
-        </header>
+          </header>
 
         <section className="print-card">
           <h2>
@@ -204,6 +210,17 @@ export function PrintFicha({ ficha, printedBy }: PrintFichaProps) {
                 </div>
               ))}
             </div>
+          </section>
+        ) : null}
+        </div>
+
+        {shouldPrintRawNameList ? (
+          <section className={rawNameListColumns > 1 ? "print-container print-page print-raw-name-list-page print-raw-name-list-page--columns" : "print-container print-page print-raw-name-list-page"}>
+            <h2>
+              <ClipboardList aria-hidden="true" size={16} /> Lista de nomes
+            </h2>
+            <p>{formatCliente(ficha)}</p>
+            <pre>{rawNameList}</pre>
           </section>
         ) : null}
       </div>
@@ -462,4 +479,9 @@ function normalizeKey(value: string) {
 function capitalizeFirst(value: string) {
   if (!value) return "";
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function getRawNameListColumnCount(value: string) {
+  const lineCount = value.split(/\r?\n/).filter((line) => line.trim()).length;
+  return lineCount > RAW_NAME_LIST_SINGLE_COLUMN_LINE_LIMIT ? 3 : 1;
 }

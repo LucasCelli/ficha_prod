@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAppSession } from "@/features/auth/session";
+import { normalizeNameOrCompany } from "@/lib/name-normalizer";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { ClienteDeleteActionState, ClienteFieldErrors, ClienteFormState } from "./form-state";
@@ -19,9 +20,14 @@ function getClienteFormInput(formData: FormData) {
 function getClientePayload(values: ClienteFormValues) {
   return {
     email: values.email,
-    nome: values.nome,
+    nome: normalizeNameOrCompany(values.nome),
     telefone: values.telefone,
   };
+}
+
+function shouldRenameLinkedFichas(formData: FormData) {
+  const value = formData.get("renomearFichasVinculadas");
+  return value === "on" || value === "true";
 }
 
 function getReturnTo(formData: FormData, fallback: string) {
@@ -38,7 +44,7 @@ function withToastParam(path: string, value: string) {
 }
 
 function normalizeClienteName(value: string) {
-  return value.trim().toLowerCase();
+  return normalizeNameOrCompany(value).toLocaleLowerCase("pt-BR");
 }
 
 function getValidationState(fieldErrors: ClienteFieldErrors): ClienteFormState {
@@ -151,7 +157,8 @@ export async function updateClienteAction(_previousState: ClienteFormState, form
     });
   }
 
-  const { error } = await supabase.from("clientes").update(getClientePayload(parsed.data)).eq("id", id);
+  const payload = getClientePayload(parsed.data);
+  const { error } = await supabase.from("clientes").update(payload).eq("id", id);
 
   if (error) {
     return {
@@ -160,8 +167,25 @@ export async function updateClienteAction(_previousState: ClienteFormState, form
     };
   }
 
+  if (shouldRenameLinkedFichas(formData)) {
+    const { error: fichasError } = await supabase
+      .from("fichas")
+      .update({ cliente_nome_snapshot: payload.nome })
+      .eq("cliente_id", id);
+
+    if (fichasError) {
+      return {
+        message: fichasError.message,
+        status: "error",
+      };
+    }
+  }
+
   revalidatePath("/clientes");
   revalidatePath(`/clientes/${id}`);
+  revalidatePath("/fichas");
+  revalidatePath("/quadro-producao");
+  revalidatePath("/relatorios");
   redirect(withToastParam(getReturnTo(formData, `/clientes/${id}`), "cliente-updated"));
 }
 

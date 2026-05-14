@@ -1,4 +1,5 @@
 import { getBusinessTodayInput, getBusinessWeekRange, isDateInputWithinRange } from "@/lib/dates";
+import { normalizeNameOrCompany } from "@/lib/name-normalizer";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -424,7 +425,7 @@ export async function createManualKanbanCard(input: CreateManualKanbanCardInput)
     .from("fichas")
     .insert({
       arte: input.arte ?? null,
-      cliente_nome_snapshot: input.title,
+      cliente_nome_snapshot: normalizeNameOrCompany(input.title),
       data_entrega: input.dataEntrega,
       data_inicio: getBusinessTodayInput(),
       evento: input.evento,

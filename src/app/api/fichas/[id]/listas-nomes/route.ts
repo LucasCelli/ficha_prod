@@ -82,6 +82,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     return Response.json({
       success: true,
       ficha: {
+        clienteNome: data.cliente_nome_snapshot,
         id: data.id,
         label: getFichaLabel(data),
       },
@@ -105,6 +106,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   return Response.json({
     success: true,
     ficha: {
+      clienteNome: data.cliente_nome_snapshot,
       id: data.id,
       label: getFichaLabel(data),
     },
