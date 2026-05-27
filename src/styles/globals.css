@@ -3546,6 +3546,49 @@ html[data-theme="dark"] .relatorios-activity__cell--4 {
   padding-block: 9px;
 }
 
+.etiqueta-group {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  grid-column: 1 / -1;
+}
+
+.etiqueta-group__label {
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.etiqueta-options {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.etiqueta-options input[type="checkbox"] {
+  color-scheme: light;
+}
+
+html[data-theme="dark"] .etiqueta-options input[type="checkbox"] {
+  color-scheme: dark;
+}
+
+.etiqueta-outra-row {
+  display: contents;
+}
+
+.etiqueta-outra-input {
+  width: 220px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
 .checkbox-field--print:has(input:disabled) {
   color: var(--color-muted);
   cursor: not-allowed;

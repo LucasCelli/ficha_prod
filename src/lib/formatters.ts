@@ -1,6 +1,6 @@
 export function normalizePersonalizacaoLabel(value: string | null) {
   const slug = value?.trim();
-  if (!slug) return "Sem tipo definido";
+  if (!slug) return "Sem Personalização";
 
   const map: Record<string, string> = {
     "sublimacao": "Sublimação",

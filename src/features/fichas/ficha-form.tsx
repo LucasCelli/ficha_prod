@@ -379,6 +379,7 @@ function buildFichaDraftSnapshot(
       clienteAuxiliar: formText(formData, "clienteAuxiliar"),
       comNomes: values.comNomes,
       composicao: values.composicao,
+      etiqueta: formText(formData, "etiqueta"),
       corAberturaLateral: formText(formData, "corAberturaLateral"),
       corAcabamentoManga: formText(formData, "corAcabamentoManga"),
       corBotao: formText(formData, "corBotao"),
@@ -754,6 +755,19 @@ function FichaFormInner({
   const hasListaNomesRaw = Boolean(listaNomesRaw?.trim());
   const [includeRawNameListOnPrint, setIncludeRawNameListOnPrint] = useState(false);
   const [deliveryDate, setDeliveryDate] = useState(initialData.dataEntrega);
+  const ETIQUETA_FIXAS = ["Priscila Malhas", "EDSS"] as const;
+  const [etiquetaSelecao, setEtiquetaSelecao] = useState<string>(() => {
+    const e = initialData.etiqueta;
+    if (!e) return "Priscila Malhas";
+    if (ETIQUETA_FIXAS.includes(e as typeof ETIQUETA_FIXAS[number])) return e;
+    return "Outra";
+  });
+  const [etiquetaOutra, setEtiquetaOutra] = useState<string>(() => {
+    const e = initialData.etiqueta;
+    if (!e || ETIQUETA_FIXAS.includes(e as typeof ETIQUETA_FIXAS[number])) return "";
+    return e;
+  });
+  const etiquetaValue = etiquetaSelecao === "Outra" ? etiquetaOutra : etiquetaSelecao;
   const printFichaHref =
     mode === "edit" && ficha?.id
       ? `/fichas/${ficha.id}/imprimir${includeRawNameListOnPrint && hasListaNomesRaw ? "?listaNomesRaw=1" : ""}`
@@ -2355,6 +2369,42 @@ function FichaFormInner({
               value={composicao ?? ""}
             />
           </Field>
+          <div className="etiqueta-group">
+            <span className="etiqueta-group__label">Etiqueta</span>
+            <input type="hidden" name="etiqueta" value={etiquetaValue} />
+            <div className="etiqueta-options">
+              {ETIQUETA_FIXAS.map((opcao) => (
+                <label key={opcao} className="checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={etiquetaSelecao === opcao}
+                    onChange={() => setEtiquetaSelecao(etiquetaSelecao === opcao ? "" : opcao)}
+                  />
+                  <span>{opcao}</span>
+                </label>
+              ))}
+              <div className="etiqueta-outra-row">
+                <label className="checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={etiquetaSelecao === "Outra"}
+                    onChange={() => setEtiquetaSelecao(etiquetaSelecao === "Outra" ? "" : "Outra")}
+                  />
+                  <span>Outra</span>
+                </label>
+                {etiquetaSelecao === "Outra" ? (
+                  <input
+                    autoFocus
+                    className="etiqueta-outra-input"
+                    type="text"
+                    value={etiquetaOutra}
+                    onChange={(e) => setEtiquetaOutra(e.currentTarget.value)}
+                    placeholder="Nome da etiqueta…"
+                  />
+                ) : null}
+              </div>
+            </div>
+          </div>
           </div>
           <div className="form-subsection form-subsection--single">
             <h3>Observações</h3>
@@ -2732,6 +2782,7 @@ function buildDraftPrintFicha(form: HTMLFormElement, values: FichaFormClientValu
     cliente_nome_snapshot: normalizeNameOrCompany(text("cliente")) || "Ficha sem cliente",
     com_nomes: values.comNomes ? Number(values.comNomes) : null,
     composicao: values.composicao || null,
+    etiqueta: text("etiqueta") || null,
     cor_abertura_lateral: text("corAberturaLateral") || null,
     cor_acabamento_manga: text("corAcabamentoManga") || null,
     cor_botao: text("corBotao") || null,

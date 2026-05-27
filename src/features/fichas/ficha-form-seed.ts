@@ -32,6 +32,7 @@ export type FichaFormClientValues = {
   arte: string;
   comNomes: string;
   composicao: string;
+  etiqueta: string;
   faixa: string;
   filete: string;
   gola: string;
@@ -54,6 +55,7 @@ export type FichaFormInitialData = {
   clienteAuxiliar: string;
   comNomes: string;
   composicao: string;
+  etiqueta: string;
   corAberturaLateral: string;
   corAcabamentoManga: string;
   corBotao: string;
@@ -110,6 +112,7 @@ export function createEmptyFichaFormInitialData(): FichaFormInitialData {
     clienteAuxiliar: "",
     comNomes: "",
     composicao: "",
+    etiqueta: "",
     corAberturaLateral: "",
     corAcabamentoManga: "",
     corBotao: "",
@@ -161,6 +164,7 @@ export function mapFichaToInitialData(ficha?: FichaDetail): FichaFormInitialData
     clienteAuxiliar: ficha.cliente_auxiliar ?? "",
     comNomes: ficha.com_nomes?.toString() ?? "",
     composicao: ficha.composicao ?? "",
+    etiqueta: ficha.etiqueta ?? "",
     corAberturaLateral: ficha.cor_abertura_lateral ?? "",
     corAcabamentoManga: ficha.cor_acabamento_manga ?? "",
     corBotao: ficha.cor_botao ?? "",

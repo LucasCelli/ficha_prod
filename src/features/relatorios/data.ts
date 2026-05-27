@@ -439,7 +439,7 @@ function formatPersonalizacaoLabel(value: string | null) {
   const normalized = value?.replaceAll("_", " ").replaceAll("-", " ").trim().toLocaleLowerCase("pt-BR");
 
   if (!normalized) {
-    return "Sem tipo definido";
+    return "Sem Personalização";
   }
 
   const labels = new Map([

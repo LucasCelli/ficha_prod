@@ -9,6 +9,7 @@ export type FieldErrors = Partial<
     | "cliente"
     | "clienteAuxiliar"
     | "composicao"
+    | "etiqueta"
     | "corAberturaLateral"
     | "corAcabamentoManga"
     | "corBotao"

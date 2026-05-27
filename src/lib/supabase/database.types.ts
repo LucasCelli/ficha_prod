@@ -172,6 +172,7 @@ export type Database = {
           insumo_status: Database["public"]["Enums"]["insumo_status"];
           material: string | null;
           composicao: string | null;
+          etiqueta: string | null;
           cor_material: string | null;
           manga: string | null;
           acabamento_manga: string | null;
@@ -232,6 +233,7 @@ export type Database = {
           insumo_status?: Database["public"]["Enums"]["insumo_status"];
           material?: string | null;
           composicao?: string | null;
+          etiqueta?: string | null;
           cor_material?: string | null;
           manga?: string | null;
           acabamento_manga?: string | null;

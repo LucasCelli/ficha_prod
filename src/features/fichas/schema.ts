@@ -71,6 +71,7 @@ export const fichaFormSchema = z.object({
   arte: optionalText,
   material: optionalText,
   composicao: optionalText,
+  etiqueta: optionalText,
   corMaterial: optionalText,
   manga: optionalText,
   acabamentoManga: optionalText,

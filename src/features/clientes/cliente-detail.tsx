@@ -164,5 +164,5 @@ function formatNumber(value: number) {
 }
 
 function formatPersonalizacao(value: string | null) {
-  return value?.replaceAll("_", " ").trim() || "Sem tipo definido";
+  return value?.replaceAll("_", " ").trim() || "Sem Personalização";
 }

@@ -2,6 +2,7 @@ import { formatBusinessDateTime, formatDateInput } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import {
   ArrowLeftRight,
+  Bookmark,
   Boxes,
   CalendarCheck,
   CalendarDays,
@@ -181,6 +182,7 @@ export function PrintFicha({ ficha, includeRawNameList = false, printedBy }: Pri
               <PrintField icon={Paintbrush} label="Personalização" value={normalizePrintPersonalizacao(ficha.arte)} />
               <PrintField icon={List} label="Nome/Nº" value={formatComNomes(ficha.com_nomes)} />
               <PrintField icon={Tag} label="Composição" value={ficha.composicao} />
+              <PrintField icon={Bookmark} label="Etiqueta" value={ficha.etiqueta} />
             </div>
           </section>
         </div>
