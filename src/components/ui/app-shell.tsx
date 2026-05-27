@@ -5,6 +5,7 @@ import type { AppSession } from "@/features/auth/types";
 import { AppNavigation } from "./app-navigation";
 import { MotionPage } from "./motion-page";
 import { ThemeToggle } from "./theme-toggle";
+import { PriscilaIcon } from "./branding";
 
 type AppShellProps = {
   children: ReactNode;
@@ -18,7 +19,7 @@ export function AppShell({ children, session, title }: AppShellProps) {
       <aside className="app-sidebar" aria-label="Navegação principal">
         <Link className="app-brand" href="/">
           <span className="app-brand__mark" aria-hidden="true">
-            FT
+            <PriscilaIcon height={22} />
           </span>
           <span className="app-brand__text" translate="no">
             Fichas Tecnicas

@@ -1,5 +1,56 @@
 # Registro de alteracoes
 
+## 2026-05-27 - Branding: componentes PriscilaLogo e PriscilaIcon
+
+- Modulo: branding / UI global.
+- Arquivos alterados:
+  - `src/components/ui/branding.tsx` (novo)
+  - `src/components/ui/app-shell.tsx`
+  - `src/app/login/page.tsx`
+  - `src/styles/globals.css`
+- Resultado: criado componente `branding.tsx` com `PriscilaLogo` e `PriscilaIcon` — SVGs inline com `fill="currentColor"` para controle de cor via CSS e prop `height` para escala (width calculado automaticamente pela proporção do viewBox).
+- Resultado: logo da empresa (`PriscilaLogo height=48`) substituiu o "FT" + "Fichas Técnicas" na tela de login; brand text alterado para "Sistema de Fichas Técnicas"; `.auth-card-brand` refeito como coluna centralizada com `color: var(--color-primary)` para o SVG.
+- Resultado: ícone da empresa (`PriscilaIcon height=22`) substituiu o texto "FT" no `.app-brand__mark` da sidebar; `.app-brand__mark` perdeu o gradiente e ganhou fundo `var(--color-primary-bg)` + cor `var(--color-primary)`.
+- Decisao: SVGs inline (não `next/image`) para suportar `currentColor` e evitar requisições extras.
+- Validacao: `npm run lint` e `npm run typecheck` passaram sem erros.
+
+## 2026-05-27 - Quadro de produção: migração do Kanban para DnD Kit
+
+- Módulo: quadro de produção.
+- Arquivos alterados:
+  - `package.json`
+  - `package-lock.json`
+  - `src/features/quadro-producao/quadro-producao-client.tsx`
+  - `src/styles/globals.css`
+  - `TODO.md`
+  - `registro-alteracoes.md`
+- Resultado: removido o uso de `fluid-dnd` do quadro de produção e substituído por `@dnd-kit/react`, com `DragDropProvider`, `useSortable` nos cards e `useDroppable` nas listas de coluna.
+- Resultado: o estado visual do drag agora é local por coluna (`Record<columnId, KanbanCardSummary[]>`) e a identidade persistida vem do `id` do sortable/card, não de índice interno ou DOM mutável.
+- Resultado: cancelamento por `Escape` restaura o snapshot local e não chama a API; drops válidos continuam usando `patchKanbanCardMove(cardId, destinationColumnId, destinationIndex)` sem mudar contrato.
+- Resultado: controles internos de card (`select`, preview, entregar e mover por botão) bloqueiam o início do drag e seguem operando como fallback.
+- Refinamento posterior: revisada a integração contra a documentação atual do DnD Kit. O `dragover` agora deduplica atualizações por destino para evitar render a cada movimento do ponteiro; `Feedback.configure({ dropAnimation: null })` evita dupla reconciliação no drop; os cards usam `transition: null` no `useSortable`.
+- Refinamento posterior: removido `will-change: transform` do card e desligadas transições locais do card, rodapé e botões enquanto `.quadro-producao-card--dragging` está ativo, evitando qualquer animação CSS local concorrendo com o renderer do DnD Kit.
+- Decisão: `fluid-dnd` permanece instalado para superfícies ainda dependentes, mas `/quadro-producao` não importa mais a biblioteca nem o guard específico dela.
+- Caveat: o smoke de coluna vazia não foi exercitado porque o quadro real atual não tem coluna vazia; `useDroppable` foi mantido na lista da coluna para aceitar esse cenário.
+- Validação: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Playwright em `localhost:3000/quadro-producao` com `/api/quadro-producao/cards/*/move` interceptado confirmou: `Centro Educacional Infantil Vitalina Martinez` enviou `/cards/003bd213-b242-452d-ad53-58888c6d0899/move`; `Eldorado Madeiras` enviou `/cards/160b508f-3cce-4de5-b87e-eb1388e6939e/move`; reordenação interna enviou o UUID do próprio card; `Escape`, `select` de status e preview não chamaram `/move`; smoke desktop e viewport 390px renderizaram 5 colunas e 86 cards; sem overlay Next e sem erros de console.
+
+## 2026-05-27 - Login: redesign glass card + glow e ajuste de token dark mode
+
+- Modulo: auth / login, tokens globais.
+- Arquivos alterados:
+  - `src/app/login/page.tsx`
+  - `src/features/auth/login-form.tsx`
+  - `src/features/auth/auth-card.tsx` (novo)
+  - `src/styles/globals.css`
+  - `src/styles/tokens/colors.css`
+- Resultado: tela de login redesenhada — fundo com radial-gradient usando `--color-primary` e `--color-bg`, card centralizado com `backdrop-filter: blur(24px)`. Estrutura: brand mark FT + nome, heading "Entrar", formulario. Removidos `Card`, `Badge`, split-panel `.auth-brand`/`.auth-panel`/`.auth-shell`.
+- Resultado: borda do card de login com efeito glow seguindo o mouse — `AuthCardWrap` (`"use client"`) rastreia `mousemove` e seta `--mouse-x`/`--mouse-y` como CSS custom properties no wrapper; `.auth-card-wrap` usa `padding: 1px` com `radial-gradient` centrado nessas coordenadas, exibindo a cor primária como borda dinâmica; na ausência do mouse o gradiente parte do topo-centro (glow estático suave).
+- Resultado: inputs do formulario de login ganham `border-radius: var(--radius-lg)` e fundo ligeiramente mais escuro via `color-mix`, sem alterar estilo global de inputs.
+- Resultado: corrigido label `"Usuario"` para `"Usuário"` no formulario de login.
+- Resultado: `--color-bg` dark mode ajustado de `#0a0e17` para `#0e1628`, mantendo carater navy-escuro mas com menos dureza visual.
+- Decisao: `color-mix()` para tints sem hardcode de cor; Chrome < 111 e limite aceitavel para ferramenta interna.
+- Validacao: `npm run lint` e `npm run typecheck` passaram sem erros.
+
 ## 2026-05-27 - Quadro de producao: identidade correta no drag and drop
 
 - Modulo: quadro de producao.

@@ -183,16 +183,15 @@ a {
 }
 
 .app-brand__mark {
-  display: inline-grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-active));
-  color: var(--color-primary-contrast);
-  font-size: 0.8125rem;
-  font-weight: 800;
-  box-shadow: var(--shadow-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
 }
 
 .app-brand__text {
@@ -932,55 +931,72 @@ html[data-theme="dark"] .app-nav__link[aria-current="page"] .app-nav__icon {
 
 .auth-page {
   display: grid;
-  min-height: 100vh;
   place-items: center;
-  background: var(--color-bg);
-  padding: clamp(24px, 6vw, 64px);
+  min-height: 100svh;
+  padding: clamp(24px, 6vw, 48px);
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 50% 30%,
+      color-mix(in srgb, var(--color-primary) 22%, transparent),
+      transparent 70%
+    ),
+    var(--color-bg);
 }
 
-.auth-shell {
-  display: grid;
-  width: min(920px, 100%);
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
-  gap: 32px;
-  align-items: center;
-}
-
-.auth-copy {
-  display: grid;
-  gap: 16px;
-}
-
-.auth-copy h1 {
-  margin: 0;
-  color: var(--color-text);
-  font-size: clamp(2.25rem, 5vw, 4rem);
-  letter-spacing: 0;
-  line-height: var(--line-height-tight);
-}
-
-.auth-copy p {
-  max-width: 56ch;
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-md);
-  line-height: var(--line-height-relaxed);
+.auth-card-wrap {
+  position: relative;
+  width: min(420px, 100%);
+  border-radius: 21px;
+  padding: 1px;
+  background: radial-gradient(
+    380px circle at var(--mouse-x, 50%) var(--mouse-y, 0%),
+    color-mix(in srgb, var(--color-primary) 70%, transparent),
+    var(--color-border-subtle) 50%
+  );
 }
 
 .auth-card {
   display: grid;
-  gap: 20px;
+  gap: 28px;
+  padding: clamp(32px, 5vw, 48px);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--color-surface-elevated) 90%, transparent);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  box-shadow: var(--shadow-lg);
 }
 
-.auth-card h2 {
+.auth-card-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+}
+
+.auth-card-brand span {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.auth-form-title {
   margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
   color: var(--color-text);
-  font-size: var(--font-size-xl);
+  letter-spacing: -0.025em;
+  line-height: var(--line-height-tight);
+}
+
+.auth-card .field input {
+  background: color-mix(in srgb, var(--color-bg) 65%, var(--color-surface));
+  border-radius: var(--radius-lg);
 }
 
 .auth-form {
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
 .auth-message {
@@ -4503,10 +4519,6 @@ html[data-theme="dark"] .field select {
 }
 
 @media (max-width: 760px) {
-  .auth-shell {
-    grid-template-columns: 1fr;
-  }
-
   .catalog-form,
   .ui-table .catalog-form {
     min-width: 0;
@@ -7300,7 +7312,6 @@ html[data-theme="dark"] .field select {
   padding: 11px 10px;
   cursor: grab;
   transition: box-shadow var(--duration-fast) var(--easing-standard), border-color var(--duration-fast) var(--easing-standard);
-  will-change: transform;
 }
 
 html[data-theme="dark"] .quadro-producao-card {
@@ -7323,6 +7334,7 @@ html[data-theme="dark"] .quadro-producao-card:hover {
   border-color: var(--color-primary);
   box-shadow: 0 18px 32px color-mix(in srgb, var(--color-primary) 14%, transparent);
   cursor: grabbing;
+  transition: none;
 }
 
 .quadro-producao-card__body {
@@ -7330,6 +7342,23 @@ html[data-theme="dark"] .quadro-producao-card:hover {
   gap: 8px;
   min-width: 0;
   padding-inline-end: 50px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.quadro-producao-card--dragging .quadro-producao-card__body {
+  cursor: grabbing;
+}
+
+.quadro-producao-card--dragging .quadro-producao-icon-button {
+  transform: none;
+  transition: none;
+}
+
+.quadro-producao-card--dragging .quadro-producao-card__footer {
+  opacity: 1;
+  transition: none;
 }
 
 .quadro-producao-card svg,

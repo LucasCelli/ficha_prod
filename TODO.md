@@ -22,8 +22,8 @@ Backlog vivo para features, refinos e decisoes futuras. Itens concluidos devem s
 
 - [x] Centralizar presets de Motion nos primitivos compartilhados.
 - [x] Migrar popovers, loading, modal, alerta, tooltip, datalist e menu para Motion compartilhado.
-- [x] Corrigir flashes e estado inconsistente ao mover cards no quadro com `fluid-dnd`.
+- [x] Corrigir flashes e estado inconsistente ao mover cards no quadro migrando o Kanban para `@dnd-kit/react`.
 - [ ] Animar saida de fichas na listagem ao entregar/deletar.
-- [ ] Revisar Motion do quadro sem competir com fluid-dnd.
+- [ ] Revisar Motion do quadro sem competir com DnD Kit.
 - [ ] Migrar ordenacao por tamanho e autopreenchimento de observacoes para feedback Motion.
 - [ ] Remover keyframes/transicoes manuais obsoletas restantes do CSS global.

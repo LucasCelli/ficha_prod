@@ -21,7 +21,7 @@ export function LoginForm({ next }: LoginFormProps) {
     <form action={formAction} className="auth-form" noValidate>
       <input name="next" type="hidden" value={next ?? "/"} />
       <div className="field">
-        <label htmlFor="username">Usuario</label>
+        <label htmlFor="username">Usuário</label>
         <input
           aria-describedby={state.fieldErrors?.username ? "username-error" : undefined}
           aria-invalid={Boolean(state.fieldErrors?.username)}

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Badge, Card } from "@/components/ui";
 import { getCurrentSession } from "@/features/auth/session";
 import { LoginForm } from "@/features/auth/login-form";
+import { AuthCardWrap } from "@/features/auth/auth-card";
+import { PriscilaLogo } from "@/components/ui/branding";
 
 export const metadata: Metadata = {
-  title: "Login | Fichas Tecnicas",
+  title: "Login | Fichas Técnicas",
 };
 
 type LoginPageProps = {
@@ -20,17 +21,17 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const next = Array.isArray(params?.next) ? params?.next[0] : params?.next;
 
   return (
-    <main className="auth-page" aria-labelledby="login-title">
-      <section className="auth-shell">
-        <div className="auth-copy">
-          <Badge tone="info">Acesso operacional</Badge>
-          <h1 id="login-title">Fichas Tecnicas</h1>
-        </div>
-        <Card className="auth-card">
-          <h2>Entrar</h2>
+    <main className="auth-page">
+      <AuthCardWrap>
+        <section className="auth-card" aria-labelledby="login-title">
+          <div className="auth-card-brand" aria-hidden="true">
+            <PriscilaLogo height={96} />
+            <span translate="no">Sistema de Fichas Técnicas</span>
+          </div>
+          <h1 id="login-title" className="auth-form-title">Entrar</h1>
           <LoginForm next={next} />
-        </Card>
-      </section>
+        </section>
+      </AuthCardWrap>
     </main>
   );
 }
