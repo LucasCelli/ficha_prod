@@ -15,7 +15,7 @@ type AppShellProps = {
 export function AppShell({ children, session, title }: AppShellProps) {
   return (
     <div className="app-frame">
-      <aside className="app-sidebar" aria-label="Navegacao principal">
+      <aside className="app-sidebar" aria-label="Navegação principal">
         <Link className="app-brand" href="/">
           <span className="app-brand__mark" aria-hidden="true">
             FT
@@ -27,7 +27,7 @@ export function AppShell({ children, session, title }: AppShellProps) {
         <AppNavigation role={session?.user.role ?? "operador"} />
         <div className="app-sidebar__footer">
           {session ? (
-            <div className="app-user" aria-label="Usuario atual">
+            <div className="app-user" aria-label="Usuário atual">
               <span className="app-user__name">{session.user.displayName}</span>
             </div>
           ) : null}

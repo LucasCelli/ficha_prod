@@ -128,8 +128,8 @@ const catalogoToastMessages: Record<string, RouteToastMessage> = {
     tone: "success",
   },
   "catalog-item-deleted": {
-    description: "O item foi excluido.",
-    title: "Item excluido",
+    description: "O item foi excluído.",
+    title: "Item excluído",
     tone: "success",
   },
 };

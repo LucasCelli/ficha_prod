@@ -148,7 +148,7 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
         >
           <option value="">Todos</option>
           <option value="pendente">Pendente</option>
-          <option value="atrasado">Atrasados</option>
+          <option value="atrasado">Atrasado</option>
           <option value="entregue">Entregue</option>
         </select>
       </div>

@@ -34,7 +34,7 @@ const columns = [
 ];
 
 const statusLabels: Record<FichaStatus, string> = {
-  cancelado: "Cancelado",
+  cancelado: "Cancelada",
   entregue: "Entregue",
   pendente: "Pendente",
 };
@@ -54,7 +54,7 @@ export function FichasOverview({ filters, result }: FichasOverviewProps) {
       <header className="fichas-view__header">
         <div className="page-heading">
           <div className="page-heading__copy">
-            <p className="eyebrow">Módulo prioritário</p>
+            <p className="eyebrow">Fichas</p>
             <h1 id="fichas-title" className="app-title">
               Fichas
             </h1>
@@ -261,7 +261,7 @@ function formatDate(value: string) {
 }
 
 function formatOverdueDays(days: number) {
-  return days === 1 ? "Atrasado há 1 dia" : `Atrasado há ${formatCount(days)} dias`;
+  return days === 1 ? "Atrasada há 1 dia" : `Atrasada há ${formatCount(days)} dias`;
 }
 
 function getFichaItemsTotal(ficha: FichaListItem) {
@@ -277,7 +277,7 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
   const itemsTotal = getFichaItemsTotal(ficha);
   const isOverdue = isFichaOverdue(ficha);
   const overdueDays = getFichaOverdueDays(ficha);
-  const statusLabel = isOverdue ? "Atrasado" : statusLabels[ficha.status];
+  const statusLabel = isOverdue ? "Atrasada" : statusLabels[ficha.status];
   const statusTone = isOverdue ? "danger" : statusTones[ficha.status];
   const kanbanStageLabel = getKanbanColumnLabel(
     ficha.kanban_column?.slug ?? ficha.kanban_status,

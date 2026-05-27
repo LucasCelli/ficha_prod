@@ -1,5 +1,23 @@
 # Registro de alteracoes
 
+## 2026-05-27 - Revisao visual: acentuacao, consistencia de status e eyebrow
+
+- Modulo: UI transversal (fichas, clientes, catalogos, quadro, shell).
+- Arquivos alterados:
+  - `src/components/ui/app-shell.tsx`
+  - `src/features/fichas/fichas-overview.tsx`
+  - `src/features/fichas/ficha-preview.tsx`
+  - `src/features/fichas/fichas-filter-toolbar.tsx`
+  - `src/features/clientes/cliente-detail.tsx`
+  - `src/features/catalogos/catalogos-overview.tsx`
+- Resultado: corrigida acentuacao ausente em aria-labels do app-shell ("Navegacao" -> "Navegação", "Usuario" -> "Usuário") e nos toasts de exclusao de catalogo ("excluido" -> "excluído").
+- Resultado: padronizado o label de status "Cancelado" para "Cancelada" em fichas-overview, ficha-preview e cliente-detail, alinhando com ficha-status-actions.tsx que ja usava a forma feminina; "ficha" e substantivo feminino.
+- Resultado: padronizado o label de overdue "Atrasado" para "Atrasada" (badge e mensagem de dias) em fichas-overview.tsx.
+- Resultado: corrigido eyebrow de "Módulo prioritário" para "Fichas" em fichas-overview.tsx, alinhando com o padrao de todas as outras telas (clientes, catalogos, usuarios, relatorios).
+- Resultado: corrigida opcao "Atrasados" do select de status em fichas-filter-toolbar.tsx para "Atrasado", tornando-a consistente com as opcoes singulares "Pendente" e "Entregue".
+- Decisao: nenhuma mudanca em data layer, schema ou actions; todas as alteracoes sao estritamente de texto visivel e acessibilidade.
+- Validacao: `npm run lint` e `npm run typecheck` passaram sem erros.
+
 ## 2026-05-27 - Quadro de producao: estabilidade do drag and drop
 
 - Modulo: quadro de producao.

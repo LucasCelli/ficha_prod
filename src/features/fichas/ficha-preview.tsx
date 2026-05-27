@@ -13,7 +13,7 @@ const statusTones: Record<FichaStatus, "danger" | "success" | "warning"> = {
 };
 
 const statusLabels: Record<FichaStatus, string> = {
-  cancelado: "Cancelado",
+  cancelado: "Cancelada",
   entregue: "Entregue",
   pendente: "Pendente",
 };
