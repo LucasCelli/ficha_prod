@@ -1,5 +1,22 @@
 # Registro de alteracoes
 
+## 2026-05-27 - Quadro de producao: estabilidade do drag and drop
+
+- Modulo: quadro de producao.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `TODO.md`, `registro-alteracoes.md`.
+- Resultado: o movimento otimista dos cards agora atualiza o cache do React Query antes de qualquer espera assincrona, evitando o flash em que o card voltava para a coluna anterior logo apos o drop.
+- Resultado: o estado visual de arraste deixa de ser limpo no proximo tick e passa a ser encerrado apenas no fim da mutation; o `dragEnd` tambem limpa a referencia ativa imediatamente para impedir commits duplicados do mesmo arraste.
+- Decisao: manter `fluid-dnd` como fonte transitoria durante o arraste e React Query como fonte canonica fora dele, sem animar `transform` dos cards.
+- Validacao: `npx eslint src\features\quadro-producao\quadro-producao-client.tsx`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Playwright em `localhost:3100/quadro-producao` confirmou login, 5 colunas, 86 cards, pagina com conteudo, ausencia de overlay e ausencia de erros de console; o arraste real nao foi automatizado para evitar persistir movimento em cards reais.
+
+## 2026-05-27 - Operacao: fronteiras de agentes
+
+- Modulo: documentacao operacional.
+- Arquivos alterados: `agent-boundaries.md`, `registro-alteracoes.md`.
+- Resultado: criado `agent-boundaries.md` com divisao pratica entre Claude Code e Codex adaptada ao App Router atual do ficha_prod.
+- Decisao: o arquivo entra como excecao operacional solicitada para coordenar edicoes entre agentes; a regra anti-conflito exige `git status --short` antes de editar e aprovacao humana para arquivos compartilhados.
+- Validacao: revisao documental; sem execucao de build por nao haver alteracao de codigo.
+
 ## 2026-05-14 - Fichas: impressao de listas no modal
 
 - Modulo: fichas / listas de nomes.

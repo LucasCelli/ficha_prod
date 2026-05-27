@@ -511,13 +511,14 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
     onMutate: async (input) => {
       const queryKey = ["quadro-producao", filters];
       const boardQueryKey = ["quadro-producao"];
-      await queryClient.cancelQueries({ queryKey: boardQueryKey });
+      const cancelPendingQueries = queryClient.cancelQueries({ queryKey: boardQueryKey }, { revert: false });
       const previous = queryClient.getQueryData<QuadroProducaoResult>(queryKey);
       const previousQueries = queryClient.getQueriesData<QuadroProducaoResult>({ queryKey: boardQueryKey });
 
       queryClient.setQueriesData<QuadroProducaoResult>({ queryKey: boardQueryKey }, (current) =>
         current ? applyOptimisticCardMove(current, input) : current,
       );
+      await cancelPendingQueries;
 
       return { previous, previousQueries, queryKey };
     },
@@ -658,7 +659,6 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
     moveCard(move, {
       onSettled: cancelCardDrag,
     });
-    window.setTimeout(cancelCardDrag, 0);
   }, [cancelCardDrag, moveCard]);
   const handleChangeInsumo = useCallback((card: KanbanCardSummary, insumoStatus: InsumoStatus) => {
     changeInsumo({
@@ -1484,6 +1484,8 @@ function ColumnSurface({
     },
     onDragEnd: (data: DragEndEventData<KanbanCardSummary>) => {
       const dragSource = activeCardDragRef.current;
+      activeCardDragRef.current = null;
+
       if (dragSource) {
         const destinationIndex = Math.max(0, data.index);
 
