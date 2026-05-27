@@ -1,5 +1,22 @@
 # Registro de alteracoes
 
+## 2026-05-27 - Quadro de producao: identidade correta no drag and drop
+
+- Modulo: quadro de producao.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `registro-alteracoes.md`.
+- Resultado: o card arrastado agora e identificado pelo `data-card-id` do elemento real no DOM, evitando que um indice interno defasado do `fluid-dnd` envie o UUID de outro card no endpoint de move.
+- Resultado: durante o arraste, a coluna renderiza a lista transitoria do Fluid sem deduplicar nem sincronizar `setFluidCards`; a deduplicacao e a volta para a lista canonica ficam restritas ao estado fora de drag ativo.
+- Decisao: manter a API de move inalterada e corrigir apenas a fronteira de identidade entre DOM, Fluid e React Query.
+- Validacao: `npx eslint src\features\quadro-producao\quadro-producao-client.tsx`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Playwright em `localhost:3100/quadro-producao` arrastou `Centro Educacional Infantil Vitalina Martinez` com a API `/move` interceptada; o request capturado usou `/cards/003bd213-b242-452d-ad53-58888c6d0899/move`, o mesmo UUID do `data-card-id` do card arrastado, sem persistir alteracao real no banco.
+
+## 2026-05-27 - Home: normalizar arte e exibir como badge em Ultimas fichas
+
+- Modulo: home (/).
+- Arquivos alterados: `src/app/page.tsx`.
+- Resultado: o campo `arte` na secao "Ultimas fichas" da home passava o slug bruto do banco diretamente para o JSX (`sublimacao`, `sem_personalizacao`, `serigrafia`, etc.). Agora passa por `normalizePersonalizacaoLabel()` e e renderizado como `<Badge tone="neutral">`, consistente com o padrao visual dos demais modulos.
+- Decisao: nenhuma mudanca no data layer; a correcao e somente na camada de apresentacao, importando o formatter ja existente.
+- Validacao: `npm run lint` e `npm run typecheck` passaram sem erros.
+
 ## 2026-05-27 - Revisao visual: acentuacao, consistencia de status e eyebrow
 
 - Modulo: UI transversal (fichas, clientes, catalogos, quadro, shell).

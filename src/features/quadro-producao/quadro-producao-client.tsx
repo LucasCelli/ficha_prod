@@ -181,6 +181,11 @@ function stopKanbanCardDrag(event: { nativeEvent?: Event; stopPropagation: () =>
   event.stopPropagation();
 }
 
+function getCardIdFromDragElement(element: Element) {
+  const cardElement = element.closest<HTMLElement>("[data-card-id]");
+  return cardElement?.dataset.cardId ?? null;
+}
+
 function formatDateLong(value: string) {
   return formatDateInput(value, {
     day: "2-digit",
@@ -1467,6 +1472,12 @@ function ColumnSurface({
   onShiftColumn,
   onSortByDate,
 }: ColumnSurfaceProps) {
+  const latestColumnCardsRef = useRef(column.cards);
+
+  useEffect(() => {
+    latestColumnCardsRef.current = column.cards;
+  }, [column.cards]);
+
   const cardDragConfig = useMemo(() => ({
     animationDuration: 90,
     delayBeforeInsert: 0,
@@ -1476,10 +1487,13 @@ function ColumnSurface({
     droppableGroup: "quadro-producao-cards",
     isDraggable: (element: HTMLElement) => element.classList.contains("quadro-producao-card"),
     onDragStart: (data: DragStartEventData<KanbanCardSummary>) => {
+      const cardId = getCardIdFromDragElement(data.element) ?? data.value.id;
+      const sourceIndex = latestColumnCardsRef.current.findIndex((card) => card.id === cardId);
+
       onStartCardDrag({
-        cardId: data.value.id,
+        cardId,
         sourceColumnId: column.id,
-        sourceIndex: data.index,
+        sourceIndex: sourceIndex >= 0 ? sourceIndex : data.index,
       });
     },
     onDragEnd: (data: DragEndEventData<KanbanCardSummary>) => {
@@ -1507,21 +1521,20 @@ function ColumnSurface({
     cardDragConfig,
   );
   const visibleCards = useMemo(() => {
-    const sourceCards = activeCardDrag ? fluidCards : column.cards;
-    return getUniqueCardsById(sourceCards);
+    return activeCardDrag ? fluidCards : column.cards;
   }, [activeCardDrag, column.cards, fluidCards]);
 
   useEffect(() => {
+    if (activeCardDrag) {
+      return;
+    }
+
     if (!hasUniqueCardIds(fluidCards)) {
       setFluidCards(getUniqueCardsById(fluidCards));
       return;
     }
 
     const sameOrder = haveSameCardOrder(fluidCards, column.cards);
-
-    if (activeCardDrag) {
-      return;
-    }
 
     if (!sameOrder || JSON.stringify(fluidCards) !== JSON.stringify(column.cards)) {
       setFluidCards(column.cards);
@@ -1586,16 +1599,18 @@ function ColumnSurface({
       </header>
 
       <div className="quadro-producao-column__list" ref={cardListRef}>
-        {column.cards.length === 0 ? <div className="quadro-producao-empty-column">Nenhum cartão nesta etapa.</div> : null}
+        {visibleCards.length === 0 ? <div className="quadro-producao-empty-column">Nenhum cartão nesta etapa.</div> : null}
         {visibleCards.map((card, cardIndex) => {
               const deliveryUrgency = getDeliveryUrgency(card);
               const isLastColumn = index === currentColumns.length - 1;
+              const cardKey = activeCardDrag ? `${card.id}-${cardIndex}` : card.id;
 
               return (
                 <article
                   className="quadro-producao-card"
+                  data-card-id={card.id}
                   data-index={cardIndex}
-                  key={card.id}
+                  key={cardKey}
                 >
                 <div className="quadro-producao-card__body">
                   <div className="quadro-producao-card__identity">

@@ -3,6 +3,7 @@ import { ArrowRight, BarChart3, CalendarClock, FileText, Layers3, Plus } from "l
 import { Badge, Card } from "@/components/ui";
 import { getCurrentSession } from "@/features/auth/session";
 import { formatBusinessDashboardDate, getBusinessGreeting, getBusinessTodayInput } from "@/lib/dates";
+import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -162,7 +163,7 @@ export default async function HomePage() {
                     </span>
                     <span className="home-recent-list__copy">
                       <strong>{ficha.cliente_nome_snapshot}</strong>
-                      <small>{ficha.arte || "Sem personalização"}</small>
+                      <Badge tone="neutral">{normalizePersonalizacaoLabel(ficha.arte ?? null)}</Badge>
                     </span>
                     <Badge className="home-recent-list__badge" tone={ficha.status === "entregue" ? "success" : "warning"}>
                       {formatStatus(ficha.status)}
