@@ -24,6 +24,7 @@ Backlog vivo para features, refinos e decisoes futuras. Itens concluidos devem s
 - [x] Migrar popovers, loading, modal, alerta, tooltip, datalist e menu para Motion compartilhado.
 - [x] Corrigir flashes e estado inconsistente ao mover cards no quadro migrando o Kanban para `@dnd-kit/react`.
 - [x] Reduzir travamento do card no quadro durante colisao com outros cards/colunas.
+- [x] Reconstruir `/quadro-producao` com `@dnd-kit/react` como controlador unico dos cards e visual fiel compacto baseado em `kanban-ideia/`.
 - [ ] Animar saida de fichas na listagem ao entregar/deletar.
 - [x] Revisar Motion do quadro sem competir com DnD Kit.
 - [ ] Migrar ordenacao por tamanho e autopreenchimento de observacoes para feedback Motion.

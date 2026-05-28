@@ -1,5 +1,39 @@
 # Registro de alteracoes
 
+## 2026-05-27 - Quadro de producao: cards mais compactos
+
+- Modulo: `/quadro-producao`, Kanban operacional.
+- Arquivos alterados:
+  - `src/components/ui/app-shell.tsx`
+  - `src/features/quadro-producao/quadro-producao-client.tsx`
+  - `src/styles/globals.css`
+  - `registro-alteracoes.md`
+- Resultado: os cards do quadro ficaram mais densos, com padding externo zerado, padding interno menor no body, gaps, chips, data e botoes internos reduzidos.
+- Resultado: o wrapper do quadro passou a usar limite maior que o shell padrao, ficando ainda mais amplo quando a sidebar esta recolhida.
+- Resultado: o card voltou a exibir o prefixo `Entrega`, a UI passou a tratar o seletor como `Status` em vez de `Insumo`, e a animacao do DnD Kit foi ajustada para 130ms no sortable/drop.
+- Resultado: o indicador de urgencia da entrega saiu do dot separado e passou para a cor do icone de calendario, mantendo texto acessivel oculto para o status.
+- Resultado: o handle do DnD saiu do corpo inteiro do card e virou um grip proprio, liberando clique no nome do cliente e foco no select de status; hover do card, nome do cliente, gap do corpo, data de entrega e glow do icone de calendario foram refinados.
+- Resultado: a inicializacao da sidebar ficou em lazy state para manter o lint completo verde sem alterar o comportamento visual.
+- Decisao: manter a estrutura atual do DnD Kit e compactar apenas a camada visual do card, sem reabrir comportamento de arraste ou persistencia.
+- Validacao: `npx eslint src\features\quadro-producao\quadro-producao-client.tsx`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Edge em `localhost:3000/quadro-producao` renderizou os cards compactos, com 5 colunas e sem erros de console capturados; CSS computado confirmou `.quadro-producao-card` com `padding: 0px`, body com `6px`, wrapper em `1520px` normal e `1720px` com sidebar recolhida; UI confirmou `Entrega 05/06/26`, filtro `Todos os status`, aria `Status de Escola Dom Bosco`, zero dots de entrega renderizados, icone de calendario colorido com glow, clique no nome abrindo modal e select de status focavel sem abrir modal.
+
+## 2026-05-27 - Quadro de producao reconstruido com dnd-kit
+
+- Modulo: `/quadro-producao`, Kanban operacional.
+- Arquivos alterados:
+  - `src/features/quadro-producao/quadro-producao-client.tsx`
+  - `src/styles/globals.css`
+  - `src/components/ui/app-shell.tsx`
+  - `TODO.md`
+  - `registro-alteracoes.md`
+- Resultado: o cliente do quadro foi refeito do zero, removendo o fluxo antigo de debug/sincronizacao manual e usando `@dnd-kit/react`/`useSortable` como controlador unico dos cards.
+- Resultado: aplicado visual fiel/compacto inspirado em `kanban-ideia/`, com toolbar densa, colunas de 280px, cards compactos, chips objetivos, preview de imagem e modal de detalhe preservado.
+- Persistencia: mantidas as APIs atuais de criar/renomear/reordenar colunas, criar cartao manual, mover card, alterar insumo, ordenar por entrega e entregar pedido.
+- Shell: `src/components/ui/app-shell.tsx` passou a inicializar o estado da sidebar por lazy state para atender o lint React sem mudar o comportamento.
+- Decisao: nao reintroduzir HTML/JS legado; `kanban-ideia/` foi usado apenas como referencia visual.
+- Caveat: o CSS antigo do quadro ficou neutralizado por um bloco novo no fim do global para evitar patch destrutivo amplo no arquivo.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram; `npm run lint` manteve apenas um warning em `kanban-ideia/app.js`. Edge em `localhost:3000/quadro-producao` renderizou 5 colunas e 106 cards, abriu modal de nova coluna e modal de detalhe de card, sem erros de console capturados.
+
 ## 2026-05-27 - Quadro de producao: DnD sem animacao concorrente
 
 - Modulo: quadro de producao.
