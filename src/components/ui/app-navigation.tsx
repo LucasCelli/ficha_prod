@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { mainNavigation } from "@/lib/navigation";
 import type { AppUserRole } from "@/features/auth/types";
+import { Tooltip } from "./tooltip";
 
 const iconMap: Record<string, typeof Home> = {
   "/": Home,
@@ -28,28 +29,61 @@ const iconMap: Record<string, typeof Home> = {
 
 type AppNavigationProps = {
   role: AppUserRole;
+  collapsed?: boolean;
 };
 
-export function AppNavigation({ role }: AppNavigationProps) {
+export function AppNavigation({ role, collapsed }: AppNavigationProps) {
   const pathname = usePathname();
 
   return (
     <nav className="app-nav" aria-label="Módulos principais">
-      {mainNavigation.filter((item) => !item.roles || item.roles.includes(role)).map((item) => {
-        const isActive = item.href === "/" ? pathname === item.href : pathname.startsWith(item.href);
-        const Icon = iconMap[item.href] ?? FileText;
+      {mainNavigation
+        .filter((item) => !item.roles || item.roles.includes(role))
+        .map((item) => {
+          const isActive = item.href === "/" ? pathname === item.href : pathname.startsWith(item.href);
+          const Icon = iconMap[item.href] ?? FileText;
 
-        return (
-          <Link className="app-nav__link" href={item.href} key={item.href} aria-current={isActive ? "page" : undefined}>
-            <span className="app-nav__icon" aria-hidden="true">
-              <Icon size={18} />
-            </span>
-            <span className="app-nav__copy">
-              <span>{item.label}</span>
-            </span>
-          </Link>
-        );
-      })}
+          const link = (
+            <Link
+              className="app-nav__link"
+              href={item.href}
+              aria-current={isActive ? "page" : undefined}
+            >
+              <span className="app-nav__icon" aria-hidden="true">
+                <Icon size={18} />
+              </span>
+              {!collapsed && (
+                <span className="app-nav__copy">
+                  <span>{item.label}</span>
+                </span>
+              )}
+            </Link>
+          );
+
+          if (collapsed) {
+            return (
+              <Tooltip key={item.href} label={item.label} side="right">
+                {link}
+              </Tooltip>
+            );
+          }
+
+          return (
+            <Link
+              className="app-nav__link"
+              href={item.href}
+              key={item.href}
+              aria-current={isActive ? "page" : undefined}
+            >
+              <span className="app-nav__icon" aria-hidden="true">
+                <Icon size={18} />
+              </span>
+              <span className="app-nav__copy">
+                <span>{item.label}</span>
+              </span>
+            </Link>
+          );
+        })}
     </nav>
   );
 }

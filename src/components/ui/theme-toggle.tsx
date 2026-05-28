@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { MoonStar, Sun } from "lucide-react";
 
 type Theme = "light" | "dark";
 
@@ -56,15 +57,15 @@ export function ThemeToggle() {
   return (
     <button
       aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
-      aria-pressed={isDark}
       className="theme-toggle"
       onClick={toggleTheme}
       type="button"
     >
-      <span aria-hidden="true" className="theme-toggle__track">
-        <span className="theme-toggle__thumb" />
-      </span>
-      <span className="theme-toggle__label">{isDark ? "Escuro" : "Claro"}</span>
+      {isDark
+        ? <Sun size={18} aria-hidden="true" />
+        : <MoonStar size={18} aria-hidden="true" />
+      }
+      <span className="theme-toggle__label">{isDark ? "Modo escuro" : "Modo claro"}</span>
     </button>
   );
 }

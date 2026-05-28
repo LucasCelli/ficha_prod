@@ -1,5 +1,50 @@
 # Registro de alteracoes
 
+## 2026-05-27 - Quadro de producao: DnD sem animacao concorrente
+
+- Modulo: quadro de producao.
+- Arquivos alterados:
+  - `src/styles/globals.css`
+  - `TODO.md`
+  - `registro-alteracoes.md`
+- Resultado: removidas as transicoes CSS manuais da superficie de drag do quadro (`column__list`, `card`, footer do card e botoes internos), deixando o DnD Kit como unico responsavel pela sensacao de movimento.
+- Resultado: removido o deslocamento `translateY` no hover/focus dos botoes do card no Kanban, evitando qualquer transform local em elementos do card durante o contexto de arraste.
+- Decisao: o quadro nao deve usar Motion nem animacoes manuais para ordenar/mover cards; quando houver movimento, ele fica sob responsabilidade do DnD Kit.
+- Validacao: `rg` confirmou ausencia de `motion`/`AnimatePresence` no cliente do quadro; a faixa CSS do Kanban ficou sem `transition`, exceto `transform: none` de neutralizacao. `npm run typecheck`, `npx eslint src\features\quadro-producao\quadro-producao-client.tsx`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. `npm run lint` completo falhou em `src/components/ui/app-shell.tsx` por `react-hooks/set-state-in-effect`, fora dos arquivos desta alteracao. Edge em `localhost:3000/quadro-producao` renderizou 5 colunas e 106 cards, sem overlay e sem erros de console capturados; CSS computado de card, lista, footer e botao do card mostrou `transition-duration: 0s`.
+
+## 2026-05-27 - Quadro de producao: arraste mais leve no Kanban
+
+- Modulo: quadro de producao.
+- Arquivos alterados:
+  - `src/features/quadro-producao/quadro-producao-client.tsx`
+  - `TODO.md`
+  - `registro-alteracoes.md`
+- Resultado: o reorder local durante `dragover` deixou de recriar todos os objetos dos cards das colunas afetadas; agora troca apenas os arrays necessarios e preserva as referencias dos cards que nao mudaram.
+- Resultado: o flush de estado do provider de DnD passou a ser agrupado por `requestAnimationFrame`, reduzindo recomposicoes durante colisao com outro card ou coluna.
+- Resultado: a captura de diagnostico `window.__quadroDndLogs` deixou de ficar ligada por padrao em desenvolvimento; continua disponivel com `localStorage.setItem("quadro:dnd-debug", "1")`, e o console ao vivo com `localStorage.setItem("quadro:dnd-console", "1")`.
+- Decisao: manter React como dono da ordem visual durante o drag, mas diminuir o trabalho sincronizado no frame do ponteiro antes de considerar troca de biblioteca ou virtualizacao do quadro.
+- Caveat: validacao manual do feeling do arraste ainda e recomendada, porque o sintoma original e perceptivo e aparece principalmente em colisao real com mouse/touch.
+- Validacao: `npx eslint src\features\quadro-producao\quadro-producao-client.tsx`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Edge em `localhost:3000/quadro-producao` renderizou 5 colunas e 106 cards, sem overlay e sem erros de console capturados; a flag local de diagnostico `quadro:dnd-debug` estava ligada na sessao e foi removida para testar o estado normal.
+
+## 2026-05-27 - Quadro de produção: logs de DnD, remoção de resize e anti-flash
+
+- Módulo: quadro de produção / shell.
+- Arquivos alterados:
+  - `src/features/quadro-producao/quadro-producao-client.tsx`
+  - `src/styles/globals.css`
+  - `src/components/ui/app-shell.tsx`
+  - `package.json`
+  - `package-lock.json`
+  - `registro-alteracoes.md`
+- Resultado: removido o layout com `react-resizable-panels`; o quadro voltou a usar uma grade horizontal única com scroll, sem handles de resize nem componentes `Group`, `Panel` ou `Separator`.
+- Resultado: removida a dependência `react-resizable-panels` de `package.json` e `package-lock.json`.
+- Resultado: adicionada captura de diagnóstico do Kanban em `window.__quadroDndLogs`, com helpers `window.__exportQuadroDndLogs()` e `window.__clearQuadroDndLogs()`. Em desenvolvimento a captura fica ativa; em produção pode ser ligada com `localStorage.setItem("quadro:dnd-debug", "1")`. O console ao vivo só liga com `localStorage.setItem("quadro:dnd-console", "1")`.
+- Resultado: corrigido flash pós-drop: o quadro mantém a fonte local durante persistência, refresh agendado e invalidação de `["quadro-producao"]`, só retornando para a fonte canônica após `refresh-finished`.
+- Resultado: os logs de movimentos humanos apontaram a janela exata do flash: `render-source: canonical` acontecia depois de `persist.queued` e antes de `persist.request-start`/`refresh-finished`. O drag persistido agora mantém `activeCardDrag` até o refresh final sem fila pendente.
+- Resultado: reduzido o atraso artificial da fila de persistência de 180ms para 60ms e reduzido o payload dos logs de `render-source` para contagem + IDs iniciais, evitando que a própria instrumentação pese no arraste em desenvolvimento.
+- Resultado: `AppShell` passou a inicializar `collapsed` com lazy initializer em vez de `setState` dentro de `useEffect`, atendendo a regra de lint atual.
+- Validação: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Playwright em `localhost:3000/quadro-producao` com `/move` interceptado confirmou: os requests usaram o UUID do card arrastado; o buffer registrou eventos `drag.start`, `drag.over`, `drag.end`, `persist.*` e `render-source`; não houve `render-source: canonical` entre `persist.queued` e `persist.refresh-finished`; `.quadro-producao-resize-handle` e `.quadro-producao-panels` renderizaram zero ocorrências. Console do Edge integrado exibiu apenas HMR/Fast Refresh, sem erro de runtime.
+
 ## 2026-05-27 - Branding: componentes PriscilaLogo e PriscilaIcon
 
 - Modulo: branding / UI global.
@@ -30,9 +75,14 @@
 - Resultado: controles internos de card (`select`, preview, entregar e mover por botão) bloqueiam o início do drag e seguem operando como fallback.
 - Refinamento posterior: revisada a integração contra a documentação atual do DnD Kit. O `dragover` agora deduplica atualizações por destino para evitar render a cada movimento do ponteiro; `Feedback.configure({ dropAnimation: null })` evita dupla reconciliação no drop; os cards usam `transition: null` no `useSortable`.
 - Refinamento posterior: removido `will-change: transform` do card e desligadas transições locais do card, rodapé e botões enquanto `.quadro-producao-card--dragging` está ativo, evitando qualquer animação CSS local concorrendo com o renderer do DnD Kit.
+- Refinamento posterior: persistência de movimentos passou a ser serializada em fila com atraso curto antes do `/move`; o quadro mantém o estado local enquanto houver persistências pendentes e invalida `["quadro-producao"]` apenas quando a fila esvazia, evitando mistura entre um novo gesto e a persistência do gesto anterior.
+- Refinamento posterior: o `dragEnd` usa o último destino confirmado em `dragOver` antes de cair no snapshot final do DnD Kit, preservando o destino correto quando há reparent durante persistência pendente.
+- Refinamento posterior: removido o `OptimisticSortingPlugin` padrão dos cards, mantendo apenas `SortableKeyboardPlugin`, para evitar dupla posse do DOM entre DnD Kit e React. As atualizações de estado disparadas por eventos do DnD agora são agendadas por `setTimeout`, fora da fase interna de `useInsertionEffect`.
+- Refinamento posterior: `KanbanCard` foi memoizado e recebeu props menores (`columnId`, `isLastColumn`) para reduzir re-render dos cards durante o arraste.
+- Refinamento posterior: após diagnóstico do fluxo, a ordenação durante o drag ficou com posse única do React. O `dragOver` atualiza o estado local para mudança de coluna e reordenação interna, deduplicando por `{ columnId, index }`, enquanto o DnD Kit fica restrito a sensores, colisão e handle.
 - Decisão: `fluid-dnd` permanece instalado para superfícies ainda dependentes, mas `/quadro-producao` não importa mais a biblioteca nem o guard específico dela.
 - Caveat: o smoke de coluna vazia não foi exercitado porque o quadro real atual não tem coluna vazia; `useDroppable` foi mantido na lista da coluna para aceitar esse cenário.
-- Validação: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Playwright em `localhost:3000/quadro-producao` com `/api/quadro-producao/cards/*/move` interceptado confirmou: `Centro Educacional Infantil Vitalina Martinez` enviou `/cards/003bd213-b242-452d-ad53-58888c6d0899/move`; `Eldorado Madeiras` enviou `/cards/160b508f-3cce-4de5-b87e-eb1388e6939e/move`; reordenação interna enviou o UUID do próprio card; `Escape`, `select` de status e preview não chamaram `/move`; smoke desktop e viewport 390px renderizaram 5 colunas e 86 cards; sem overlay Next e sem erros de console.
+- Validação: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram. Playwright em `localhost:3000/quadro-producao` com `/api/quadro-producao/cards/*/move` interceptado confirmou: cancelamento com `Escape` não gera erro `useInsertionEffect`, mantém 106 cards renderizados e não chama `/move`; dois arrastes em sequência curta (`Eldorado Madeiras` e `Centro Educacional Infantil Vitalina Martinez`) enviaram os UUIDs corretos, em chamadas serializadas mesmo com `/move` atrasado artificialmente; reordenação interna enviou o UUID do próprio card; `select` de status e preview não chamaram `/move`; smoke desktop e viewport 390px renderizaram 5 colunas e 86 cards; sem erros de console e sem overlay de erro do Next.
 
 ## 2026-05-27 - Login: redesign glass card + glow e ajuste de token dark mode
 

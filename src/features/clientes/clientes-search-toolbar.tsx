@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { useQueryState } from "nuqs";
 
 type ClientesSearchToolbarProps = {
@@ -43,6 +43,17 @@ export function ClientesSearchToolbar({ initialTerm = "" }: ClientesSearchToolba
             type="search"
             value={term}
           />
+          {term.trim() ? (
+            <button
+              aria-label="Limpar busca"
+              className="clientes-search-field__clear"
+              onClick={() => setTerm("")}
+              onMouseDown={(event) => event.preventDefault()}
+              type="button"
+            >
+              <X aria-hidden="true" size={16} />
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

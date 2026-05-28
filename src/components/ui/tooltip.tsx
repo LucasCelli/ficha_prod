@@ -1,27 +1,29 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   motionTransition,
   tooltipBottomMotion,
   tooltipMotion,
+  tooltipRightMotion,
   transitionForReducedMotion,
 } from "./motion-presets";
 
 type TooltipProps = {
   children: ReactNode;
   label: string;
+  side?: "top" | "right";
 };
 
-export function Tooltip({ children, label }: TooltipProps) {
+export function Tooltip({ children, label, side = "top" }: TooltipProps) {
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [position, setPosition] = useState<{
     left: number;
-    side: "bottom" | "top";
+    side: "bottom" | "top" | "right";
     top: number;
   } | null>(null);
   const triggerRef = useRef<HTMLSpanElement | null>(null);
@@ -36,39 +38,6 @@ export function Tooltip({ children, label }: TooltipProps) {
   function handleClose() {
     setOpen(false);
   }
-
-  useEffect(() => {
-    const trigger = triggerRef.current;
-
-    if (!trigger) {
-      return;
-    }
-
-    function handleFocusOut(event: FocusEvent) {
-      if (!trigger?.contains(event.relatedTarget as Node | null)) {
-        handleClose();
-      }
-    }
-
-    function handleClick() {
-      setDismissed(true);
-      handleClose();
-    }
-
-    trigger.addEventListener("mouseenter", handleOpen);
-    trigger.addEventListener("mouseleave", handleClose);
-    trigger.addEventListener("focusin", handleOpen);
-    trigger.addEventListener("focusout", handleFocusOut);
-    trigger.addEventListener("click", handleClick, { capture: true });
-
-    return () => {
-      trigger.removeEventListener("mouseenter", handleOpen);
-      trigger.removeEventListener("mouseleave", handleClose);
-      trigger.removeEventListener("focusin", handleOpen);
-      trigger.removeEventListener("focusout", handleFocusOut);
-      trigger.removeEventListener("click", handleClick, { capture: true });
-    };
-  }, []);
 
   useLayoutEffect(() => {
     if (!open) {
@@ -86,20 +55,34 @@ export function Tooltip({ children, label }: TooltipProps) {
       const triggerRect = trigger.getBoundingClientRect();
       const tooltipRect = tooltip.getBoundingClientRect();
       const viewportPadding = 8;
+
+      if (side === "right") {
+        const left = triggerRect.right + 10;
+        const top = Math.max(
+          viewportPadding,
+          Math.min(
+            window.innerHeight - viewportPadding - tooltipRect.height,
+            triggerRect.top + (triggerRect.height - tooltipRect.height) / 2,
+          ),
+        );
+        setPosition({ left, top, side: "right" });
+        return;
+      }
+
       let left = triggerRect.left + triggerRect.width / 2;
       const minLeft = viewportPadding + tooltipRect.width / 2;
       const maxLeft = window.innerWidth - viewportPadding - tooltipRect.width / 2;
       left = Math.min(Math.max(left, minLeft), maxLeft);
 
-      let side: "bottom" | "top" = "top";
+      let resolvedSide: "bottom" | "top" = "top";
       let top = triggerRect.top - 40;
 
       if (triggerRect.top - tooltipRect.height - 10 < viewportPadding) {
-        side = "bottom";
+        resolvedSide = "bottom";
         top = triggerRect.bottom + 10;
       }
 
-      setPosition({ left, side, top });
+      setPosition({ left, side: resolvedSide, top });
     }
 
     updatePosition();
@@ -110,7 +93,7 @@ export function Tooltip({ children, label }: TooltipProps) {
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [open, label]);
+  }, [open, label, side]);
 
   const tooltipStyle: CSSProperties | undefined = position
     ? {
@@ -118,6 +101,12 @@ export function Tooltip({ children, label }: TooltipProps) {
         top: position.top,
       }
     : undefined;
+
+  function motionVariants() {
+    if (position?.side === "right") return tooltipRightMotion;
+    if (position?.side === "bottom") return tooltipBottomMotion;
+    return tooltipMotion;
+  }
 
   return (
     <span
@@ -160,7 +149,7 @@ export function Tooltip({ children, label }: TooltipProps) {
                   role="tooltip"
                   style={tooltipStyle}
                   transition={transitionForReducedMotion(reduceMotion, motionTransition.fast)}
-                  variants={position?.side === "bottom" ? tooltipBottomMotion : tooltipMotion}
+                  variants={motionVariants()}
                 >
                   {label}
                 </motion.span>

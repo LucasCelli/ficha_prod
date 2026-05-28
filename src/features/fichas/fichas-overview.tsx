@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { CalendarDays, History, ListFilter, Plus } from "lucide-react";
-import { Badge, DataTable, EmptyState, Pagination } from "@/components/ui";
+import { CalendarDays, CircleHelp, History, ListFilter, Plus } from "lucide-react";
+import { Badge, DataTable, EmptyState, Pagination, Tooltip } from "@/components/ui";
 import { formatCompactDateInput, getBusinessWeekRange } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { getKanbanColumnLabel } from "@/features/quadro-producao/config";
@@ -302,9 +302,18 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
         <div className="ficha-row__client">
           <FichaRowThumbnail alt={ficha.cliente_nome_snapshot} imageUrl={thumbUrl} />
           <span className="ui-table__primary">
-            <Link className="ui-table__link" href={href} prefetch={false} scroll={false}>
-              {ficha.cliente_nome_snapshot}
-            </Link>
+            <span className="ficha-row__name-line">
+              <Link className="ui-table__link" href={href} prefetch={false} scroll={false}>
+                {ficha.cliente_nome_snapshot}
+              </Link>
+              {ficha.cliente_auxiliar ? (
+                <Tooltip label={ficha.cliente_auxiliar}>
+                  <button aria-label={`Alias: ${ficha.cliente_auxiliar}`} className="field-info-button" type="button">
+                    <CircleHelp aria-hidden="true" size={14} />
+                  </button>
+                </Tooltip>
+              ) : null}
+            </span>
             <span className="ficha-row__meta">
               <Badge className="ficha-row__meta-badge" tone="neutral">{formatItemsTotal(itemsTotal)}</Badge>
               <Badge className="ficha-row__meta-badge" tone="neutral">

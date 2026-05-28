@@ -134,7 +134,7 @@ export async function getClienteById(id: string): Promise<ClienteDetailResult> {
 
     const { data: fichas, error: fichasError } = await supabase
       .from("fichas")
-      .select("id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, kanban_column:kanban_columns(name,slug)")
+      .select("id, cliente_nome_snapshot, cliente_auxiliar, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, kanban_column:kanban_columns(name,slug)")
       .eq("cliente_id", id)
       .order("data_entrega", { ascending: false })
       .limit(CLIENTE_HISTORY_LIMIT);

@@ -12,6 +12,7 @@ export type FichaListItem = Pick<
   Database["public"]["Tables"]["fichas"]["Row"],
   | "id"
   | "cliente_nome_snapshot"
+  | "cliente_auxiliar"
   | "data_inicio"
   | "data_entrega"
   | "status"
@@ -98,7 +99,7 @@ export async function listFichas(filters: FichaFilters = {}): Promise<FichaListR
       supabase
         .from("fichas")
         .select(
-          "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, lista_ia_anexada, lista_nomes_raw_anexada, ficha_itens(quantidade), ficha_imagens(url), kanban_column:kanban_columns(name,slug)",
+          "id, cliente_nome_snapshot, cliente_auxiliar, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, lista_ia_anexada, lista_nomes_raw_anexada, ficha_itens(quantidade), ficha_imagens(url), kanban_column:kanban_columns(name,slug)",
           { count: "exact" },
         )
         .order("created_at", { ascending: false })
@@ -148,7 +149,7 @@ export async function listFichasForOperationalPdf(filters: FichaFilters = {}): P
       supabase
         .from("fichas")
         .select(
-          "id, cliente_nome_snapshot, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, kanban_column:kanban_columns(name,slug)",
+          "id, cliente_nome_snapshot, cliente_auxiliar, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, kanban_column:kanban_columns(name,slug)",
           { count: "exact" },
         )
         .order("created_at", { ascending: false })

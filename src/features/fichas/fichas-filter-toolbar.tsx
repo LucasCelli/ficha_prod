@@ -97,7 +97,7 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
 
   function clearSearch() {
     setSearchDraftValue("");
-    setIsEditingSearch(false);
+    setIsEditingSearch(true);
     updateFilter(searchParams, pathname, router, startTransition, "busca", "");
   }
 
