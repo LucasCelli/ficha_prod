@@ -2917,6 +2917,13 @@ html[data-theme="dark"] .relatorios-activity__cell--4 {
   gap: 8px;
 }
 
+.products-editor__copy-stack {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  gap: 2px;
+}
+
 .products-editor__actions .ui-tooltip {
   display: inline-flex;
 }
@@ -2933,6 +2940,16 @@ html[data-theme="dark"] .relatorios-activity__cell--4 {
   color: var(--color-text);
   cursor: pointer;
   user-select: none;
+}
+
+.products-editor__copy-stack .ui-tooltip,
+.products-editor__copy-stack button {
+  width: 44px;
+  height: 21px;
+}
+
+.products-editor__copy-stack button {
+  border-radius: 7px;
 }
 
 .products-editor__drag {

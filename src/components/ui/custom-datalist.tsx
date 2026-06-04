@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { motionTransition, popoverMotion, transitionForReducedMotion } from "./motion-presets";
 
@@ -21,10 +21,13 @@ type CustomDatalistProps = {
   inputMode?: "text" | "numeric";
   name?: string;
   onEnterKey?: (value: string) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
   onValueChange?: (value: string, option?: CustomDatalistOption) => void;
   options: CustomDatalistOption[];
   placeholder?: string;
   value?: string;
+  "data-product-column"?: string;
+  "data-product-index"?: number;
 };
 
 function normalize(value: string) {
@@ -44,10 +47,13 @@ export function CustomDatalist({
   inputMode = "text",
   name,
   onEnterKey,
+  onKeyDown,
   onValueChange,
   options,
   placeholder,
   value,
+  "data-product-column": dataProductColumn,
+  "data-product-index": dataProductIndex,
 }: CustomDatalistProps) {
   const listboxId = useId();
   const reduceMotion = useReducedMotion();
@@ -96,6 +102,8 @@ export function CustomDatalist({
         aria-invalid={ariaInvalid}
         aria-label={ariaLabel}
         autoComplete="off"
+        data-product-column={dataProductColumn}
+        data-product-index={dataProductIndex}
         id={id}
         inputMode={inputMode}
         name={name}
@@ -109,6 +117,9 @@ export function CustomDatalist({
         }}
         onFocus={() => setIsOpen(true)}
         onKeyDown={(event) => {
+          onKeyDown?.(event);
+          if (event.defaultPrevented) return;
+
           if (event.key === "ArrowDown") {
             event.preventDefault();
             setIsOpen(true);

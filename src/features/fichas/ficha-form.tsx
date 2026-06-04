@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal, flushSync, useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useDragAndDrop } from "fluid-dnd/react";
@@ -87,22 +87,16 @@ const SIZE_ORDER = new Map(
     ["2"],
     ["4"],
     ["6"],
-    ["8"],
-    ["10"],
-    ["12"],
-    ["14"],
-    ["16", "PP"],
+    ["PP"],
     ["P"],
     ["M"],
     ["G"],
     ["GG"],
-    ["52", "XG", "G1"],
-    ["54", "EG", "G2"],
-    ["56", "EGG", "XGG", "G3"],
-    ["58", "EEGG", "XXGG", "G4"],
-    ["60", "ESP1", "G5"],
-    ["62", "ESP2", "G6"],
-    ["64", "ESP3", "G7"],
+    ["52"],
+    ["54"],
+    ["56"],
+    ["ESP1"],
+    ["ESP2"],
   ].flatMap((sizes, index) => sizes.map((size) => [size, index] as const)),
 );
 
@@ -199,6 +193,15 @@ function normalizeProductForRule(value: string) {
 function getSizeOrder(value: string) {
   const normalized = value.trim().toUpperCase();
   return SIZE_ORDER.get(normalized) ?? 1000;
+}
+
+function normalizeProductSize(value: string) {
+  return value.toLocaleUpperCase("pt-BR");
+}
+
+function isBabyLookProduct(value: string) {
+  const normalized = normalizeProductForRule(value).replace(/[\s_-]+/g, "");
+  return normalized.includes("babylook");
 }
 
 function getImageCardWidthFromGrid(gridWidth: number, count: number) {
@@ -1413,10 +1416,11 @@ function FichaFormInner({
   }, [gola, golaOptions, material, materialOptions, primeiroProduto, setValue, syncComposicaoByMaterial]);
 
   function updateProductItem(id: string, field: keyof Omit<ProductFormItem, "id">, value: string) {
+    const nextValue = field === "tamanho" ? normalizeProductSize(value) : value;
     const itemIndex = getValues("itens").findIndex((item) => item.id === id);
     if (itemIndex >= 0) {
-      setValue(`itens.${itemIndex}.${field}`, value, { shouldDirty: true });
-      setFluidProductItems((current) => current.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
+      setValue(`itens.${itemIndex}.${field}`, nextValue, { shouldDirty: true });
+      setFluidProductItems((current) => current.map((item) => (item.id === id ? { ...item, [field]: nextValue } : item)));
       scheduleDraftSnapshotPersist();
     }
   }
@@ -1429,15 +1433,36 @@ function FichaFormInner({
     scheduleDraftSnapshotPersist();
   }
 
-  function duplicateProductItem(id: string) {
+  function duplicateProductItem(id: string, position: "above" | "below") {
     const current = getValues("itens");
-    const item = current.find((candidate) => candidate.id === id);
-    if (!item) return;
+    const itemIndex = current.findIndex((candidate) => candidate.id === id);
+    const item = current[itemIndex];
+    if (!item || itemIndex < 0) return;
 
     const duplicated = { ...item, id: `item-${Date.now()}-${current.length}` };
-    appendProductItem(duplicated);
-    setFluidProductItems([...current, duplicated]);
+    const nextItems = [...current];
+    nextItems.splice(position === "above" ? itemIndex : itemIndex + 1, 0, duplicated);
+    replaceProductItems(nextItems);
+    setFluidProductItems(nextItems);
     scheduleDraftSnapshotPersist();
+  }
+
+  function focusProductColumnItem(column: string, index: number) {
+    const selector = `[data-product-column="${column}"][data-product-index="${index}"]`;
+    const control = productsListRef.current?.querySelector<HTMLInputElement>(selector);
+    control?.focus();
+    control?.select();
+    return Boolean(control);
+  }
+
+  function handleProductColumnTab(event: KeyboardEvent<HTMLInputElement>, column: string, index: number) {
+    if (event.key !== "Tab") return;
+
+    const nextIndex = index + (event.shiftKey ? -1 : 1);
+    if (nextIndex < 0 || nextIndex >= fluidProductItems.length) return;
+
+    event.preventDefault();
+    focusProductColumnItem(column, nextIndex);
   }
 
   function removeProductItem(id: string) {
@@ -1472,6 +1497,8 @@ function FichaFormInner({
 
   function sortProductItems() {
     const sortedItems = [...getValues("itens")].sort((a, b) => {
+      const byModelBlock = Number(isBabyLookProduct(a.produto)) - Number(isBabyLookProduct(b.produto));
+      if (byModelBlock !== 0) return byModelBlock;
       const bySize = getSizeOrder(a.tamanho) - getSizeOrder(b.tamanho);
       if (bySize !== 0) return bySize;
       return a.produto.localeCompare(b.produto, "pt-BR", { sensitivity: "base" });
@@ -1843,8 +1870,11 @@ function FichaFormInner({
                   <span>Tam.</span>
                   <CustomDatalist
                     aria-label={`Tamanho do produto ${index + 1}`}
+                    data-product-column="tamanho"
+                    data-product-index={index}
                     id={`tamanho-${item.id}`}
                     inputMode="text"
+                    onKeyDown={(event) => handleProductColumnTab(event, "tamanho", index)}
                     onValueChange={(value) => updateProductItem(item.id, "tamanho", value)}
                     options={sizeOptions}
                     placeholder="Tam."
@@ -1855,8 +1885,11 @@ function FichaFormInner({
                   <span>Qtd.</span>
                   <input
                     aria-label={`Quantidade do produto ${index + 1}`}
+                    data-product-column="quantidade"
+                    data-product-index={index}
                     inputMode="numeric"
                     onChange={(event) => updateProductItem(item.id, "quantidade", event.currentTarget.value)}
+                    onKeyDown={(event) => handleProductColumnTab(event, "quantidade", index)}
                     placeholder="Qtd."
                     value={item.quantidade ?? ""}
                   />
@@ -1866,7 +1899,10 @@ function FichaFormInner({
                   <CustomDatalist
                     aria-invalid={Boolean(state.fieldErrors?.itensJson)}
                     aria-label={`Produto ${index + 1}`}
+                    data-product-column="produto"
+                    data-product-index={index}
                     id={`produto-${item.id}`}
+                    onKeyDown={(event) => handleProductColumnTab(event, "produto", index)}
                     onValueChange={(value) => updateProductItem(item.id, "produto", value)}
                     options={productOptions}
                     placeholder="Camiseta, polo, regata…"
@@ -1878,17 +1914,27 @@ function FichaFormInner({
                   <input
                     aria-label={`Detalhes do produto ${index + 1}`}
                     autoComplete="off"
+                    data-product-column="detalhesProduto"
+                    data-product-index={index}
                     onChange={(event) => updateProductItem(item.id, "detalhesProduto", event.currentTarget.value)}
+                    onKeyDown={(event) => handleProductColumnTab(event, "detalhesProduto", index)}
                     placeholder="Opcional…"
                     value={item.detalhesProduto ?? ""}
                   />
                 </label>
                 <div className="products-editor__actions">
-                  <Tooltip label="Copiar produto">
-                    <button aria-label={`Duplicar produto ${index + 1}`} onClick={() => duplicateProductItem(item.id)} type="button">
-                      <Copy aria-hidden="true" size={16} />
-                    </button>
-                  </Tooltip>
+                  <div className="products-editor__copy-stack">
+                    <Tooltip label="Copiar acima">
+                      <button aria-label={`Duplicar produto ${index + 1} acima`} onClick={() => duplicateProductItem(item.id, "above")} type="button">
+                        <Copy aria-hidden="true" size={14} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip label="Copiar abaixo">
+                      <button aria-label={`Duplicar produto ${index + 1} abaixo`} onClick={() => duplicateProductItem(item.id, "below")} type="button">
+                        <Copy aria-hidden="true" size={14} />
+                      </button>
+                    </Tooltip>
+                  </div>
                   <Tooltip label="Remover produto">
                     <button
                       aria-label={`Remover produto ${index + 1}`}
