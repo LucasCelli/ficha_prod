@@ -57,6 +57,10 @@ export function FloatingMenu({ children, label, trigger }: FloatingMenuProps) {
 
   function handleMenuClick(event: MouseEvent<HTMLDivElement>) {
     const target = event.target;
+    if (target instanceof Element && target.closest("[data-keep-floating-menu-open='true']")) {
+      return;
+    }
+
     if (target instanceof Element && target.closest('button[type="submit"]')) {
       return;
     }

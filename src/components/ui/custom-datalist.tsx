@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useId, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { motionTransition, popoverMotion, transitionForReducedMotion } from "./motion-presets";
 
@@ -20,7 +20,9 @@ type CustomDatalistProps = {
   id: string;
   inputMode?: "text" | "numeric";
   name?: string;
+  onBlur?: (event: FocusEvent<HTMLInputElement>) => void;
   onEnterKey?: (value: string) => void;
+  onFocus?: (event: FocusEvent<HTMLInputElement>) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
   onValueChange?: (value: string, option?: CustomDatalistOption) => void;
   options: CustomDatalistOption[];
@@ -46,7 +48,9 @@ export function CustomDatalist({
   id,
   inputMode = "text",
   name,
+  onBlur,
   onEnterKey,
+  onFocus,
   onKeyDown,
   onValueChange,
   options,
@@ -107,7 +111,8 @@ export function CustomDatalist({
         id={id}
         inputMode={inputMode}
         name={name}
-        onBlur={() => {
+        onBlur={(event) => {
+          onBlur?.(event);
           window.setTimeout(() => setIsOpen(false), 120);
         }}
         onChange={(event) => {
@@ -115,7 +120,10 @@ export function CustomDatalist({
           setActiveIndex(0);
           setIsOpen(true);
         }}
-        onFocus={() => setIsOpen(true)}
+        onFocus={(event) => {
+          onFocus?.(event);
+          setIsOpen(true);
+        }}
         onKeyDown={(event) => {
           onKeyDown?.(event);
           if (event.defaultPrevented) return;

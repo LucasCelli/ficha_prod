@@ -346,6 +346,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
   const [isSavingLink, setIsSavingLink] = useState(false);
   const [isEditingResult, setIsEditingResult] = useState(false);
   const [activeCopyCell, setActiveCopyCell] = useState<ActiveCopyCell | null>(null);
+  const [nameCaseMode, setNameCaseMode] = useState<NameCaseMode>("original");
   const [linkedFichas, setLinkedFichas] = useState<LinkedFicha[]>(initialFicha ? [initialFicha] : []);
   const [selectedFichaId, setSelectedFichaId] = useState(initialFicha?.id ?? "");
   const [selectedFichaLabel, setSelectedFichaLabel] = useState(initialFicha ? getFichaOptionLabel(initialFicha) : "");
@@ -368,6 +369,14 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
   const sortedItems = useMemo(
     () => (result ? (sortConfig ? sortItems(result.items, sortConfig.key, sortConfig.direction) : result.items) : []),
     [result, sortConfig],
+  );
+  const displayedSortedItems = useMemo(
+    () =>
+      sortedItems.map((item) => ({
+        ...item,
+        nome: nameCaseMode === "original" ? item.nome : transformNameCase(item.nome, nameCaseMode),
+      })),
+    [nameCaseMode, sortedItems],
   );
   const selectedFichaHasLinkedList = Boolean(selectedFicha?.listaIaAnexada || selectedFicha?.listaIa);
   const columns = useMemo(
@@ -394,17 +403,13 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
     );
   }
 
+  function setEditableResult(nextResult: EditableUniformList | null) {
+    setNameCaseMode("original");
+    setResult(nextResult);
+  }
+
   function transformResultNames(mode: NameCaseMode) {
-    setResult((current) =>
-      current
-        ? {
-            items: current.items.map((item) => ({
-              ...item,
-              nome: transformNameCase(item.nome, mode),
-            })),
-          }
-        : current,
-    );
+    setNameCaseMode(mode);
   }
 
   function updateModelItem(rowId: string, value: string) {
@@ -438,7 +443,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setResult(null);
+    setEditableResult(null);
     setIsEditingResult(false);
 
     if (!text.trim()) {
@@ -475,7 +480,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
 
       setActiveCopyCell(null);
       setIsEditingResult(false);
-      setResult(createEditableList(payload.data));
+      setEditableResult(createEditableList(payload.data));
     } catch {
       const message = "Não foi possível organizar a lista.";
       setError(message);
@@ -540,7 +545,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
       if (payload.ficha.listaIa) {
         setActiveCopyCell(null);
         setIsEditingResult(false);
-        setResult(createEditableList({ items: payload.ficha.listaIa.items }));
+        setEditableResult(createEditableList({ items: payload.ficha.listaIa.items }));
         setSortConfig(null);
         toast.success("Lista vinculada carregada.");
       } else {
@@ -771,13 +776,16 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
                 {isEditingResult ? "Concluir" : "Editar"}
               </Button>
               <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={() => transformResultNames("capitalized")} type="button" variant="secondary">
-                Capitalizado
+                Capitalizar
               </Button>
               <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={() => transformResultNames("uppercase")} type="button" variant="secondary">
-                Uppercase
+                Maiúsculas
               </Button>
               <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={() => transformResultNames("lowercase")} type="button" variant="secondary">
-                Lowercase
+                Minúsculas
+              </Button>
+              <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={() => transformResultNames("original")} type="button" variant="secondary">
+                Original
               </Button>
               <Button
                 aria-disabled={!hasItems || isExporting}
@@ -802,7 +810,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
             <TableGenerationAnimation />
           ) : result ? (
             <DataTable caption="Lista organizada para revisão" columns={columns}>
-              {sortedItems.map((item, index) => {
+              {(isEditingResult ? sortedItems : displayedSortedItems).map((item, index) => {
                 if (isEditingResult) {
                   return (
                     <tr key={item.rowId}>

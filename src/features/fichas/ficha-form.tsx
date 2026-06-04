@@ -19,12 +19,13 @@ import {
   CircleAlert,
   CircleX,
   Cog,
-  Copy,
   GripVertical,
   Images,
   Italic,
   List,
   ListOrdered,
+  ArrowDown,
+  ArrowUp,
   ClipboardList,
   PackageOpen,
   Plus,
@@ -101,6 +102,7 @@ const SIZE_ORDER = new Map(
 );
 
 type RichTextCommand = "bold" | "italic" | "underline" | "insertUnorderedList" | "insertOrderedList" | "removeFormat";
+type ClearableProductField = "quantidade" | "tamanho";
 
 type FichaDraftSnapshot = {
   initialData: FichaFormInitialData;
@@ -646,6 +648,7 @@ function FichaFormInner({
   const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
   const submitAfterUploadRef = useRef(false);
   const sortFeedbackTimerRef = useRef<number | null>(null);
+  const clearedProductFieldsRef = useRef(new Map<string, { edited: boolean; value: string }>());
   const autoGolaRef = useRef(false);
   const autoMaterialRef = useRef(false);
   const autoComposicaoRef = useRef(false);
@@ -1471,12 +1474,51 @@ function FichaFormInner({
     const item = current[itemIndex];
     if (!item || itemIndex < 0) return;
 
-    const duplicated = { ...item, id: `item-${Date.now()}-${current.length}` };
+    const duplicated = { ...item, id: `item-${Date.now()}-${current.length}`, quantidade: "", tamanho: "" };
     const nextItems = [...current];
     nextItems.splice(position === "above" ? itemIndex : itemIndex + 1, 0, duplicated);
     replaceProductItems(nextItems);
     setFluidProductItems(nextItems);
     scheduleDraftSnapshotPersist();
+  }
+
+  function getClearableProductFieldKey(id: string, field: ClearableProductField) {
+    return `${id}:${field}`;
+  }
+
+  function getProductFieldValue(id: string, field: ClearableProductField) {
+    return getValues("itens").find((item) => item.id === id)?.[field] ?? "";
+  }
+
+  function handleClearableProductFieldFocus(id: string, field: ClearableProductField) {
+    const currentValue = getProductFieldValue(id, field);
+    if (!currentValue) return;
+
+    const key = getClearableProductFieldKey(id, field);
+    clearedProductFieldsRef.current.set(key, { edited: false, value: currentValue });
+    updateProductItem(id, field, "");
+  }
+
+  function handleClearableProductFieldChange(id: string, field: ClearableProductField, value: string) {
+    const key = getClearableProductFieldKey(id, field);
+    const clearedField = clearedProductFieldsRef.current.get(key);
+
+    if (clearedField) {
+      clearedProductFieldsRef.current.set(key, { ...clearedField, edited: true });
+    }
+
+    updateProductItem(id, field, value);
+  }
+
+  function handleClearableProductFieldBlur(id: string, field: ClearableProductField) {
+    const key = getClearableProductFieldKey(id, field);
+    const clearedField = clearedProductFieldsRef.current.get(key);
+    if (!clearedField) return;
+
+    clearedProductFieldsRef.current.delete(key);
+    if (!clearedField.edited) {
+      updateProductItem(id, field, clearedField.value);
+    }
   }
 
   function focusProductColumnItem(column: string, index: number) {
@@ -1906,8 +1948,10 @@ function FichaFormInner({
                     data-product-index={index}
                     id={`tamanho-${item.id}`}
                     inputMode="text"
+                    onBlur={() => handleClearableProductFieldBlur(item.id, "tamanho")}
+                    onFocus={() => handleClearableProductFieldFocus(item.id, "tamanho")}
                     onKeyDown={(event) => handleProductColumnTab(event, "tamanho", index)}
-                    onValueChange={(value) => updateProductItem(item.id, "tamanho", value)}
+                    onValueChange={(value) => handleClearableProductFieldChange(item.id, "tamanho", value)}
                     options={sizeOptions}
                     placeholder="Tam."
                     value={item.tamanho ?? ""}
@@ -1920,7 +1964,9 @@ function FichaFormInner({
                     data-product-column="quantidade"
                     data-product-index={index}
                     inputMode="numeric"
-                    onChange={(event) => updateProductItem(item.id, "quantidade", event.currentTarget.value)}
+                    onBlur={() => handleClearableProductFieldBlur(item.id, "quantidade")}
+                    onChange={(event) => handleClearableProductFieldChange(item.id, "quantidade", event.currentTarget.value)}
+                    onFocus={() => handleClearableProductFieldFocus(item.id, "quantidade")}
                     onKeyDown={(event) => handleProductColumnTab(event, "quantidade", index)}
                     placeholder="Qtd."
                     value={item.quantidade ?? ""}
@@ -1958,12 +2004,12 @@ function FichaFormInner({
                   <div className="products-editor__copy-stack">
                     <Tooltip label="Copiar acima">
                       <button aria-label={`Duplicar produto ${index + 1} acima`} onClick={() => duplicateProductItem(item.id, "above")} type="button">
-                        <Copy aria-hidden="true" size={14} />
+                        <ArrowUp aria-hidden="true" size={14} />
                       </button>
                     </Tooltip>
                     <Tooltip label="Copiar abaixo">
                       <button aria-label={`Duplicar produto ${index + 1} abaixo`} onClick={() => duplicateProductItem(item.id, "below")} type="button">
-                        <Copy aria-hidden="true" size={14} />
+                        <ArrowDown aria-hidden="true" size={14} />
                       </button>
                     </Tooltip>
                   </div>

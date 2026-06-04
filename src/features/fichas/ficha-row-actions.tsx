@@ -14,6 +14,7 @@ import {
   revertFichaToPendenteAction,
 } from "./actions";
 import type { FichaStatus } from "./data";
+import { FichaNameListBadge } from "./ficha-name-list-badge";
 import { getInitialFichaDeleteActionState, getInitialFichaStatusActionState } from "./form-state";
 import { PrintTriggerButton } from "./print-trigger-button";
 
@@ -118,6 +119,7 @@ export function FichaRowActions({
                 Organizar Lista de Nomes
               </FloatingMenuLink>
             ) : null}
+            {hasRawNameList ? <FichaNameListBadge appearance="menu-item" fichaId={fichaId} labelOverride="Ver lista bruta" tipo="bruta" /> : null}
             <NameListRemoveMenuItems
               fichaId={fichaId}
               hasOrganizedNameList={hasOrganizedNameList}
@@ -214,6 +216,7 @@ export function FichaRowActions({
               Organizar Lista de Nomes
             </FloatingMenuLink>
           ) : null}
+          {hasRawNameList ? <FichaNameListBadge appearance="menu-item" fichaId={fichaId} labelOverride="Ver lista bruta" tipo="bruta" /> : null}
           <NameListRemoveMenuItems
             fichaId={fichaId}
             hasOrganizedNameList={hasOrganizedNameList}

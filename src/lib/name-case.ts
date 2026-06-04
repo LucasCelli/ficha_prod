@@ -1,7 +1,8 @@
-export type NameCaseMode = "capitalized" | "lowercase" | "uppercase";
+export type NameCaseMode = "capitalized" | "lowercase" | "original" | "uppercase";
 
 export function transformNameCase(value: string | null | undefined, mode: NameCaseMode) {
   if (!value) return value ?? null;
+  if (mode === "original") return value;
 
   if (mode === "uppercase") return value.toLocaleUpperCase("pt-BR");
   if (mode === "lowercase") return value.toLocaleLowerCase("pt-BR");

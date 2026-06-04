@@ -8,7 +8,9 @@ import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list
 import { transformNameCase, type NameCaseMode } from "@/lib/name-case";
 
 type FichaNameListBadgeProps = {
+  appearance?: "badge" | "menu-item";
   fichaId: string;
+  labelOverride?: string;
   tipo: "bruta" | "organizada";
 };
 
@@ -332,13 +334,15 @@ function printNameList(input: Parameters<typeof buildNameListPrintHtml>[0]) {
   }, 50);
 }
 
-export function FichaNameListBadge({ fichaId, tipo }: FichaNameListBadgeProps) {
+export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverride, tipo }: FichaNameListBadgeProps) {
   const [activeCopyCell, setActiveCopyCell] = useState<ActiveCopyCell | null>(null);
   const [loadedList, setLoadedList] = useState<LoadedList | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [sizeSortDirection, setSizeSortDirection] = useState<SizeSortDirection | null>(null);
+  const [nameCaseMode, setNameCaseMode] = useState<NameCaseMode>("original");
   const tone = tipo === "organizada" ? "success" : "warning";
   const label = tipo === "organizada" ? "Lista organizada" : "Lista pendente";
+  const buttonLabel = labelOverride ?? label;
   const title = tipo === "organizada" ? "Lista organizada" : "Lista bruta";
   const displayTitle = loadedList ? `Lista - ${getFichaClientName(loadedList.ficha)}` : title;
   const contextLabel = loadedList ? getFichaContextLabel(loadedList.ficha.label) : "";
@@ -359,6 +363,14 @@ export function FichaNameListBadge({ fichaId, tipo }: FichaNameListBadgeProps) {
     if (!loadedList || !isOrganizedList(loadedList.lista)) return [];
     return sizeSortDirection ? [...loadedList.lista.items].sort((first, second) => compareBySize(first, second, sizeSortDirection)) : loadedList.lista.items;
   }, [loadedList, sizeSortDirection]);
+  const displayedOrganizedItems = useMemo(
+    () =>
+      organizedItems.map((item) => ({
+        ...item,
+        nome: nameCaseMode === "original" ? item.nome : transformNameCase(item.nome, nameCaseMode),
+      })),
+    [nameCaseMode, organizedItems],
+  );
 
   async function handleOpen() {
     setIsLoading(true);
@@ -373,6 +385,7 @@ export function FichaNameListBadge({ fichaId, tipo }: FichaNameListBadgeProps) {
 
       setActiveCopyCell(null);
       setSizeSortDirection(null);
+      setNameCaseMode("original");
       setLoadedList(payload);
     } catch (error) {
       toast.error("Nao foi possivel carregar lista", {
@@ -383,34 +396,23 @@ export function FichaNameListBadge({ fichaId, tipo }: FichaNameListBadgeProps) {
     }
   }
 
-  function transformLoadedNames(mode: NameCaseMode) {
-    setLoadedList((current) => {
-      if (!current || current.tipo !== "organizada" || !isOrganizedList(current.lista)) return current;
-
-      return {
-        ...current,
-        lista: {
-          ...current.lista,
-          items: current.lista.items.map((item) => ({
-            ...item,
-            nome: transformNameCase(item.nome, mode),
-          })),
-        },
-      };
-    });
-  }
-
   return (
     <>
       <button
-        aria-label={`Abrir ${label.toLowerCase()}`}
-        className={`ui-badge ui-badge--${tone} ficha-row__meta-badge ficha-name-list-badge`}
+        aria-label={`Abrir ${buttonLabel.toLowerCase()}`}
+        className={
+          appearance === "menu-item"
+            ? "floating-menu__item"
+            : `ui-badge ui-badge--${tone} ficha-row__meta-badge ficha-name-list-badge`
+        }
+        data-keep-floating-menu-open={appearance === "menu-item" ? "true" : undefined}
+        role={appearance === "menu-item" ? "menuitem" : undefined}
         disabled={isLoading}
         onClick={handleOpen}
         type="button"
       >
-        {isLoading ? <span className="button-spinner" aria-hidden="true" /> : <ClipboardList aria-hidden="true" size={13} />}
-        {isLoading ? "Carregando..." : label}
+        {isLoading ? <span className="button-spinner" aria-hidden="true" /> : <ClipboardList aria-hidden="true" size={appearance === "menu-item" ? 16 : 13} />}
+        {isLoading ? "Carregando..." : buttonLabel}
       </button>
 
       {loadedList ? (
@@ -424,14 +426,17 @@ export function FichaNameListBadge({ fichaId, tipo }: FichaNameListBadgeProps) {
               <div className="name-list-view-modal__actions">
                 {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
                   <div className="name-list-view-modal__case-actions" aria-label="Formatar nomes">
-                    <button className="ui-button ui-button--secondary" onClick={() => transformLoadedNames("capitalized")} type="button">
-                      Capitalizado
+                    <button className="ui-button ui-button--secondary" onClick={() => setNameCaseMode("capitalized")} type="button">
+                      Capitalizar
                     </button>
-                    <button className="ui-button ui-button--secondary" onClick={() => transformLoadedNames("uppercase")} type="button">
-                      Uppercase
+                    <button className="ui-button ui-button--secondary" onClick={() => setNameCaseMode("uppercase")} type="button">
+                      Maiúsculas
                     </button>
-                    <button className="ui-button ui-button--secondary" onClick={() => transformLoadedNames("lowercase")} type="button">
-                      Lowercase
+                    <button className="ui-button ui-button--secondary" onClick={() => setNameCaseMode("lowercase")} type="button">
+                      Minúsculas
+                    </button>
+                    <button className="ui-button ui-button--secondary" onClick={() => setNameCaseMode("original")} type="button">
+                      Original
                     </button>
                   </div>
                 ) : null}
@@ -439,7 +444,7 @@ export function FichaNameListBadge({ fichaId, tipo }: FichaNameListBadgeProps) {
                   className="ui-button ui-button--secondary name-list-view-modal__print"
                   onClick={() =>
                     printNameList({
-                      items: organizedItems,
+                      items: displayedOrganizedItems,
                       label: contextLabel,
                       rawText: typeof loadedList.lista === "string" ? loadedList.lista : "",
                       title: displayTitle,
@@ -457,7 +462,7 @@ export function FichaNameListBadge({ fichaId, tipo }: FichaNameListBadgeProps) {
             {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
               <div className="name-list-view-modal__table">
                 <DataTable caption="Lista organizada" className="name-list-view-modal__organized-table" columns={organizedColumns}>
-                  {organizedItems.map((item, index) => (
+                  {displayedOrganizedItems.map((item, index) => (
                     <OrganizedListRow
                       activeCopyCell={activeCopyCell}
                       item={item}
