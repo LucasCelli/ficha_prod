@@ -190,9 +190,41 @@ function normalizeProductForRule(value: string) {
     .trim();
 }
 
-function getSizeOrder(value: string) {
-  const normalized = value.trim().toUpperCase();
-  return SIZE_ORDER.get(normalized) ?? 1000;
+function getSizeSortParts(value: string) {
+  const normalized = value.trim().toUpperCase().replace(/\s+/g, "");
+  const explicitOrder = SIZE_ORDER.get(normalized);
+  const numericSize = /^\d+$/.test(normalized) ? Number(normalized) : null;
+
+  if (explicitOrder !== undefined) {
+    return {
+      order: explicitOrder,
+      section: 0,
+      text: normalized,
+    };
+  }
+
+  if (numericSize !== null) {
+    return {
+      order: numericSize,
+      section: 1,
+      text: normalized,
+    };
+  }
+
+  return {
+    order: 999,
+    section: 2,
+    text: normalized,
+  };
+}
+
+function compareProductSize(a: string, b: string) {
+  const left = getSizeSortParts(a);
+  const right = getSizeSortParts(b);
+
+  if (left.section !== right.section) return left.section - right.section;
+  if (left.order !== right.order) return left.order - right.order;
+  return left.text.localeCompare(right.text, "pt-BR", { sensitivity: "base" });
 }
 
 function normalizeProductSize(value: string) {
@@ -1499,7 +1531,7 @@ function FichaFormInner({
     const sortedItems = [...getValues("itens")].sort((a, b) => {
       const byModelBlock = Number(isBabyLookProduct(a.produto)) - Number(isBabyLookProduct(b.produto));
       if (byModelBlock !== 0) return byModelBlock;
-      const bySize = getSizeOrder(a.tamanho) - getSizeOrder(b.tamanho);
+      const bySize = compareProductSize(a.tamanho, b.tamanho);
       if (bySize !== 0) return bySize;
       return a.produto.localeCompare(b.produto, "pt-BR", { sensitivity: "base" });
     });

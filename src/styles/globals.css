@@ -3213,6 +3213,27 @@ html[data-theme="dark"] .relatorios-activity__cell--4 {
   flex: 0 0 auto;
 }
 
+.name-list-view-modal__actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.name-list-view-modal__case-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.name-list-view-modal__case-actions .ui-button {
+  min-height: 38px;
+  padding-inline: 12px;
+}
+
 .name-list-view-modal__table {
   overflow-x: auto;
 }

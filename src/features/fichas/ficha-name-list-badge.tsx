@@ -5,6 +5,7 @@ import { ClipboardList, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, Modal } from "@/components/ui";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
+import { transformNameCase, type NameCaseMode } from "@/lib/name-case";
 
 type FichaNameListBadgeProps = {
   fichaId: string;
@@ -382,6 +383,23 @@ export function FichaNameListBadge({ fichaId, tipo }: FichaNameListBadgeProps) {
     }
   }
 
+  function transformLoadedNames(mode: NameCaseMode) {
+    setLoadedList((current) => {
+      if (!current || current.tipo !== "organizada" || !isOrganizedList(current.lista)) return current;
+
+      return {
+        ...current,
+        lista: {
+          ...current.lista,
+          items: current.lista.items.map((item) => ({
+            ...item,
+            nome: transformNameCase(item.nome, mode),
+          })),
+        },
+      };
+    });
+  }
+
   return (
     <>
       <button
@@ -403,22 +421,37 @@ export function FichaNameListBadge({ fichaId, tipo }: FichaNameListBadgeProps) {
                 <span className="ui-badge ui-badge--info name-list-view-modal__context">{contextLabel}</span>
                 <h2>{displayTitle}</h2>
               </div>
-              <button
-                className="ui-button ui-button--secondary name-list-view-modal__print"
-                onClick={() =>
-                  printNameList({
-                    items: organizedItems,
-                    label: contextLabel,
-                    rawText: typeof loadedList.lista === "string" ? loadedList.lista : "",
-                    title: displayTitle,
-                    tipo: loadedList.tipo,
-                  })
-                }
-                type="button"
-              >
-                <Printer aria-hidden="true" size={17} />
-                Imprimir lista
-              </button>
+              <div className="name-list-view-modal__actions">
+                {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
+                  <div className="name-list-view-modal__case-actions" aria-label="Formatar nomes">
+                    <button className="ui-button ui-button--secondary" onClick={() => transformLoadedNames("capitalized")} type="button">
+                      Capitalizado
+                    </button>
+                    <button className="ui-button ui-button--secondary" onClick={() => transformLoadedNames("uppercase")} type="button">
+                      Uppercase
+                    </button>
+                    <button className="ui-button ui-button--secondary" onClick={() => transformLoadedNames("lowercase")} type="button">
+                      Lowercase
+                    </button>
+                  </div>
+                ) : null}
+                <button
+                  className="ui-button ui-button--secondary name-list-view-modal__print"
+                  onClick={() =>
+                    printNameList({
+                      items: organizedItems,
+                      label: contextLabel,
+                      rawText: typeof loadedList.lista === "string" ? loadedList.lista : "",
+                      title: displayTitle,
+                      tipo: loadedList.tipo,
+                    })
+                  }
+                  type="button"
+                >
+                  <Printer aria-hidden="true" size={17} />
+                  Imprimir lista
+                </button>
+              </div>
             </header>
 
             {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (

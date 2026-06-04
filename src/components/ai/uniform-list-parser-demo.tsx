@@ -7,6 +7,7 @@ import { Badge, Button, CustomDatalist, DataTable, type CustomDatalistOption } f
 import { AI_MODEL_OPTIONS } from "@/lib/ai/model-options";
 import { formatShortDateInput, getBusinessTodayInput } from "@/lib/dates";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
+import { transformNameCase, type NameCaseMode } from "@/lib/name-case";
 
 type ApiSuccess = {
   success: true;
@@ -393,6 +394,19 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
     );
   }
 
+  function transformResultNames(mode: NameCaseMode) {
+    setResult((current) =>
+      current
+        ? {
+            items: current.items.map((item) => ({
+              ...item,
+              nome: transformNameCase(item.nome, mode),
+            })),
+          }
+        : current,
+    );
+  }
+
   function updateModelItem(rowId: string, value: string) {
     if (!MODEL_OPTIONS.includes(value as (typeof MODEL_OPTIONS)[number])) return;
 
@@ -755,6 +769,15 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
               >
                 {isEditingResult ? <Check aria-hidden="true" size={17} /> : <Pencil aria-hidden="true" size={17} />}
                 {isEditingResult ? "Concluir" : "Editar"}
+              </Button>
+              <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={() => transformResultNames("capitalized")} type="button" variant="secondary">
+                Capitalizado
+              </Button>
+              <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={() => transformResultNames("uppercase")} type="button" variant="secondary">
+                Uppercase
+              </Button>
+              <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={() => transformResultNames("lowercase")} type="button" variant="secondary">
+                Lowercase
               </Button>
               <Button
                 aria-disabled={!hasItems || isExporting}
