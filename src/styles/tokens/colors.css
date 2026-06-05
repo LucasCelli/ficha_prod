@@ -44,7 +44,7 @@
   --color-overlay: rgba(0, 0, 0, 0.4);
 
   --print-product-black: #000000;
-  --print-product-white: #999999;
+  --print-product-white: #000000;
   --print-product-royal: #2f5da8;
   --print-product-navy: #1f3a63;
   --print-product-turquoise: #2d8c94;
@@ -130,7 +130,7 @@ html[data-theme="dark"] {
   --color-overlay: rgba(0, 0, 0, 0.65);
 
   --print-product-black: #000000;
-  --print-product-white: #999999;
+  --print-product-white: #000000;
   --print-product-royal: #2f5da8;
   --print-product-navy: #1f3a63;
   --print-product-turquoise: #2d8c94;
