@@ -8,7 +8,7 @@ import { hashSessionToken } from "./crypto";
 import type { AppSession, AppSessionUser } from "./types";
 
 export const APP_SESSION_COOKIE = "ficha_app_session";
-export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 10;
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 type SessionRow = {
   expires_at: string;
