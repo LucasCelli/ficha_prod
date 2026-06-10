@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ClipboardList, Printer } from "lucide-react";
+import { ClipboardList, FileSpreadsheet, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, Modal } from "@/components/ui";
+import { buildUniformNameNumberCsv } from "@/lib/ai/uniform-list-csv";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
+import { getBusinessTodayInput } from "@/lib/dates";
 import { transformNameCase, type NameCaseMode } from "@/lib/name-case";
 
 type FichaNameListBadgeProps = {
@@ -334,6 +336,24 @@ function printNameList(input: Parameters<typeof buildNameListPrintHtml>[0]) {
   }, 50);
 }
 
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportNameListCsv(items: UniformListItem[]) {
+  saveBlob(
+    new Blob([buildUniformNameNumberCsv(items)], {
+      type: "text/csv;charset=utf-8",
+    }),
+    `lista-uniformes-${getBusinessTodayInput()}.csv`,
+  );
+}
+
 export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverride, tipo }: FichaNameListBadgeProps) {
   const [activeCopyCell, setActiveCopyCell] = useState<ActiveCopyCell | null>(null);
   const [loadedList, setLoadedList] = useState<LoadedList | null>(null);
@@ -439,6 +459,16 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
                       Original
                     </button>
                   </div>
+                ) : null}
+                {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
+                  <button
+                    className="ui-button ui-button--secondary name-list-view-modal__csv"
+                    onClick={() => exportNameListCsv(displayedOrganizedItems)}
+                    type="button"
+                  >
+                    <FileSpreadsheet aria-hidden="true" size={17} />
+                    Exportar CSV
+                  </button>
                 ) : null}
                 <button
                   className="ui-button ui-button--secondary name-list-view-modal__print"

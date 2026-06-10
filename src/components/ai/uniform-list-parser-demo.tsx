@@ -5,6 +5,7 @@ import { Check, ClipboardList, FileSpreadsheet, Link2, Pencil, Search } from "lu
 import { toast } from "sonner";
 import { Badge, Button, CustomDatalist, DataTable, type CustomDatalistOption } from "@/components/ui";
 import { AI_MODEL_OPTIONS } from "@/lib/ai/model-options";
+import { buildUniformNameNumberCsv } from "@/lib/ai/uniform-list-csv";
 import { formatShortDateInput, getBusinessTodayInput } from "@/lib/dates";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
 import { transformNameCase, type NameCaseMode } from "@/lib/name-case";
@@ -153,6 +154,10 @@ function getExportRows(items: UniformListItem[]) {
 
 function getExportFilename() {
   return `lista-uniformes-${getBusinessTodayInput()}.xlsx`;
+}
+
+function getCsvExportFilename() {
+  return `lista-uniformes-${getBusinessTodayInput()}.csv`;
 }
 
 function saveBlob(blob: Blob, filename: string) {
@@ -665,6 +670,17 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
     }
   }
 
+  function handleExportCsv() {
+    if (!result?.items.length) return;
+
+    saveBlob(
+      new Blob([buildUniformNameNumberCsv(displayedSortedItems)], {
+        type: "text/csv;charset=utf-8",
+      }),
+      getCsvExportFilename(),
+    );
+  }
+
   return (
     <section className="ai-demo" aria-labelledby={`${textareaId}-title`}>
       <div className="ai-demo__workspace">
@@ -796,6 +812,10 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
               >
                 {isExporting ? <span className="button-spinner" aria-hidden="true" /> : <FileSpreadsheet aria-hidden="true" size={17} />}
                 Exportar para Excel
+              </Button>
+              <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={handleExportCsv} type="button" variant="secondary">
+                <FileSpreadsheet aria-hidden="true" size={17} />
+                Exportar CSV
               </Button>
             </div>
           </div>

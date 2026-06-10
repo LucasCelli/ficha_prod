@@ -1,5 +1,18 @@
 # Registro de alteracoes
 
+## 2026-06-10 - IA: exportacao CSV de nomes e numeros
+
+- Modulo: `/ferramentas/organizar-nomes-ia` e consulta de listas anexadas em `/fichas`.
+- Arquivos alterados:
+  - `src/lib/ai/uniform-list-csv.ts`
+  - `src/components/ai/uniform-list-parser-demo.tsx`
+  - `src/features/fichas/ficha-name-list-badge.tsx`
+  - `registro-alteracoes.md`
+- Resultado: listas organizadas ganharam exportacao `.csv` com duas colunas (`Nome,Número`), respeitando a ordenacao e a capitalizacao exibidas na tabela.
+- Resultado: o mesmo CSV tambem pode ser baixado pelo modal de lista organizada vinculada a ficha, alem da impressao ja existente.
+- Decisao: manter a exportacao client-side porque os dados ja estao carregados para revisao/consulta local; o helper compartilhado faz escape de CSV e inclui BOM para melhor leitura em planilhas.
+- Validacao: `cmd /c npm run typecheck`, `cmd /c npm run lint`, `cmd /c npm run build`, `cmd /c npm run supabase:check` e `git diff --check` passaram.
+
 ## 2026-05-27 - Quadro de producao: cards mais compactos
 
 - Modulo: `/quadro-producao`, Kanban operacional.
