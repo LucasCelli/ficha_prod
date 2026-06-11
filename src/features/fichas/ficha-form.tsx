@@ -49,6 +49,7 @@ import {
   type CustomDatalistOption,
 } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
+import { compareUniformSizeAndBabyLookText } from "@/lib/uniform-sizes";
 import {
   addDaysToInput,
   createUtcDateFromInput,
@@ -80,26 +81,6 @@ type FichaFormProps = {
   mode?: "create" | "edit";
   vendedorOptions?: CustomDatalistOption[];
 };
-
-const SIZE_ORDER = new Map(
-  [
-    ["RN"],
-    ["1"],
-    ["2"],
-    ["4"],
-    ["6"],
-    ["PP"],
-    ["P"],
-    ["M"],
-    ["G"],
-    ["GG"],
-    ["52"],
-    ["54"],
-    ["56"],
-    ["ESP1"],
-    ["ESP2"],
-  ].flatMap((sizes, index) => sizes.map((size) => [size, index] as const)),
-);
 
 type RichTextCommand = "bold" | "italic" | "underline" | "insertUnorderedList" | "insertOrderedList" | "removeFormat";
 type ClearableProductField = "quantidade" | "tamanho";
@@ -135,7 +116,45 @@ const FALLBACK_CATALOG_OPTIONS: CatalogOptionsByKind = {
   gola: ["Gola Redonda", "Gola V", "Gola Polo", "Gola Social", "Gola Padre com Zíper", "Gola Padre Esportiva", "Gola V Polo", "Gola Canoa"].map(createOption),
   manga: ["Curta", "Longa", "Curta e Longa", "Raglan Curta", "Raglan Longa", "3/4"].map(createOption),
   produto: [],
-  tamanho: ["PP", "P", "M", "G", "GG", "XG", "XGG", "EXG"].map(createOption),
+  tamanho: [
+    "RN",
+    "1",
+    "2",
+    "4",
+    "6",
+    "PP",
+    "16",
+    "P",
+    "M",
+    "G",
+    "GG",
+    "52",
+    "XG",
+    "G1",
+    "54",
+    "EG",
+    "G2",
+    "56",
+    "EGG",
+    "EXG",
+    "G3",
+    "XXG",
+    "XGG",
+    "58",
+    "EEGG",
+    "G4",
+    "60",
+    "EXGG",
+    "G5",
+    "ESP1",
+    "62",
+    "XLG",
+    "G6",
+    "ESP2",
+    "64",
+    "G7",
+    "ESP3",
+  ].map(createOption),
   tecido: MATERIAL_OPTIONS.map((option) => ({
     details: [option.composicao],
     label: option.nome,
@@ -192,50 +211,8 @@ function normalizeProductForRule(value: string) {
     .trim();
 }
 
-function getSizeSortParts(value: string) {
-  const normalized = value.trim().toUpperCase().replace(/\s+/g, "");
-  const explicitOrder = SIZE_ORDER.get(normalized);
-  const numericSize = /^\d+$/.test(normalized) ? Number(normalized) : null;
-
-  if (explicitOrder !== undefined) {
-    return {
-      order: explicitOrder,
-      section: 0,
-      text: normalized,
-    };
-  }
-
-  if (numericSize !== null) {
-    return {
-      order: numericSize,
-      section: 1,
-      text: normalized,
-    };
-  }
-
-  return {
-    order: 999,
-    section: 2,
-    text: normalized,
-  };
-}
-
-function compareProductSize(a: string, b: string) {
-  const left = getSizeSortParts(a);
-  const right = getSizeSortParts(b);
-
-  if (left.section !== right.section) return left.section - right.section;
-  if (left.order !== right.order) return left.order - right.order;
-  return left.text.localeCompare(right.text, "pt-BR", { sensitivity: "base" });
-}
-
 function normalizeProductSize(value: string) {
   return value.toLocaleUpperCase("pt-BR");
-}
-
-function isBabyLookProduct(value: string) {
-  const normalized = normalizeProductForRule(value).replace(/[\s_-]+/g, "");
-  return normalized.includes("babylook");
 }
 
 function getImageCardWidthFromGrid(gridWidth: number, count: number) {
@@ -1571,9 +1548,7 @@ function FichaFormInner({
 
   function sortProductItems() {
     const sortedItems = [...getValues("itens")].sort((a, b) => {
-      const byModelBlock = Number(isBabyLookProduct(a.produto)) - Number(isBabyLookProduct(b.produto));
-      if (byModelBlock !== 0) return byModelBlock;
-      const bySize = compareProductSize(a.tamanho, b.tamanho);
+      const bySize = compareUniformSizeAndBabyLookText(a, b);
       if (bySize !== 0) return bySize;
       return a.produto.localeCompare(b.produto, "pt-BR", { sensitivity: "base" });
     });

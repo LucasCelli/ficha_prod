@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { ClipboardList, FileSpreadsheet, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, Modal } from "@/components/ui";
-import { buildUniformNameNumberCsv } from "@/lib/ai/uniform-list-csv";
+import { buildUniformCorelCsv } from "@/lib/ai/uniform-list-csv";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
 import { getBusinessTodayInput } from "@/lib/dates";
 import { transformNameCase, type NameCaseMode } from "@/lib/name-case";
+import { compareUniformSizeAndModel } from "@/lib/uniform-sizes";
 
 type FichaNameListBadgeProps = {
   appearance?: "badge" | "menu-item";
@@ -52,26 +53,6 @@ type ActiveCopyCell = {
 };
 type SizeSortDirection = "ascending" | "descending";
 
-const SIZE_ORDER = new Map(
-  [
-    ["RN"],
-    ["1"],
-    ["2"],
-    ["4"],
-    ["6"],
-    ["PP"],
-    ["P"],
-    ["M"],
-    ["G"],
-    ["GG"],
-    ["52"],
-    ["54"],
-    ["56"],
-    ["ESP1"],
-    ["ESP2"],
-  ].flatMap((sizes, index) => sizes.map((size) => [size, index] as const)),
-);
-
 const baseOrganizedColumns = [
   { key: "nome", label: "Nome", width: "160px" },
   { key: "numero", label: "Numero", width: "104px" },
@@ -108,55 +89,9 @@ function formatConfidence(value: string) {
   return labels[value] ?? value;
 }
 
-function normalizeSize(value: string | null | undefined) {
-  return (value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "");
-}
-
-function getSizeSortParts(item: UniformListItem) {
-  const size = normalizeSize(item.tamanho);
-  const explicitOrder = SIZE_ORDER.get(size);
-  const numericSize = /^\d+$/.test(size) ? Number(size) : null;
-  const modelBlock = item.modelo === "baby_look" ? 1 : 0;
-
-  if (explicitOrder !== undefined) {
-    return {
-      modelBlock,
-      order: explicitOrder,
-      section: 0,
-      text: size,
-    };
-  }
-
-  if (numericSize !== null) {
-    return {
-      modelBlock,
-      order: numericSize,
-      section: 1,
-      text: size,
-    };
-  }
-
-  return {
-    modelBlock,
-    order: 999,
-    section: 2,
-    text: size,
-  };
-}
-
 function compareBySize(first: UniformListItem, second: UniformListItem, direction: SizeSortDirection) {
-  const firstParts = getSizeSortParts(first);
-  const secondParts = getSizeSortParts(second);
   const result =
-    firstParts.modelBlock - secondParts.modelBlock ||
-    firstParts.section - secondParts.section ||
-    firstParts.order - secondParts.order ||
-    firstParts.text.localeCompare(secondParts.text, "pt-BR", { numeric: true, sensitivity: "base" }) ||
+    compareUniformSizeAndModel(first, second) ||
     displayValue(first.nome).localeCompare(displayValue(second.nome), "pt-BR", { numeric: true, sensitivity: "base" });
 
   return direction === "ascending" ? result : -result;
@@ -347,7 +282,7 @@ function saveBlob(blob: Blob, filename: string) {
 
 function exportNameListCsv(items: UniformListItem[]) {
   saveBlob(
-    new Blob([buildUniformNameNumberCsv(items)], {
+    new Blob([buildUniformCorelCsv(items)], {
       type: "text/csv;charset=utf-8",
     }),
     `lista-uniformes-${getBusinessTodayInput()}.csv`,

@@ -5,10 +5,11 @@ import { Check, ClipboardList, FileSpreadsheet, Link2, Pencil, Search } from "lu
 import { toast } from "sonner";
 import { Badge, Button, CustomDatalist, DataTable, type CustomDatalistOption } from "@/components/ui";
 import { AI_MODEL_OPTIONS } from "@/lib/ai/model-options";
-import { buildUniformNameNumberCsv } from "@/lib/ai/uniform-list-csv";
+import { buildUniformCorelCsv } from "@/lib/ai/uniform-list-csv";
 import { formatShortDateInput, getBusinessTodayInput } from "@/lib/dates";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
 import { transformNameCase, type NameCaseMode } from "@/lib/name-case";
+import { compareUniformSizeAndModel } from "@/lib/uniform-sizes";
 
 type ApiSuccess = {
   success: true;
@@ -136,7 +137,11 @@ function getSortValue(item: UniformListItem, key: SortKey) {
 
 function sortItems<T extends UniformListItem>(items: T[], key: SortKey, direction: SortDirection) {
   return [...items].sort((first, second) => {
-    const result = sortCollator.compare(getSortValue(first, key), getSortValue(second, key));
+    const result =
+      key === "tamanho"
+        ? compareUniformSizeAndModel(first, second) ||
+          sortCollator.compare(displayValue(first.nome), displayValue(second.nome))
+        : sortCollator.compare(getSortValue(first, key), getSortValue(second, key));
     return direction === "ascending" ? result : -result;
   });
 }
@@ -674,7 +679,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
     if (!result?.items.length) return;
 
     saveBlob(
-      new Blob([buildUniformNameNumberCsv(displayedSortedItems)], {
+      new Blob([buildUniformCorelCsv(displayedSortedItems)], {
         type: "text/csv;charset=utf-8",
       }),
       getCsvExportFilename(),

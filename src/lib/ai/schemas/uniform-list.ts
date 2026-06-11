@@ -1,6 +1,38 @@
 import { z } from "zod";
 
-export const adultUniformSizes = ["PP", "P", "M", "G", "GG", "XG", "XXG", "XXXG", "XXXGG", "EXG", "G1", "G2", "G3", "G4"] as const;
+export const adultUniformSizes = [
+  "PP",
+  "P",
+  "M",
+  "G",
+  "GG",
+  "52",
+  "XG",
+  "G1",
+  "54",
+  "EG",
+  "G2",
+  "56",
+  "EGG",
+  "EXG",
+  "G3",
+  "XXG",
+  "XGG",
+  "58",
+  "EEGG",
+  "G4",
+  "60",
+  "EXGG",
+  "G5",
+  "ESP1",
+  "62",
+  "XLG",
+  "G6",
+  "ESP2",
+  "64",
+  "G7",
+  "ESP3",
+] as const;
 export const childUniformSizes = ["2", "4", "6", "8", "10", "12", "14", "16"] as const;
 
 export const UniformListItemSchema = z.object({

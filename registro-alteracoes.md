@@ -1,5 +1,24 @@
 # Registro de alteracoes
 
+## 2026-06-11 - IA/Fichas: equivalencia operacional de tamanhos
+
+- Modulo: listas organizadas por IA e itens de ficha.
+- Arquivos alterados:
+  - `src/lib/uniform-sizes.ts`
+  - `src/components/ai/uniform-list-parser-demo.tsx`
+  - `src/features/fichas/ficha-form.tsx`
+  - `src/features/fichas/ficha-name-list-badge.tsx`
+  - `src/lib/ai/prompts/uniform-list.ts`
+  - `src/lib/ai/schemas/uniform-list.ts`
+  - `registro-alteracoes.md`
+- Resultado: criada tabela compartilhada de equivalencia/ordenacao de tamanhos: `RN`; `1`; `2`; `4`; `6`; `PP/16`; `P`; `M`; `G`; `GG`; `52/XG/G1`; `54/EG/G2`; `56/EGG/EXG/G3/XXG/XGG`; `58/EEGG/G4`; `60/EXGG/G5/ESP1`; `62/XLG/G6/ESP2`; `64/G7/ESP3`.
+- Resultado: a ordenacao por tamanho no editor/criador de ficha, na tela de organizar nomes e no modal de lista organizada passa a usar a mesma tabela compartilhada.
+- Resultado: listas organizadas e itens do editor/criador de ficha agora ordenam primeiro a grade normal inteira e depois os itens `baby_look`/`BL`/`baby`/`baby look` seguindo a mesma sequencia de tamanhos.
+- Resultado: no editor/criador de ficha, a deteccao de baby look considera produto, detalhes do produto e tamanho, incluindo entradas como `BL PP` ou `baby p` no campo de tamanho.
+- Resultado: o prompt/schema informativo da IA passou a reconhecer os aliases novos como tamanhos aceitos, sem converter automaticamente o valor exibido/exportado.
+- Decisao: equivalencia afeta ordenacao operacional; a exibicao continua preservando o tamanho que veio da lista ou foi digitado.
+- Validacao: `cmd /c npm run typecheck`, `cmd /c npm run lint`, `cmd /c npm run build`, `cmd /c npm run supabase:check` e `git diff --check` passaram.
+
 ## 2026-06-10 - IA: exportacao CSV de nomes e numeros
 
 - Modulo: `/ferramentas/organizar-nomes-ia` e consulta de listas anexadas em `/fichas`.
@@ -8,9 +27,9 @@
   - `src/components/ai/uniform-list-parser-demo.tsx`
   - `src/features/fichas/ficha-name-list-badge.tsx`
   - `registro-alteracoes.md`
-- Resultado: listas organizadas ganharam exportacao `.csv` com duas colunas (`Nome,Número`), respeitando a ordenacao e a capitalizacao exibidas na tabela.
+- Resultado: listas organizadas ganharam exportacao `.csv` para importacao no Corel com quatro colunas (`tamanho;nome;numero;modelo`), respeitando a ordenacao e a capitalizacao exibidas na tabela.
 - Resultado: o mesmo CSV tambem pode ser baixado pelo modal de lista organizada vinculada a ficha, alem da impressao ja existente.
-- Decisao: manter a exportacao client-side porque os dados ja estao carregados para revisao/consulta local; o helper compartilhado faz escape de CSV e inclui BOM para melhor leitura em planilhas.
+- Decisao: manter a exportacao client-side porque os dados ja estao carregados para revisao/consulta local; o helper compartilhado usa `;`, faz escape de CSV e inclui BOM para melhor leitura em planilhas.
 - Validacao: `cmd /c npm run typecheck`, `cmd /c npm run lint`, `cmd /c npm run build`, `cmd /c npm run supabase:check` e `git diff --check` passaram.
 
 ## 2026-05-27 - Quadro de producao: cards mais compactos
