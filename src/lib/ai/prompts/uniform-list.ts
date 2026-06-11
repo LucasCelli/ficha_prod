@@ -30,12 +30,15 @@ Regras gerais:
 - Nao invente nome, numero ou tamanho.
 - Se um campo estiver ausente, use null.
 - Se houver duvida, use null e explique em observacao.
+- Marcadores de ausencia de nome nunca entram no campo nome: "sem nome", "sem nomes", "s/nome", "s/ nome", "sem identificação", "sem identificacao", "sem id", "sem nome:" e similares.
+- Quando um marcador de ausencia de nome aparecer sozinho como cabecalho ou antes de uma lista, ele cria uma secao sem nome: extraia as linhas seguintes como itens normalmente, mas deixe nome null ate aparecer outro cabecalho ou uma linha com nome claro.
+- Em uma secao sem nome, palavras antes do tamanho ou numero podem ser responsavel, professor(a), referencia ou anotacao, nao nome da camisa. Exemplo: depois de "SEM NOME:", linhas como "Prof° Daiane G" e "Arlene P" devem ter nome null, tamanhos "G" e "P".
 - Preserve nomes e apelidos exatamente como escritos.
 - Nao deduplique automaticamente.
 - Nao junte pessoas diferentes.
 - Nao remova item so porque parece duplicado.
 - Nao interprete cabecalhos como pessoa.
-- Ignore cabecalhos como "Lista camisa", "LISTA QUEM VAI FAZER CAMISA", "Nome/numero - tamanho" e similares.
+- Ignore cabecalhos como "Lista camisa", "LISTA QUEM VAI FAZER CAMISA", "Nome/numero - tamanho", "SEM NOME" e similares.
 - Uma linha nao deve gerar item se for apenas cabecalho, instrucao ou legenda.
 - Numeros com zero a esquerda devem ser preservados como string. Exemplo: "09" continua "09".
 - Normalize tamanho adulto para maiusculo: p, m e g viram P, M e G.
@@ -93,6 +96,8 @@ Exemplos:
 "Amanda babylook" => nome "Amanda", numero null, tamanho null, modelo "baby_look".
 "pedro infantil 10 aceito" => nome "pedro", numero null, tamanho "10", modelo "tradicional".
 "gabriel g. num 12 tam" => nome "gabriel g.", numero "12", tamanho null, modelo "tradicional".
+"SEM NOME:\nProf° Daiane G\nArlene P" => dois itens: nome null, tamanho "G"; nome null, tamanho "P".
+"S/NOME\n12 M\n09 GG" => dois itens: nome null, numero "12", tamanho "M"; nome null, numero "09", tamanho "GG".
 
 Nunca transforme:
 - "ellyvan" em "Ellyvan"

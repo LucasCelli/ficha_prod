@@ -1,5 +1,14 @@
 # Registro de alteracoes
 
+## 2026-06-11 - IA: marcador sem nome em listas
+
+- Modulo: listas organizadas por IA.
+- Arquivos alterados:
+  - `src/lib/ai/prompts/uniform-list.ts`
+  - `registro-alteracoes.md`
+- Resultado: o prompt passou a tratar marcadores como `SEM NOME`, `S/NOME`, `sem nomes` e similares como secao de itens sem nome, mantendo as linhas seguintes na tabela com `nome` vazio/null.
+- Cobertura: exemplos como `SEM NOME:\nProf° Daiane G\nArlene P` agora orientam a IA a extrair os tamanhos `G` e `P` sem preencher a coluna `Nome`.
+
 ## 2026-06-11 - IA/Fichas: equivalencia operacional de tamanhos
 
 - Modulo: listas organizadas por IA e itens de ficha.
