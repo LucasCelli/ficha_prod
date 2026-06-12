@@ -1,5 +1,16 @@
 # Registro de alteracoes
 
+## 2026-06-11 - Fichas: nome do CSV por cliente
+
+- Modulo: consulta de listas organizadas em `/fichas`.
+- Arquivos alterados:
+  - `src/lib/ai/uniform-list-csv.ts`
+  - `src/features/fichas/ficha-name-list-badge.tsx`
+  - `registro-alteracoes.md`
+- Resultado: o CSV baixado pelo modal de lista organizada vinculada a ficha passou a usar o cliente no nome do arquivo em snake_case, como `lista_nome_do_cliente.csv`.
+- Decisao: manter o conteudo do CSV inalterado e centralizar apenas a regra de nome de arquivo no helper compartilhado de exportacao.
+- Validacao: `cmd /c npm run typecheck`, `cmd /c npm run lint`, `cmd /c npm run build` e `cmd /c npm run supabase:check` passaram.
+
 ## 2026-06-11 - IA: marcador sem nome em listas
 
 - Modulo: listas organizadas por IA.

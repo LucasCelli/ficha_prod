@@ -25,6 +25,7 @@ import {
   ArrowRight,
   CalendarDays,
   Check,
+  CircleHelp,
   Eye,
   Filter,
   GripVertical,
@@ -1099,26 +1100,43 @@ const KanbanCard = memo(function KanbanCard({
       ref={ref}
     >
       <div className="quadro-producao-card__body">
-        <button
-          aria-label={`Abrir detalhes de ${card.clienteNome}`}
-          className="quadro-producao-card__title"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenView(card);
-          }}
-          onMouseDownCapture={stopCardDrag}
-          onMouseDown={stopCardDrag}
-          onPointerDownCapture={stopCardDrag}
-          onPointerDown={stopCardDrag}
-          type="button"
-        >
-          {card.evento ? (
-            <span aria-label="Pedido de evento" className="quadro-producao-card__event-chip" role="img">
-              <Star aria-hidden="true" size={12} />
-            </span>
+        <div className="quadro-producao-card__titlebar">
+          <button
+            aria-label={`Abrir detalhes de ${card.clienteNome}`}
+            className="quadro-producao-card__title"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenView(card);
+            }}
+            onMouseDownCapture={stopCardDrag}
+            onMouseDown={stopCardDrag}
+            onPointerDownCapture={stopCardDrag}
+            onPointerDown={stopCardDrag}
+            type="button"
+          >
+            {card.evento ? (
+              <span aria-label="Pedido de evento" className="quadro-producao-card__event-chip" role="img">
+                <Star aria-hidden="true" size={12} />
+              </span>
+            ) : null}
+            <span>{card.clienteNome}</span>
+          </button>
+          {card.clienteAuxiliar ? (
+            <Tooltip label={card.clienteAuxiliar}>
+              <button
+                aria-label={`Alias: ${card.clienteAuxiliar}`}
+                className="field-info-button"
+                onMouseDownCapture={stopCardDrag}
+                onMouseDown={stopCardDrag}
+                onPointerDownCapture={stopCardDrag}
+                onPointerDown={stopCardDrag}
+                type="button"
+              >
+                <CircleHelp aria-hidden="true" size={14} />
+              </button>
+            </Tooltip>
           ) : null}
-          <span>{card.clienteNome}</span>
-        </button>
+        </div>
 
         <div className="quadro-producao-card__meta">
           <span className="quadro-producao-card__chip">{normalizePersonalizacaoLabel(card.arte)}</span>

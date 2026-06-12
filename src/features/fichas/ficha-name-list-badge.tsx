@@ -4,9 +4,8 @@ import { useMemo, useState } from "react";
 import { ClipboardList, FileSpreadsheet, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, Modal } from "@/components/ui";
-import { buildUniformCorelCsv } from "@/lib/ai/uniform-list-csv";
+import { buildUniformCorelCsv, buildUniformCorelCsvFilename } from "@/lib/ai/uniform-list-csv";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
-import { getBusinessTodayInput } from "@/lib/dates";
 import { transformNameCase, type NameCaseMode } from "@/lib/name-case";
 import { compareUniformSizeAndModel } from "@/lib/uniform-sizes";
 
@@ -280,12 +279,12 @@ function saveBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function exportNameListCsv(items: UniformListItem[]) {
+function exportNameListCsv(items: UniformListItem[], clienteNome: string) {
   saveBlob(
     new Blob([buildUniformCorelCsv(items)], {
       type: "text/csv;charset=utf-8",
     }),
-    `lista-uniformes-${getBusinessTodayInput()}.csv`,
+    buildUniformCorelCsvFilename(clienteNome),
   );
 }
 
@@ -398,7 +397,7 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
                 {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
                   <button
                     className="ui-button ui-button--secondary name-list-view-modal__csv"
-                    onClick={() => exportNameListCsv(displayedOrganizedItems)}
+                    onClick={() => exportNameListCsv(displayedOrganizedItems, loadedList.ficha.clienteNome)}
                     type="button"
                   >
                     <FileSpreadsheet aria-hidden="true" size={17} />

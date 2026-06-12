@@ -14,7 +14,7 @@ type ClienteDeleteActionProps = {
   clienteNome: string;
   editHref?: string;
   returnTo: string;
-  variant?: "inline" | "header";
+  variant?: "inline" | "header" | "icon";
   viewFichasHref?: string;
 };
 
@@ -56,6 +56,17 @@ export function ClienteDeleteAction({
             Excluir cliente
           </button>
         </>
+      ) : variant === "icon" ? (
+        <Tooltip label="Excluir cliente">
+          <button
+            aria-label={`Excluir cliente ${clienteNome}`}
+            className="icon-action icon-action--danger"
+            onClick={() => setOpen(true)}
+            type="button"
+          >
+            <Trash2 aria-hidden="true" size={17} />
+          </button>
+        </Tooltip>
       ) : (
         <span className="cliente-row-actions">
           {viewFichasHref ? (

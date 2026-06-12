@@ -18,6 +18,7 @@ type InsumoStatus = Database["public"]["Enums"]["insumo_status"];
 type BoardFichaRow = Pick<
   Database["public"]["Tables"]["fichas"]["Row"],
   | "arte"
+  | "cliente_auxiliar"
   | "cliente_nome_snapshot"
   | "data_entrega"
   | "evento"
@@ -45,6 +46,7 @@ export type QuadroProducaoFilters = {
 
 export type KanbanCardSummary = {
   arte: string | null;
+  clienteAuxiliar: string | null;
   clienteNome: string;
   dataEntrega: string;
   evento: boolean;
@@ -126,6 +128,7 @@ function mapBoardCard(row: BoardFichaRow): KanbanCardSummary {
 
   return {
     arte: row.arte,
+    clienteAuxiliar: row.cliente_auxiliar,
     clienteNome: row.cliente_nome_snapshot,
     dataEntrega: row.data_entrega,
     evento: row.evento,
@@ -196,7 +199,7 @@ async function getOpenBoardCards() {
   const { data, error } = await supabase
     .from("fichas")
     .select(
-      "id, cliente_nome_snapshot, numero_venda, data_entrega, evento, arte, material, status, insumo_status, kanban_column_id, kanban_ordem, kanban_status, is_manual_card, vendedor, ficha_imagens(url,ordem)",
+      "id, cliente_nome_snapshot, cliente_auxiliar, numero_venda, data_entrega, evento, arte, material, status, insumo_status, kanban_column_id, kanban_ordem, kanban_status, is_manual_card, vendedor, ficha_imagens(url,ordem)",
     )
     .eq("status", "pendente")
     .order("kanban_ordem", { ascending: true });

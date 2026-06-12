@@ -3,7 +3,11 @@ import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 
+type SupabaseServerClient = ReturnType<typeof createServerSupabaseClient>;
+
 export type RelatorioPeriodo = "ano" | "customizado" | "mes" | "ultimo_mes";
+
+export type RelatorioGranularidade = "dia" | "mes" | "semana";
 
 export type RelatorioFilters = {
   dataFim?: string;
@@ -15,7 +19,7 @@ export type RelatorioFilters = {
 
 type FichaRow = Pick<
   Database["public"]["Tables"]["fichas"]["Row"],
-  "id" | "cliente_nome_snapshot" | "data_inicio" | "data_entrega" | "material" | "status" | "arte" | "vendedor" | "evento"
+  "id" | "cliente_nome_snapshot" | "data_inicio" | "data_entrega" | "delivered_at" | "material" | "status" | "arte" | "vendedor" | "evento"
 >;
 
 type FichaItemRow = Pick<Database["public"]["Tables"]["ficha_itens"]["Row"], "ficha_id" | "produto" | "quantidade" | "tamanho">;
@@ -44,33 +48,60 @@ export type RelatorioDetalhe = {
   vendedor: string;
 };
 
-export type RelatorioAtividade = {
-  count: number;
-  date: string;
-  level: number;
+export type RelatorioTrendPoint = {
+  bucket: string;
+  label: string;
+  criadas: number;
+  entregues: number;
+  pendentes: number;
+  itens: number;
+};
+
+export type RelatorioStatusFatia = {
+  status: Database["public"]["Enums"]["ficha_status"];
+  label: string;
+  value: number;
+  percent: number;
+};
+
+export type RelatorioComparativoTotais = {
+  clientes: number;
+  fichas: number;
+  itens: number;
+  taxaEntrega: number;
 };
 
 export type RelatorioData = {
-  atividade: RelatorioAtividade[];
   comparativo: {
     clientes: number;
     fichas: number;
     itens: number;
     taxaEntrega: number;
   };
+  comparativoAnterior: RelatorioComparativoTotais;
+  comparativoAtual: RelatorioComparativoTotais;
   detalhes: RelatorioDetalhe[];
+  eventos: {
+    avulsos: number;
+    eventos: number;
+  };
   filtros: RelatorioFilters;
+  granularidade: RelatorioGranularidade;
   periodoLabel: string;
   personalizacoes: RelatorioRankItem[];
   resumo: {
-    fichasEntregues: number;
-    fichasPendentes: number;
     entregasAnoAtual: number;
     entregasRecorteAnterior: number;
+    fichasCanceladas: number;
+    fichasEntregues: number;
+    fichasPendentes: number;
     itensConfeccionados: number;
+    itensPorFicha: number;
     novosClientes: number;
+    prazoMedioEntrega: number | null;
     taxaEntrega: number;
     totalFichas: number;
+    totalItens: number;
   };
   rankings: {
     clientes: RelatorioRankItem[];
@@ -79,6 +110,8 @@ export type RelatorioData = {
     tamanhos: RelatorioRankItem[];
     vendedores: RelatorioVendedor[];
   };
+  statusDistribuicao: RelatorioStatusFatia[];
+  tendencia: RelatorioTrendPoint[];
 };
 
 export type RelatorioResult =
@@ -97,6 +130,13 @@ export type RelatorioResult =
     };
 
 const MAX_ROWS = 1200;
+const ITENS_CHUNK_SIZE = 150;
+
+const STATUS_LABELS: Record<Database["public"]["Enums"]["ficha_status"], string> = {
+  cancelado: "Canceladas",
+  entregue: "Entregues",
+  pendente: "Pendentes",
+};
 
 export async function getRelatorioData(filters: RelatorioFilters): Promise<RelatorioResult> {
   if (!getSupabaseConfigStatus().hasServerConfig) {
@@ -109,37 +149,29 @@ export async function getRelatorioData(filters: RelatorioFilters): Promise<Relat
   try {
     const range = getPeriodRange(filters);
     const previousRange = getPreviousPeriodRange(range);
-    const activityRange = getActivityRange();
     const deliveryYearRange = getYearToDateRange();
     const supabase = createServerSupabaseClient();
 
-    const [
-      fichasResult,
-      clientesResult,
-      previousFichasResult,
-      previousClientesResult,
-      activityFichasResult,
-      deliveryYearResult,
-    ] = await Promise.all([
-      fetchFichas(range, filters),
-      supabase.from("clientes").select("primeira_ficha").gte("primeira_ficha", range.start).lte("primeira_ficha", range.end).limit(MAX_ROWS),
-      fetchFichas(previousRange, filters),
-      supabase
-        .from("clientes")
-        .select("primeira_ficha")
-        .gte("primeira_ficha", previousRange.start)
-        .lte("primeira_ficha", previousRange.end)
-        .limit(MAX_ROWS),
-      fetchFichas(activityRange),
-      fetchFichas(deliveryYearRange, filters),
-    ]);
+    const [fichasResult, clientesResult, previousFichasResult, previousClientesResult, deliveryYearResult] = await withRetry(() =>
+      Promise.all([
+        fetchFichas(supabase, range, filters),
+        supabase.from("clientes").select("primeira_ficha").gte("primeira_ficha", range.start).lte("primeira_ficha", range.end).limit(MAX_ROWS),
+        fetchFichas(supabase, previousRange, filters),
+        supabase
+          .from("clientes")
+          .select("primeira_ficha")
+          .gte("primeira_ficha", previousRange.start)
+          .lte("primeira_ficha", previousRange.end)
+          .limit(MAX_ROWS),
+        fetchFichas(supabase, deliveryYearRange, filters),
+      ]),
+    );
 
     const error =
       fichasResult.error ??
       clientesResult.error ??
       previousFichasResult.error ??
       previousClientesResult.error ??
-      activityFichasResult.error ??
       deliveryYearResult.error;
 
     if (error) {
@@ -152,8 +184,12 @@ export async function getRelatorioData(filters: RelatorioFilters): Promise<Relat
 
     const fichas = fichasResult.fichas;
     const previousFichas = previousFichasResult.fichas;
-    const itens = await fetchItens(fichas.map((ficha) => ficha.id));
-    const previousItens = await fetchItens(previousFichas.map((ficha) => ficha.id));
+    const [itens, previousItens] = await withRetry(() =>
+      Promise.all([
+        fetchItens(supabase, fichas.map((ficha) => ficha.id)),
+        fetchItens(supabase, previousFichas.map((ficha) => ficha.id)),
+      ]),
+    );
 
     if (itens.error ?? previousItens.error) {
       return {
@@ -176,8 +212,6 @@ export async function getRelatorioData(filters: RelatorioFilters): Promise<Relat
       previousFichas,
       previousItens: previousItens.itens,
       range,
-      activityFichas: activityFichasResult.fichas,
-      activityRange,
       deliveryYearFichas: deliveryYearResult.fichas,
     });
 
@@ -186,12 +220,35 @@ export async function getRelatorioData(filters: RelatorioFilters): Promise<Relat
       kind: "ok",
     };
   } catch (error) {
+    const raw = error instanceof Error ? error.message : "";
+    const isNetwork = /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|network/i.test(raw);
+
     return {
       data: null,
       kind: "error",
-      message: error instanceof Error ? error.message : "Falha ao carregar relatório.",
+      message: isNetwork
+        ? "Não foi possível conectar ao banco de dados. Verifique a conexão e tente novamente."
+        : raw || "Falha ao carregar relatório.",
     };
   }
+}
+
+// Reexecuta leituras idempotentes em caso de falha de rede transitória (ex.: "fetch failed" do undici).
+async function withRetry<T>(run: () => Promise<T>, attempts = 2): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 export function normalizeRelatorioPeriodo(value: string | string[] | undefined): RelatorioPeriodo {
@@ -229,10 +286,14 @@ export function buildRelatorioSearchParams(filters: RelatorioFilters) {
   return params;
 }
 
-async function fetchFichas(range: { end: string; start: string }, filters: Pick<RelatorioFilters, "evento" | "status"> = {}) {
-  let query = createServerSupabaseClient()
+async function fetchFichas(
+  supabase: SupabaseServerClient,
+  range: { end: string; start: string },
+  filters: Pick<RelatorioFilters, "evento" | "status"> = {},
+) {
+  let query = supabase
     .from("fichas")
-    .select("id, cliente_nome_snapshot, data_inicio, data_entrega, material, status, arte, vendedor, evento")
+    .select("id, cliente_nome_snapshot, data_inicio, data_entrega, delivered_at, material, status, arte, vendedor, evento")
     .gte("data_inicio", range.start)
     .lte("data_inicio", range.end)
     .order("data_inicio", { ascending: false })
@@ -254,29 +315,37 @@ async function fetchFichas(range: { end: string; start: string }, filters: Pick<
   };
 }
 
-async function fetchItens(fichaIds: string[]) {
+async function fetchItens(supabase: SupabaseServerClient, fichaIds: string[]) {
   if (fichaIds.length === 0) {
     return {
       error: null,
-      itens: [],
+      itens: [] as FichaItemRow[],
     };
   }
 
-  const { data, error } = await createServerSupabaseClient()
-    .from("ficha_itens")
-    .select("ficha_id, produto, quantidade, tamanho")
-    .in("ficha_id", fichaIds)
-    .limit(MAX_ROWS * 8);
+  // Fragmenta o filtro `in` para não gerar uma URL gigante (periodos longos com muitas fichas
+  // estouram o limite de tamanho da requisição e causam "fetch failed").
+  const chunks: string[][] = [];
+  for (let index = 0; index < fichaIds.length; index += ITENS_CHUNK_SIZE) {
+    chunks.push(fichaIds.slice(index, index + ITENS_CHUNK_SIZE));
+  }
+
+  const results = await Promise.all(
+    chunks.map((chunk) =>
+      supabase.from("ficha_itens").select("ficha_id, produto, quantidade, tamanho").in("ficha_id", chunk).limit(ITENS_CHUNK_SIZE * 12),
+    ),
+  );
+
+  const error = results.find((result) => result.error)?.error ?? null;
+  const itens = results.flatMap((result) => result.data ?? []);
 
   return {
     error,
-    itens: data ?? [],
+    itens,
   };
 }
 
 function buildRelatorioData(input: {
-  activityFichas: FichaRow[];
-  activityRange: { end: string; start: string };
   clientes: ClienteRow[];
   filters: RelatorioFilters;
   fichas: FichaRow[];
@@ -289,26 +358,43 @@ function buildRelatorioData(input: {
 }): RelatorioData {
   const itensPorFicha = groupItensByFicha(input.itens);
   const totalFichas = input.fichas.length;
+  const totalItens = sumItens(input.itens);
   const fichasEntregues = input.fichas.filter((ficha) => ficha.status === "entregue").length;
   const fichasPendentes = input.fichas.filter((ficha) => ficha.status === "pendente").length;
+  const fichasCanceladas = input.fichas.filter((ficha) => ficha.status === "cancelado").length;
   const itensConfeccionados = sumItensForFichas(
     input.itens,
     new Set(input.fichas.filter((ficha) => ficha.status === "entregue").map((ficha) => ficha.id)),
   );
   const taxaEntrega = getPercent(fichasEntregues, fichasEntregues + fichasPendentes);
+  const previousTaxaEntrega = getPercent(
+    input.previousFichas.filter((ficha) => ficha.status === "entregue").length,
+    input.previousFichas.filter((ficha) => ficha.status === "entregue" || ficha.status === "pendente").length,
+  );
   const vendedores = buildVendedores(input.fichas, itensPorFicha);
 
+  const comparativoAtual: RelatorioComparativoTotais = {
+    clientes: input.clientes.length,
+    fichas: totalFichas,
+    itens: totalItens,
+    taxaEntrega,
+  };
+  const comparativoAnterior: RelatorioComparativoTotais = {
+    clientes: input.previousClientes.length,
+    fichas: input.previousFichas.length,
+    itens: sumItens(input.previousItens),
+    taxaEntrega: previousTaxaEntrega,
+  };
+
   return {
-    atividade: buildActivity(input.activityFichas, input.activityRange),
     comparativo: {
-      clientes: input.clientes.length - input.previousClientes.length,
-      fichas: input.fichas.length - input.previousFichas.length,
-      itens: sumItens(input.itens) - sumItens(input.previousItens),
-      taxaEntrega: taxaEntrega - getPercent(
-        input.previousFichas.filter((ficha) => ficha.status === "entregue").length,
-        input.previousFichas.filter((ficha) => ficha.status === "entregue" || ficha.status === "pendente").length,
-      ),
+      clientes: comparativoAtual.clientes - comparativoAnterior.clientes,
+      fichas: comparativoAtual.fichas - comparativoAnterior.fichas,
+      itens: comparativoAtual.itens - comparativoAnterior.itens,
+      taxaEntrega: comparativoAtual.taxaEntrega - comparativoAnterior.taxaEntrega,
     },
+    comparativoAnterior,
+    comparativoAtual,
     detalhes: input.fichas.map((ficha) => ({
       cliente: ficha.cliente_nome_snapshot,
       data: ficha.data_inicio,
@@ -318,7 +404,12 @@ function buildRelatorioData(input: {
       status: ficha.status,
       vendedor: ficha.vendedor ?? "Sem vendedor",
     })),
+    eventos: {
+      avulsos: input.fichas.filter((ficha) => !ficha.evento).length,
+      eventos: input.fichas.filter((ficha) => ficha.evento).length,
+    },
     filtros: input.filters,
+    granularidade: getGranularidade(input.range),
     periodoLabel: formatPeriodLabel(input.filters.periodo, input.range),
     personalizacoes: buildRank(input.fichas, itensPorFicha, (ficha) => formatPersonalizacaoLabel(ficha.arte)),
     rankings: {
@@ -329,43 +420,78 @@ function buildRelatorioData(input: {
       vendedores,
     },
     resumo: {
-      fichasEntregues,
-      fichasPendentes,
       entregasAnoAtual: countDelivered(input.deliveryYearFichas),
       entregasRecorteAnterior: countDelivered(input.previousFichas),
+      fichasCanceladas,
+      fichasEntregues,
+      fichasPendentes,
       itensConfeccionados,
+      itensPorFicha: totalFichas > 0 ? Math.round((totalItens / totalFichas) * 10) / 10 : 0,
       novosClientes: input.clientes.length,
+      prazoMedioEntrega: getAverageLeadTime(input.fichas),
       taxaEntrega,
       totalFichas,
+      totalItens,
     },
+    statusDistribuicao: buildStatusDistribuicao(fichasEntregues, fichasPendentes, fichasCanceladas),
+    tendencia: buildTendencia(input.fichas, itensPorFicha, input.range),
   };
 }
 
-function buildActivity(fichas: FichaRow[], range: { end: string; start: string }): RelatorioAtividade[] {
-  const counts = new Map<string, number>();
+function buildStatusDistribuicao(entregues: number, pendentes: number, canceladas: number): RelatorioStatusFatia[] {
+  const total = entregues + pendentes + canceladas;
+
+  return (
+    [
+      { status: "entregue", value: entregues },
+      { status: "pendente", value: pendentes },
+      { status: "cancelado", value: canceladas },
+    ] as const
+  )
+    .filter((fatia) => fatia.value > 0)
+    .map((fatia) => ({
+      label: STATUS_LABELS[fatia.status],
+      percent: getPercent(fatia.value, total),
+      status: fatia.status,
+      value: fatia.value,
+    }));
+}
+
+function buildTendencia(
+  fichas: FichaRow[],
+  itensPorFicha: Map<string, FichaItemRow[]>,
+  range: { end: string; start: string },
+): RelatorioTrendPoint[] {
+  const granularidade = getGranularidade(range);
+  const buckets = new Map<string, RelatorioTrendPoint>();
+
+  for (const bucket of getBucketKeys(range, granularidade)) {
+    buckets.set(bucket, {
+      bucket,
+      criadas: 0,
+      entregues: 0,
+      itens: 0,
+      label: formatBucketLabel(bucket, granularidade),
+      pendentes: 0,
+    });
+  }
 
   for (const ficha of fichas) {
     if (!ficha.data_inicio) continue;
-    counts.set(ficha.data_inicio, (counts.get(ficha.data_inicio) ?? 0) + 1);
-  }
+    const key = getBucketKey(ficha.data_inicio, granularidade);
+    const point = buckets.get(key);
+    if (!point) continue;
 
-  const max = Math.max(...counts.values(), 1);
-  const days: RelatorioAtividade[] = [];
-  let cursor = range.start;
-
-  while (cursor <= range.end) {
-    if (isBusinessWeekday(cursor)) {
-      const count = counts.get(cursor) ?? 0;
-      days.push({
-        count,
-        date: cursor,
-        level: count === 0 ? 0 : Math.max(1, Math.ceil((count / max) * 4)),
-      });
+    point.criadas += 1;
+    point.itens += sumItens(itensPorFicha.get(ficha.id) ?? []);
+    if (ficha.status === "entregue") {
+      point.entregues += 1;
+    } else if (ficha.status === "pendente") {
+      point.pendentes += 1;
     }
-    cursor = addDays(cursor, 1);
   }
 
-  return days;
+  return Array.from(buckets.values());
 }
 
 function buildVendedores(fichas: FichaRow[], itensPorFicha: Map<string, FichaItemRow[]>): RelatorioVendedor[] {
@@ -387,7 +513,8 @@ function buildVendedores(fichas: FichaRow[], itensPorFicha: Map<string, FichaIte
       totalFichas: group.length,
       totalItens: sumItensForFichas(itensPorFicha, new Set(group.map((ficha) => ficha.id))),
     }))
-    .sort((a, b) => b.totalFichas - a.totalFichas || a.label.localeCompare(b.label, "pt-BR"));
+    .sort((a, b) => b.totalFichas - a.totalFichas || a.label.localeCompare(b.label, "pt-BR"))
+    .slice(0, 12);
 }
 
 function buildRank(fichas: FichaRow[], itensPorFicha: Map<string, FichaItemRow[]>, getLabel: (ficha: FichaRow) => string) {
@@ -492,6 +619,88 @@ function getPercent(value: number, total: number) {
   return total > 0 ? Math.round((value / total) * 100) : 0;
 }
 
+function getAverageLeadTime(fichas: FichaRow[]): number | null {
+  const prazos: number[] = [];
+
+  for (const ficha of fichas) {
+    if (ficha.status !== "entregue" || !ficha.data_inicio) continue;
+
+    const entrega = (ficha.delivered_at ?? ficha.data_entrega)?.slice(0, 10);
+    if (!entrega) continue;
+
+    const dias = Math.round((createUtcDateFromInput(entrega).getTime() - createUtcDateFromInput(ficha.data_inicio).getTime()) / 86_400_000);
+    if (Number.isFinite(dias) && dias >= 0) {
+      prazos.push(dias);
+    }
+  }
+
+  if (prazos.length === 0) {
+    return null;
+  }
+
+  return Math.round((prazos.reduce((sum, dias) => sum + dias, 0) / prazos.length) * 10) / 10;
+}
+
+function getGranularidade(range: { end: string; start: string }): RelatorioGranularidade {
+  const days = getRangeSpanDays(range);
+  if (days <= 62) return "dia";
+  if (days <= 215) return "semana";
+  return "mes";
+}
+
+function getBucketKeys(range: { end: string; start: string }, granularidade: RelatorioGranularidade): string[] {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  let cursor = getBucketKey(range.start, granularidade);
+  const lastKey = getBucketKey(range.end, granularidade);
+
+  // Garante terminação mesmo com intervalos atípicos.
+  for (let guard = 0; guard < 800; guard += 1) {
+    if (!seen.has(cursor)) {
+      seen.add(cursor);
+      keys.push(cursor);
+    }
+    if (cursor >= lastKey) break;
+    cursor = advanceBucket(cursor, granularidade);
+  }
+
+  return keys;
+}
+
+function getBucketKey(value: string, granularidade: RelatorioGranularidade) {
+  if (granularidade === "dia") return value;
+  if (granularidade === "semana") return startOfWeek(value);
+  return `${value.slice(0, 7)}-01`;
+}
+
+function advanceBucket(value: string, granularidade: RelatorioGranularidade) {
+  if (granularidade === "dia") return addDaysToInput(value, 1);
+  if (granularidade === "semana") return addDaysToInput(value, 7);
+
+  const date = createUtcDateFromInput(value);
+  return formatUtcDateInput(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)));
+}
+
+function formatBucketLabel(value: string, granularidade: RelatorioGranularidade) {
+  if (granularidade === "mes") {
+    const label = formatDateInput(value, { month: "short", year: "2-digit" }).replace(".", "");
+    return label.charAt(0).toLocaleUpperCase("pt-BR") + label.slice(1);
+  }
+
+  return formatDateInput(value, { day: "2-digit", month: "2-digit" });
+}
+
+function startOfWeek(value: string) {
+  const date = createUtcDateFromInput(value);
+  const day = date.getUTCDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  return addDaysToInput(value, mondayOffset);
+}
+
+function getRangeSpanDays(range: { end: string; start: string }) {
+  return Math.max(1, Math.round((createUtcDateFromInput(range.end).getTime() - createUtcDateFromInput(range.start).getTime()) / 86_400_000) + 1);
+}
+
 function getPeriodRange(filters: RelatorioFilters) {
   const today = getBusinessTodayInput();
   const current = createDateFromInput(today);
@@ -528,14 +737,6 @@ function getPreviousPeriodRange(range: { end: string; start: string }) {
   return {
     end: previousEnd,
     start: previousStart,
-  };
-}
-
-function getActivityRange() {
-  const today = getBusinessTodayInput();
-  return {
-    end: today,
-    start: addDays(today, -364),
   };
 }
 
@@ -576,11 +777,6 @@ function createDateFromInput(value: string) {
 
 function countDelivered(fichas: FichaRow[]) {
   return fichas.filter((ficha) => ficha.status === "entregue").length;
-}
-
-function isBusinessWeekday(value: string) {
-  const day = createDateFromInput(value).getUTCDay();
-  return day >= 1 && day <= 5;
 }
 
 function formatDate(value: string) {

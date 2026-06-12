@@ -8,10 +8,26 @@ export type ClienteListItem = Pick<
   "id" | "nome" | "email" | "telefone" | "primeira_ficha" | "ultima_ficha" | "total_fichas"
 >;
 
+export type ClienteSort = "recentes" | "antigos" | "mais_fichas" | "nome";
+export type ClienteAtividade = "ativos" | "inativos" | "sem_fichas";
+
 export type ClienteFilters = {
   page?: number;
   termo?: string;
+  sort?: ClienteSort;
+  atividade?: ClienteAtividade;
 };
+
+export type ClientesStats = {
+  total: number;
+  ativos: number;
+  novosMes: number;
+  semFichas: number;
+};
+
+export type ClientesStatsResult = { kind: "ok"; stats: ClientesStats } | { kind: "unavailable" };
+
+const CLIENTE_ATIVO_JANELA_DIAS = 90;
 
 export type ClientesListResult =
   | {
@@ -70,13 +86,21 @@ export async function listClientes(filters: ClienteFilters = {}): Promise<Client
     const supabase = createServerSupabaseClient();
     let query = supabase
       .from("clientes")
-      .select("id, nome, email, telefone, primeira_ficha, ultima_ficha, total_fichas", { count: "exact" })
-      .order("ultima_ficha", { ascending: false, nullsFirst: false })
-      .order("nome", { ascending: true })
-      .range(getOffset(filters.page, CLIENTES_PAGE_SIZE), getOffset(filters.page, CLIENTES_PAGE_SIZE) + CLIENTES_PAGE_SIZE - 1);
+      .select("id, nome, email, telefone, primeira_ficha, ultima_ficha, total_fichas", { count: "exact" });
+
+    query = applyClienteSort(query, filters.sort);
+    query = query.range(getOffset(filters.page, CLIENTES_PAGE_SIZE), getOffset(filters.page, CLIENTES_PAGE_SIZE) + CLIENTES_PAGE_SIZE - 1);
 
     if (filters.termo) {
       query = query.ilike("nome", `%${filters.termo}%`);
+    }
+
+    if (filters.atividade === "ativos") {
+      query = query.gte("ultima_ficha", getAtividadeCutoff());
+    } else if (filters.atividade === "inativos") {
+      query = query.lt("ultima_ficha", getAtividadeCutoff());
+    } else if (filters.atividade === "sem_fichas") {
+      query = query.eq("total_fichas", 0);
     }
 
     const { count, data, error } = await query;
@@ -163,9 +187,60 @@ export async function getClienteById(id: string): Promise<ClienteDetailResult> {
   }
 }
 
+export async function getClientesStats(): Promise<ClientesStatsResult> {
+  if (!getSupabaseConfigStatus().hasServerConfig) {
+    return { kind: "unavailable" };
+  }
+
+  try {
+    const supabase = createServerSupabaseClient();
+    const cutoff = getAtividadeCutoff();
+    const inicioMes = getInicioMes();
+
+    const [total, ativos, novosMes, semFichas] = await Promise.all([
+      supabase.from("clientes").select("id", { count: "exact", head: true }),
+      supabase.from("clientes").select("id", { count: "exact", head: true }).gte("ultima_ficha", cutoff),
+      supabase.from("clientes").select("id", { count: "exact", head: true }).gte("created_at", inicioMes),
+      supabase.from("clientes").select("id", { count: "exact", head: true }).eq("total_fichas", 0),
+    ]);
+
+    if (total.error) {
+      return { kind: "unavailable" };
+    }
+
+    return {
+      kind: "ok",
+      stats: {
+        total: total.count ?? 0,
+        ativos: ativos.count ?? 0,
+        novosMes: novosMes.count ?? 0,
+        semFichas: semFichas.count ?? 0,
+      },
+    };
+  } catch {
+    return { kind: "unavailable" };
+  }
+}
+
 export function normalizeClienteSearch(value: string | string[] | undefined) {
   const raw = Array.isArray(value) ? value[0] : value;
   return raw?.trim() || undefined;
+}
+
+export function normalizeClienteSort(value: string | string[] | undefined): ClienteSort | undefined {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw === "antigos" || raw === "mais_fichas" || raw === "nome") {
+    return raw;
+  }
+  return undefined;
+}
+
+export function normalizeClienteAtividade(value: string | string[] | undefined): ClienteAtividade | undefined {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw === "ativos" || raw === "inativos" || raw === "sem_fichas") {
+    return raw;
+  }
+  return undefined;
 }
 
 export function normalizeClientePage(value: string | string[] | undefined) {
@@ -176,4 +251,32 @@ export function normalizeClientePage(value: string | string[] | undefined) {
 
 function getOffset(page: number | undefined, pageSize: number) {
   return ((page ?? 1) - 1) * pageSize;
+}
+
+function applyClienteSort<T extends { order: (column: string, options: { ascending: boolean; nullsFirst?: boolean }) => T }>(
+  query: T,
+  sort: ClienteSort | undefined,
+): T {
+  switch (sort) {
+    case "antigos":
+      return query.order("primeira_ficha", { ascending: true, nullsFirst: false }).order("nome", { ascending: true });
+    case "mais_fichas":
+      return query.order("total_fichas", { ascending: false }).order("nome", { ascending: true });
+    case "nome":
+      return query.order("nome", { ascending: true });
+    case "recentes":
+    default:
+      return query.order("ultima_ficha", { ascending: false, nullsFirst: false }).order("nome", { ascending: true });
+  }
+}
+
+function getAtividadeCutoff() {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - CLIENTE_ATIVO_JANELA_DIAS);
+  return date.toISOString().slice(0, 10);
+}
+
+function getInicioMes() {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 }
