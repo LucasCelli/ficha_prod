@@ -55,7 +55,7 @@ Regras gerais:
 - Se uma linha tiver "Nome Numero Tamanho", extraia os tres campos.
 - Se houver marcador de numero, como n, nº, num, numero ou número, o valor seguinte tende a ser o numero da camisa.
 - Se houver marcador de tamanho, como tam, tm ou tamanho, o valor seguinte tende a ser o tamanho.
-- Se a ultima informacao da linha for RN, 1, 2, 4, 6, PP, 16, P, M, G, GG, 52, XG, G1, 54, EG, G2, 56, EGG, EXG, G3, XXG, XGG, 58, EEGG, G4, 60, EXGG, G5, ESP1, 62, XLG, G6, ESP2, 64, G7 ou ESP3, trate como tamanho.
+- Se a ultima informacao da linha for RN, 1, 2, 4, 6, 8, 10, 12, 14, 16, PP, P, M, G, GG, 52, XG, G1, 54, EG, G2, 56, EGG, EXG, G3, XXG, XGG, 58, EEGG, G4, 60, EXGG, G5, ESP1, 62, XLG, G6, ESP2, 64, G7 ou ESP3, trate como tamanho.
 - Se a ultima informacao da linha for 10, 12, 14 ou 16 e houver outro numero antes, trate o ultimo como tamanho infantil.
 - Tamanho infantil raramente e numero impar. Se aparecer idade seguida de numero par, como "miguel 9 anos 10", interprete 9 anos como idade e use "10" como numero e tamanho, pois a operacao normalmente arredonda idade para o tamanho par acima.
 - Em listas informais, PP, P, M, G, GG, XG, EG, EGG, EXG, XXG, XGG, EEGG, EXGG, XLG, G1, G2, G3, G4, G5, G6, G7, ESP1, ESP2 e ESP3 quase sempre indicam tamanho, principalmente quando nao aparecem logo apos o nome.
@@ -96,6 +96,9 @@ Exemplos:
 "Amanda babylook" => nome "Amanda", numero null, tamanho null, modelo "baby_look".
 "pedro infantil 10 aceito" => nome "pedro", numero null, tamanho "10", modelo "tradicional".
 "gabriel g. num 12 tam" => nome "gabriel g.", numero "12", tamanho null, modelo "tradicional".
+"Ana 8" => nome "Ana", numero null, tamanho "8", modelo "tradicional".
+"Marcos 52" => nome "Marcos", numero null, tamanho "52", modelo "tradicional".
+"Paulo 64" => nome "Paulo", numero null, tamanho "64", modelo "tradicional".
 "SEM NOME:\nProf° Daiane G\nArlene P" => dois itens: nome null, tamanho "G"; nome null, tamanho "P".
 "S/NOME\n12 M\n09 GG" => dois itens: nome null, numero "12", tamanho "M"; nome null, numero "09", tamanho "GG".
 

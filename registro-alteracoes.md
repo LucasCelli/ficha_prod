@@ -1,5 +1,6 @@
 # Registro de alteracoes
 
+<<<<<<< Updated upstream
 ## 2026-06-11 - Fichas: nome do CSV por cliente
 
 - Modulo: consulta de listas organizadas em `/fichas`.
@@ -10,6 +11,17 @@
 - Resultado: o CSV baixado pelo modal de lista organizada vinculada a ficha passou a usar o cliente no nome do arquivo em snake_case, como `lista_nome_do_cliente.csv`.
 - Decisao: manter o conteudo do CSV inalterado e centralizar apenas a regra de nome de arquivo no helper compartilhado de exportacao.
 - Validacao: `cmd /c npm run typecheck`, `cmd /c npm run lint`, `cmd /c npm run build` e `cmd /c npm run supabase:check` passaram.
+=======
+## 2026-06-19 - IA: reconhecimento completo de tamanhos infantis
+
+- Modulo: listas organizadas por IA.
+- Arquivos alterados:
+  - `src/lib/ai/prompts/uniform-list.ts`
+  - `src/lib/ai/schemas/uniform-list.ts`
+  - `registro-alteracoes.md`
+- Resultado: a regra que reconhece o tamanho no final da linha passou a cobrir toda a grade infantil: `RN`, `1`, `2`, `4`, `6`, `8`, `10`, `12`, `14` e `16`
+- Confirmacao: os tamanhos grandes `52`, `54`, `56`, `58`, `60`, `62` e `64` ja eram reconhecidos e foram mantidos; exemplos adicionais reforcam os extremos `52` e `64` no prompt.
+>>>>>>> Stashed changes
 
 ## 2026-06-11 - IA: marcador sem nome em listas
 

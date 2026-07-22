@@ -33,7 +33,7 @@ export const adultUniformSizes = [
   "G7",
   "ESP3",
 ] as const;
-export const childUniformSizes = ["2", "4", "6", "8", "10", "12", "14", "16"] as const;
+export const childUniformSizes = ["RN", "1", "2", "4", "6", "8", "10", "12", "14", "16"] as const;
 
 export const UniformListItemSchema = z.object({
   nome: z.string().nullable(),
