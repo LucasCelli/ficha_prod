@@ -54,6 +54,7 @@ type SizeSortDirection = "ascending" | "descending";
 
 const baseOrganizedColumns = [
   { key: "exportar", label: "", width: "54px", align: "center" as const },
+  { key: "grupo", label: "Grupo", width: "120px" },
   { key: "nome", label: "Nome", width: "160px" },
   { key: "numero", label: "Numero", width: "104px" },
   { key: "tamanho", label: "Tamanho", width: "116px" },
@@ -177,6 +178,7 @@ function buildNameListPrintHtml(input: {
           <thead>
             <tr>
               <th>Nome</th>
+              <th>Grupo</th>
               <th>Numero</th>
               <th>Tamanho</th>
               <th>Modelo</th>
@@ -190,6 +192,7 @@ function buildNameListPrintHtml(input: {
                 (item) => `
                   <tr>
                     <td>${escapeHtml(item.nome)}</td>
+                    <td>${escapeHtml(item.grupo)}</td>
                     <td>${escapeHtml(item.numero)}</td>
                     <td>${escapeHtml(item.tamanho)}</td>
                     <td>${escapeHtml(formatModel(item.modelo))}</td>
@@ -219,7 +222,7 @@ function buildNameListPrintHtml(input: {
           table { border-collapse: collapse; width: 100%; }
           th, td { border: 1px solid #d1d5db; padding: 6px 7px; text-align: left; vertical-align: top; }
           th { background: #f3f4f6; font-size: 10px; text-transform: uppercase; }
-          td:nth-child(2), td:nth-child(3), td:nth-child(5) { text-align: center; }
+          td:nth-child(3), td:nth-child(4), td:nth-child(6) { text-align: center; }
           pre { border: 1px solid #d1d5db; font-family: "Courier New", monospace; font-size: 12px; line-height: 1.45; margin: 0; padding: 10px; white-space: pre-wrap; word-break: break-word; }
         </style>
       </head>
@@ -280,12 +283,12 @@ function saveBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function exportNameListCsv(items: UniformListItem[], clienteNome: string) {
+function exportNameListCsv(items: UniformListItem[], clienteNome: string, grupo?: string | null) {
   saveBlob(
     new Blob([buildUniformCorelCsv(items)], {
       type: "text/csv;charset=utf-8",
     }),
-    buildUniformCorelCsvFilename(clienteNome),
+    buildUniformCorelCsvFilename(clienteNome, grupo),
   );
 }
 
@@ -326,6 +329,14 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
     [nameCaseMode, organizedItems],
   );
   const selectedCsvItems = displayedOrganizedItems.filter((_, index) => selectedCsvRows.has(organizedItems[index]));
+  const groupEntries = useMemo(() => {
+    const groups = new Map<string, UniformListItem[]>();
+    organizedItems.forEach((item) => {
+      const group = item.grupo?.trim() || "Sem grupo";
+      groups.set(group, [...(groups.get(group) ?? []), item]);
+    });
+    return Array.from(groups.entries());
+  }, [organizedItems]);
   const allRowsSelected = organizedItems.length > 0 && selectedCsvItems.length === organizedItems.length;
   const someRowsSelected = selectedCsvItems.length > 0 && !allRowsSelected;
   const organizedColumns = useMemo(
@@ -394,6 +405,27 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
     });
   }, []);
 
+  const toggleCsvGroup = useCallback((items: UniformListItem[]) => {
+    setSelectedCsvRows((current) => {
+      const next = new Set(current);
+      const groupSelected = items.every((item) => next.has(item));
+      items.forEach((item) => (groupSelected ? next.delete(item) : next.add(item)));
+      return next;
+    });
+  }, []);
+
+  function exportSelectedGroups() {
+    groupEntries.forEach(([group, sourceItems]) => {
+      const selectedSourceItems = sourceItems.filter((item) => selectedCsvRows.has(item));
+      if (selectedSourceItems.length === 0) return;
+      const exportedItems = selectedSourceItems.map((sourceItem) => {
+        const itemIndex = organizedItems.indexOf(sourceItem);
+        return displayedOrganizedItems[itemIndex];
+      });
+      exportNameListCsv(exportedItems, loadedList?.ficha.clienteNome ?? "cliente", group);
+    });
+  }
+
   return (
     <>
       <button
@@ -434,6 +466,29 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
                         <option value="lowercase">Minúsculas</option>
                       </select>
                     </label>
+                    {groupEntries.length > 0 ? (
+                      <div className="name-list-view-modal__groups" aria-label="Selecionar grupos para exportação">
+                        <span>Grupos</span>
+                        <div>
+                          {groupEntries.map(([group, items]) => (
+                            <label key={group}>
+                              <input
+                                checked={items.every((item) => selectedCsvRows.has(item))}
+                                onChange={() => toggleCsvGroup(items)}
+                                ref={(element) => {
+                                  if (element) {
+                                    const selectedCount = items.filter((item) => selectedCsvRows.has(item)).length;
+                                    element.indeterminate = selectedCount > 0 && selectedCount < items.length;
+                                  }
+                                }}
+                                type="checkbox"
+                              />
+                              {group} ({items.length})
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     {rawText ? (
                       <label className="name-list-view-modal__raw-toggle">
                         <input checked={showRawList} onChange={(event) => setShowRawList(event.target.checked)} type="checkbox" />
@@ -450,15 +505,28 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
                     </a>
                   ) : null}
                   {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
-                    <button
-                      className="ui-button ui-button--primary name-list-view-modal__csv"
-                      disabled={selectedCsvItems.length === 0}
-                      onClick={() => exportNameListCsv(selectedCsvItems, loadedList.ficha.clienteNome)}
-                      type="button"
-                    >
-                      <FileSpreadsheet aria-hidden="true" size={17} />
-                      Exportar {selectedCsvItems.length} para CSV
-                    </button>
+                    <>
+                      <button
+                        className="ui-button ui-button--primary name-list-view-modal__csv"
+                        disabled={selectedCsvItems.length === 0}
+                        onClick={() => exportNameListCsv(selectedCsvItems, loadedList.ficha.clienteNome)}
+                        type="button"
+                      >
+                        <FileSpreadsheet aria-hidden="true" size={17} />
+                        Exportar {selectedCsvItems.length} para CSV
+                      </button>
+                      {groupEntries.some(([group]) => group !== "Sem grupo") ? (
+                        <button
+                          className="ui-button ui-button--secondary"
+                          disabled={selectedCsvItems.length === 0}
+                          onClick={exportSelectedGroups}
+                          type="button"
+                        >
+                          <FileSpreadsheet aria-hidden="true" size={17} />
+                          Exportar separado por grupo
+                        </button>
+                      ) : null}
+                    </>
                   ) : null}
                   <button
                     className="ui-button ui-button--secondary name-list-view-modal__print"
@@ -537,6 +605,7 @@ const OrganizedListRow = memo(function OrganizedListRow({
       <td className="name-list-view-modal__csv-row">
         <input aria-label={`Incluir ${item.nome || "linha"} no CSV`} checked={csvSelected} onChange={() => onToggleCsvItem(sourceItem)} type="checkbox" />
       </td>
+      <td>{displayValue(item.grupo)}</td>
       <td
         className={[
           "ui-table__primary ai-demo__copy-td",

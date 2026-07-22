@@ -19,8 +19,9 @@ function formatCsvValue(value: string | null | undefined) {
   return /[";\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-export function buildUniformCorelCsvFilename(clienteNome: string | null | undefined) {
-  return `lista_${toSnakeCaseSegment(clienteNome)}.csv`;
+export function buildUniformCorelCsvFilename(clienteNome: string | null | undefined, grupo?: string | null) {
+  const groupSuffix = grupo?.trim() ? `_${toSnakeCaseSegment(grupo)}` : "";
+  return `lista_${toSnakeCaseSegment(clienteNome)}${groupSuffix}.csv`;
 }
 
 export function buildUniformCorelCsv(items: UniformListItem[]) {

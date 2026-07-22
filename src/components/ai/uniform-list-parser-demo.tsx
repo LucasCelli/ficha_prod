@@ -71,16 +71,17 @@ const MODEL_OPTIONS = ["tradicional", "baby_look", "infantil", "regata", "polo",
 const CONFIDENCE_OPTIONS = ["alta", "media", "baixa"] as const;
 
 type SortDirection = "ascending" | "descending";
-type SortKey = "confianca" | "modelo" | "nome" | "numero" | "observacao" | "tamanho";
+type SortKey = "confianca" | "grupo" | "modelo" | "nome" | "numero" | "observacao" | "tamanho";
 type EditableUniformListItem = UniformListItem & { rowId: string };
 type EditableUniformList = { items: EditableUniformListItem[] };
-type EditableTextField = "nome" | "numero" | "observacao" | "tamanho";
+type EditableTextField = "grupo" | "nome" | "numero" | "observacao" | "tamanho";
 type ActiveCopyCell = {
   field: "nome" | "numero";
   rowKey: string;
 };
 
 const baseColumns: Array<{ key: SortKey; label: string; width: string }> = [
+  { key: "grupo", label: "Grupo", width: "132px" },
   { key: "nome", label: "Nome", width: "160px" },
   { key: "numero", label: "Número", width: "104px" },
   { key: "tamanho", label: "Tamanho", width: "116px" },
@@ -125,6 +126,7 @@ function formatConfidence(value: string) {
 function getSortValue(item: UniformListItem, key: SortKey) {
   const values: Record<SortKey, string> = {
     confianca: formatConfidence(item.confianca),
+    grupo: displayValue(item.grupo),
     modelo: formatModel(item.modelo),
     nome: displayValue(item.nome),
     numero: displayValue(item.numero),
@@ -148,6 +150,7 @@ function sortItems<T extends UniformListItem>(items: T[], key: SortKey, directio
 
 function getExportRows(items: UniformListItem[]) {
   return items.map((item) => [
+    displayValue(item.grupo),
     displayValue(item.nome),
     displayValue(item.numero),
     displayValue(item.tamanho),
@@ -191,6 +194,7 @@ function stripEditableList(list: EditableUniformList): UniformList {
   return {
     items: list.items.map((item) => ({
       confianca: item.confianca,
+      grupo: item.grupo,
       modelo: item.modelo,
       nome: item.nome,
       numero: item.numero,
@@ -616,6 +620,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
       getExportRows(sortedItems).forEach((row) => sheet.addRow(row));
 
       sheet.columns = [
+        { width: 18 },
         { width: 24 },
         { width: 14 },
         { width: 14 },
@@ -623,7 +628,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
         { width: 14 },
         { width: 44 },
       ];
-      sheet.autoFilter = { from: "A1", to: "F1" };
+      sheet.autoFilter = { from: "A1", to: "G1" };
 
       sheet.getRow(1).eachCell((cell) => {
         cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -824,6 +829,14 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
                 if (isEditingResult) {
                   return (
                     <tr key={item.rowId}>
+                      <td>
+                        <input
+                          aria-label={`Grupo ${index + 1}`}
+                          className="ai-demo__cell-input"
+                          onChange={(event) => updateTextItem(item.rowId, "grupo", event.target.value)}
+                          value={item.grupo ?? ""}
+                        />
+                      </td>
                       <td className="ui-table__primary">
                         <input
                           aria-label={`Nome ${index + 1}`}
@@ -890,6 +903,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
 
                 return (
                   <tr key={item.rowId}>
+                    <td>{displayValue(item.grupo)}</td>
                     <td className="ui-table__primary ai-demo__copy-td">
                       <CopyCell
                         isActive={activeCopyCell?.rowKey === item.rowId && activeCopyCell.field === "nome"}

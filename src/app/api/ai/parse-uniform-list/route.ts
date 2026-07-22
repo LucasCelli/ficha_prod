@@ -21,7 +21,7 @@ const JSON_FALLBACK_SYSTEM_PROMPT = `${UNIFORM_LIST_SYSTEM_PROMPT}
 
 Retorne apenas JSON valido, sem markdown, sem comentario e sem texto antes ou depois.
 O JSON deve seguir exatamente este formato:
-{"items":[{"nome":null,"numero":null,"tamanho":null,"modelo":"tradicional","confianca":"alta","observacao":null}]}`.trim();
+{"items":[{"grupo":null,"nome":null,"numero":null,"tamanho":null,"modelo":"tradicional","confianca":"alta","observacao":null}]}`.trim();
 
 const RequestSchema = z.object({
   aiModel: z.string().optional(),
@@ -161,6 +161,7 @@ function splitUniformText(text: string, modelValue?: string) {
   const chunks: string[] = [];
   let current: string[] = [];
   let currentLength = 0;
+  let lastSectionHeader = "";
 
   for (const line of lines) {
     const nextLength = currentLength + line.length + 1;
@@ -168,12 +169,16 @@ function splitUniformText(text: string, modelValue?: string) {
 
     if (shouldFlush) {
       chunks.push(current.join("\n"));
-      current = [];
-      currentLength = 0;
+      current = lastSectionHeader ? [lastSectionHeader] : [];
+      currentLength = lastSectionHeader ? lastSectionHeader.length + 1 : 0;
     }
 
     current.push(line);
     currentLength += line.length + 1;
+
+    if (/^\s*[^:\r\n]{1,50}:\s*$/.test(line)) {
+      lastSectionHeader = line;
+    }
   }
 
   if (current.length > 0) {
