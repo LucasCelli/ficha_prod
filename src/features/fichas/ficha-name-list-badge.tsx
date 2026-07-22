@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ClipboardList, FileSpreadsheet, Printer } from "lucide-react";
+import { memo, useCallback, useMemo, useState } from "react";
+import { ClipboardList, FileSpreadsheet, Printer, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, Modal } from "@/components/ui";
 import { buildUniformCorelCsv, buildUniformCorelCsvFilename } from "@/lib/ai/uniform-list-csv";
@@ -53,7 +53,7 @@ type ActiveCopyCell = {
 type SizeSortDirection = "ascending" | "descending";
 
 const baseOrganizedColumns = [
-  { key: "exportar", label: "CSV", width: "54px", align: "center" as const },
+  { key: "exportar", label: "", width: "54px", align: "center" as const },
   { key: "nome", label: "Nome", width: "160px" },
   { key: "numero", label: "Numero", width: "104px" },
   { key: "tamanho", label: "Tamanho", width: "116px" },
@@ -296,7 +296,7 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
   const [sizeSortDirection, setSizeSortDirection] = useState<SizeSortDirection | null>(null);
   const [nameCaseMode, setNameCaseMode] = useState<NameCaseMode>("original");
   const [showRawList, setShowRawList] = useState(false);
-  const [selectedCsvRows, setSelectedCsvRows] = useState<UniformListItem[]>([]);
+  const [selectedCsvRows, setSelectedCsvRows] = useState<Set<UniformListItem>>(() => new Set());
   const tone = tipo === "organizada" ? "success" : "warning";
   const label = tipo === "organizada" ? "Lista organizada" : "Lista pendente";
   const buttonLabel = labelOverride ?? label;
@@ -313,19 +313,6 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
       ? loadedList.lista.items.length
       : rawText.split(/\r?\n/).filter((line) => line.trim()).length
     : 0;
-  const organizedColumns = useMemo(
-    () =>
-      baseOrganizedColumns.map((column) =>
-        column.key === "tamanho"
-          ? {
-              ...column,
-              onSort: () => setSizeSortDirection((current) => (current === "ascending" ? "descending" : "ascending")),
-              sortDirection: sizeSortDirection ?? undefined,
-            }
-          : column,
-      ),
-    [sizeSortDirection],
-  );
   const organizedItems = useMemo(() => {
     if (!loadedList || !isOrganizedList(loadedList.lista)) return [];
     return sizeSortDirection ? [...loadedList.lista.items].sort((first, second) => compareBySize(first, second, sizeSortDirection)) : loadedList.lista.items;
@@ -338,7 +325,39 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
       })),
     [nameCaseMode, organizedItems],
   );
-  const selectedCsvItems = displayedOrganizedItems.filter((_, index) => selectedCsvRows.includes(organizedItems[index]));
+  const selectedCsvItems = displayedOrganizedItems.filter((_, index) => selectedCsvRows.has(organizedItems[index]));
+  const allRowsSelected = organizedItems.length > 0 && selectedCsvItems.length === organizedItems.length;
+  const someRowsSelected = selectedCsvItems.length > 0 && !allRowsSelected;
+  const organizedColumns = useMemo(
+    () =>
+      baseOrganizedColumns.map((column) => {
+        if (column.key === "exportar") {
+          return {
+            ...column,
+            label: (
+              <input
+                aria-label={allRowsSelected ? "Desmarcar todos para o CSV" : "Marcar todos para o CSV"}
+                checked={allRowsSelected}
+                onChange={() => setSelectedCsvRows(allRowsSelected ? new Set() : new Set(organizedItems))}
+                ref={(element) => {
+                  if (element) element.indeterminate = someRowsSelected;
+                }}
+                type="checkbox"
+              />
+            ),
+          };
+        }
+
+        return column.key === "tamanho"
+          ? {
+              ...column,
+              onSort: () => setSizeSortDirection((current) => (current === "ascending" ? "descending" : "ascending")),
+              sortDirection: sizeSortDirection ?? undefined,
+            }
+          : column;
+      }),
+    [allRowsSelected, organizedItems, sizeSortDirection, someRowsSelected],
+  );
 
   async function handleOpen() {
     setIsLoading(true);
@@ -355,7 +374,7 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
       setSizeSortDirection(null);
       setNameCaseMode("original");
       setShowRawList(false);
-      setSelectedCsvRows(isOrganizedList(payload.lista) ? payload.lista.items : []);
+      setSelectedCsvRows(new Set(isOrganizedList(payload.lista) ? payload.lista.items : []));
       setLoadedList(payload);
     } catch (error) {
       toast.error("Nao foi possivel carregar lista", {
@@ -365,6 +384,15 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
       setIsLoading(false);
     }
   }
+
+  const toggleCsvItem = useCallback((item: UniformListItem) => {
+    setSelectedCsvRows((current) => {
+      const next = new Set(current);
+      if (next.has(item)) next.delete(item);
+      else next.add(item);
+      return next;
+    });
+  }, []);
 
   return (
     <>
@@ -396,54 +424,59 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
               </div>
               <div className="name-list-view-modal__actions">
                 {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
-                  <div className="name-list-view-modal__case-actions" aria-label="Formatar nomes">
-                    <button className="ui-button ui-button--secondary" onClick={() => setNameCaseMode("capitalized")} type="button">
-                      Capitalizar
-                    </button>
-                    <button className="ui-button ui-button--secondary" onClick={() => setNameCaseMode("uppercase")} type="button">
-                      Maiúsculas
-                    </button>
-                    <button className="ui-button ui-button--secondary" onClick={() => setNameCaseMode("lowercase")} type="button">
-                      Minúsculas
-                    </button>
-                    <button className="ui-button ui-button--secondary" onClick={() => setNameCaseMode("original")} type="button">
-                      Original
-                    </button>
+                  <div className="name-list-view-modal__controls">
+                    <label className="name-list-view-modal__format">
+                      <span>Formato dos nomes</span>
+                      <select onChange={(event) => setNameCaseMode(event.target.value as NameCaseMode)} value={nameCaseMode}>
+                        <option value="original">Original</option>
+                        <option value="capitalized">Capitalizar</option>
+                        <option value="uppercase">Maiúsculas</option>
+                        <option value="lowercase">Minúsculas</option>
+                      </select>
+                    </label>
+                    {rawText ? (
+                      <label className="name-list-view-modal__raw-toggle">
+                        <input checked={showRawList} onChange={(event) => setShowRawList(event.target.checked)} type="checkbox" />
+                        Comparar com a lista bruta
+                      </label>
+                    ) : null}
                   </div>
                 ) : null}
-                {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) && rawText ? (
-                  <label className="name-list-view-modal__raw-toggle">
-                    <input checked={showRawList} onChange={(event) => setShowRawList(event.target.checked)} type="checkbox" />
-                    Exibir lista bruta junto
-                  </label>
-                ) : null}
-                {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
+                <div className="name-list-view-modal__output-actions">
+                  {loadedList.tipo === "bruta" ? (
+                    <a className="ui-button ui-button--primary" href={`/ferramentas/organizar-nomes-ia?fichaId=${encodeURIComponent(fichaId)}`}>
+                      <WandSparkles aria-hidden="true" size={17} />
+                      Organizar com IA
+                    </a>
+                  ) : null}
+                  {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
+                    <button
+                      className="ui-button ui-button--primary name-list-view-modal__csv"
+                      disabled={selectedCsvItems.length === 0}
+                      onClick={() => exportNameListCsv(selectedCsvItems, loadedList.ficha.clienteNome)}
+                      type="button"
+                    >
+                      <FileSpreadsheet aria-hidden="true" size={17} />
+                      Exportar {selectedCsvItems.length} para CSV
+                    </button>
+                  ) : null}
                   <button
-                    className="ui-button ui-button--secondary name-list-view-modal__csv"
-                    disabled={selectedCsvItems.length === 0}
-                    onClick={() => exportNameListCsv(selectedCsvItems, loadedList.ficha.clienteNome)}
+                    className="ui-button ui-button--secondary name-list-view-modal__print"
+                    onClick={() =>
+                      printNameList({
+                        items: displayedOrganizedItems,
+                        label: contextLabel,
+                        rawText: typeof loadedList.lista === "string" ? loadedList.lista : "",
+                        title: displayTitle,
+                        tipo: loadedList.tipo,
+                      })
+                    }
                     type="button"
                   >
-                    <FileSpreadsheet aria-hidden="true" size={17} />
-                    Exportar CSV
+                    <Printer aria-hidden="true" size={17} />
+                    Imprimir
                   </button>
-                ) : null}
-                <button
-                  className="ui-button ui-button--secondary name-list-view-modal__print"
-                  onClick={() =>
-                    printNameList({
-                      items: displayedOrganizedItems,
-                      label: contextLabel,
-                      rawText: typeof loadedList.lista === "string" ? loadedList.lista : "",
-                      title: displayTitle,
-                      tipo: loadedList.tipo,
-                    })
-                  }
-                  type="button"
-                >
-                  <Printer aria-hidden="true" size={17} />
-                  Imprimir lista
-                </button>
+                </div>
               </div>
             </header>
 
@@ -453,18 +486,13 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
                   <DataTable caption="Lista organizada" className="name-list-view-modal__organized-table" columns={organizedColumns}>
                     {displayedOrganizedItems.map((item, index) => (
                       <OrganizedListRow
-                        activeCopyCell={activeCopyCell}
-                        csvSelected={selectedCsvRows.includes(organizedItems[index])}
+                        activeCopyField={activeCopyCell?.rowKey === `${item.nome ?? "nome"}-${item.numero ?? "numero"}-${index}` ? activeCopyCell.field : null}
+                        csvSelected={selectedCsvRows.has(organizedItems[index])}
                         item={item}
                         key={`${item.nome ?? "nome"}-${item.numero ?? "numero"}-${index}`}
                         rowKey={`${item.nome ?? "nome"}-${item.numero ?? "numero"}-${index}`}
-                        onToggleCsv={() =>
-                          setSelectedCsvRows((current) =>
-                            current.includes(organizedItems[index])
-                              ? current.filter((selectedItem) => selectedItem !== organizedItems[index])
-                              : [...current, organizedItems[index]],
-                          )
-                        }
+                        onToggleCsvItem={toggleCsvItem}
+                        sourceItem={organizedItems[index]}
                         setActiveCopyCell={setActiveCopyCell}
                       />
                     ))}
@@ -487,36 +515,38 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
   );
 }
 
-function OrganizedListRow({
-  activeCopyCell,
+const OrganizedListRow = memo(function OrganizedListRow({
+  activeCopyField,
   csvSelected,
   item,
-  onToggleCsv,
+  onToggleCsvItem,
   rowKey,
   setActiveCopyCell,
+  sourceItem,
 }: {
-  activeCopyCell: ActiveCopyCell | null;
+  activeCopyField: ActiveCopyCell["field"] | null;
   csvSelected: boolean;
   item: UniformListItem;
-  onToggleCsv: () => void;
+  onToggleCsvItem: (item: UniformListItem) => void;
   rowKey: string;
   setActiveCopyCell: (value: ActiveCopyCell) => void;
+  sourceItem: UniformListItem;
 }) {
   return (
     <tr>
       <td className="name-list-view-modal__csv-row">
-        <input aria-label={`Incluir ${item.nome || "linha"} no CSV`} checked={csvSelected} onChange={onToggleCsv} type="checkbox" />
+        <input aria-label={`Incluir ${item.nome || "linha"} no CSV`} checked={csvSelected} onChange={() => onToggleCsvItem(sourceItem)} type="checkbox" />
       </td>
       <td
         className={[
           "ui-table__primary ai-demo__copy-td",
-          activeCopyCell?.rowKey === rowKey && activeCopyCell.field === "nome" ? "ai-demo__copy-td--active" : null,
+          activeCopyField === "nome" ? "ai-demo__copy-td--active" : null,
         ]
           .filter(Boolean)
           .join(" ")}
       >
         <CopyCell
-          isActive={activeCopyCell?.rowKey === rowKey && activeCopyCell.field === "nome"}
+          isActive={activeCopyField === "nome"}
           label="Nome"
           onActivate={() => setActiveCopyCell({ field: "nome", rowKey })}
           value={item.nome}
@@ -525,13 +555,13 @@ function OrganizedListRow({
       <td
         className={[
           "ai-demo__copy-td",
-          activeCopyCell?.rowKey === rowKey && activeCopyCell.field === "numero" ? "ai-demo__copy-td--active" : null,
+          activeCopyField === "numero" ? "ai-demo__copy-td--active" : null,
         ]
           .filter(Boolean)
           .join(" ")}
       >
         <CopyCell
-          isActive={activeCopyCell?.rowKey === rowKey && activeCopyCell.field === "numero"}
+          isActive={activeCopyField === "numero"}
           label="Numero"
           onActivate={() => setActiveCopyCell({ field: "numero", rowKey })}
           value={item.numero}
@@ -545,4 +575,4 @@ function OrganizedListRow({
       <td>{displayValue(item.observacao)}</td>
     </tr>
   );
-}
+});

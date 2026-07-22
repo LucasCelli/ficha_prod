@@ -3312,16 +3312,18 @@ html[data-theme="dark"] .auth-card-brand {
 
 .name-list-view-modal {
   display: grid;
-  gap: 18px;
+  gap: 20px;
   padding: 24px 28px 28px;
 }
 
 .name-list-view-modal__header {
-  display: flex;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 2fr);
+  gap: 24px;
   align-items: start;
-  justify-content: space-between;
   padding-inline-end: 34px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .name-list-view-modal__header span {
@@ -3346,24 +3348,40 @@ html[data-theme="dark"] .auth-card-brand {
 }
 
 .name-list-view-modal__actions {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.name-list-view-modal__controls,
+.name-list-view-modal__output-actions {
   display: flex;
   min-width: 0;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  align-items: end;
+  gap: 10px;
 }
 
-.name-list-view-modal__case-actions {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
+.name-list-view-modal__format {
+  display: grid;
+  gap: 5px;
 }
 
-.name-list-view-modal__case-actions .ui-button {
-  min-height: 38px;
-  padding-inline: 12px;
+.name-list-view-modal__format span {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.name-list-view-modal__format select {
+  min-width: 180px;
+  min-height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 0 34px 0 11px;
 }
 
 .name-list-view-modal__table {
@@ -3380,6 +3398,10 @@ html[data-theme="dark"] .auth-card-brand {
   align-items: center;
   gap: 5px;
   font-size: 0.8125rem;
+  min-height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding-inline: 11px;
 }
 
 .name-list-view-modal__comparison {
@@ -3395,9 +3417,26 @@ html[data-theme="dark"] .auth-card-brand {
 }
 
 @media (max-width: 900px) {
+  .name-list-view-modal__header {
+    grid-template-columns: 1fr;
+  }
+
+  .name-list-view-modal__controls,
+  .name-list-view-modal__output-actions {
+    justify-content: flex-start;
+  }
+
   .name-list-view-modal__comparison {
     grid-template-columns: 1fr;
   }
+}
+
+.name-list-view-modal__csv-row input,
+.name-list-view-modal__organized-table th:first-child input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
 }
 
 .name-list-view-modal__organized-table th:nth-child(3),

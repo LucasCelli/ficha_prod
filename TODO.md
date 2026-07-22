@@ -17,6 +17,8 @@ Backlog vivo para features, refinos e decisoes futuras. Itens concluidos devem s
 - [x] Mostrar a quantidade de itens nas listas de nomes.
 - [x] Adicionar uma exibicao dupla para comparar a lista bruta e a lista organizada.
 - [x] Permitir exibir opcionalmente o conteudo bruto junto da lista organizada.
+- [x] Simplificar o modal de listas, permitir selecionar todas as linhas no cabecalho e abrir o organizador a partir da lista bruta.
+- [x] Otimizar selecao e renderizacao das listas grandes, evitando buscas lineares e rerender de todas as linhas.
 
 ## IA
 

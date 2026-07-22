@@ -2,7 +2,7 @@ import type { ReactNode, RefObject } from "react";
 
 type DataTableColumn = {
   key: string;
-  label: string;
+  label: ReactNode;
   width?: string;
   align?: "left" | "center" | "right";
   onSort?: () => void;
