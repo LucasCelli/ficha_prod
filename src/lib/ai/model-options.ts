@@ -13,6 +13,24 @@ export const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";
 
 export const AI_MODEL_OPTIONS = [
   {
+    label: "Gemini - 2.5 Flash",
+    model: GEMINI_DEFAULT_MODEL,
+    provider: "gemini",
+    value: "gemini:gemini-2.5-flash",
+  },
+  {
+    label: "Gemini - 2.5 Flash-Lite",
+    model: "gemini-2.5-flash-lite",
+    provider: "gemini",
+    value: "gemini:gemini-2.5-flash-lite",
+  },
+  {
+    label: "Gemini - 2.5 Pro",
+    model: "gemini-2.5-pro",
+    provider: "gemini",
+    value: "gemini:gemini-2.5-pro",
+  },
+  {
     label: "Groq - GPT-OSS 120B",
     model: GROQ_DEFAULT_MODEL,
     provider: "groq",
@@ -42,25 +60,14 @@ export const AI_MODEL_OPTIONS = [
     provider: "openrouter",
     value: "openrouter:qwen/qwen-2.5-72b-instruct",
   },
-  {
-    label: "Gemini - 2.5 Flash",
-    model: GEMINI_DEFAULT_MODEL,
-    provider: "gemini",
-    value: "gemini:gemini-2.5-flash",
-  },
-  {
-    label: "Gemini - 2.5 Flash-Lite",
-    model: "gemini-2.5-flash-lite",
-    provider: "gemini",
-    value: "gemini:gemini-2.5-flash-lite",
-  },
-  {
-    label: "Gemini - 2.5 Pro",
-    model: "gemini-2.5-pro",
-    provider: "gemini",
-    value: "gemini:gemini-2.5-pro",
-  },
 ] as const satisfies readonly AiModelOption[];
+
+export function getAiModelFallbackOptions(preferredValue?: unknown) {
+  const preferred = findAiModelOption(preferredValue);
+  return preferred
+    ? [preferred, ...AI_MODEL_OPTIONS.filter((option) => option.value !== preferred.value)]
+    : [...AI_MODEL_OPTIONS];
+}
 
 export type AiModelOptionValue = (typeof AI_MODEL_OPTIONS)[number]["value"];
 

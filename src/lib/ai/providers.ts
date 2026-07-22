@@ -6,7 +6,7 @@ export const AI_PROVIDERS = ["groq", "openrouter", "gemini"] as const;
 
 export type AiProvider = (typeof AI_PROVIDERS)[number];
 
-export const DEFAULT_AI_PROVIDER: AiProvider = "groq";
+export const DEFAULT_AI_PROVIDER: AiProvider = "gemini";
 
 export function getAiProvider(): AiProvider {
   const provider = process.env.AI_PROVIDER?.trim().toLowerCase();

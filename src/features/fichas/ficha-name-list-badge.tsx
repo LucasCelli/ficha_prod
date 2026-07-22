@@ -53,6 +53,7 @@ type ActiveCopyCell = {
 type SizeSortDirection = "ascending" | "descending";
 
 const baseOrganizedColumns = [
+  { key: "exportar", label: "CSV", width: "54px", align: "center" as const },
   { key: "nome", label: "Nome", width: "160px" },
   { key: "numero", label: "Numero", width: "104px" },
   { key: "tamanho", label: "Tamanho", width: "116px" },
@@ -294,12 +295,24 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
   const [isLoading, setIsLoading] = useState(false);
   const [sizeSortDirection, setSizeSortDirection] = useState<SizeSortDirection | null>(null);
   const [nameCaseMode, setNameCaseMode] = useState<NameCaseMode>("original");
+  const [showRawList, setShowRawList] = useState(false);
+  const [selectedCsvRows, setSelectedCsvRows] = useState<UniformListItem[]>([]);
   const tone = tipo === "organizada" ? "success" : "warning";
   const label = tipo === "organizada" ? "Lista organizada" : "Lista pendente";
   const buttonLabel = labelOverride ?? label;
   const title = tipo === "organizada" ? "Lista organizada" : "Lista bruta";
   const displayTitle = loadedList ? `Lista - ${getFichaClientName(loadedList.ficha)}` : title;
   const contextLabel = loadedList ? getFichaContextLabel(loadedList.ficha.label) : "";
+  const rawText = loadedList
+    ? typeof loadedList.lista === "string"
+      ? loadedList.lista
+      : loadedList.lista.sourceText?.trim() ?? ""
+    : "";
+  const itemCount = loadedList
+    ? isOrganizedList(loadedList.lista)
+      ? loadedList.lista.items.length
+      : rawText.split(/\r?\n/).filter((line) => line.trim()).length
+    : 0;
   const organizedColumns = useMemo(
     () =>
       baseOrganizedColumns.map((column) =>
@@ -325,6 +338,7 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
       })),
     [nameCaseMode, organizedItems],
   );
+  const selectedCsvItems = displayedOrganizedItems.filter((_, index) => selectedCsvRows.includes(organizedItems[index]));
 
   async function handleOpen() {
     setIsLoading(true);
@@ -340,6 +354,8 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
       setActiveCopyCell(null);
       setSizeSortDirection(null);
       setNameCaseMode("original");
+      setShowRawList(false);
+      setSelectedCsvRows(isOrganizedList(payload.lista) ? payload.lista.items : []);
       setLoadedList(payload);
     } catch (error) {
       toast.error("Nao foi possivel carregar lista", {
@@ -376,6 +392,7 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
               <div>
                 <span className="ui-badge ui-badge--info name-list-view-modal__context">{contextLabel}</span>
                 <h2>{displayTitle}</h2>
+                <p className="name-list-view-modal__count">{itemCount} {itemCount === 1 ? "item" : "itens"}</p>
               </div>
               <div className="name-list-view-modal__actions">
                 {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
@@ -394,10 +411,17 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
                     </button>
                   </div>
                 ) : null}
+                {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) && rawText ? (
+                  <label className="name-list-view-modal__raw-toggle">
+                    <input checked={showRawList} onChange={(event) => setShowRawList(event.target.checked)} type="checkbox" />
+                    Exibir lista bruta junto
+                  </label>
+                ) : null}
                 {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
                   <button
                     className="ui-button ui-button--secondary name-list-view-modal__csv"
-                    onClick={() => exportNameListCsv(displayedOrganizedItems, loadedList.ficha.clienteNome)}
+                    disabled={selectedCsvItems.length === 0}
+                    onClick={() => exportNameListCsv(selectedCsvItems, loadedList.ficha.clienteNome)}
                     type="button"
                   >
                     <FileSpreadsheet aria-hidden="true" size={17} />
@@ -424,18 +448,34 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
             </header>
 
             {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
-              <div className="name-list-view-modal__table">
-                <DataTable caption="Lista organizada" className="name-list-view-modal__organized-table" columns={organizedColumns}>
-                  {displayedOrganizedItems.map((item, index) => (
-                    <OrganizedListRow
-                      activeCopyCell={activeCopyCell}
-                      item={item}
-                      key={`${item.nome ?? "nome"}-${item.numero ?? "numero"}-${index}`}
-                      rowKey={`${item.nome ?? "nome"}-${item.numero ?? "numero"}-${index}`}
-                      setActiveCopyCell={setActiveCopyCell}
-                    />
-                  ))}
-                </DataTable>
+              <div className={showRawList ? "name-list-view-modal__comparison" : undefined}>
+                <div className="name-list-view-modal__table">
+                  <DataTable caption="Lista organizada" className="name-list-view-modal__organized-table" columns={organizedColumns}>
+                    {displayedOrganizedItems.map((item, index) => (
+                      <OrganizedListRow
+                        activeCopyCell={activeCopyCell}
+                        csvSelected={selectedCsvRows.includes(organizedItems[index])}
+                        item={item}
+                        key={`${item.nome ?? "nome"}-${item.numero ?? "numero"}-${index}`}
+                        rowKey={`${item.nome ?? "nome"}-${item.numero ?? "numero"}-${index}`}
+                        onToggleCsv={() =>
+                          setSelectedCsvRows((current) =>
+                            current.includes(organizedItems[index])
+                              ? current.filter((selectedItem) => selectedItem !== organizedItems[index])
+                              : [...current, organizedItems[index]],
+                          )
+                        }
+                        setActiveCopyCell={setActiveCopyCell}
+                      />
+                    ))}
+                  </DataTable>
+                </div>
+                {showRawList ? (
+                  <div className="name-list-view-modal__raw-panel">
+                    <h3>Lista bruta</h3>
+                    <pre className="name-list-view-modal__raw">{rawText}</pre>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <pre className="name-list-view-modal__raw">{typeof loadedList.lista === "string" ? loadedList.lista : ""}</pre>
@@ -449,17 +489,24 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
 
 function OrganizedListRow({
   activeCopyCell,
+  csvSelected,
   item,
+  onToggleCsv,
   rowKey,
   setActiveCopyCell,
 }: {
   activeCopyCell: ActiveCopyCell | null;
+  csvSelected: boolean;
   item: UniformListItem;
+  onToggleCsv: () => void;
   rowKey: string;
   setActiveCopyCell: (value: ActiveCopyCell) => void;
 }) {
   return (
     <tr>
+      <td className="name-list-view-modal__csv-row">
+        <input aria-label={`Incluir ${item.nome || "linha"} no CSV`} checked={csvSelected} onChange={onToggleCsv} type="checkbox" />
+      </td>
       <td
         className={[
           "ui-table__primary ai-demo__copy-td",

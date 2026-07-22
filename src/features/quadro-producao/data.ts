@@ -34,6 +34,7 @@ type BoardFichaRow = Pick<
   | "vendedor"
 > & {
   ficha_imagens?: Array<Pick<Database["public"]["Tables"]["ficha_imagens"]["Row"], "ordem" | "url">>;
+  ficha_itens?: Array<Pick<Database["public"]["Tables"]["ficha_itens"]["Row"], "quantidade">>;
 };
 
 export type QuadroProducaoFilters = {
@@ -52,6 +53,7 @@ export type KanbanCardSummary = {
   evento: boolean;
   id: string;
   insumoStatus: InsumoStatus;
+  itemQuantity: number;
   isManualCard: boolean;
   kanbanColumnId: string;
   kanbanOrder: number;
@@ -134,6 +136,7 @@ function mapBoardCard(row: BoardFichaRow): KanbanCardSummary {
     evento: row.evento,
     id: row.id,
     insumoStatus: row.insumo_status,
+    itemQuantity: (row.ficha_itens ?? []).reduce((total, item) => total + Number(item.quantidade || 0), 0),
     isManualCard: row.is_manual_card,
     kanbanColumnId: row.kanban_column_id,
     kanbanOrder: row.kanban_ordem,
@@ -199,7 +202,7 @@ async function getOpenBoardCards() {
   const { data, error } = await supabase
     .from("fichas")
     .select(
-      "id, cliente_nome_snapshot, cliente_auxiliar, numero_venda, data_entrega, evento, arte, material, status, insumo_status, kanban_column_id, kanban_ordem, kanban_status, is_manual_card, vendedor, ficha_imagens(url,ordem)",
+      "id, cliente_nome_snapshot, cliente_auxiliar, numero_venda, data_entrega, evento, arte, material, status, insumo_status, kanban_column_id, kanban_ordem, kanban_status, is_manual_card, vendedor, ficha_imagens(url,ordem), ficha_itens(quantidade)",
     )
     .eq("status", "pendente")
     .order("kanban_ordem", { ascending: true });

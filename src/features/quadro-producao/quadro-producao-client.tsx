@@ -30,6 +30,7 @@ import {
   Filter,
   GripVertical,
   Pencil,
+  Package,
   Plus,
   RefreshCw,
   Search,
@@ -1140,6 +1141,12 @@ const KanbanCard = memo(function KanbanCard({
 
         <div className="quadro-producao-card__meta">
           <span className="quadro-producao-card__chip">{normalizePersonalizacaoLabel(card.arte)}</span>
+          {!card.isManualCard ? (
+            <span className="quadro-producao-card__chip" title="Quantidade total de itens">
+              <Package aria-hidden="true" size={12} />
+              {formatCount(card.itemQuantity)} {card.itemQuantity === 1 ? "item" : "itens"}
+            </span>
+          ) : null}
           <label className="quadro-producao-status-chip" data-status={card.insumoStatus}>
             <span className="sr-only">Status</span>
             <select

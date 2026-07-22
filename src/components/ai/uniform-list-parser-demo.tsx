@@ -4,8 +4,8 @@ import { useId, useMemo, useState, type FormEvent } from "react";
 import { Check, ClipboardList, FileSpreadsheet, Link2, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, Button, CustomDatalist, DataTable, type CustomDatalistOption } from "@/components/ui";
-import { AI_MODEL_OPTIONS } from "@/lib/ai/model-options";
-import { buildUniformCorelCsv } from "@/lib/ai/uniform-list-csv";
+import { findAiModelOption } from "@/lib/ai/model-options";
+import { buildUniformCorelCsv, buildUniformCorelCsvFilename } from "@/lib/ai/uniform-list-csv";
 import { formatShortDateInput, getBusinessTodayInput } from "@/lib/dates";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
 import { transformNameCase, type NameCaseMode } from "@/lib/name-case";
@@ -14,6 +14,7 @@ import { compareUniformSizeAndModel } from "@/lib/uniform-sizes";
 type ApiSuccess = {
   success: true;
   data: UniformList;
+  aiModel: string;
 };
 
 type ApiError = {
@@ -60,7 +61,6 @@ type LinkApiError = {
 type LinkApiResponse = LinkApiSuccess | LinkApiError;
 
 type UniformListParserDemoProps = {
-  defaultModelValue: string;
   initialFicha?: LinkedFicha | null;
   initialText?: string;
 };
@@ -159,10 +159,6 @@ function getExportRows(items: UniformListItem[]) {
 
 function getExportFilename() {
   return `lista-uniformes-${getBusinessTodayInput()}.xlsx`;
-}
-
-function getCsvExportFilename() {
-  return `lista-uniformes-${getBusinessTodayInput()}.csv`;
 }
 
 function saveBlob(blob: Blob, filename: string) {
@@ -341,12 +337,11 @@ function getApiErrorMessage(response: Response, payload: ApiResponse | null) {
   return "Não foi possível organizar a lista.";
 }
 
-export function UniformListParserDemo({ defaultModelValue, initialFicha = null, initialText = "" }: UniformListParserDemoProps) {
+export function UniformListParserDemo({ initialFicha = null, initialText = "" }: UniformListParserDemoProps) {
   const textareaId = useId();
   const fichaInputId = useId();
-  const modelSelectId = useId();
   const [text, setText] = useState(initialText);
-  const [selectedModel, setSelectedModel] = useState(defaultModelValue);
+  const [organizingModel, setOrganizingModel] = useState<string | null>(initialFicha?.listaIa?.aiModel ?? null);
   const [result, setResult] = useState<EditableUniformList | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -362,6 +357,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
   const [selectedFichaLabel, setSelectedFichaLabel] = useState(initialFicha ? getFichaOptionLabel(initialFicha) : "");
   const [sortConfig, setSortConfig] = useState<{ direction: SortDirection; key: SortKey } | null>(null);
   const hasItems = Boolean(result?.items.length);
+  const organizingModelLabel = organizingModel ? findAiModelOption(organizingModel)?.label ?? organizingModel : null;
   const selectedFicha = linkedFichas.find((ficha) => ficha.id === selectedFichaId) ?? null;
   const fichaOptions = useMemo<CustomDatalistOption[]>(
     () =>
@@ -454,6 +450,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
     event.preventDefault();
     setError(null);
     setEditableResult(null);
+    setOrganizingModel(null);
     setIsEditingResult(false);
 
     if (!text.trim()) {
@@ -474,7 +471,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ aiModel: selectedModel, text }),
+        body: JSON.stringify({ text }),
       });
 
       const payload = (await response.json().catch(() => null)) as ApiResponse | null;
@@ -490,6 +487,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
 
       setActiveCopyCell(null);
       setIsEditingResult(false);
+      setOrganizingModel(payload.aiModel);
       setEditableResult(createEditableList(payload.data));
     } catch {
       const message = "Não foi possível organizar a lista.";
@@ -556,6 +554,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
         setActiveCopyCell(null);
         setIsEditingResult(false);
         setEditableResult(createEditableList({ items: payload.ficha.listaIa.items }));
+        setOrganizingModel(payload.ficha.listaIa.aiModel ?? null);
         setSortConfig(null);
         toast.success("Lista vinculada carregada.");
       } else {
@@ -578,7 +577,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          aiModel: selectedModel,
+          aiModel: organizingModel,
           fichaId: selectedFichaId,
           list: stripEditableList(result),
           sourceText: text.trim() || undefined,
@@ -682,7 +681,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
       new Blob([buildUniformCorelCsv(displayedSortedItems)], {
         type: "text/csv;charset=utf-8",
       }),
-      getCsvExportFilename(),
+      buildUniformCorelCsvFilename(selectedFicha?.cliente ?? "sem_ficha"),
     );
   }
 
@@ -696,21 +695,6 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
               <p>{REVIEW_MESSAGE}</p>
             </div>
             <div className="ai-demo__actions">
-              <label className="ai-demo__model-select" htmlFor={modelSelectId}>
-                <span>Modelo</span>
-                <select
-                  disabled={isLoading}
-                  id={modelSelectId}
-                  onChange={(event) => setSelectedModel(event.target.value)}
-                  value={selectedModel}
-                >
-                  {AI_MODEL_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <Button aria-disabled={isLoading} disabled={isLoading} type="submit">
                 {isLoading ? <span className="button-spinner" aria-hidden="true" /> : <ClipboardList aria-hidden="true" size={18} />}
                 {isLoading ? "Organizando..." : "Organizar lista"}
@@ -736,6 +720,7 @@ export function UniformListParserDemo({ defaultModelValue, initialFicha = null, 
             <div>
               <h2>Resultado</h2>
               <p>{hasItems ? `${result?.items.length} itens` : "Nenhum item"}</p>
+              {organizingModelLabel ? <Badge tone="info">Organizado por {organizingModelLabel}</Badge> : null}
             </div>
             <div className="ai-demo__exports" aria-label="Ações da lista organizada">
               <div className="ai-demo__link">

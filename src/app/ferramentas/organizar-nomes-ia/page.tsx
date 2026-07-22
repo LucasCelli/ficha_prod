@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { UniformListParserDemo } from "@/components/ai/uniform-list-parser-demo";
 import { requireAppSession } from "@/features/auth/session";
-import { getDefaultAiModelOption } from "@/lib/ai/model-options";
-import { getAiProvider } from "@/lib/ai/providers";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -31,7 +29,6 @@ export default async function OrganizarNomesIaPage({ searchParams }: OrganizarNo
 
   return (
     <UniformListParserDemo
-      defaultModelValue={getDefaultAiModelOption(getAiProvider()).value}
       initialFicha={
         ficha
           ? {

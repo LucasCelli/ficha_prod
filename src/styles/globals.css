@@ -3370,12 +3370,43 @@ html[data-theme="dark"] .auth-card-brand {
   overflow-x: auto;
 }
 
-.name-list-view-modal__organized-table th:nth-child(2),
+.name-list-view-modal__count {
+  color: var(--color-text-muted);
+  margin: 4px 0 0;
+}
+
+.name-list-view-modal__raw-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8125rem;
+}
+
+.name-list-view-modal__comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.name-list-view-modal__raw-panel h3 {
+  font-size: 0.875rem;
+  margin: 0 0 8px;
+}
+
+@media (max-width: 900px) {
+  .name-list-view-modal__comparison {
+    grid-template-columns: 1fr;
+  }
+}
+
 .name-list-view-modal__organized-table th:nth-child(3),
-.name-list-view-modal__organized-table th:nth-child(5),
-.name-list-view-modal__organized-table td:nth-child(2),
+.name-list-view-modal__organized-table th:nth-child(4),
+.name-list-view-modal__organized-table th:nth-child(6),
 .name-list-view-modal__organized-table td:nth-child(3),
-.name-list-view-modal__organized-table td:nth-child(5) {
+.name-list-view-modal__organized-table td:nth-child(4),
+.name-list-view-modal__organized-table td:nth-child(6),
+.name-list-view-modal__csv-row {
   text-align: center;
 }
 

@@ -1,7 +1,7 @@
 import { APICallError, generateText, NoObjectGeneratedError, Output } from "ai";
 import { z } from "zod";
 import { getCurrentSession } from "@/features/auth/session";
-import { findAiModelOption } from "@/lib/ai/model-options";
+import { findAiModelOption, getAiModelFallbackOptions } from "@/lib/ai/model-options";
 import { getAiModel, getSelectedAiModelOption, hasAiModelApiKey } from "@/lib/ai/models";
 import { buildUniformListPrompt, UNIFORM_LIST_SYSTEM_PROMPT } from "@/lib/ai/prompts/uniform-list";
 import { UniformListSchema, type UniformList } from "@/lib/ai/schemas/uniform-list";
@@ -302,15 +302,23 @@ export async function POST(request: Request) {
     return errorResponse("Modelo de IA indisponível.", 400);
   }
 
-  if (!hasAiModelApiKey(modelValue)) {
+  const fallbackModels = getAiModelFallbackOptions(modelValue).filter((option) => hasAiModelApiKey(option.value));
+
+  if (fallbackModels.length === 0) {
     return errorResponse("IA não configurada.", 503);
   }
 
-  try {
-    const data = await parseUniformList(parsed.data.text, modelValue);
-    return Response.json({ success: true, data });
-  } catch (error) {
-    const aiError = getAiError(error);
-    return errorResponse(aiError.message, aiError.status, aiError.code);
+  let lastError: unknown;
+
+  for (const fallbackModel of fallbackModels) {
+    try {
+      const data = await parseUniformList(parsed.data.text, fallbackModel.value);
+      return Response.json({ success: true, data, aiModel: fallbackModel.value });
+    } catch (error) {
+      lastError = error;
+    }
   }
+
+  const aiError = getAiError(lastError);
+  return errorResponse(aiError.message, aiError.status, aiError.code);
 }

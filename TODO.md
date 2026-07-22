@@ -10,6 +10,28 @@ Backlog vivo para features, refinos e decisoes futuras. Itens concluidos devem s
 - [x] Permitir vincular uma lista organizada pela IA a uma ficha, salvando o JSON revisado junto da ficha para consulta, reexportacao e auditoria posterior.
 - [x] Mostrar total de produtos no editor de ficha e permitir imprimir a lista de nomes anexada junto da ficha.
 
+## Listas de nomes
+
+- [x] Permitir remover uma lista de nomes anexada.
+- [x] Permitir organizar a lista de nomes diretamente pela listagem de fichas.
+- [x] Mostrar a quantidade de itens nas listas de nomes.
+- [x] Adicionar uma exibicao dupla para comparar a lista bruta e a lista organizada.
+- [x] Permitir exibir opcionalmente o conteudo bruto junto da lista organizada.
+
+## IA
+
+- [x] Usar Gemini Flash como principal, tentar outras variacoes Gemini e depois os demais provedores como fallback.
+- [x] Remover o seletor manual de IA e mostrar no resultado qual provedor/modelo organizou a lista.
+
+## Exportacao
+
+- [x] Corrigir a exportacao das listas de nomes e padronizar o nome do CSV pelo cliente da ficha.
+- [x] Controlar por checkboxes quais linhas entram no CSV, permitindo selecionar os nomes individualmente.
+
+## Quadro de producao
+
+- [x] Mostrar a quantidade total de itens em cada card do quadro.
+
 ## Bibliotecas e arquitetura
 
 - [x] Avaliar `@tanstack/react-table` quando sorting, filtros compostos e paginacao ficarem mais exigentes em fichas, clientes e catalogos.
