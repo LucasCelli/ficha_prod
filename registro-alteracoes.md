@@ -1,3 +1,9 @@
+## 2026-07-23 - IA: numeros colados ao nome
+
+- Modulo: listas organizadas por IA.
+- Resultado: o prompt passou a preservar como nome completo identificadores com algarismos colados por pontuacao, como `ANTONIO_FLOGS.18`, sem extrair `18` falsamente como numero da camisa.
+- Decisao: pontuacao interna sem espacos nao delimita campos; a extracao de numero exige separacao estrutural clara ou marcador explicito, como `num` ou `nº`.
+
 # Registro de alteracoes
 
 ## 2026-07-22 - Shell: hidratacao segura da sidebar

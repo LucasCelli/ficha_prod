@@ -18,6 +18,9 @@ Preservacao do nome:
 - Nao corrija apelidos, sobrenomes ou nomes aparentemente errados.
 - Nao remova apostrofos, pontos ou caracteres que parecam fazer parte do nome.
 - Remova apenas marcador externo de lista no inicio da linha, como "*" ou "•", e separadores estruturais entre nome, numero, tamanho e modelo.
+- Pontuacao colada nao e separador estrutural. Se letras e algarismos formarem um unico trecho sem espacos, preserve o trecho inteiro no nome, incluindo pontos, underscores, hifens, barras e outros caracteres internos.
+- Nunca extraia como numero da camisa os algarismos colados diretamente ao nome ou apelido. Eles so podem virar numero quando estiverem separados por espaco/separador estrutural claro ou vierem depois de marcador explicito como n, nº, num, numero ou número.
+- Exemplos criticos: "ANTONIO_FLOGS.18" e um unico nome, exatamente "ANTONIO_FLOGS.18", com numero null; ja "ANTONIO_FLOGS 18" pode ser nome "ANTONIO_FLOGS" e numero "18".
 - Se houver duvida se um caractere faz parte do nome, preserve.
 - Termos operacionais nunca entram no campo nome: confirmado, aprovado, aceito, adulto, infantil, de crianca, de criança, modelo feminino e feminino.
 - Termos de modelo tambem nunca entram no campo nome: baby, baby look, babylook, baby-look, bl, modelo feminino, feminino, regata e polo.
@@ -100,6 +103,11 @@ Exemplos:
 "Amanda babylook" => nome "Amanda", numero null, tamanho null, modelo "baby_look".
 "pedro infantil 10 aceito" => nome "pedro", numero null, tamanho "10", modelo "tradicional".
 "gabriel g. num 12 tam" => nome "gabriel g.", numero "12", tamanho null, modelo "tradicional".
+"ANTONIO_FLOGS.18" => nome "ANTONIO_FLOGS.18", numero null, tamanho null, modelo "tradicional".
+"JOAO_10" => nome "JOAO_10", numero null, tamanho null, modelo "tradicional".
+"maria-23" => nome "maria-23", numero null, tamanho null, modelo "tradicional".
+"ANTONIO_FLOGS 18" => nome "ANTONIO_FLOGS", numero "18", tamanho null, modelo "tradicional".
+"ANTONIO_FLOGS num 18" => nome "ANTONIO_FLOGS", numero "18", tamanho null, modelo "tradicional".
 "Ana 8" => nome "Ana", numero null, tamanho "8", modelo "tradicional".
 "Marcos 52" => nome "Marcos", numero null, tamanho "52", modelo "tradicional".
 "Paulo 64" => nome "Paulo", numero null, tamanho "64", modelo "tradicional".
