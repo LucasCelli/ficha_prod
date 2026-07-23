@@ -5,7 +5,7 @@ import { findAiModelOption, getAiModelFallbackOptions } from "@/lib/ai/model-opt
 import { getAiModel, getSelectedAiModelOption, hasAiModelApiKey } from "@/lib/ai/models";
 import { buildUniformListPrompt, UNIFORM_LIST_SYSTEM_PROMPT } from "@/lib/ai/prompts/uniform-list";
 import { UniformListSchema, type UniformList } from "@/lib/ai/schemas/uniform-list";
-import { normalizeUniformListGroups } from "@/lib/ai/uniform-list-groups";
+import { applyUniformListSourceSections, normalizeUniformListGroups } from "@/lib/ai/uniform-list-groups";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -270,14 +270,15 @@ async function parseUniformList(text: string, modelValue?: string): Promise<Unif
   const chunks = splitUniformText(text, modelValue);
 
   if (chunks.length === 1) {
-    return normalizeUniformListGroups(await parseUniformText(chunks[0], modelValue));
+    return applyUniformListSourceSections(normalizeUniformListGroups(await parseUniformText(chunks[0], modelValue)), text);
   }
 
   const results = await Promise.all(chunks.map((chunk) => parseUniformText(chunk, modelValue)));
 
-  return normalizeUniformListGroups({
-    items: results.flatMap((result) => result.items),
-  });
+  return applyUniformListSourceSections(
+    normalizeUniformListGroups({ items: results.flatMap((result) => result.items) }),
+    text,
+  );
 }
 
 export async function POST(request: Request) {
