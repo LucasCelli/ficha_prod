@@ -30,7 +30,10 @@ Validacao mental:
 Antes de responder, confira internamente se o nome extraido aparece literalmente na linha de origem. Se nao aparecer, use confianca baixa e explique em observacao. Nao inclua a linha original na resposta.
 
 Regras gerais:
-- Cabecalhos que classificam uma secao, como "PRETA:", "CINZA:", "AZUL:", "MANGA LONGA:" ou "MODELO A:", nao sao pessoas: use o texto do cabecalho sem os dois-pontos como grupo dos itens seguintes.
+- Grupo serve somente para separar uma caracteristica especifica compartilhada, como cor, acabamento, manga ou outra variante de producao.
+- Nunca use modelo ou tamanho como grupo. Cabecalhos como "PP:", "G:", "BABY LOOK P:", "CAMISETA GG:" ou "REGATA M:" definem tamanho/modelo dos itens seguintes; preencha suas colunas proprias e deixe grupo null.
+- Se um cabecalho combinar uma caracteristica com modelo/tamanho, mantenha somente a caracteristica no grupo. Exemplo: "PRETA BABY LOOK P:" => grupo "PRETA", modelo baby_look e tamanho "P".
+- Cabecalhos que classificam uma secao por caracteristica, como "PRETA:", "CINZA:", "AZUL:" ou "MANGA LONGA:", nao sao pessoas: use o texto do cabecalho sem os dois-pontos como grupo dos itens seguintes.
 - Propague o grupo para todos os itens seguintes ate aparecer outro cabecalho de classificacao.
 - Preserve o texto do grupo como recebido, removendo apenas espacos externos e os dois-pontos finais.
 - Cabecalhos meramente operacionais, como "LISTA DE NOMES" ou "NOME/TAMANHO", continuam ignorados e nao viram grupo.
@@ -114,6 +117,9 @@ Exemplos:
 "SEM NOME:\nProf° Daiane G\nArlene P" => dois itens: nome null, tamanho "G"; nome null, tamanho "P".
 "S/NOME\n12 M\n09 GG" => dois itens: nome null, numero "12", tamanho "M"; nome null, numero "09", tamanho "GG".
 "PRETA:\nKailany (M)\nCINZA:\nMarilene (G)" => dois itens: Kailany com grupo "PRETA" e tamanho "M"; Marilene com grupo "CINZA" e tamanho "G".
+"PP:\nAdriel\nGabrieli F." => dois itens com grupo null, modelo "tradicional" e tamanho "PP".
+"BABY LOOK P:\nLivia\nCoord. Jessica" => dois itens com grupo null, modelo "baby_look" e tamanho "P".
+"PRETA BABY LOOK M:\nMari\nNai" => dois itens com grupo "PRETA", modelo "baby_look" e tamanho "M".
 
 Nunca transforme:
 - "ellyvan" em "Ellyvan"

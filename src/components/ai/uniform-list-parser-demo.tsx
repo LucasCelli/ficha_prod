@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { Badge, Button, CustomDatalist, DataTable, type CustomDatalistOption } from "@/components/ui";
 import { findAiModelOption } from "@/lib/ai/model-options";
 import { buildUniformCorelCsv, buildUniformCorelCsvFilename } from "@/lib/ai/uniform-list-csv";
+import { normalizeUniformListGroups } from "@/lib/ai/uniform-list-groups";
 import { printUniformList } from "@/lib/ai/uniform-list-print";
 import { formatShortDateInput } from "@/lib/dates";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
@@ -188,8 +189,10 @@ function createRowId(index: number) {
 }
 
 function createEditableList(list: UniformList): EditableUniformList {
+  const normalizedList = normalizeUniformListGroups(list);
+
   return {
-    items: list.items.map((item, index) => ({
+    items: normalizedList.items.map((item, index) => ({
       ...item,
       rowId: createRowId(index),
     })),
