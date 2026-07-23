@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { LogOut, PanelLeft, ArrowRightFromLine } from "lucide-react";
 import type { AppSession } from "@/features/auth/types";
@@ -15,18 +15,15 @@ type AppShellProps = {
   title?: string;
 };
 
+const SIDEBAR_STORAGE_KEY = "sidebar-collapsed";
+const SIDEBAR_STATE_EVENT = "app:sidebar-collapsed-change";
+
 export function AppShell({ children, session, title }: AppShellProps) {
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("sidebar-collapsed") === "true";
-  });
+  const collapsed = useSyncExternalStore(subscribeToSidebarState, getSidebarStateSnapshot, getServerSidebarStateSnapshot);
 
   function toggle() {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("sidebar-collapsed", String(next));
-      return next;
-    });
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(!collapsed));
+    window.dispatchEvent(new Event(SIDEBAR_STATE_EVENT));
   }
 
   return (
@@ -84,4 +81,22 @@ export function AppShell({ children, session, title }: AppShellProps) {
       </main>
     </div>
   );
+}
+
+function subscribeToSidebarState(onStoreChange: () => void) {
+  window.addEventListener("storage", onStoreChange);
+  window.addEventListener(SIDEBAR_STATE_EVENT, onStoreChange);
+
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(SIDEBAR_STATE_EVENT, onStoreChange);
+  };
+}
+
+function getSidebarStateSnapshot() {
+  return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true";
+}
+
+function getServerSidebarStateSnapshot() {
+  return false;
 }

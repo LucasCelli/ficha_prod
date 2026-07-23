@@ -1,12 +1,26 @@
 "use client";
 
-import { useId, useMemo, useState, type FormEvent } from "react";
-import { Check, ClipboardList, FileSpreadsheet, Link2, Pencil, Search } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  CaseLower,
+  CaseSensitive,
+  CaseUpper,
+  Check,
+  ClipboardList,
+  FileSpreadsheet,
+  Pencil,
+  Printer,
+  RemoveFormatting,
+  Save,
+  Search,
+  type LucideIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Badge, Button, CustomDatalist, DataTable, type CustomDatalistOption } from "@/components/ui";
 import { findAiModelOption } from "@/lib/ai/model-options";
 import { buildUniformCorelCsv, buildUniformCorelCsvFilename } from "@/lib/ai/uniform-list-csv";
-import { formatShortDateInput, getBusinessTodayInput } from "@/lib/dates";
+import { printUniformList } from "@/lib/ai/uniform-list-print";
+import { formatShortDateInput } from "@/lib/dates";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
 import { transformNameCase, type NameCaseMode } from "@/lib/name-case";
 import { compareUniformSizeAndModel } from "@/lib/uniform-sizes";
@@ -80,17 +94,25 @@ type ActiveCopyCell = {
   rowKey: string;
 };
 
-const baseColumns: Array<{ key: SortKey; label: string; width: string }> = [
-  { key: "grupo", label: "Grupo", width: "132px" },
-  { key: "nome", label: "Nome", width: "160px" },
-  { key: "numero", label: "Número", width: "104px" },
-  { key: "tamanho", label: "Tamanho", width: "116px" },
-  { key: "modelo", label: "Modelo", width: "132px" },
-  { key: "confianca", label: "Confiança", width: "116px" },
-  { key: "observacao", label: "Observação", width: "340px" },
+const COLUMN_META: Record<SortKey, { align?: "center"; label: string }> = {
+  nome: { label: "Nome" },
+  numero: { label: "Número", align: "center" },
+  tamanho: { label: "Tamanho", align: "center" },
+  modelo: { label: "Modelo" },
+  confianca: { label: "Confiança", align: "center" },
+  grupo: { label: "Grupo" },
+  observacao: { label: "Observação" },
+};
+
+const DISPLAY_COLUMN_ORDER: SortKey[] = ["nome", "numero", "tamanho", "modelo", "confianca", "grupo", "observacao"];
+
+const NAME_CASE_OPTIONS: { icon: LucideIcon; label: string; mode: NameCaseMode }[] = [
+  { icon: RemoveFormatting, label: "Original", mode: "original" },
+  { icon: CaseSensitive, label: "Capitalizar", mode: "capitalized" },
+  { icon: CaseUpper, label: "Maiúsculas", mode: "uppercase" },
+  { icon: CaseLower, label: "Minúsculas", mode: "lowercase" },
 ];
 
-const exportHeaders = baseColumns.map((column) => column.label);
 const sortCollator = new Intl.Collator("pt-BR", {
   numeric: true,
   sensitivity: "base",
@@ -146,22 +168,6 @@ function sortItems<T extends UniformListItem>(items: T[], key: SortKey, directio
         : sortCollator.compare(getSortValue(first, key), getSortValue(second, key));
     return direction === "ascending" ? result : -result;
   });
-}
-
-function getExportRows(items: UniformListItem[]) {
-  return items.map((item) => [
-    displayValue(item.grupo),
-    displayValue(item.nome),
-    displayValue(item.numero),
-    displayValue(item.tamanho),
-    formatModel(item.modelo),
-    formatConfidence(item.confianca),
-    displayValue(item.observacao),
-  ]);
-}
-
-function getExportFilename() {
-  return `lista-uniformes-${getBusinessTodayInput()}.xlsx`;
 }
 
 function saveBlob(blob: Blob, filename: string) {
@@ -248,13 +254,14 @@ function CopyCell({
   );
 }
 
-function ConfidenceBadge({ value }: { value: string }) {
+function ConfidenceDot({ value }: { value: string }) {
   const label = formatConfidence(value);
 
   return (
-    <div className={`ai-demo__confidence ai-demo__confidence--${value}`}>
-      <span className="ai-demo__confidence-badge">{label}</span>
-    </div>
+    <span className={`confidence-dot confidence-dot--${value}`} title={`Confiança: ${label}`}>
+      <span aria-hidden="true" className="confidence-dot__mark" />
+      <span className="sr-only">{label}</span>
+    </span>
   );
 }
 
@@ -349,10 +356,9 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
   const [result, setResult] = useState<EditableUniformList | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [isLoadingLink, setIsLoadingLink] = useState(false);
-  const [isLoadingLinkedList, setIsLoadingLinkedList] = useState(false);
-  const [isSavingLink, setIsSavingLink] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isEditingResult, setIsEditingResult] = useState(false);
   const [activeCopyCell, setActiveCopyCell] = useState<ActiveCopyCell | null>(null);
   const [nameCaseMode, setNameCaseMode] = useState<NameCaseMode>("original");
@@ -360,6 +366,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
   const [selectedFichaId, setSelectedFichaId] = useState(initialFicha?.id ?? "");
   const [selectedFichaLabel, setSelectedFichaLabel] = useState(initialFicha ? getFichaOptionLabel(initialFicha) : "");
   const [sortConfig, setSortConfig] = useState<{ direction: SortDirection; key: SortKey } | null>(null);
+  const loadedFichaListRef = useRef<string | null>(null);
   const hasItems = Boolean(result?.items.length);
   const organizingModelLabel = organizingModel ? findAiModelOption(organizingModel)?.label ?? organizingModel : null;
   const selectedFicha = linkedFichas.find((ficha) => ficha.id === selectedFichaId) ?? null;
@@ -389,21 +396,29 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
     [nameCaseMode, sortedItems],
   );
   const selectedFichaHasLinkedList = Boolean(selectedFicha?.listaIaAnexada || selectedFicha?.listaIa);
+  const hasDistinctGroups = useMemo(
+    () => new Set((result?.items ?? []).map((item) => item.grupo?.trim() || "")).size > 1,
+    [result],
+  );
+  const showGroupColumn = isEditingResult || hasDistinctGroups;
   const columns = useMemo(
     () =>
-      baseColumns.map((column) => ({
-        ...column,
+      DISPLAY_COLUMN_ORDER.filter((key) => key !== "grupo" || showGroupColumn).map((key) => ({
+        key,
+        label: COLUMN_META[key].label,
+        align: COLUMN_META[key].align,
         onSort: () =>
           setSortConfig((current) => ({
-            direction: current?.key === column.key && current.direction === "ascending" ? "descending" : "ascending",
-            key: column.key,
+            direction: current?.key === key && current.direction === "ascending" ? "descending" : "ascending",
+            key,
           })),
-        sortDirection: sortConfig?.key === column.key ? sortConfig.direction : undefined,
+        sortDirection: sortConfig?.key === key ? sortConfig.direction : undefined,
       })),
-    [sortConfig],
+    [showGroupColumn, sortConfig],
   );
 
   function updateTextItem(rowId: string, field: EditableTextField, value: string) {
+    setHasUnsavedChanges(true);
     setResult((current) =>
       current
         ? {
@@ -425,6 +440,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
   function updateModelItem(rowId: string, value: string) {
     if (!MODEL_OPTIONS.includes(value as (typeof MODEL_OPTIONS)[number])) return;
 
+    setHasUnsavedChanges(true);
     setResult((current) =>
       current
         ? {
@@ -439,6 +455,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
   function updateConfidenceItem(rowId: string, value: string) {
     if (!CONFIDENCE_OPTIONS.includes(value as (typeof CONFIDENCE_OPTIONS)[number])) return;
 
+    setHasUnsavedChanges(true);
     setResult((current) =>
       current
         ? {
@@ -450,10 +467,55 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
     );
   }
 
+  async function saveListToFicha(list: EditableUniformList, options: { aiModel?: string | null; silent?: boolean } = {}) {
+    if (!list.items.length || !selectedFichaId) return false;
+
+    setIsSaving(true);
+
+    try {
+      const response = await fetch("/api/ai/uniform-list-ficha", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          aiModel: options.aiModel ?? organizingModel,
+          fichaId: selectedFichaId,
+          list: stripEditableList(list),
+          sourceText: text.trim() || undefined,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as LinkApiResponse | null;
+
+      if (!response.ok || !payload?.success || !payload.ficha) {
+        toast.error(payload && !payload.success ? payload.error : "Não foi possível salvar a lista.");
+        return false;
+      }
+
+      const savedFicha = payload.ficha;
+      setLinkedFichas((current) => current.map((ficha) => (ficha.id === savedFicha.id ? savedFicha : ficha)));
+      setSelectedFichaId(savedFicha.id);
+      setSelectedFichaLabel(getFichaOptionLabel(savedFicha));
+      loadedFichaListRef.current = savedFicha.id;
+      setHasUnsavedChanges(false);
+
+      if (!options.silent) toast.success("Lista salva na ficha.");
+      return true;
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleSave() {
+    if (result) await saveListToFicha(result);
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setEditableResult(null);
+    setHasUnsavedChanges(false);
     setOrganizingModel(null);
     setIsEditingResult(false);
 
@@ -489,10 +551,17 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
         return;
       }
 
+      const organizedList = createEditableList(payload.data);
       setActiveCopyCell(null);
       setIsEditingResult(false);
       setOrganizingModel(payload.aiModel);
-      setEditableResult(createEditableList(payload.data));
+      setEditableResult(organizedList);
+      setHasUnsavedChanges(true);
+
+      if (selectedFichaId) {
+        const saved = await saveListToFicha(organizedList, { aiModel: payload.aiModel, silent: true });
+        if (saved) toast.success("Primeira versão salva na ficha.");
+      }
     } catch {
       const message = "Não foi possível organizar a lista.";
       setError(message);
@@ -536,148 +605,41 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
     }
   }
 
-  async function handleLoadSelectedList() {
-    if (!selectedFichaId) return;
+  // Carrega automaticamente a lista organizada (e a lista bruta) quando uma ficha
+  // que já possui lista vinculada é selecionada, sem sobrescrever alterações não salvas.
+  useEffect(() => {
+    const ficha = linkedFichas.find((item) => item.id === selectedFichaId);
+    if (!selectedFichaId || !ficha?.listaIaAnexada) return;
+    if (loadedFichaListRef.current === selectedFichaId || hasUnsavedChanges) return;
 
-    setIsLoadingLinkedList(true);
+    loadedFichaListRef.current = selectedFichaId;
+    let cancelled = false;
 
-    try {
+    void (async () => {
       const response = await fetch(`/api/ai/uniform-list-ficha?fichaId=${encodeURIComponent(selectedFichaId)}`);
       const payload = (await response.json().catch(() => null)) as LinkApiResponse | null;
+      if (cancelled || !response.ok || !payload?.success || !payload.ficha) return;
 
-      if (!response.ok || !payload?.success || !payload.ficha) {
-        toast.error(payload && !payload.success ? payload.error : "Não foi possível carregar a lista.");
-        return;
-      }
+      const loadedFicha = payload.ficha;
+      setLinkedFichas((current) => current.map((item) => (item.id === loadedFicha.id ? loadedFicha : item)));
 
-      setLinkedFichas((current) => current.map((ficha) => (ficha.id === payload.ficha?.id ? payload.ficha : ficha)));
-      setSelectedFichaId(payload.ficha.id);
-      setSelectedFichaLabel(getFichaOptionLabel(payload.ficha));
-
-      if (payload.ficha.listaIa) {
+      if (loadedFicha.listaIa) {
         setActiveCopyCell(null);
         setIsEditingResult(false);
-        setEditableResult(createEditableList({ items: payload.ficha.listaIa.items }));
-        setOrganizingModel(payload.ficha.listaIa.aiModel ?? null);
+        setEditableResult(createEditableList({ items: loadedFicha.listaIa.items }));
+        setOrganizingModel(loadedFicha.listaIa.aiModel ?? null);
         setSortConfig(null);
-        toast.success("Lista vinculada carregada.");
-      } else {
-        toast.info("Ficha sem lista vinculada.");
+        setHasUnsavedChanges(false);
+
+        const sourceText = loadedFicha.listaIa.sourceText?.trim();
+        if (sourceText) setText(sourceText);
       }
-    } finally {
-      setIsLoadingLinkedList(false);
-    }
-  }
+    })();
 
-  async function handleSaveLinkedList() {
-    if (!result?.items.length || !selectedFichaId) return;
-
-    setIsSavingLink(true);
-
-    try {
-      const response = await fetch("/api/ai/uniform-list-ficha", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          aiModel: organizingModel,
-          fichaId: selectedFichaId,
-          list: stripEditableList(result),
-          sourceText: text.trim() || undefined,
-        }),
-      });
-
-      const payload = (await response.json().catch(() => null)) as LinkApiResponse | null;
-
-      if (!response.ok || !payload?.success || !payload.ficha) {
-        toast.error(payload && !payload.success ? payload.error : "Não foi possível vincular a lista.");
-        return;
-      }
-
-      setLinkedFichas((current) => current.map((ficha) => (ficha.id === payload.ficha?.id ? payload.ficha : ficha)));
-      setSelectedFichaId(payload.ficha.id);
-      setSelectedFichaLabel(getFichaOptionLabel(payload.ficha));
-      toast.success("Lista vinculada à ficha.");
-    } finally {
-      setIsSavingLink(false);
-    }
-  }
-
-  async function handleExportXlsx() {
-    if (!result?.items.length) return;
-
-    setIsExporting(true);
-
-    try {
-      const { Workbook } = await import("exceljs");
-      const workbook = new Workbook();
-      const sheet = workbook.addWorksheet("Lista organizada", {
-        views: [{ state: "frozen", ySplit: 1 }],
-      });
-
-      sheet.addRow(exportHeaders);
-      getExportRows(sortedItems).forEach((row) => sheet.addRow(row));
-
-      sheet.columns = [
-        { width: 18 },
-        { width: 24 },
-        { width: 14 },
-        { width: 14 },
-        { width: 16 },
-        { width: 14 },
-        { width: 44 },
-      ];
-      sheet.autoFilter = { from: "A1", to: "G1" };
-
-      sheet.getRow(1).eachCell((cell) => {
-        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-        cell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: "FF1D4ED8" },
-        };
-        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-        cell.border = {
-          bottom: { style: "thin", color: { argb: "FFCBD5E1" } },
-          left: { style: "thin", color: { argb: "FFCBD5E1" } },
-          right: { style: "thin", color: { argb: "FFCBD5E1" } },
-          top: { style: "thin", color: { argb: "FFCBD5E1" } },
-        };
-      });
-
-      sheet.eachRow((row, rowNumber) => {
-        row.height = rowNumber === 1 ? 24 : 28;
-        row.eachCell((cell) => {
-          cell.alignment = { vertical: "middle", wrapText: true };
-          cell.border = {
-            bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
-            left: { style: "thin", color: { argb: "FFE2E8F0" } },
-            right: { style: "thin", color: { argb: "FFE2E8F0" } },
-            top: { style: "thin", color: { argb: "FFE2E8F0" } },
-          };
-
-          if (rowNumber > 1) {
-            cell.fill = {
-              type: "pattern",
-              pattern: "solid",
-              fgColor: { argb: rowNumber % 2 === 0 ? "FFF8FAFC" : "FFFFFFFF" },
-            };
-          }
-        });
-      });
-
-      const buffer = await workbook.xlsx.writeBuffer();
-      saveBlob(
-        new Blob([buffer], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        }),
-        getExportFilename(),
-      );
-    } finally {
-      setIsExporting(false);
-    }
-  }
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedFichaId, linkedFichas, hasUnsavedChanges]);
 
   function handleExportCsv() {
     if (!result?.items.length) return;
@@ -688,6 +650,43 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
       }),
       buildUniformCorelCsvFilename(selectedFicha?.cliente ?? "sem_ficha"),
     );
+  }
+
+  function handleExportByGroups() {
+    if (!result?.items.length) return;
+
+    const clienteNome = selectedFicha?.cliente ?? "sem_ficha";
+    const groups = new Map<string, typeof displayedSortedItems>();
+    displayedSortedItems.forEach((item) => {
+      const group = item.grupo?.trim() || "Sem grupo";
+      groups.set(group, [...(groups.get(group) ?? []), item]);
+    });
+
+    groups.forEach((items, group) => {
+      saveBlob(
+        new Blob([buildUniformCorelCsv(items)], {
+          type: "text/csv;charset=utf-8",
+        }),
+        buildUniformCorelCsvFilename(clienteNome, group),
+      );
+    });
+  }
+
+  function handlePrint() {
+    if (!result?.items.length) return;
+
+    const opened = printUniformList({
+      items: displayedSortedItems,
+      label: organizingModelLabel ? `Organizado por ${organizingModelLabel}` : "Lista organizada",
+      rawText: "",
+      showGroup: hasDistinctGroups,
+      title: selectedFicha?.cliente ? `Lista - ${selectedFicha.cliente}` : "Lista organizada",
+      tipo: "organizada",
+    });
+
+    if (!opened) {
+      toast.error("Nao foi possivel abrir a impressao", { description: "Tente novamente." });
+    }
   }
 
   return (
@@ -722,60 +721,68 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
 
         <div className="ai-demo__result" aria-live="polite">
           <div className="ai-demo__result-header">
-            <div>
+            <div className="ai-demo__result-heading">
               <h2>Resultado</h2>
               <p>{hasItems ? `${result?.items.length} itens` : "Nenhum item"}</p>
               {organizingModelLabel ? <Badge tone="info">Organizado por {organizingModelLabel}</Badge> : null}
             </div>
-            <div className="ai-demo__exports" aria-label="Ações da lista organizada">
-              <div className="ai-demo__link">
-                <label htmlFor={fichaInputId}>Ficha</label>
-                <div className="ai-demo__link-row">
-                  <CustomDatalist
-                    aria-label="Ficha vinculada"
-                    id={fichaInputId}
-                    onValueChange={(value, option) => {
-                      setSelectedFichaLabel(value);
-                      setSelectedFichaId(option?.metadata?.id ?? "");
-                    }}
-                    onEnterKey={() => {
-                      void handleLoadFichas();
-                    }}
-                    options={fichaOptions}
-                    placeholder="Cliente ou venda"
-                    value={selectedFichaLabel}
-                  />
-                  <Button aria-disabled={isLoadingLink} disabled={isLoadingLink} onClick={handleLoadFichas} type="button" variant="secondary">
-                    {isLoadingLink ? <span className="button-spinner" aria-hidden="true" /> : <Search aria-hidden="true" size={16} />}
-                    Buscar
-                  </Button>
-                </div>
-                {selectedFicha ? (
-                  <Badge tone={selectedFichaHasLinkedList ? "success" : "neutral"}>
-                    {selectedFichaHasLinkedList ? "Lista organizada" : "Sem lista"}
-                  </Badge>
-                ) : null}
+            <div className="ai-demo__link">
+              <label htmlFor={fichaInputId}>Ficha</label>
+              <div className="ai-demo__link-row">
+                <CustomDatalist
+                  aria-label="Ficha vinculada"
+                  id={fichaInputId}
+                  onValueChange={(value, option) => {
+                    setSelectedFichaLabel(value);
+                    setSelectedFichaId(option?.metadata?.id ?? "");
+                  }}
+                  onEnterKey={() => {
+                    void handleLoadFichas();
+                  }}
+                  options={fichaOptions}
+                  placeholder="Cliente ou venda"
+                  value={selectedFichaLabel}
+                />
+                <Button aria-disabled={isLoadingLink} disabled={isLoadingLink} onClick={handleLoadFichas} type="button" variant="secondary">
+                  {isLoadingLink ? <span className="button-spinner" aria-hidden="true" /> : <Search aria-hidden="true" size={16} />}
+                  Buscar
+                </Button>
+                <Button
+                  aria-disabled={!hasItems || !selectedFicha || isSaving || !hasUnsavedChanges}
+                  disabled={!hasItems || !selectedFicha || isSaving || !hasUnsavedChanges}
+                  onClick={handleSave}
+                  type="button"
+                >
+                  {isSaving ? <span className="button-spinner" aria-hidden="true" /> : <Save aria-hidden="true" size={17} />}
+                  {hasItems && !hasUnsavedChanges ? "Salvo" : "Salvar"}
+                </Button>
               </div>
-              <Button
-                aria-disabled={!selectedFicha || isLoadingLinkedList}
-                disabled={!selectedFicha || isLoadingLinkedList}
-                onClick={handleLoadSelectedList}
-                type="button"
-                variant="secondary"
-              >
-                {isLoadingLinkedList ? <span className="button-spinner" aria-hidden="true" /> : <ClipboardList aria-hidden="true" size={17} />}
-                Carregar lista
-              </Button>
-              <Button
-                aria-disabled={!hasItems || !selectedFicha || isSavingLink}
-                disabled={!hasItems || !selectedFicha || isSavingLink}
-                onClick={handleSaveLinkedList}
-                type="button"
-                variant="secondary"
-              >
-                {isSavingLink ? <span className="button-spinner" aria-hidden="true" /> : <Link2 aria-hidden="true" size={17} />}
-                Vincular
-              </Button>
+              {selectedFicha ? (
+                <Badge tone={selectedFichaHasLinkedList ? "success" : "neutral"}>
+                  {selectedFichaHasLinkedList ? "Lista organizada" : "Sem lista"}
+                </Badge>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="ai-demo__toolbar">
+            <div className="ai-demo__toolbar-start">
+              <div className="format-toolbar" role="group" aria-label="Formato dos nomes">
+                {NAME_CASE_OPTIONS.map(({ icon: Icon, label: optionLabel, mode }) => (
+                  <button
+                    aria-label={optionLabel}
+                    className={["format-toolbar__button", nameCaseMode === mode ? "is-active" : null].filter(Boolean).join(" ")}
+                    data-active={nameCaseMode === mode ? "true" : undefined}
+                    disabled={!hasItems || isEditingResult}
+                    key={mode}
+                    onClick={() => transformResultNames(mode)}
+                    title={optionLabel}
+                    type="button"
+                  >
+                    <Icon aria-hidden="true" size={16} />
+                  </button>
+                ))}
+              </div>
               <Button
                 aria-disabled={!hasItems}
                 disabled={!hasItems}
@@ -786,31 +793,21 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
                 {isEditingResult ? <Check aria-hidden="true" size={17} /> : <Pencil aria-hidden="true" size={17} />}
                 {isEditingResult ? "Concluir" : "Editar"}
               </Button>
-              <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={() => transformResultNames("capitalized")} type="button" variant="secondary">
-                Capitalizar
-              </Button>
-              <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={() => transformResultNames("uppercase")} type="button" variant="secondary">
-                Maiúsculas
-              </Button>
-              <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={() => transformResultNames("lowercase")} type="button" variant="secondary">
-                Minúsculas
-              </Button>
-              <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={() => transformResultNames("original")} type="button" variant="secondary">
-                Original
-              </Button>
-              <Button
-                aria-disabled={!hasItems || isExporting}
-                disabled={!hasItems || isExporting}
-                onClick={handleExportXlsx}
-                type="button"
-                variant="secondary"
-              >
-                {isExporting ? <span className="button-spinner" aria-hidden="true" /> : <FileSpreadsheet aria-hidden="true" size={17} />}
-                Exportar para Excel
-              </Button>
+            </div>
+            <div className="ai-demo__toolbar-end">
               <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={handleExportCsv} type="button" variant="secondary">
                 <FileSpreadsheet aria-hidden="true" size={17} />
                 Exportar CSV
+              </Button>
+              {hasDistinctGroups ? (
+                <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={handleExportByGroups} type="button" variant="secondary">
+                  <FileSpreadsheet aria-hidden="true" size={17} />
+                  Exportar separado por grupo
+                </Button>
+              ) : null}
+              <Button aria-disabled={!hasItems} disabled={!hasItems} onClick={handlePrint} type="button" variant="secondary">
+                <Printer aria-hidden="true" size={17} />
+                Imprimir
               </Button>
             </div>
           </div>
@@ -829,14 +826,6 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
                 if (isEditingResult) {
                   return (
                     <tr key={item.rowId}>
-                      <td>
-                        <input
-                          aria-label={`Grupo ${index + 1}`}
-                          className="ai-demo__cell-input"
-                          onChange={(event) => updateTextItem(item.rowId, "grupo", event.target.value)}
-                          value={item.grupo ?? ""}
-                        />
-                      </td>
                       <td className="ui-table__primary">
                         <input
                           aria-label={`Nome ${index + 1}`}
@@ -845,7 +834,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
                           value={item.nome ?? ""}
                         />
                       </td>
-                      <td>
+                      <td className="ai-demo__cell--center">
                         <input
                           aria-label={`Número ${index + 1}`}
                           className="ai-demo__cell-input"
@@ -853,7 +842,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
                           value={item.numero ?? ""}
                         />
                       </td>
-                      <td>
+                      <td className="ai-demo__cell--center">
                         <input
                           aria-label={`Tamanho ${index + 1}`}
                           className="ai-demo__cell-input"
@@ -875,7 +864,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
                           ))}
                         </select>
                       </td>
-                      <td>
+                      <td className="ai-demo__cell--center">
                         <select
                           aria-label={`Confiança ${index + 1}`}
                           className="ai-demo__cell-select"
@@ -889,6 +878,16 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
                           ))}
                         </select>
                       </td>
+                      {showGroupColumn ? (
+                        <td>
+                          <input
+                            aria-label={`Grupo ${index + 1}`}
+                            className="ai-demo__cell-input"
+                            onChange={(event) => updateTextItem(item.rowId, "grupo", event.target.value)}
+                            value={item.grupo ?? ""}
+                          />
+                        </td>
+                      ) : null}
                       <td>
                         <input
                           aria-label={`Observação ${index + 1}`}
@@ -903,7 +902,6 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
 
                 return (
                   <tr key={item.rowId}>
-                    <td>{displayValue(item.grupo)}</td>
                     <td className="ui-table__primary ai-demo__copy-td">
                       <CopyCell
                         isActive={activeCopyCell?.rowKey === item.rowId && activeCopyCell.field === "nome"}
@@ -912,7 +910,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
                         value={item.nome}
                       />
                     </td>
-                    <td className="ai-demo__copy-td">
+                    <td className="ai-demo__copy-td ai-demo__cell--center">
                       <CopyCell
                         isActive={activeCopyCell?.rowKey === item.rowId && activeCopyCell.field === "numero"}
                         label="Número"
@@ -920,11 +918,12 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
                         value={item.numero}
                       />
                     </td>
-                    <td>{displayValue(item.tamanho)}</td>
+                    <td className="ai-demo__cell--center">{displayValue(item.tamanho)}</td>
                     <td>{formatModel(item.modelo)}</td>
-                    <td>
-                      <ConfidenceBadge value={item.confianca} />
+                    <td className="ai-demo__cell--center">
+                      <ConfidenceDot value={item.confianca} />
                     </td>
+                    {showGroupColumn ? <td>{displayValue(item.grupo)}</td> : null}
                     <td>{displayValue(item.observacao)}</td>
                   </tr>
                 );

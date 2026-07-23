@@ -1,5 +1,59 @@
 # Registro de alteracoes
 
+## 2026-07-22 - Shell: hidratacao segura da sidebar
+
+- Modulo: shell autenticado e preferencia de sidebar recolhida.
+- Arquivos alterados: `src/components/ui/app-shell.tsx`, `registro-alteracoes.md`.
+- Causa: o initializer de `useState` lia `localStorage` no primeiro render do navegador, enquanto o servidor sempre renderizava a sidebar expandida; com a preferencia `sidebar-collapsed=true`, classes, labels e icones divergiam na hidratacao.
+- Correcao: o estado persistido passou a usar `useSyncExternalStore`, com snapshot de servidor expandido e snapshot de cliente baseado em `localStorage`. Um evento local sincroniza o clique na mesma aba e o evento `storage` cobre outras abas.
+- Resultado: SSR e primeiro render do cliente produzem o mesmo HTML; a preferencia salva e aplicada imediatamente apos a hidratacao sem regenerar a arvore React.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. Edge com `sidebar-collapsed=true` fez navegacao completa, aplicou `app-frame--collapsed`, exibiu `Expandir menu` e nao registrou erros no console; o toggle atualizou DOM e `localStorage` nos dois sentidos.
+
+## 2026-07-22 - Graficos: pendentes em amarelo-ouro
+
+- Modulo: grafico semanal da home e graficos de relatorios.
+- Arquivos alterados: `src/styles/tokens/colors.css`, `src/features/dashboard/dashboard-week-chart.tsx`, `src/features/relatorios/relatorios-charts.tsx`, `registro-alteracoes.md`.
+- Resultado: barras, legendas e indicadores graficos de pendentes deixaram de reutilizar o token discreto das badges e passaram a usar `--color-pending-chart`, amarelo-ouro solido em light e dark.
+- Decisao: manter separados o amarelo de visualizacao, com leitura forte em graficos, e o amarelo operacional translúcido das badges.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. Edge confirmou 4 barras e a legenda em `#d6a500` no light e `#f0c34a` no dark; o grafico da home ficou amarelo-ouro sem mistura marrom e sem erros no console.
+
+## 2026-07-22 - Fichas: status compacto e evento icon-only
+
+- Modulo: listagem de `/fichas`, coluna Status.
+- Arquivos alterados: `src/features/fichas/fichas-overview.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: a badge `Pendente` da listagem passou a usar tom neutro semelhante a estado desabilitado, sem alterar o amarelo semantico usado nas demais superficies.
+- Evento: a estrela foi incorporada na propria badge de status antes do texto. O glow foi removido da badge e isolado no SVG da estrela; `aria-label`, foco visivel e tooltip continuam acessiveis.
+- Entregues: fichas de evento ja entregues exibem somente a badge `Entregue`, sem estrela, glow, tooltip ou foco adicional.
+- Layout: cada status ocupa uma unica badge em `inline-flex`, com `nowrap` e altura de 24px para nao aumentar as linhas da tabela.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. Edge em `/fichas?status=pendente` confirmou uma unica badge por status, com estrela interna e glow restrito ao icone nas 7 linhas de evento, altura de 24px e sem wrap; em `/fichas?status=entregue`, fichas de evento exibiram apenas `Entregue`; foco por teclado abriu o tooltip `Evento`; console sem erros.
+
+## 2026-07-22 - Home: greetings dinamicos por periodo
+
+- Modulo: pagina inicial e datas operacionais.
+- Arquivos alterados: `src/features/dashboard/greeting.ts`, `src/app/page.tsx`, `src/lib/dates.ts`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: o titulo da home passou a combinar uma abertura e uma frase curta de acao personalizadas pelo primeiro nome do usuario, com 24 combinacoes distribuidas entre manha, tarde, noite e madrugada.
+- Decisao: a escolha usa nome, data de Cuiaba e faixa do dia como semente deterministica; a frase permanece estavel durante o periodo e muda entre dias/faixas sem aleatoriedade de renderizacao.
+- Responsividade: a parte em Playfair Display pode quebrar linha quando necessario, evitando overflow com as novas frases em telas estreitas.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. Edge em `localhost:3000` exibiu `Tudo pronto por aqui, Lucas. Manda ver.` na faixa de madrugada, preservou a hierarquia visual do titulo e nao registrou erros no console.
+
+## 2026-07-22 - Status pendente com criterio visual unico
+
+- Modulo: badges compartilhadas, fichas, clientes, home e relatorios.
+- Arquivos alterados: `src/components/ui/badge.tsx`, `src/styles/tokens/colors.css`, `src/styles/globals.css`, `src/features/fichas/fichas-overview.tsx`, `src/features/fichas/ficha-preview.tsx`, `src/features/fichas/ficha-status-actions.tsx`, `src/features/clientes/cliente-detail.tsx`, `src/app/page.tsx`, `src/features/dashboard/dashboard-week-chart.tsx`, `src/features/relatorios/relatorios-charts.tsx`, `registro-alteracoes.md`.
+- Resultado: o estado operacional pendente ganhou o tom semantico `pending`, separado de `warning`; badges, metrica da home e graficos agora usam os mesmos tokens de cor.
+- Cores: pendente permanece amarelo nos dois temas. No light usa amarelo solido e claro; no dark, primeiro plano, fundo e borda amarelos usam transparencia para reduzir a intensidade sem mudar a identidade do status. Alertas permanecem em `warning` e fichas vencidas permanecem em `danger`.
+- Correcao relacionada: fichas canceladas na lista recente da home agora usam `danger`, em vez de cair no antigo fallback visual de pendente.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. Edge confirmou 25 badges pendentes uniformes na listagem, alem do mesmo token aplicado ao card e ao grafico da home; console sem erros.
+
+## 2026-07-22 - Home: calendario iniciado no domingo
+
+- Modulo: pagina inicial, calendario de entregas.
+- Arquivos alterados: `src/features/dashboard/dashboard-calendar.tsx`, `src/styles/globals.css`, `registro-alteracoes.md`.
+- Resultado: o calendario da home passou a ordenar a semana de domingo a sabado, usando o indice nativo dos dias para posicionar corretamente o inicio de cada mes.
+- Refinamento visual: sabados e domingos receberam texto, fundo, borda e contador mais discretos, sem remover os estados de entrega, atraso ou dia atual.
+- Decisao: manter a mudanca no componente atual e nos tokens existentes, sem criar outra implementacao de calendario.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build` e `git diff --check` passaram. Edge em `localhost:3000` confirmou os cabecalhos de domingo a sabado, o primeiro dia do mes na coluna correta, classes `is-weekend` nas duas colunas e estilos computados mais suaves; console sem erros.
+
 <<<<<<< Updated upstream
 ## 2026-06-11 - Fichas: nome do CSV por cliente
 

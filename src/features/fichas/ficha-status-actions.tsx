@@ -13,10 +13,10 @@ type FichaStatusActionsProps = {
   status: FichaStatus;
 };
 
-const statusTone: Record<FichaStatus, "danger" | "success" | "warning"> = {
+const statusTone: Record<FichaStatus, "danger" | "pending" | "success"> = {
   cancelado: "danger",
   entregue: "success",
-  pendente: "warning",
+  pendente: "pending",
 };
 
 const statusLabel: Record<FichaStatus, string> = {

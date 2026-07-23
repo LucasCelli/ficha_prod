@@ -23,10 +23,10 @@ const statusLabels: Record<FichaStatus, string> = {
   pendente: "Pendente",
 };
 
-const statusTones: Record<FichaStatus, "danger" | "success" | "warning"> = {
+const statusTones: Record<FichaStatus, "danger" | "pending" | "success"> = {
   cancelado: "danger",
   entregue: "success",
-  pendente: "warning",
+  pendente: "pending",
 };
 
 export function ClienteDetail({ result }: ClienteDetailProps) {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, CircleHelp, History, ListFilter, Plus } from "lucide-react";
+import { CalendarDays, CircleHelp, History, ListFilter, Plus, Star } from "lucide-react";
 import { Badge, DataTable, EmptyState, Pagination, Tooltip } from "@/components/ui";
 import { formatCompactDateInput, getBusinessWeekRange } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
@@ -39,10 +39,10 @@ const statusLabels: Record<FichaStatus, string> = {
   pendente: "Pendente",
 };
 
-const statusTones: Record<FichaStatus, "danger" | "success" | "warning"> = {
+const statusTones: Record<FichaStatus, "danger" | "pending" | "success"> = {
   cancelado: "danger",
   entregue: "success",
-  pendente: "warning",
+  pendente: "pending",
 };
 
 export function FichasOverview({ filters, result }: FichasOverviewProps) {
@@ -278,7 +278,25 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
   const isOverdue = isFichaOverdue(ficha);
   const overdueDays = getFichaOverdueDays(ficha);
   const statusLabel = isOverdue ? "Atrasada" : statusLabels[ficha.status];
-  const statusTone = isOverdue ? "danger" : statusTones[ficha.status];
+  const statusTone = ficha.status === "pendente" && !isOverdue ? "neutral" : isOverdue ? "danger" : statusTones[ficha.status];
+  const showEventStar = ficha.evento && ficha.status !== "entregue";
+  const statusBadgeClassName = [
+    statusTone === "neutral" ? "ficha-status-badge--pending" : "",
+    showEventStar ? "ficha-status-badge--event" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const statusBadge = (
+    <Badge
+      aria-label={showEventStar ? `Evento, ${statusLabel}` : undefined}
+      className={statusBadgeClassName || undefined}
+      tabIndex={showEventStar ? 0 : undefined}
+      tone={statusTone}
+    >
+      {showEventStar ? <Star aria-hidden="true" fill="currentColor" size={13} /> : null}
+      {statusLabel}
+    </Badge>
+  );
   const kanbanStageLabel = getKanbanColumnLabel(
     ficha.kanban_column?.slug ?? ficha.kanban_status,
     ficha.arte,
@@ -337,8 +355,7 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
       </td>
       <td>
         <div className="ficha-status-line">
-          <Badge tone={statusTone}>{statusLabel}</Badge>
-          {ficha.evento ? <Badge tone="info">Evento</Badge> : null}
+          {showEventStar ? <Tooltip label="Evento">{statusBadge}</Tooltip> : statusBadge}
         </div>
       </td>
       <td>

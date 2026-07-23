@@ -52,7 +52,7 @@ const CATEGORY_COLORS = [
 const STATUS_COLORS: Record<RelatorioStatusFatia["status"], string> = {
   cancelado: "var(--color-danger)",
   entregue: "var(--color-success)",
-  pendente: "var(--color-warning)",
+  pendente: "var(--color-pending-chart)",
 };
 
 const TOOLTIP_CURSOR = { fill: "color-mix(in srgb, var(--color-primary) 8%, transparent)" };
@@ -209,7 +209,7 @@ export function RelatorioVendedoresChart({ items }: { items: RelatorioVendedor[]
           <Tooltip cursor={TOOLTIP_CURSOR} formatter={(value, name) => [`${formatNumber(Number(value))} fichas`, String(name)]} />
           <Legend iconType="circle" wrapperStyle={{ fontSize: "0.78rem", paddingTop: 8 }} />
           <Bar dataKey="entregues" fill="var(--color-success)" name="Entregues" stackId="vendedor" />
-          <Bar dataKey="pendentes" fill="var(--color-warning)" name="Pendentes" radius={[0, 6, 6, 0]} stackId="vendedor" />
+          <Bar dataKey="pendentes" fill="var(--color-pending-chart)" name="Pendentes" radius={[0, 6, 6, 0]} stackId="vendedor" />
         </BarChart>
       </ResponsiveContainer>
     </RelatorioMotionBlock>

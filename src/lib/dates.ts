@@ -10,14 +10,6 @@ export function getBusinessTodayInput(date = new Date()) {
   return formatBusinessDateInput(date);
 }
 
-export function getBusinessGreeting(date = new Date()) {
-  const hour = getBusinessHour(date);
-
-  if (hour < 12) return "Bom dia";
-  if (hour < 18) return "Boa tarde";
-  return "Boa noite";
-}
-
 export function formatBusinessDashboardDate(date = new Date()) {
   const formatted = new Intl.DateTimeFormat("pt-BR", {
     day: "numeric",
@@ -135,7 +127,7 @@ function formatBusinessDateInput(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function getBusinessHour(date: Date) {
+export function getBusinessHour(date: Date) {
   const hour = new Intl.DateTimeFormat("en-US", {
     hour: "2-digit",
     hour12: false,

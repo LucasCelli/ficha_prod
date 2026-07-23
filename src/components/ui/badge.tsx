@@ -2,7 +2,7 @@ import type { HTMLAttributes, ReactNode } from "react";
 
 type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
   children: ReactNode;
-  tone?: "neutral" | "info" | "success" | "warning" | "danger";
+  tone?: "neutral" | "info" | "success" | "pending" | "warning" | "danger";
 };
 
 export function Badge({ children, className, tone = "neutral", ...props }: BadgeProps) {

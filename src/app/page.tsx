@@ -1,69 +1,71 @@
-import Link from "next/link";
-import { ArrowRight, BarChart3, CalendarClock, FileText, Layers3, Plus } from "lucide-react";
-import { Badge, Card } from "@/components/ui";
-import { getCurrentSession } from "@/features/auth/session";
-import { formatBusinessDashboardDate, getBusinessGreeting, getBusinessTodayInput } from "@/lib/dates";
-import { normalizePersonalizacaoLabel } from "@/lib/formatters";
-import { getSupabaseConfigStatus } from "@/lib/supabase/env";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { Database } from "@/lib/supabase/database.types";
 import type { CSSProperties } from "react";
+import Link from "next/link";
+import {
+  ArrowRight,
+  BarChart3,
+  BookOpen,
+  CalendarClock,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  FileText,
+  FilePlus2,
+  Layers3,
+  Plus,
+  Users,
+  Wrench,
+} from "lucide-react";
+import { Badge } from "@/components/ui";
+import { getCurrentSession } from "@/features/auth/session";
+import { DashboardCalendar } from "@/features/dashboard/dashboard-calendar";
+import { getDashboardGreeting } from "@/features/dashboard/greeting";
+import { DashboardWeekChart } from "@/features/dashboard/dashboard-week-chart";
+import { getDashboardData } from "@/features/dashboard/data";
+import type { DashboardMetrics, DashboardUpcoming } from "@/features/dashboard/data";
+import { getDateInputDifferenceInDays } from "@/lib/dates";
+import { formatBusinessDashboardDate, getBusinessTodayInput } from "@/lib/dates";
+import { normalizePersonalizacaoLabel } from "@/lib/formatters";
+import type { Database } from "@/lib/supabase/database.types";
+import type { LucideIcon } from "lucide-react";
 
-type HomeMetric = {
-  accentVar: string;
+type MetricCard = {
+  accent: string;
   href: string;
+  icon: LucideIcon;
+  key: keyof DashboardMetrics;
   label: string;
-  value: string;
-  valueColor: string;
 };
 
-type HomeFicha = Pick<
-  Database["public"]["Tables"]["fichas"]["Row"],
-  "id" | "cliente_nome_snapshot" | "data_entrega" | "status" | "arte"
->;
+const METRIC_CARDS: MetricCard[] = [
+  { accent: "var(--color-info)", href: "/fichas", icon: FileText, key: "fichas", label: "Fichas" },
+  { accent: "var(--color-pending)", href: "/fichas?status=pendente", icon: Clock3, key: "pendentes", label: "Pendentes" },
+  { accent: "var(--color-success)", href: "/fichas?status=entregue", icon: CheckCircle2, key: "entregues", label: "Entregues" },
+  { accent: "var(--color-primary)", href: "/clientes", icon: Users, key: "clientes", label: "Clientes" },
+  { accent: "var(--color-danger)", href: "/fichas?status=atrasado", icon: CalendarClock, key: "atrasadas", label: "Atrasadas" },
+];
 
-type HomeDashboardData =
-  | {
-      kind: "ok";
-      metrics: HomeMetric[];
-      recentFichas: HomeFicha[];
-    }
-  | {
-      kind: "not-configured";
-      metrics: HomeMetric[];
-      recentFichas: [];
-    }
-  | {
-      kind: "error";
-      message: string;
-      metrics: HomeMetric[];
-      recentFichas: [];
-    };
-
-const operationalLinks = [
-  {
-    href: "/fichas",
-    icon: FileText,
-    label: "Fichas",
-  },
-  {
-    href: "/quadro-producao",
-    icon: Layers3,
-    label: "Quadro",
-  },
-  {
-    href: "/relatorios",
-    icon: BarChart3,
-    label: "Relatórios",
-  },
+const SHORTCUTS: { desc: string; href: string; icon: LucideIcon; label: string }[] = [
+  { desc: "Registrar um novo pedido", href: "/fichas/nova", icon: FilePlus2, label: "Nova ficha" },
+  { desc: "Buscar e filtrar pedidos", href: "/fichas", icon: FileText, label: "Fichas" },
+  { desc: "Acompanhar a produção", href: "/quadro-producao", icon: Layers3, label: "Quadro" },
+  { desc: "Base de clientes", href: "/clientes", icon: Users, label: "Clientes" },
+  { desc: "Materiais e modelos", href: "/catalogos", icon: BookOpen, label: "Catálogos" },
+  { desc: "Métricas e exportações", href: "/relatorios", icon: BarChart3, label: "Relatórios" },
+  { desc: "Utilitários e IA", href: "/ferramentas", icon: Wrench, label: "Ferramentas" },
 ];
 
 export default async function HomePage() {
-  const dashboard = await getHomeDashboardData();
-  const session = await getCurrentSession();
+  const [result, session] = await Promise.all([getDashboardData(), getCurrentSession()]);
   const firstName = getFirstName(session?.user.displayName);
   const todayInput = getBusinessTodayInput();
-  const greeting = getBusinessGreeting().toLocaleLowerCase("pt-BR");
+  const greeting = firstName ? getDashboardGreeting(firstName) : null;
+
+  const metrics: DashboardMetrics =
+    result.kind === "ok" ? result.data.metrics : { atrasadas: 0, clientes: 0, entregues: 0, fichas: 0, pendentes: 0 };
+  const recentFichas = result.kind === "ok" ? result.data.recentFichas : [];
+  const upcoming = result.kind === "ok" ? result.data.upcoming : [];
+  const weekSeries = result.kind === "ok" ? result.data.weekSeries : [];
+  const deliveryCounts = result.kind === "ok" ? result.data.deliveryCounts : {};
 
   return (
     <section className="home-dashboard" aria-labelledby="home-title">
@@ -74,9 +76,9 @@ export default async function HomePage() {
             <time dateTime={todayInput}>{formatBusinessDashboardDate()}</time>
           </div>
           <h1 id="home-title" className="home-dashboard__title">
-            {firstName ? (
+            {greeting ? (
               <>
-                Olá, {firstName}, <span className="home-dashboard__title-greeting">{greeting}!</span>
+                {greeting.lead} <span className="home-dashboard__title-greeting">{greeting.prompt}</span>
               </>
             ) : (
               "Visão geral"
@@ -96,195 +98,187 @@ export default async function HomePage() {
       </header>
 
       <div className="home-dashboard__metrics" aria-label="Indicadores principais">
-        {dashboard.metrics.map((metric) => (
-          <Link
-            className="home-metric__link"
-            href={metric.href}
-            key={metric.label}
-            style={{ "--home-metric-accent": metric.accentVar } as CSSProperties}
-          >
-            <Card className="home-metric">
-              <span>{metric.label}</span>
-              <strong style={{ color: metric.valueColor }}>{metric.value}</strong>
-            </Card>
-          </Link>
-        ))}
+        {METRIC_CARDS.map((metric) => {
+          const Icon = metric.icon;
+
+          return (
+            <Link
+              className="home-metric"
+              href={metric.href}
+              key={metric.key}
+              style={{ "--home-metric-accent": metric.accent } as CSSProperties}
+            >
+              <span className="home-metric__icon" aria-hidden="true">
+                <Icon size={18} />
+              </span>
+              <span className="home-metric__label">{metric.label}</span>
+              <strong className="home-metric__value">{formatNumber(metrics[metric.key])}</strong>
+            </Link>
+          );
+        })}
       </div>
 
       <div className="home-dashboard__grid">
-        <section className="home-panel" aria-labelledby="home-workflow-title">
-          <div className="home-panel__header">
-            <div>
-              <p className="eyebrow">Atalhos</p>
-              <h2 id="home-workflow-title">Rotina</h2>
+        <div className="home-dashboard__main">
+          <section className="home-panel" aria-labelledby="home-week-title">
+            <div className="home-panel__header">
+              <div>
+                <p className="eyebrow">Últimos 7 dias</p>
+                <h2 id="home-week-title">Fichas criadas</h2>
+              </div>
+              <Link className="home-panel__link" href="/relatorios">
+                Relatórios
+                <ArrowRight size={16} aria-hidden="true" />
+              </Link>
             </div>
-          </div>
+            <DashboardWeekChart data={weekSeries} />
+          </section>
 
-          <ul className="home-workflow-list">
-            {operationalLinks.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <li key={item.href}>
-                  <Link className="home-workflow-card" href={item.href}>
-                    <span className="home-workflow-card__icon" aria-hidden="true">
-                      <Icon size={20} />
-                    </span>
-                    <span className="home-workflow-card__copy">
-                      <strong>{item.label}</strong>
-                    </span>
-                    <ArrowRight size={16} aria-hidden="true" />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-
-        <section className="home-panel" aria-labelledby="home-recent-title">
-          <div className="home-panel__header">
-            <div>
-              <p className="eyebrow">Recentes</p>
-              <h2 id="home-recent-title">Últimas fichas</h2>
+          <section className="home-panel" aria-labelledby="home-shortcuts-title">
+            <div className="home-panel__header">
+              <div>
+                <p className="eyebrow">Atalhos</p>
+                <h2 id="home-shortcuts-title">Ir para</h2>
+              </div>
             </div>
-            <Link className="home-panel__link" href="/fichas">
-              Abrir
-              <ArrowRight size={16} aria-hidden="true" />
-            </Link>
-          </div>
+            <ul className="home-shortcuts">
+              {SHORTCUTS.map((item) => {
+                const Icon = item.icon;
 
-          {dashboard.recentFichas.length > 0 ? (
-            <ul className="home-recent-list">
-              {dashboard.recentFichas.map((ficha) => (
-                <li key={ficha.id}>
-                  <Link href={`/fichas/${ficha.id}`}>
-                    <span className="home-recent-list__avatar" aria-hidden="true">
-                      {getInitials(ficha.cliente_nome_snapshot)}
-                    </span>
-                    <span className="home-recent-list__copy">
-                      <strong>{ficha.cliente_nome_snapshot}</strong>
-                      <Badge tone="neutral">{normalizePersonalizacaoLabel(ficha.arte ?? null)}</Badge>
-                    </span>
-                    <Badge className="home-recent-list__badge" tone={ficha.status === "entregue" ? "success" : "warning"}>
-                      {formatStatus(ficha.status)}
-                    </Badge>
-                  </Link>
-                </li>
-              ))}
+                return (
+                  <li key={item.href}>
+                    <Link className="home-shortcut" href={item.href}>
+                      <span className="home-shortcut__icon" aria-hidden="true">
+                        <Icon size={20} />
+                      </span>
+                      <span className="home-shortcut__copy">
+                        <strong>{item.label}</strong>
+                        <small>{item.desc}</small>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
-          ) : (
-            <p className="home-panel__empty">Nenhuma ficha recente.</p>
-          )}
-        </section>
+          </section>
+
+          <section className="home-panel" aria-labelledby="home-recent-title">
+            <div className="home-panel__header">
+              <div>
+                <p className="eyebrow">Recentes</p>
+                <h2 id="home-recent-title">Últimas fichas</h2>
+              </div>
+              <Link className="home-panel__link" href="/fichas">
+                Abrir
+                <ArrowRight size={16} aria-hidden="true" />
+              </Link>
+            </div>
+
+            {recentFichas.length > 0 ? (
+              <ul className="home-recent-list">
+                {recentFichas.map((ficha) => (
+                  <li key={ficha.id}>
+                    <Link href={`/fichas/${ficha.id}`}>
+                      <span className="home-recent-list__avatar" aria-hidden="true">
+                        {getInitials(ficha.cliente_nome_snapshot)}
+                      </span>
+                      <span className="home-recent-list__copy">
+                        <strong>{ficha.cliente_nome_snapshot}</strong>
+                        <Badge tone="neutral">{normalizePersonalizacaoLabel(ficha.arte ?? null)}</Badge>
+                      </span>
+                      <Badge
+                        className="home-recent-list__badge"
+                        tone={ficha.status === "entregue" ? "success" : ficha.status === "cancelado" ? "danger" : "pending"}
+                      >
+                        {formatStatus(ficha.status)}
+                      </Badge>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="home-panel__empty">Nenhuma ficha recente.</p>
+            )}
+          </section>
+        </div>
+
+        <aside className="home-dashboard__side" aria-label="Agenda de entregas">
+          <section className="home-panel" aria-labelledby="home-calendar-title">
+            <div className="home-panel__header">
+              <div>
+                <p className="eyebrow">Calendário</p>
+                <h2 id="home-calendar-title">Entregas</h2>
+              </div>
+            </div>
+            <DashboardCalendar deliveryCounts={deliveryCounts} today={todayInput} />
+          </section>
+
+          <section className="home-panel" aria-labelledby="home-upcoming-title">
+            <div className="home-panel__header">
+              <div>
+                <p className="eyebrow">Agenda</p>
+                <h2 id="home-upcoming-title">Próximas entregas</h2>
+              </div>
+            </div>
+
+            {upcoming.length > 0 ? (
+              <ul className="home-upcoming">
+                {upcoming.map((ficha) => (
+                  <li key={ficha.id}>
+                    <Link href={`/fichas/${ficha.id}`}>
+                      <span className="home-upcoming__date" aria-hidden="true">
+                        <CalendarDays size={15} />
+                        {formatDeliveryDate(ficha.data_entrega)}
+                      </span>
+                      <span className="home-upcoming__copy">
+                        <strong>{ficha.cliente_nome_snapshot}</strong>
+                        <small>{normalizePersonalizacaoLabel(ficha.arte ?? null)}</small>
+                      </span>
+                      {renderDeadlineBadge(ficha, todayInput)}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="home-panel__empty">Nenhuma entrega agendada.</p>
+            )}
+          </section>
+        </aside>
       </div>
     </section>
   );
 }
 
-async function getHomeDashboardData(): Promise<HomeDashboardData> {
-  const fallbackMetrics = buildMetrics({
-    clientes: 0,
-    entregues: 0,
-    fichas: 0,
-    pendentes: 0,
-    vencidas: 0,
-  });
+function renderDeadlineBadge(ficha: DashboardUpcoming, today: string) {
+  const diff = getDateInputDifferenceInDays(ficha.data_entrega, today);
 
-  if (!getSupabaseConfigStatus().hasServerConfig) {
-    return {
-      kind: "not-configured",
-      metrics: fallbackMetrics,
-      recentFichas: [],
-    };
+  if (diff === null) return null;
+
+  if (diff <= 0) {
+    return (
+      <Badge className="home-upcoming__badge" tone="danger">
+        Hoje
+      </Badge>
+    );
   }
 
-  try {
-    const supabase = createServerSupabaseClient();
-    const today = getBusinessTodayInput();
-
-    const [fichasResult, pendentesResult, entreguesResult, vencidasResult, clientesResult, recentResult] = await Promise.all([
-      supabase.from("fichas").select("id", { count: "exact", head: true }),
-      supabase.from("fichas").select("id", { count: "exact", head: true }).eq("status", "pendente"),
-      supabase.from("fichas").select("id", { count: "exact", head: true }).eq("status", "entregue"),
-      supabase.from("fichas").select("id", { count: "exact", head: true }).neq("status", "entregue").lt("data_entrega", today),
-      supabase.from("clientes").select("id", { count: "exact", head: true }),
-      supabase
-        .from("fichas")
-        .select("id, cliente_nome_snapshot, data_entrega, status, arte")
-        .order("created_at", { ascending: false })
-        .limit(5),
-    ]);
-
-    const error = fichasResult.error ?? pendentesResult.error ?? entreguesResult.error ?? vencidasResult.error ?? clientesResult.error ?? recentResult.error;
-
-    if (error) {
-      return {
-        kind: "error",
-        message: error.message,
-        metrics: fallbackMetrics,
-        recentFichas: [],
-      };
-    }
-
-    return {
-      kind: "ok",
-      metrics: buildMetrics({
-        clientes: clientesResult.count ?? 0,
-        entregues: entreguesResult.count ?? 0,
-        fichas: fichasResult.count ?? 0,
-        pendentes: pendentesResult.count ?? 0,
-        vencidas: vencidasResult.count ?? 0,
-      }),
-      recentFichas: recentResult.data ?? [],
-    };
-  } catch (error) {
-    return {
-      kind: "error",
-      message: error instanceof Error ? error.message : "Falha ao carregar a visão geral.",
-      metrics: fallbackMetrics,
-      recentFichas: [],
-    };
-  }
+  const tone = diff <= 2 ? "warning" : "neutral";
+  return (
+    <Badge className="home-upcoming__badge" tone={tone}>
+      {diff === 1 ? "Amanhã" : `${diff} dias`}
+    </Badge>
+  );
 }
 
-function buildMetrics(input: { clientes: number; entregues: number; fichas: number; pendentes: number; vencidas: number }) {
-  return [
-    {
-      accentVar: "var(--color-info)",
-      href: "/fichas",
-      label: "Fichas",
-      value: formatNumber(input.fichas),
-      valueColor: "var(--color-info)",
-    },
-    {
-      accentVar: "var(--color-warning)",
-      href: "/fichas?status=pendente",
-      label: "Pendentes",
-      value: formatNumber(input.pendentes),
-      valueColor: "var(--color-warning)",
-    },
-    {
-      accentVar: "var(--color-success)",
-      href: "/fichas?status=entregue",
-      label: "Entregues",
-      value: formatNumber(input.entregues),
-      valueColor: "var(--color-success)",
-    },
-    {
-      accentVar: "var(--color-primary)",
-      href: "/clientes",
-      label: "Clientes",
-      value: formatNumber(input.clientes),
-      valueColor: "var(--color-primary)",
-    },
-    {
-      accentVar: "var(--color-danger)",
-      href: "/fichas?status=atrasado",
-      label: "Atrasadas",
-      value: formatNumber(input.vencidas),
-      valueColor: "var(--color-danger)",
-    },
-  ] satisfies HomeMetric[];
+function formatDeliveryDate(value: string) {
+  const date = new Date(`${value}T12:00:00.000Z`);
+  const label = new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    timeZone: "UTC",
+  }).format(date);
+
+  return label.replace(".", "");
 }
 
 function formatNumber(value: number) {

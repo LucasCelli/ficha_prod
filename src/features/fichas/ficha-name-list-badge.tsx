@@ -1,10 +1,21 @@
 "use client";
 
 import { memo, useCallback, useMemo, useState } from "react";
-import { ClipboardList, FileSpreadsheet, Printer, WandSparkles } from "lucide-react";
+import {
+  CaseLower,
+  CaseSensitive,
+  CaseUpper,
+  ClipboardList,
+  FileSpreadsheet,
+  Printer,
+  RemoveFormatting,
+  WandSparkles,
+  type LucideIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, Modal } from "@/components/ui";
 import { buildUniformCorelCsv, buildUniformCorelCsvFilename } from "@/lib/ai/uniform-list-csv";
+import { printUniformList } from "@/lib/ai/uniform-list-print";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
 import { transformNameCase, type NameCaseMode } from "@/lib/name-case";
 import { compareUniformSizeAndModel } from "@/lib/uniform-sizes";
@@ -52,15 +63,11 @@ type ActiveCopyCell = {
 };
 type SizeSortDirection = "ascending" | "descending";
 
-const baseOrganizedColumns = [
-  { key: "exportar", label: "", width: "54px", align: "center" as const },
-  { key: "grupo", label: "Grupo", width: "120px" },
-  { key: "nome", label: "Nome", width: "160px" },
-  { key: "numero", label: "Numero", width: "104px" },
-  { key: "tamanho", label: "Tamanho", width: "116px" },
-  { key: "modelo", label: "Modelo", width: "132px" },
-  { key: "confianca", label: "Confianca", width: "116px" },
-  { key: "observacao", label: "Observacao", width: "340px" },
+const NAME_CASE_OPTIONS: { icon: LucideIcon; label: string; mode: NameCaseMode }[] = [
+  { icon: RemoveFormatting, label: "Original", mode: "original" },
+  { icon: CaseSensitive, label: "Capitalizar", mode: "capitalized" },
+  { icon: CaseUpper, label: "Maiúsculas", mode: "uppercase" },
+  { icon: CaseLower, label: "Minúsculas", mode: "lowercase" },
 ];
 
 function displayValue(value: string | null | undefined) {
@@ -105,13 +112,14 @@ async function copyToClipboard(value: string, label: string) {
   });
 }
 
-function ConfidenceBadge({ value }: { value: string }) {
+function ConfidenceDot({ value }: { value: string }) {
   const label = formatConfidence(value);
 
   return (
-    <div className={`ai-demo__confidence ai-demo__confidence--${value}`}>
-      <span className="ai-demo__confidence-badge">{label}</span>
-    </div>
+    <span className={`confidence-dot confidence-dot--${value}`} title={`Confiança: ${label}`}>
+      <span aria-hidden="true" className="confidence-dot__mark" />
+      <span className="sr-only">{label}</span>
+    </span>
   );
 }
 
@@ -153,125 +161,6 @@ function getFichaContextLabel(label: string) {
 
 function getFichaClientName(ficha: LoadedList["ficha"]) {
   return ficha.clienteNome?.trim() || ficha.label.split(" - ").slice(1).join(" - ").trim() || ficha.label;
-}
-
-function escapeHtml(value: string | null | undefined) {
-  return displayValue(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function buildNameListPrintHtml(input: {
-  items: UniformListItem[];
-  label: string;
-  rawText: string;
-  title: string;
-  tipo: LoadedList["tipo"];
-}) {
-  const body =
-    input.tipo === "organizada"
-      ? `
-        <table>
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Grupo</th>
-              <th>Numero</th>
-              <th>Tamanho</th>
-              <th>Modelo</th>
-              <th>Confianca</th>
-              <th>Observacao</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${input.items
-              .map(
-                (item) => `
-                  <tr>
-                    <td>${escapeHtml(item.nome)}</td>
-                    <td>${escapeHtml(item.grupo)}</td>
-                    <td>${escapeHtml(item.numero)}</td>
-                    <td>${escapeHtml(item.tamanho)}</td>
-                    <td>${escapeHtml(formatModel(item.modelo))}</td>
-                    <td>${escapeHtml(formatConfidence(item.confianca))}</td>
-                    <td>${escapeHtml(item.observacao)}</td>
-                  </tr>
-                `,
-              )
-              .join("")}
-          </tbody>
-        </table>
-      `
-      : `<pre>${escapeHtml(input.rawText)}</pre>`;
-
-  return `<!doctype html>
-    <html lang="pt-BR">
-      <head>
-        <meta charset="utf-8" />
-        <title>${escapeHtml(input.title)}</title>
-        <style>
-          @page { margin: 12mm; }
-          * { box-sizing: border-box; }
-          body { color: #111827; font-family: Arial, sans-serif; font-size: 12px; margin: 0; }
-          header { display: grid; gap: 4px; margin-bottom: 12px; }
-          header span { color: #4b5563; font-size: 11px; font-weight: 700; }
-          h1 { font-size: 18px; line-height: 1.2; margin: 0; }
-          table { border-collapse: collapse; width: 100%; }
-          th, td { border: 1px solid #d1d5db; padding: 6px 7px; text-align: left; vertical-align: top; }
-          th { background: #f3f4f6; font-size: 10px; text-transform: uppercase; }
-          td:nth-child(3), td:nth-child(4), td:nth-child(6) { text-align: center; }
-          pre { border: 1px solid #d1d5db; font-family: "Courier New", monospace; font-size: 12px; line-height: 1.45; margin: 0; padding: 10px; white-space: pre-wrap; word-break: break-word; }
-        </style>
-      </head>
-      <body>
-        <header>
-          <span>${escapeHtml(input.label)}</span>
-          <h1>${escapeHtml(input.title)}</h1>
-        </header>
-        ${body}
-      </body>
-    </html>`;
-}
-
-function printNameList(input: Parameters<typeof buildNameListPrintHtml>[0]) {
-  const frame = document.createElement("iframe");
-  frame.setAttribute("aria-hidden", "true");
-  frame.style.position = "fixed";
-  frame.style.inset = "0";
-  frame.style.width = "0";
-  frame.style.height = "0";
-  frame.style.border = "0";
-  frame.style.opacity = "0";
-  frame.style.pointerEvents = "none";
-
-  document.body.appendChild(frame);
-  const printDocument = frame.contentDocument;
-  const printWindow = frame.contentWindow;
-
-  if (!printDocument || !printWindow) {
-    frame.remove();
-    toast.error("Nao foi possivel abrir a impressao", {
-      description: "Tente novamente.",
-    });
-    return;
-  }
-
-  printDocument.open();
-  printDocument.write(buildNameListPrintHtml(input));
-  printDocument.close();
-
-  const cleanup = () => {
-    window.setTimeout(() => frame.remove(), 500);
-  };
-
-  window.setTimeout(() => {
-    printWindow.focus();
-    printWindow.print();
-    cleanup();
-  }, 50);
 }
 
 function saveBlob(blob: Blob, filename: string) {
@@ -337,38 +226,46 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
     });
     return Array.from(groups.entries());
   }, [organizedItems]);
+  const hasDistinctGroups = useMemo(
+    () => new Set(organizedItems.map((item) => item.grupo?.trim() || "")).size > 1,
+    [organizedItems],
+  );
   const allRowsSelected = organizedItems.length > 0 && selectedCsvItems.length === organizedItems.length;
   const someRowsSelected = selectedCsvItems.length > 0 && !allRowsSelected;
-  const organizedColumns = useMemo(
-    () =>
-      baseOrganizedColumns.map((column) => {
-        if (column.key === "exportar") {
-          return {
-            ...column,
-            label: (
-              <input
-                aria-label={allRowsSelected ? "Desmarcar todos para o CSV" : "Marcar todos para o CSV"}
-                checked={allRowsSelected}
-                onChange={() => setSelectedCsvRows(allRowsSelected ? new Set() : new Set(organizedItems))}
-                ref={(element) => {
-                  if (element) element.indeterminate = someRowsSelected;
-                }}
-                type="checkbox"
-              />
-            ),
-          };
-        }
-
-        return column.key === "tamanho"
-          ? {
-              ...column,
-              onSort: () => setSizeSortDirection((current) => (current === "ascending" ? "descending" : "ascending")),
-              sortDirection: sizeSortDirection ?? undefined,
-            }
-          : column;
-      }),
-    [allRowsSelected, organizedItems, sizeSortDirection, someRowsSelected],
-  );
+  const organizedColumns = useMemo(() => {
+    const columns = [
+      {
+        key: "exportar",
+        width: "54px",
+        align: "center" as const,
+        label: (
+          <input
+            aria-label={allRowsSelected ? "Desmarcar todos para o CSV" : "Marcar todos para o CSV"}
+            checked={allRowsSelected}
+            onChange={() => setSelectedCsvRows(allRowsSelected ? new Set() : new Set(organizedItems))}
+            ref={(element) => {
+              if (element) element.indeterminate = someRowsSelected;
+            }}
+            type="checkbox"
+          />
+        ),
+      },
+      { key: "nome", label: "Nome" },
+      { key: "numero", label: "Numero", align: "center" as const },
+      {
+        key: "tamanho",
+        label: "Tamanho",
+        align: "center" as const,
+        onSort: () => setSizeSortDirection((current) => (current === "ascending" ? "descending" : "ascending")),
+        sortDirection: sizeSortDirection ?? undefined,
+      },
+      { key: "modelo", label: "Modelo" },
+      { key: "confianca", label: "Confianca", align: "center" as const },
+      ...(hasDistinctGroups ? [{ key: "grupo", label: "Grupo" }] : []),
+      { key: "observacao", label: "Observacao" },
+    ];
+    return columns;
+  }, [allRowsSelected, hasDistinctGroups, organizedItems, sizeSortDirection, someRowsSelected]);
 
   async function handleOpen() {
     setIsLoading(true);
@@ -449,54 +346,40 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
         <Modal description="Consulta da lista vinculada a ficha." onClose={() => setLoadedList(null)} size="lg" title={displayTitle}>
           <section className="name-list-view-modal">
             <header className="name-list-view-modal__header">
-              <div>
-                <span className="ui-badge ui-badge--info name-list-view-modal__context">{contextLabel}</span>
+              <div className="name-list-view-modal__heading">
                 <h2>{displayTitle}</h2>
                 <p className="name-list-view-modal__count">{itemCount} {itemCount === 1 ? "item" : "itens"}</p>
               </div>
-              <div className="name-list-view-modal__actions">
-                {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
-                  <div className="name-list-view-modal__controls">
-                    <label className="name-list-view-modal__format">
-                      <span>Formato dos nomes</span>
-                      <select onChange={(event) => setNameCaseMode(event.target.value as NameCaseMode)} value={nameCaseMode}>
-                        <option value="original">Original</option>
-                        <option value="capitalized">Capitalizar</option>
-                        <option value="uppercase">Maiúsculas</option>
-                        <option value="lowercase">Minúsculas</option>
-                      </select>
-                    </label>
-                    {groupEntries.length > 0 ? (
-                      <div className="name-list-view-modal__groups" aria-label="Selecionar grupos para exportação">
-                        <span>Grupos</span>
-                        <div>
-                          {groupEntries.map(([group, items]) => (
-                            <label key={group}>
-                              <input
-                                checked={items.every((item) => selectedCsvRows.has(item))}
-                                onChange={() => toggleCsvGroup(items)}
-                                ref={(element) => {
-                                  if (element) {
-                                    const selectedCount = items.filter((item) => selectedCsvRows.has(item)).length;
-                                    element.indeterminate = selectedCount > 0 && selectedCount < items.length;
-                                  }
-                                }}
-                                type="checkbox"
-                              />
-                              {group} ({items.length})
-                            </label>
-                          ))}
-                        </div>
+              <div className="name-list-view-modal__toolbar">
+                <div className="name-list-view-modal__toolbar-start">
+                  {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
+                    <>
+                      <div className="format-toolbar" role="group" aria-label="Formato dos nomes">
+                        {NAME_CASE_OPTIONS.map(({ icon: Icon, label: optionLabel, mode }) => (
+                          <button
+                            aria-label={optionLabel}
+                            className={["format-toolbar__button", nameCaseMode === mode ? "is-active" : null]
+                              .filter(Boolean)
+                              .join(" ")}
+                            data-active={nameCaseMode === mode ? "true" : undefined}
+                            key={mode}
+                            onClick={() => setNameCaseMode(mode)}
+                            title={optionLabel}
+                            type="button"
+                          >
+                            <Icon aria-hidden="true" size={16} />
+                          </button>
+                        ))}
                       </div>
-                    ) : null}
-                    {rawText ? (
-                      <label className="name-list-view-modal__raw-toggle">
-                        <input checked={showRawList} onChange={(event) => setShowRawList(event.target.checked)} type="checkbox" />
-                        Comparar com a lista bruta
-                      </label>
-                    ) : null}
-                  </div>
-                ) : null}
+                      {rawText ? (
+                        <label className="name-list-view-modal__raw-toggle">
+                          <input checked={showRawList} onChange={(event) => setShowRawList(event.target.checked)} type="checkbox" />
+                          Comparar com a lista bruta
+                        </label>
+                      ) : null}
+                    </>
+                  ) : null}
+                </div>
                 <div className="name-list-view-modal__output-actions">
                   {loadedList.tipo === "bruta" ? (
                     <a className="ui-button ui-button--primary" href={`/ferramentas/organizar-nomes-ia?fichaId=${encodeURIComponent(fichaId)}`}>
@@ -530,15 +413,19 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
                   ) : null}
                   <button
                     className="ui-button ui-button--secondary name-list-view-modal__print"
-                    onClick={() =>
-                      printNameList({
+                    onClick={() => {
+                      const opened = printUniformList({
                         items: displayedOrganizedItems,
                         label: contextLabel,
                         rawText: typeof loadedList.lista === "string" ? loadedList.lista : "",
+                        showGroup: hasDistinctGroups,
                         title: displayTitle,
                         tipo: loadedList.tipo,
-                      })
-                    }
+                      });
+                      if (!opened) {
+                        toast.error("Nao foi possivel abrir a impressao", { description: "Tente novamente." });
+                      }
+                    }}
                     type="button"
                   >
                     <Printer aria-hidden="true" size={17} />
@@ -546,6 +433,29 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
                   </button>
                 </div>
               </div>
+              {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) && hasDistinctGroups ? (
+                <div className="name-list-view-modal__groups" aria-label="Selecionar grupos para exportação">
+                  <span>Grupos</span>
+                  <div>
+                    {groupEntries.map(([group, items]) => (
+                      <label key={group}>
+                        <input
+                          checked={items.every((item) => selectedCsvRows.has(item))}
+                          onChange={() => toggleCsvGroup(items)}
+                          ref={(element) => {
+                            if (element) {
+                              const selectedCount = items.filter((item) => selectedCsvRows.has(item)).length;
+                              element.indeterminate = selectedCount > 0 && selectedCount < items.length;
+                            }
+                          }}
+                          type="checkbox"
+                        />
+                        {group} ({items.length})
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </header>
 
             {loadedList.tipo === "organizada" && isOrganizedList(loadedList.lista) ? (
@@ -560,6 +470,7 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
                         key={`${item.nome ?? "nome"}-${item.numero ?? "numero"}-${index}`}
                         rowKey={`${item.nome ?? "nome"}-${item.numero ?? "numero"}-${index}`}
                         onToggleCsvItem={toggleCsvItem}
+                        showGroup={hasDistinctGroups}
                         sourceItem={organizedItems[index]}
                         setActiveCopyCell={setActiveCopyCell}
                       />
@@ -590,6 +501,7 @@ const OrganizedListRow = memo(function OrganizedListRow({
   onToggleCsvItem,
   rowKey,
   setActiveCopyCell,
+  showGroup,
   sourceItem,
 }: {
   activeCopyField: ActiveCopyCell["field"] | null;
@@ -598,14 +510,14 @@ const OrganizedListRow = memo(function OrganizedListRow({
   onToggleCsvItem: (item: UniformListItem) => void;
   rowKey: string;
   setActiveCopyCell: (value: ActiveCopyCell) => void;
+  showGroup: boolean;
   sourceItem: UniformListItem;
 }) {
   return (
     <tr>
-      <td className="name-list-view-modal__csv-row">
+      <td className="name-list-view-modal__cell--center">
         <input aria-label={`Incluir ${item.nome || "linha"} no CSV`} checked={csvSelected} onChange={() => onToggleCsvItem(sourceItem)} type="checkbox" />
       </td>
-      <td>{displayValue(item.grupo)}</td>
       <td
         className={[
           "ui-table__primary ai-demo__copy-td",
@@ -623,7 +535,7 @@ const OrganizedListRow = memo(function OrganizedListRow({
       </td>
       <td
         className={[
-          "ai-demo__copy-td",
+          "ai-demo__copy-td name-list-view-modal__cell--center",
           activeCopyField === "numero" ? "ai-demo__copy-td--active" : null,
         ]
           .filter(Boolean)
@@ -636,11 +548,12 @@ const OrganizedListRow = memo(function OrganizedListRow({
           value={item.numero}
         />
       </td>
-      <td>{displayValue(item.tamanho)}</td>
+      <td className="name-list-view-modal__cell--center">{displayValue(item.tamanho)}</td>
       <td>{formatModel(item.modelo)}</td>
-      <td>
-        <ConfidenceBadge value={item.confianca} />
+      <td className="name-list-view-modal__cell--center">
+        <ConfidenceDot value={item.confianca} />
       </td>
+      {showGroup ? <td>{displayValue(item.grupo)}</td> : null}
       <td>{displayValue(item.observacao)}</td>
     </tr>
   );

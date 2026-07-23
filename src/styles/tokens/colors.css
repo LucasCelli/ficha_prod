@@ -24,6 +24,10 @@
   /* Status */
   --color-success: #237804;
   --color-success-bg: #f0fae5;
+  --color-pending: #806000;
+  --color-pending-bg: #fff8d6;
+  --color-pending-border: #ebda8b;
+  --color-pending-chart: #d6a500;
   --color-warning: #ad4e00;
   --color-warning-bg: #fff7e6;
   --color-danger: #cf1322;
@@ -110,6 +114,10 @@ html[data-theme="dark"] {
   /* Status */
   --color-success: #6abe39;
   --color-success-bg: #162312;
+  --color-pending: rgb(244 205 73 / 0.78);
+  --color-pending-bg: rgb(244 205 73 / 0.08);
+  --color-pending-border: rgb(244 205 73 / 0.18);
+  --color-pending-chart: #f0c34a;
   --color-warning: #f3b765;
   --color-warning-bg: #2b1d11;
   --color-danger: #f37370;
