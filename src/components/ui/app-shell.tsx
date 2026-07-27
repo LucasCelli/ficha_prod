@@ -58,7 +58,9 @@ export function AppShell({ children, session, title }: AppShellProps) {
         <div className="app-sidebar__footer">
           {session && !collapsed ? (
             <div className="app-user" aria-label="Usuário atual">
-              <span className="app-user__name">{session.user.displayName}</span>
+              <Link className="app-user__name" href="/meu-painel">
+                {session.user.displayName}
+              </Link>
             </div>
           ) : null}
           <ThemeToggle />

@@ -8,6 +8,10 @@ type NavigationItem = {
 
 export const mainNavigation: readonly NavigationItem[] = [
   {
+    href: "/meu-painel",
+    label: "Meu painel",
+  },
+  {
     href: "/",
     label: "Início",
   },

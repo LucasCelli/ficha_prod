@@ -60,6 +60,70 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["app_users"]["Insert"]>;
         Relationships: [];
       };
+      user_monthly_goals: {
+        Row: {
+          id: string;
+          user_id: string;
+          month: string;
+          fichas_target: number;
+          pieces_target: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          month: string;
+          fichas_target?: number;
+          pieces_target?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["user_monthly_goals"]["Insert"]>;
+        Relationships: [];
+      };
+      ficha_status_events: {
+        Row: {
+          id: string;
+          ficha_id: string;
+          changed_by_user_id: string | null;
+          from_status: Database["public"]["Enums"]["ficha_status"] | null;
+          to_status: Database["public"]["Enums"]["ficha_status"];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          ficha_id: string;
+          changed_by_user_id?: string | null;
+          from_status?: Database["public"]["Enums"]["ficha_status"] | null;
+          to_status: Database["public"]["Enums"]["ficha_status"];
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["ficha_status_events"]["Insert"]>;
+        Relationships: [];
+      };
+      ficha_ownership_audit: {
+        Row: {
+          id: string;
+          ficha_id: string;
+          previous_user_id: string | null;
+          new_user_id: string | null;
+          changed_by_user_id: string | null;
+          reason: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          ficha_id: string;
+          previous_user_id?: string | null;
+          new_user_id?: string | null;
+          changed_by_user_id?: string | null;
+          reason?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["ficha_ownership_audit"]["Insert"]>;
+        Relationships: [];
+      };
       catalog_items: {
         Row: {
           id: string;
@@ -211,6 +275,7 @@ export type Database = {
           metadados: Json;
           created_at: string;
           updated_at: string;
+          created_by_user_id: string | null;
           delivered_at: string | null;
         };
         Insert: {
@@ -224,6 +289,7 @@ export type Database = {
           numero_venda?: string | null;
           data_entrega: string;
           evento?: boolean;
+          created_by_user_id?: string | null;
           status?: Database["public"]["Enums"]["ficha_status"];
           kanban_status?: Database["public"]["Enums"]["kanban_status"];
           kanban_column_id?: string;

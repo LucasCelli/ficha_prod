@@ -391,8 +391,10 @@ export async function updateKanbanCardInsumoStatus(cardId: string, insumoStatus:
   }
 }
 
-export async function markKanbanCardDelivered(cardId: string) {
-  const { error } = await createServerSupabaseClient()
+export async function markKanbanCardDelivered(cardId: string, changedByUserId: string) {
+  const supabase = createServerSupabaseClient();
+  const { data: previous } = await supabase.from("fichas").select("status").eq("id", cardId).maybeSingle();
+  const { error } = await supabase
     .from("fichas")
     .update({
       delivered_at: new Date().toISOString(),
@@ -403,9 +405,15 @@ export async function markKanbanCardDelivered(cardId: string) {
   if (error) {
     throw new Error(error.message);
   }
+  await supabase.from("ficha_status_events").insert({
+    ficha_id: cardId,
+    changed_by_user_id: changedByUserId,
+    from_status: previous?.status ?? null,
+    to_status: "entregue",
+  });
 }
 
-export async function createManualKanbanCard(input: CreateManualKanbanCardInput) {
+export async function createManualKanbanCard(input: CreateManualKanbanCardInput, createdByUserId: string) {
   const supabase = createServerSupabaseClient();
   const { data: targetColumn, error: columnError } = await supabase
     .from("kanban_columns")
@@ -437,6 +445,7 @@ export async function createManualKanbanCard(input: CreateManualKanbanCardInput)
       evento: input.evento,
       insumo_status: input.insumoStatus,
       is_manual_card: true,
+      created_by_user_id: createdByUserId,
       kanban_column_id: input.columnId,
       kanban_ordem: count ?? 0,
       kanban_status: getLegacyKanbanStatusFromSlug(targetColumn.slug),

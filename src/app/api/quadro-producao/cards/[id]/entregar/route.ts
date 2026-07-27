@@ -16,10 +16,11 @@ export async function POST(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    await markKanbanCardDelivered(id);
+    await markKanbanCardDelivered(id, session.user.id);
     revalidatePath("/quadro-producao");
     revalidatePath("/fichas");
     revalidatePath("/relatorios");
+    revalidatePath("/meu-painel");
     revalidatePath(`/fichas/${id}`);
     return Response.json({ ok: true });
   } catch (error) {

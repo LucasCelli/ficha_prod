@@ -123,7 +123,7 @@ function getFichaImagensPayload(fichaId: string, values: FichaFormValues) {
 }
 
 export async function createFichaAction(_previousState: FichaFormState, formData: FormData): Promise<FichaFormState> {
-  await requireAppSession();
+  const session = await requireAppSession();
 
   const parsed = fichaFormSchema.safeParse(getFichaFormInput(formData));
 
@@ -171,6 +171,7 @@ export async function createFichaAction(_previousState: FichaFormState, formData
       numero_venda: parsed.data.numeroVenda,
       lista_nomes_raw: parsed.data.listaNomesRaw,
       observacoes: parsed.data.observacoes,
+      created_by_user_id: session.user.id,
       vendedor: parsed.data.vendedor,
     })
     .select("id")
@@ -330,7 +331,7 @@ export async function markFichaEntregueAction(
   _previousState: FichaStatusActionState,
   formData: FormData,
 ): Promise<FichaStatusActionState> {
-  await requireAppSession();
+  const session = await requireAppSession();
 
   const id = String(formData.get("id") ?? "").trim();
   const returnTo = getSafeReturnPath(formData.get("returnTo"));
@@ -349,7 +350,9 @@ export async function markFichaEntregueAction(
     };
   }
 
-  const { error } = await createServerSupabaseClient()
+  const supabase = createServerSupabaseClient();
+  const { data: previous } = await supabase.from("fichas").select("status").eq("id", id).maybeSingle();
+  const { error } = await supabase
     .from("fichas")
     .update({
       delivered_at: new Date().toISOString(),
@@ -364,6 +367,13 @@ export async function markFichaEntregueAction(
     };
   }
 
+  await supabase.from("ficha_status_events").insert({
+    ficha_id: id,
+    changed_by_user_id: session.user.id,
+    from_status: previous?.status ?? null,
+    to_status: "entregue",
+  });
+  revalidatePath("/meu-painel");
   revalidatePath("/fichas");
   revalidatePath("/relatorios");
   revalidatePath(`/fichas/${id}`);
@@ -378,7 +388,7 @@ export async function revertFichaToPendenteAction(
   _previousState: FichaStatusActionState,
   formData: FormData,
 ): Promise<FichaStatusActionState> {
-  await requireAppSession();
+  const session = await requireAppSession();
 
   const id = String(formData.get("id") ?? "").trim();
   const returnTo = getSafeReturnPath(formData.get("returnTo"));
@@ -397,7 +407,9 @@ export async function revertFichaToPendenteAction(
     };
   }
 
-  const { error } = await createServerSupabaseClient()
+  const supabase = createServerSupabaseClient();
+  const { data: previous } = await supabase.from("fichas").select("status").eq("id", id).maybeSingle();
+  const { error } = await supabase
     .from("fichas")
     .update({
       delivered_at: null,
@@ -412,6 +424,13 @@ export async function revertFichaToPendenteAction(
     };
   }
 
+  await supabase.from("ficha_status_events").insert({
+    ficha_id: id,
+    changed_by_user_id: session.user.id,
+    from_status: previous?.status ?? null,
+    to_status: "pendente",
+  });
+  revalidatePath("/meu-painel");
   revalidatePath("/fichas");
   revalidatePath("/relatorios");
   revalidatePath(`/fichas/${id}`);

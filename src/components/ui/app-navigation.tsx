@@ -11,6 +11,7 @@ import {
   BarChart3,
   Columns3,
   Wrench,
+  CircleUserRound,
 } from "lucide-react";
 import { mainNavigation } from "@/lib/navigation";
 import type { AppUserRole } from "@/features/auth/types";
@@ -19,6 +20,7 @@ import { Tooltip } from "./tooltip";
 const iconMap: Record<string, typeof Home> = {
   "/": Home,
   "/fichas": FileText,
+  "/meu-painel": CircleUserRound,
   "/quadro-producao": Columns3,
   "/ferramentas": Wrench,
   "/clientes": Users,

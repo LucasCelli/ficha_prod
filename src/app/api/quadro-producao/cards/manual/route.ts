@@ -17,9 +17,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const card = await createManualKanbanCard(parsed.data);
+    const card = await createManualKanbanCard(parsed.data, session.user.id);
     revalidatePath("/quadro-producao");
     revalidatePath("/fichas");
+    revalidatePath("/meu-painel");
     return Response.json({ card });
   } catch (error) {
     return Response.json(
