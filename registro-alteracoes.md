@@ -1,3 +1,11 @@
+## 2026-07-27 - Fichas: feedbacks Motion pendentes
+
+- Modulo: listagem e formulario de fichas.
+- Listagem: as linhas passaram a usar `AnimatePresence` e `motion.tr`, com saida horizontal suave ao entregar ou excluir uma ficha e fallback de opacidade para preferencia de movimento reduzido.
+- Formulario: a ordenacao por tamanho agora confirma o resultado com feedback Motion e realce animado da lista; o autopreenchimento de observacoes ganhou confirmacao visual temporaria e acessivel via `role="status"`.
+- CSS: removidos o keyframe `product-sort-flash` e as transicoes manuais de opacidade/transform que foram substituidos pelos presets Motion compartilhados.
+- Arquivos alterados: `src/features/fichas/fichas-motion-rows.tsx`, `src/features/fichas/fichas-overview.tsx`, `src/features/fichas/ficha-form.tsx`, `src/styles/globals.css`, `TODO.md`, `registro-alteracoes.md`.
+- Validacao: `npm run typecheck`, `npm run lint` e `git diff --check` passaram.
 ## 2026-07-23 - IA: numeros colados ao nome
 
 - Modulo: listas organizadas por IA.

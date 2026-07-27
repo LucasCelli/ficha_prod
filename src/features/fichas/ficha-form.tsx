@@ -4,17 +4,16 @@ import { useActionState, useCallback, useEffect, useMemo, useRef, useState, type
 import { createPortal, flushSync, useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useDragAndDrop } from "fluid-dnd/react";
-import { DayPicker } from "react-day-picker";
-import { ptBR } from "react-day-picker/locale";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import UnderlineExtension from "@tiptap/extension-underline";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { listItemMotion, motionTransition, transitionForReducedMotion } from "@/components/ui/motion-presets";
 import { normalizeNameOrCompany } from "@/lib/name-normalizer";
 import {
   Bold,
-  CalendarDays,
   CheckCircle2,
   CircleAlert,
   CircleX,
@@ -53,14 +52,12 @@ import { compareUniformSizeAndBabyLookText } from "@/lib/uniform-sizes";
 import {
   addDaysToInput,
   createUtcDateFromInput,
-  formatDateInput,
-  formatLocalDateInput,
   getBusinessTodayInput,
   getDateInputDifferenceInDays,
-  parseDateInputToLocalDate,
 } from "@/lib/dates";
 import { useFluidDndEventTargetGuard } from "@/lib/fluid-dnd-event-target-guard";
 import { createFichaAction, updateFichaAction } from "./actions";
+import { DatePickerField } from "./date-picker-field";
 import type { FichaDetail } from "./data";
 import { clearCreateFichaDraftSnapshot, CREATE_FICHA_DRAFT_STORAGE_KEY } from "./ficha-draft-storage";
 import type { FichaFormClientValues, FichaFormInitialData, ImageFormItem, ProductFormItem } from "./ficha-form-seed";
@@ -221,23 +218,6 @@ function getImageCardWidthFromGrid(gridWidth: number, count: number) {
   if (count === 2) return Math.max(220, Math.floor((gridWidth - gap) / 2));
   if (count === 3) return Math.max(200, Math.floor((gridWidth - gap * 2) / 3));
   return Math.max(180, Math.floor((gridWidth - gap * 3) / 4));
-}
-
-function parseDateValue(value?: string | null) {
-  return parseDateInputToLocalDate(value);
-}
-
-function formatDateValue(date?: Date) {
-  return formatLocalDateInput(date);
-}
-
-function formatDateLabel(value: string) {
-  if (!parseDateValue(value)) return "Selecionar data";
-  return formatDateInput(value, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 function getPlainTextFromHtml(value: string) {
@@ -625,6 +605,7 @@ function FichaFormInner({
   const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
   const submitAfterUploadRef = useRef(false);
   const sortFeedbackTimerRef = useRef<number | null>(null);
+  const observacoesFeedbackTimerRef = useRef<number | null>(null);
   const clearedProductFieldsRef = useRef(new Map<string, { edited: boolean; value: string }>());
   const autoGolaRef = useRef(false);
   const autoMaterialRef = useRef(false);
@@ -698,6 +679,9 @@ function FichaFormInner({
   const [listaNomesDraft, setListaNomesDraft] = useState(initialData.listaNomesRaw);
   const [observacoesConfirmationValue, setObservacoesConfirmationValue] = useState<string | null>(null);
   const [sortFeedbackVisible, setSortFeedbackVisible] = useState(false);
+  const [sortAnimationKey, setSortAnimationKey] = useState(0);
+  const [observacoesFeedbackVisible, setObservacoesFeedbackVisible] = useState(false);
+  const reduceMotion = useReducedMotion();
   const observacoesEditor = useEditor({
     content: observacoes || "",
     editorProps: {
@@ -1374,6 +1358,9 @@ function FichaFormInner({
       if (sortFeedbackTimerRef.current) {
         window.clearTimeout(sortFeedbackTimerRef.current);
       }
+      if (observacoesFeedbackTimerRef.current) {
+        window.clearTimeout(observacoesFeedbackTimerRef.current);
+      }
       if (draftAutosaveTimerRef.current) {
         window.clearTimeout(draftAutosaveTimerRef.current);
       }
@@ -1563,6 +1550,7 @@ function FichaFormInner({
     });
 
     showProductSortFeedback();
+    setSortAnimationKey((current) => current + 1);
     replaceProductItems(sortedItems);
     setFluidProductItems(sortedItems);
     scheduleDraftSnapshotPersist();
@@ -1634,6 +1622,14 @@ function FichaFormInner({
     setValue("observacoes", nextHtml, { shouldDirty: true });
     if (observacoesEditor && observacoesEditor.getHTML() !== nextHtml) {
       observacoesEditor.commands.setContent(nextHtml, { emitUpdate: false });
+    }
+    if (nextObservacoes) {
+      setObservacoesFeedbackVisible(true);
+      if (observacoesFeedbackTimerRef.current) window.clearTimeout(observacoesFeedbackTimerRef.current);
+      observacoesFeedbackTimerRef.current = window.setTimeout(() => {
+        setObservacoesFeedbackVisible(false);
+        observacoesFeedbackTimerRef.current = null;
+      }, 2200);
     }
 
     applyingObservacoesAutoTimerRef.current = window.setTimeout(() => {
@@ -1882,13 +1878,21 @@ function FichaFormInner({
                 Adicionar produto
               </Button>
               <div className="products-editor__toolbar-actions">
-                <span
-                  className="products-editor__sort-feedback"
-                  data-visible={sortFeedbackVisible ? "true" : "false"}
-                  role="status"
-                >
-                  Produtos ordenados
-                </span>
+                <AnimatePresence initial={false}>
+                  {sortFeedbackVisible ? (
+                    <motion.span
+                      animate="visible"
+                      className="products-editor__sort-feedback"
+                      exit="exit"
+                      initial="hidden"
+                      role="status"
+                      transition={transitionForReducedMotion(reduceMotion, motionTransition.fast)}
+                      variants={listItemMotion}
+                    >
+                      Produtos ordenados
+                    </motion.span>
+                  ) : null}
+                </AnimatePresence>
                 <Button
                   className="products-editor__sort-button"
                   onClick={sortProductItems}
@@ -1909,7 +1913,13 @@ function FichaFormInner({
               <span>Detalhes</span>
               <span>Ações</span>
             </div>
-            <div className="products-editor__list" data-sorted={sortFeedbackVisible ? "true" : "false"} ref={productsListRef}>
+            <motion.div
+              animate={sortAnimationKey > 0 ? { backgroundColor: ["var(--color-success-bg)", "var(--color-surface)"] } : undefined}
+              className="products-editor__list"
+              key={`products-${sortAnimationKey}`}
+              ref={productsListRef}
+              transition={transitionForReducedMotion(reduceMotion, { duration: 0.7, ease: "easeOut" })}
+            >
               {fluidProductItems.map((item, index) => (
                 <div
                   className="products-editor__row"
@@ -2010,7 +2020,7 @@ function FichaFormInner({
                 </div>
                 </div>
               ))}
-            </div>
+            </motion.div>
             <div className="products-editor__total" aria-live="polite">
               <span>Total de produtos</span>
               <strong>{productTotal}</strong>
@@ -2556,6 +2566,22 @@ function FichaFormInner({
                   <Wand2 aria-hidden="true" size={16} />
                   Auto-preencher
                 </button>
+                <AnimatePresence initial={false}>
+                  {observacoesFeedbackVisible ? (
+                    <motion.span
+                      animate="visible"
+                      className="rich-editor__autofill-feedback"
+                      exit="exit"
+                      initial="hidden"
+                      role="status"
+                      transition={transitionForReducedMotion(reduceMotion, motionTransition.fast)}
+                      variants={listItemMotion}
+                    >
+                      <CheckCircle2 aria-hidden="true" size={15} />
+                      Observações preenchidas
+                    </motion.span>
+                  ) : null}
+                </AnimatePresence>
               </div>
               <EditorContent
                 className="rich-editor__content"
@@ -2981,16 +3007,6 @@ type FieldProps = {
   required?: boolean;
 };
 
-type DatePickerFieldProps = {
-  "aria-describedby"?: string;
-  "aria-invalid"?: boolean;
-  id: string;
-  initialValue?: string | null;
-  name: string;
-  onValueChange?: (value: string) => void;
-  required?: boolean;
-};
-
 function DeliveryDeadlineAlert({ deliveryDate }: { deliveryDate: string }) {
   const daysRemaining = getDateInputDifferenceInDays(deliveryDate);
 
@@ -3065,85 +3081,6 @@ function getBusinessDaysRemaining(target: string) {
   }
 
   return businessDays;
-}
-
-function DatePickerField({
-  "aria-describedby": describedBy,
-  "aria-invalid": invalid = false,
-  id,
-  initialValue,
-  name,
-  onValueChange,
-  required = false,
-}: DatePickerFieldProps) {
-  const [value, setValue] = useState(initialValue ?? "");
-  const [isOpen, setIsOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const mountedRef = useRef(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const selectedDate = parseDateValue(value);
-
-  useEffect(() => {
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      return;
-    }
-
-    inputRef.current?.dispatchEvent(new Event("change", { bubbles: true }));
-  }, [value]);
-
-  useEffect(() => {
-    function handlePointerDown(event: PointerEvent) {
-      if (!wrapperRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, []);
-
-  return (
-    <div className="date-picker" ref={wrapperRef}>
-      <input ref={inputRef} name={name} type="hidden" value={value} />
-      <button
-        id={id}
-        aria-describedby={describedBy}
-        aria-expanded={isOpen}
-        aria-haspopup="dialog"
-        className="date-picker__trigger"
-        data-invalid={invalid ? "true" : "false"}
-        onClick={() => setIsOpen((current) => !current)}
-        type="button"
-      >
-        <CalendarDays aria-hidden="true" size={17} />
-        <span data-placeholder={value ? "false" : "true"}>{formatDateLabel(value)}</span>
-      </button>
-      {isOpen ? (
-        <div className="date-picker__popover" role="dialog" aria-label="Selecionar data">
-          <DayPicker
-            mode="single"
-            locale={ptBR}
-            selected={selectedDate}
-            onSelect={(date) => {
-              if (!date && required) return;
-              const nextValue = formatDateValue(date);
-              setValue(nextValue);
-              onValueChange?.(nextValue);
-              setIsOpen(false);
-            }}
-            modifiers={{
-              weekend: { dayOfWeek: [0, 6] },
-            }}
-            modifiersClassNames={{
-              weekend: "rdp-day--weekend",
-            }}
-            weekStartsOn={0}
-          />
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 function Field({ children, error, full = false, label, name, required = false }: FieldProps) {

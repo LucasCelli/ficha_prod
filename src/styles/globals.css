@@ -3307,17 +3307,8 @@ html[data-theme="dark"] .auth-card-brand {
   color: var(--color-success);
   font-size: 0.8125rem;
   font-weight: 800;
-  opacity: 0;
   text-overflow: ellipsis;
-  transform: translateY(2px);
-  transition: opacity 160ms ease, transform 160ms ease;
   white-space: nowrap;
-}
-
-.products-editor__sort-feedback[data-visible="true"],
-.products-editor__toolbar-actions:focus-within .products-editor__sort-feedback {
-  opacity: 1;
-  transform: translateY(0);
 }
 
 .products-editor__list {
@@ -3328,7 +3319,7 @@ html[data-theme="dark"] .auth-card-brand {
   border-block-start: 0;
   border-radius: 0;
   background: var(--color-surface);
-  transition: background-color 160ms ease, border-color 160ms ease;
+  transition: border-color 160ms ease;
 }
 
 .products-editor__list--droppable {
@@ -3379,10 +3370,6 @@ html[data-theme="dark"] .auth-card-brand {
 
 .products-editor__row:focus-within {
   z-index: 25;
-}
-
-.products-editor__list[data-sorted="true"] .products-editor__row {
-  animation: product-sort-flash 900ms ease;
 }
 
 .products-editor__cell {
@@ -3587,6 +3574,16 @@ html[data-theme="dark"] .auth-card-brand {
 
 .rich-editor__autofill {
   margin-inline-start: auto;
+}
+
+.rich-editor__autofill-feedback {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-success);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .rich-editor__content {
@@ -6016,16 +6013,6 @@ html[data-theme="dark"] .field select {
 
   50% {
     opacity: 0.5;
-  }
-}
-
-@keyframes product-sort-flash {
-  0% {
-    background: var(--color-success-bg);
-  }
-
-  100% {
-    background: inherit;
   }
 }
 

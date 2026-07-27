@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, FileText, X } from "lucide-react";
 import type { FichaFilters } from "./data";
+import { DatePickerField } from "./date-picker-field";
 
 type FichasFilterToolbarProps = {
   canExportPdf: boolean;
@@ -189,26 +190,26 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
       </label>
       <div className="field">
         <label htmlFor="dataInicio">Entrega inicial</label>
-        <input
+        <DatePickerField
           id="dataInicio"
+          initialValue={filters.dataInicio}
+          key={`dataInicio-${filters.dataInicio ?? ""}`}
           name="dataInicio"
-          onChange={(event) =>
-            updateFilter(searchParams, pathname, router, startTransition, "dataInicio", event.target.value)
+          onValueChange={(value) =>
+            updateFilter(searchParams, pathname, router, startTransition, "dataInicio", value)
           }
-          type="date"
-          value={filters.dataInicio ?? ""}
         />
       </div>
       <div className="field">
         <label htmlFor="dataFim">Entrega final</label>
-        <input
+        <DatePickerField
           id="dataFim"
+          initialValue={filters.dataFim}
+          key={`dataFim-${filters.dataFim ?? ""}`}
           name="dataFim"
-          onChange={(event) =>
-            updateFilter(searchParams, pathname, router, startTransition, "dataFim", event.target.value)
+          onValueChange={(value) =>
+            updateFilter(searchParams, pathname, router, startTransition, "dataFim", value)
           }
-          type="date"
-          value={filters.dataFim ?? ""}
         />
       </div>
       <div className="fichas-toolbar__status" aria-live="polite">

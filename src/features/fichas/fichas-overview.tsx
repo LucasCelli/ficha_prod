@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { CalendarDays, CircleHelp, History, ListFilter, Plus, Star } from "lucide-react";
 import { Badge, DataTable, EmptyState, Pagination, Tooltip } from "@/components/ui";
-import { formatCompactDateInput, getBusinessWeekRange } from "@/lib/dates";
+import { formatCompactDateInput, formatDateInput, getBusinessWeekRange } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { getKanbanColumnLabel } from "@/features/quadro-producao/config";
 import { FichasFilterToolbar } from "./fichas-filter-toolbar";
+import { FichaMotionRow, FichasMotionRows } from "./fichas-motion-rows";
 import { FichaRowActions } from "./ficha-row-actions";
 import { FichaNameListBadge } from "./ficha-name-list-badge";
 import { FichaRowThumbnail } from "./ficha-row-thumbnail";
@@ -180,6 +181,24 @@ function matchesShortcut(current: FichaFilters, shortcut: ShortcutFilters) {
   );
 }
 
+function formatDateRangeSummary(filters: FichaFilters) {
+  const start = filters.dataInicio ? formatSummaryDate(filters.dataInicio) : "";
+  const end = filters.dataFim ? formatSummaryDate(filters.dataFim) : "";
+
+  if (start && end) return ` (de ${start} até ${end})`;
+  if (start) return ` (a partir de ${start})`;
+  if (end) return ` (até ${end})`;
+  return "";
+}
+
+function formatSummaryDate(value: string) {
+  return formatDateInput(value, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 function renderFichasContent(result: FichaListResult, filters: FichaFilters) {
   if (result.kind === "not-configured") {
     return (
@@ -217,7 +236,7 @@ function renderFichasContent(result: FichaListResult, filters: FichaFilters) {
     <div className="fichas-list-container" aria-label="Lista de fichas">
       <div className="results-summary" aria-label="Resumo da paginação">
         <span>
-          Exibindo {formatCount(result.fichas.length)} de {formatCount(result.total)} fichas encontradas
+          Exibindo {formatCount(result.fichas.length)} de {formatCount(result.total)} fichas encontradas{formatDateRangeSummary(filters)}
         </span>
       </div>
 
@@ -225,9 +244,11 @@ function renderFichasContent(result: FichaListResult, filters: FichaFilters) {
         caption={`Lista principal de fichas operacionais`}
         columns={columns}
       >
-        {result.fichas.map((ficha) => (
-          <FichaRow key={ficha.id} ficha={ficha} currentFilters={filters} />
-        ))}
+        <FichasMotionRows>
+          {result.fichas.map((ficha) => (
+            <FichaRow key={ficha.id} ficha={ficha} currentFilters={filters} />
+          ))}
+        </FichasMotionRows>
       </DataTable>
 
       <div className="pagination-wrapper">
@@ -317,7 +338,7 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
   const printHref = `/fichas/${encodeURIComponent(ficha.id)}/imprimir`;
 
   return (
-    <tr>
+    <FichaMotionRow>
       <td>
         <div className="ficha-row__client">
           <FichaRowThumbnail alt={ficha.cliente_nome_snapshot} imageUrl={thumbUrl} />
@@ -383,7 +404,7 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
           status={ficha.status}
         />
       </td>
-    </tr>
+    </FichaMotionRow>
   );
 }
 
