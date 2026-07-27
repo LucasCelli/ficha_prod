@@ -1,10 +1,15 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { BarChart3, CalendarClock, CheckCircle2, Clock3, FilePlus2, FileText, Package } from "lucide-react";
-import { Badge, EmptyState } from "@/components/ui";
+import { Badge, DataTable, EmptyState } from "@/components/ui";
 import { requireAppSession } from "@/features/auth/session";
+import { FichaRowActions } from "@/features/fichas/ficha-row-actions";
+import { FichaRowThumbnail } from "@/features/fichas/ficha-row-thumbnail";
 import { getPersonalDashboardData } from "@/features/meu-painel/data";
 import { formatBusinessDateTime } from "@/lib/dates";
+import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import styles from "./page.module.css";
+import visual from "./visual.module.css";
 
 type Params = Record<string, string | string[] | undefined>;
 export default async function MeuPainelPage({ searchParams }: { searchParams: Promise<Params> }) {
@@ -27,7 +32,7 @@ export default async function MeuPainelPage({ searchParams }: { searchParams: Pr
   ] as const;
   const distributionTotal = Math.max(1, data.metrics.pendentes + data.metrics.entregues + data.metrics.canceladas);
 
-  return <section className={styles.page} aria-labelledby="personal-title">
+  return <section className={`${styles.page} ${visual.visual}`} aria-labelledby="personal-title">
     <header className={styles.hero}>
       <div className={styles.identity}><span className={styles.avatar}>{initials(data.user.displayName)}</span><div>
         <p className="eyebrow">Meu perfil</p><h1 id="personal-title">{data.user.displayName}</h1>
@@ -44,8 +49,8 @@ export default async function MeuPainelPage({ searchParams }: { searchParams: Pr
       {[["mes","Mês atual"],["7","7 dias"],["30","30 dias"],["90","90 dias"]].map(([value,label]) =>
         <Link className={period === value ? styles.activePeriod : ""} href={withParams(params,{period:value,page:null})} key={value}>{label}</Link>)}
     </nav>
-    <div className={styles.metrics}>{metrics.map(([label,value,Icon]) =>
-      <article className={styles.metric} key={label}><Icon size={18}/><span>{label}</span><strong>{number(value)}</strong></article>)}</div>
+    <div className={styles.metrics}>{metrics.map(([label,value,Icon],index) =>
+      <article className={`${styles.metric} ${visual.metric}`} key={label} style={{"--metric-accent":["var(--color-info)","var(--color-primary)","var(--color-pending)","var(--color-success)","var(--color-danger)"][index]} as CSSProperties}><span className={visual.metricIcon}><Icon size={20}/></span><span>{label}</span><strong>{number(value)}</strong></article>)}</div>
 
     <div className={styles.grid}>
       <section className={styles.panel}>
@@ -76,14 +81,31 @@ export default async function MeuPainelPage({ searchParams }: { searchParams: Pr
       <form className={styles.filters}><input name="busca" defaultValue={busca} placeholder="Buscar cliente…"/><select name="status" defaultValue={status}>
         <option value="todos">Todos os status</option><option value="pendente">Pendentes</option><option value="entregue">Entregues</option><option value="cancelado">Canceladas</option><option value="atrasado">Atrasadas</option>
       </select><input type="hidden" name="period" value={period}/><button className="ui-button ui-button--secondary">Aplicar</button></form>
-      {data.recent.length ? <div className={styles.tableWrap}><table><thead><tr><th>Cliente</th><th>Criação</th><th>Entrega</th><th>Peças</th><th>Status</th><th/></tr></thead><tbody>
-        {data.recent.map((ficha)=><tr key={ficha.id}><td><strong>{ficha.cliente_nome_snapshot}</strong><small>{ficha.vendedor ?? "Sem vendedor"}</small></td><td>{date(ficha.created_at.slice(0,10))}</td><td>{date(ficha.data_entrega)}</td><td>{ficha.pieces}</td><td><Badge tone={ficha.status==="entregue"?"success":ficha.status==="cancelado"?"danger":"pending"}>{statusLabel(ficha.status)}</Badge></td><td><Link href={`/fichas/${ficha.id}`}>Abrir</Link></td></tr>)}
-      </tbody></table></div> : <EmptyState title="Nenhuma ficha encontrada" description="Crie uma ficha ou ajuste os filtros."/>}
+      {data.recent.length ? <div className="fichas-list-container"><DataTable caption="Minhas fichas" columns={personalColumns}>
+        {data.recent.map((ficha)=>{const overdue=ficha.status!=="entregue"&&ficha.data_entrega<new Date().toISOString().slice(0,10);const previewHref=`/fichas/${ficha.id}`;return <tr key={ficha.id}>
+          <td><div className="ficha-row__client"><FichaRowThumbnail alt={ficha.cliente_nome_snapshot} imageUrl={ficha.imageUrl}/><span className="ui-table__primary">
+            <Link className="ui-table__link" href={previewHref}>{ficha.cliente_nome_snapshot}</Link><span className="ficha-row__meta">
+              <Badge className="ficha-row__meta-badge" tone="neutral">{ficha.pieces} {ficha.pieces===1?"peça":"peças"}</Badge>
+              <Badge className="ficha-row__meta-badge" tone="neutral">{ficha.numero_venda?`Venda ${ficha.numero_venda}`:"Sem venda"}</Badge>
+            </span></span></div></td>
+          <td><span className="ui-table__primary"><span>{date(ficha.data_entrega)}</span><small>{date(ficha.created_at.slice(0,10))} criação</small></span></td>
+          <td><Badge tone={overdue?"danger":ficha.status==="entregue"?"success":ficha.status==="cancelado"?"danger":"pending"}>{overdue?"Atrasada":statusLabel(ficha.status)}</Badge></td>
+          <td><span className="ui-table__primary"><strong>{normalizePersonalizacaoLabel(ficha.arte)}</strong><small>{ficha.vendedor??"Sem vendedor"}</small></span></td>
+          <td><FichaRowActions fichaId={ficha.id} fichaLabel={ficha.cliente_nome_snapshot} canOrganizeNameList={false} fullDeliverButton={overdue} hasOrganizedNameList={false} hasRawNameList={false} printHref={`/fichas/${ficha.id}/imprimir`} previewHref={previewHref} returnTo="/meu-painel" status={ficha.status}/></td>
+        </tr>})}
+      </DataTable></div> : <EmptyState title="Nenhuma ficha encontrada" description="Crie uma ficha ou ajuste os filtros."/>}
       <div className={styles.pagination}>{data.page>1&&<Link href={withParams(params,{page:String(data.page-1)})}>Anterior</Link>}<span>Página {data.page} de {Math.max(1,Math.ceil(data.total/data.pageSize))}</span>{data.page*data.pageSize<data.total&&<Link href={withParams(params,{page:String(data.page+1)})}>Próxima</Link>}</div>
     </section>
   </section>;
 }
 
+const personalColumns = [
+  { key:"ficha", label:"Ficha", width:"35%" },
+  { key:"datas", label:"Entrega", width:"17%" },
+  { key:"status", label:"Status", width:"13%" },
+  { key:"detalhes", label:"Detalhes", width:"18%" },
+  { key:"acoes", label:"AÃ§Ãµes", width:"220px" },
+];
 function Goal({label,current,target,projection}:{label:string;current:number;target:number;projection:number}) {
   const progress=target?Math.min(100,(current/target)*100):0;
   return <div><div className={styles.goalLabel}><span>{label}</span><strong>{current} / {target}</strong></div><progress max="100" value={progress}/><small>Projeção: {projection} no fim do mês</small></div>;

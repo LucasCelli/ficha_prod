@@ -8,6 +8,9 @@ import { calculateComparison, normalizePersonalStatus, projectMonthlyTotal } fro
 export type PersonalFicha = {
   id: string;
   cliente_nome_snapshot: string;
+  arte: string | null;
+  imageUrl: string | null;
+  numero_venda: string | null;
   created_at: string;
   updated_at: string;
   data_entrega: string;
@@ -40,7 +43,7 @@ export type PersonalDashboardResult =
   | { kind: "error"; message: string };
 
 const PAGE_SIZE = 20;
-const FICHA_SELECT = "id,cliente_nome_snapshot,created_at,updated_at,data_entrega,delivered_at,status,vendedor,ficha_itens(quantidade)";
+const FICHA_SELECT = "id,cliente_nome_snapshot,arte,numero_venda,created_at,updated_at,data_entrega,delivered_at,status,vendedor,ficha_itens(quantidade),ficha_imagens(url,ordem)";
 
 export async function getPersonalDashboardData(input: {
   userId: string; displayName: string; username: string; role: string;
@@ -129,6 +132,9 @@ export async function getPersonalDashboardData(input: {
 function mapRows(rows: Array<Record<string, unknown>>): PersonalFicha[] {
   return rows.map((row) => ({
     id: String(row.id), cliente_nome_snapshot: String(row.cliente_nome_snapshot), created_at: String(row.created_at),
+    arte: row.arte ? String(row.arte) : null,
+    imageUrl: Array.isArray(row.ficha_imagens) ? String(row.ficha_imagens[0]?.url ?? "") || null : null,
+    numero_venda: row.numero_venda ? String(row.numero_venda) : null,
     updated_at: String(row.updated_at), data_entrega: String(row.data_entrega),
     delivered_at: row.delivered_at ? String(row.delivered_at) : null, status: row.status as PersonalFicha["status"],
     vendedor: row.vendedor ? String(row.vendedor) : null,
