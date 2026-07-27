@@ -389,11 +389,18 @@ function getProductColorClass(value: string, fallbackIndex: number) {
     "print-product-color--fallback-6",
   ];
 
-  const match = catalog.reduce<{ className: string; keyLength: number } | null>((best, item) => {
-    const key = item.keys.find((candidate) => normalized.includes(normalizeKey(candidate)));
-    if (!key) return best;
-    const keyLength = normalizeKey(key).length;
-    if (!best || keyLength > best.keyLength) return { className: item.className, keyLength };
+  const match = catalog.reduce<{ className: string; index: number; keyLength: number } | null>((best, item) => {
+    for (const candidate of item.keys) {
+      const normalizedCandidate = normalizeKey(candidate);
+      const index = normalized.indexOf(normalizedCandidate);
+      if (index < 0) continue;
+
+      const keyLength = normalizedCandidate.length;
+      if (!best || index < best.index || (index === best.index && keyLength > best.keyLength)) {
+        best = { className: item.className, index, keyLength };
+      }
+    }
+
     return best;
   }, null);
 

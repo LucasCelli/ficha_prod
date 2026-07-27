@@ -1075,6 +1075,15 @@ function FichaFormInner({
     setListaNomesModalOpen(false);
   }
 
+  function clearListaNomesRaw() {
+    setValue("listaNomesRaw", "", { shouldDirty: true });
+    setListaNomesDraft("");
+    setIncludeRawNameListOnPrint(false);
+    toast.success("Lista de nomes removida", {
+      description: mode === "edit" ? "Salve as alterações para confirmar a remoção." : "A lista foi removida do formulário.",
+    });
+  }
+
   function hasUnsavedChanges() {
     if (isSubmittingRef.current) return false;
 
@@ -2515,6 +2524,12 @@ function FichaFormInner({
                 <ClipboardList aria-hidden="true" size={16} />
                 {listaNomesRaw?.trim() ? "Editar lista de nomes" : "Adicionar lista de nomes"}
               </Button>
+              {listaNomesRaw?.trim() ? (
+                <Button onClick={clearListaNomesRaw} type="button" variant="danger">
+                  <Trash2 aria-hidden="true" size={16} />
+                  Remover lista
+                </Button>
+              ) : null}
               {listaNomesRaw?.trim() ? <span>Lista pendente anexada</span> : null}
             </div>
             <div className="rich-editor">

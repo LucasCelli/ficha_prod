@@ -29,8 +29,11 @@ export default async function NovaFichaPage({ searchParams }: NovaFichaPageProps
           ...mapFichaToInitialData({
             ...duplicateResult.ficha,
             imagens: [],
+            lista_ia: null,
+            lista_nomes_raw: null,
           }),
           imagens: [],
+          listaNomesRaw: "",
         }
       : undefined;
 

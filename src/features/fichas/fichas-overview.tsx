@@ -142,6 +142,7 @@ function buildOperationalShortcuts(): OperationalShortcut[] {
 function hrefForFilters(currentFilters: FichaFilters, shortcutFilters: ShortcutFilters) {
   const params = new URLSearchParams();
 
+  if (currentFilters.arte) params.set("arte", currentFilters.arte);
   if (currentFilters.busca) params.set("busca", currentFilters.busca);
   if (currentFilters.evento === true) params.set("evento", "true");
   if (shortcutFilters.status) params.set("status", shortcutFilters.status);
@@ -155,6 +156,7 @@ function hrefForFilters(currentFilters: FichaFilters, shortcutFilters: ShortcutF
 function hrefForPdf(filters: FichaFilters) {
   const params = new URLSearchParams();
 
+  if (filters.arte) params.set("arte", filters.arte);
   if (filters.busca) params.set("busca", filters.busca);
   if (filters.evento === true) params.set("evento", "true");
   if (filters.status) params.set("status", filters.status);

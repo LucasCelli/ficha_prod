@@ -2107,7 +2107,7 @@ html[data-theme="dark"] .auth-card-brand {
 .fichas-toolbar {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(220px, 2fr) repeat(5, minmax(0, 1fr)) auto;
+  grid-template-columns: minmax(220px, 2fr) repeat(6, minmax(0, 1fr)) auto;
   gap: 12px;
   align-items: end;
   border: 1px solid var(--color-border-subtle);
@@ -8283,12 +8283,6 @@ html[data-theme="dark"] .quadro-producao-card:hover {
   padding: 0;
 }
 
-.quadro-producao-card__title:hover,
-.quadro-producao-card__title:focus-visible {
-  color: var(--color-primary);
-  outline: none;
-}
-
 .quadro-producao-icon-button {
   display: inline-flex;
   width: 22px;
@@ -9464,7 +9458,6 @@ html[data-theme="dark"] .quadro-producao-card {
   border: 0;
   background: transparent;
   color: var(--color-text);
-  cursor: pointer;
   font: inherit;
   font-size: 0.78rem;
   font-weight: 750;
@@ -9478,12 +9471,6 @@ html[data-theme="dark"] .quadro-producao-card {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.quadro-producao-card__title:hover,
-.quadro-producao-card__title:focus-visible {
-  color: var(--color-primary);
-  outline: none;
 }
 
 .quadro-producao-card__event-chip {

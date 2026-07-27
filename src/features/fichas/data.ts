@@ -314,6 +314,10 @@ function applyFichaFilters<T extends FichaQuery>(query: T, filters: FichaFilters
     nextQuery = nextQuery.ilike("busca_normalizada", getSafeSearchPattern(filters.busca)) as T;
   }
 
+  if (filters.arte) {
+    nextQuery = nextQuery.eq("arte", filters.arte) as T;
+  }
+
   if (typeof filters.evento === "boolean") {
     nextQuery = nextQuery.eq("evento", filters.evento) as T;
   }

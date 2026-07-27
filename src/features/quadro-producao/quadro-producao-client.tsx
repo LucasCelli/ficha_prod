@@ -1102,26 +1102,14 @@ const KanbanCard = memo(function KanbanCard({
     >
       <div className="quadro-producao-card__body">
         <div className="quadro-producao-card__titlebar">
-          <button
-            aria-label={`Abrir detalhes de ${card.clienteNome}`}
-            className="quadro-producao-card__title"
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpenView(card);
-            }}
-            onMouseDownCapture={stopCardDrag}
-            onMouseDown={stopCardDrag}
-            onPointerDownCapture={stopCardDrag}
-            onPointerDown={stopCardDrag}
-            type="button"
-          >
+          <div className="quadro-producao-card__title">
             {card.evento ? (
               <span aria-label="Pedido de evento" className="quadro-producao-card__event-chip" role="img">
                 <Star aria-hidden="true" size={12} />
               </span>
             ) : null}
             <span>{card.clienteNome}</span>
-          </button>
+          </div>
           {card.clienteAuxiliar ? (
             <Tooltip label={card.clienteAuxiliar}>
               <button

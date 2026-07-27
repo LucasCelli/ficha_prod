@@ -21,10 +21,10 @@ export async function GET(request: NextRequest) {
   }
 
   const filters = {
+    arte: normalizeTextFilter(request.nextUrl.searchParams.get("arte") ?? undefined),
     busca:
       normalizeTextFilter(request.nextUrl.searchParams.get("busca") ?? undefined) ??
-      normalizeTextFilter(request.nextUrl.searchParams.get("cliente") ?? undefined) ??
-      normalizeTextFilter(request.nextUrl.searchParams.get("arte") ?? undefined),
+      normalizeTextFilter(request.nextUrl.searchParams.get("cliente") ?? undefined),
     dataFim: normalizeDateFilter(request.nextUrl.searchParams.get("dataFim") ?? undefined),
     dataInicio: normalizeDateFilter(request.nextUrl.searchParams.get("dataInicio") ?? undefined),
     evento: normalizeBooleanFilter(request.nextUrl.searchParams.get("evento") ?? undefined),

@@ -34,7 +34,7 @@ export function Modal({ children, description, onClose, onCloseHref, size = "md"
     }
 
     if (onCloseHref) {
-      router.push(onCloseHref);
+      router.replace(onCloseHref, { scroll: false });
     }
   }, [onClose, onCloseHref, router]);
 

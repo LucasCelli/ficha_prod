@@ -152,6 +152,29 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
           <option value="entregue">Entregue</option>
         </select>
       </div>
+      <div className="field">
+        <label htmlFor="arte">Personalização</label>
+        <select
+          id="arte"
+          name="arte"
+          onChange={(event) =>
+            updateFilter(searchParams, pathname, router, startTransition, "arte", event.target.value)
+          }
+          value={filters.arte ?? ""}
+        >
+          <option value="">Todas</option>
+          <option value="sem_personalizacao">Sem personalização</option>
+          <option value="sublimacao">Sublimação</option>
+          <option value="serigrafia">Serigrafia</option>
+          <option value="bordado">Bordado</option>
+          <option value="patch">PATCH Termocolante</option>
+          <option value="dtf">DTF Têxtil</option>
+          <option value="transfer">Transfer</option>
+          <option value="sublimacao_serigrafia">Sublimação e Serigrafia</option>
+          <option value="serigrafia_dtf">Serigrafia e DTF</option>
+          <option value="serigrafia_bordado">Serigrafia e Bordado</option>
+        </select>
+      </div>
       <label className="checkbox-filter" htmlFor="evento">
         <input
           checked={filters.evento === true}
@@ -244,7 +267,7 @@ function updateFilter(
   pathname: string,
   router: { replace: (href: string, options?: { scroll?: boolean }) => void },
   startTransition: (callback: () => void) => void,
-  key: keyof Pick<FichaFilters, "busca" | "dataFim" | "dataInicio" | "evento"> | "status",
+  key: keyof Pick<FichaFilters, "arte" | "busca" | "dataFim" | "dataInicio" | "evento"> | "status",
   value: string,
 ) {
   const params = new URLSearchParams(searchParams.toString());
