@@ -356,6 +356,13 @@ export type Database = {
             referencedRelation: "kanban_columns";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "fichas_created_by_user_id_fkey";
+            columns: ["created_by_user_id"];
+            isOneToOne: false;
+            referencedRelation: "app_users";
+            referencedColumns: ["id"];
+          },
         ];
       };
       ficha_itens: {

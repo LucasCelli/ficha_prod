@@ -26,6 +26,8 @@ export type FichaListItem = Pick<
   ficha_imagens?: { url: string }[];
   ficha_itens?: { quantidade: number | null }[];
   kanban_column?: { name: string; slug: string } | null;
+  created_by_user_id?: string | null;
+  author?: { display_name: string } | null;
   lista_ia_anexada?: boolean;
   lista_nomes_raw_anexada?: boolean;
 };
@@ -39,6 +41,7 @@ export type FichaDetail = Database["public"]["Tables"]["fichas"]["Row"] & {
 
 export type FichaFilters = {
   arte?: string;
+  autor?: string;
   busca?: string;
   cliente?: string;
   dataFim?: string;
@@ -99,7 +102,7 @@ export async function listFichas(filters: FichaFilters = {}): Promise<FichaListR
       supabase
         .from("fichas")
         .select(
-          "id, cliente_nome_snapshot, cliente_auxiliar, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, lista_ia_anexada, lista_nomes_raw_anexada, ficha_itens(quantidade), ficha_imagens(url), kanban_column:kanban_columns(name,slug)",
+          "id, cliente_nome_snapshot, cliente_auxiliar, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, created_by_user_id, numero_venda, evento, lista_ia_anexada, lista_nomes_raw_anexada, ficha_itens(quantidade), ficha_imagens(url), kanban_column:kanban_columns(name,slug), author:app_users!fichas_created_by_user_id_fkey(display_name)",
           { count: "exact" },
         )
         .order("created_at", { ascending: false })
@@ -310,6 +313,10 @@ function applyFichaFilters<T extends FichaQuery>(query: T, filters: FichaFilters
     nextQuery = nextQuery.eq("id", filters.id) as T;
   }
 
+  if (filters.autor) {
+    nextQuery = nextQuery.eq("created_by_user_id", filters.autor) as T;
+  }
+
   if (filters.busca) {
     nextQuery = nextQuery.ilike("busca_normalizada", getSafeSearchPattern(filters.busca)) as T;
   }
@@ -342,6 +349,15 @@ type FichaQuery = {
   neq: (column: string, value: string) => FichaQuery;
   or: (filters: string) => FichaQuery;
 };
+
+export async function listFichaAuthors() {
+  if (!getSupabaseConfigStatus().hasServerConfig) return [];
+  const { data } = await createServerSupabaseClient()
+    .from("app_users")
+    .select("id,display_name")
+    .order("display_name");
+  return data ?? [];
+}
 
 function getOffset(page: number | undefined, pageSize: number) {
   return ((page ?? 1) - 1) * pageSize;

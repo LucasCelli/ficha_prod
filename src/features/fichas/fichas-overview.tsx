@@ -21,6 +21,7 @@ import {
 } from "./data";
 
 type FichasOverviewProps = {
+  authors: { id: string; display_name: string }[];
   filters: FichaFilters;
   result: FichaListResult;
 };
@@ -32,6 +33,7 @@ const columns = [
   { key: "personalizacao", label: "Etapas", width: "15%" },
   { key: "responsavel", label: "Responsável", width: "12%" },
   { key: "acao", label: "Ações", width: "236px" },
+  { key: "autor", label: "Autor", width: "12%" },
 ];
 
 const statusLabels: Record<FichaStatus, string> = {
@@ -46,7 +48,7 @@ const statusTones: Record<FichaStatus, "danger" | "pending" | "success"> = {
   pendente: "pending",
 };
 
-export function FichasOverview({ filters, result }: FichasOverviewProps) {
+export function FichasOverview({ authors, filters, result }: FichasOverviewProps) {
   const shortcuts = buildOperationalShortcuts();
 
   return (
@@ -86,6 +88,7 @@ export function FichasOverview({ filters, result }: FichasOverviewProps) {
       </nav>
 
       <FichasFilterToolbar
+        authors={authors}
         canExportPdf={result.kind === "ok" && result.total > 0}
         filters={filters}
         pdfHref={hrefForPdf(filters)}
@@ -266,6 +269,7 @@ function renderFichasContent(result: FichaListResult, filters: FichaFilters) {
 
 function getFichaPaginationParams(filters: FichaFilters) {
   return {
+    autor: filters.autor,
     busca: filters.busca,
     dataFim: filters.dataFim,
     dataInicio: filters.dataInicio,
@@ -390,6 +394,7 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
         </span>
       </td>
       <td>{ficha.vendedor ?? <span className="ui-table__muted">—</span>}</td>
+      <td>{ficha.author?.display_name ?? <span className="ui-table__muted">Sem autor</span>}</td>
       <td>
         <FichaRowActions
           fichaId={ficha.id}

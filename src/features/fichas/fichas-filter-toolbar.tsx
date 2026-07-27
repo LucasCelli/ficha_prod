@@ -7,6 +7,7 @@ import type { FichaFilters } from "./data";
 import { DatePickerField } from "./date-picker-field";
 
 type FichasFilterToolbarProps = {
+  authors: { id: string; display_name: string }[];
   canExportPdf: boolean;
   filters: FichaFilters;
   pdfHref: string;
@@ -15,7 +16,7 @@ type FichasFilterToolbarProps = {
 const SEARCH_DEBOUNCE_MS = 450;
 const PDF_EXPORT_TIMEOUT_MS = 12_000;
 
-export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFilterToolbarProps) {
+export function FichasFilterToolbar({ authors, canExportPdf, filters, pdfHref }: FichasFilterToolbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -154,6 +155,22 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
         </select>
       </div>
       <div className="field">
+        <label htmlFor="autor">Autor</label>
+        <select
+          id="autor"
+          name="autor"
+          onChange={(event) =>
+            updateFilter(searchParams, pathname, router, startTransition, "autor", event.target.value)
+          }
+          value={filters.autor ?? ""}
+        >
+          <option value="">Todos</option>
+          {authors.map((author) => (
+            <option key={author.id} value={author.id}>{author.display_name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
         <label htmlFor="arte">Personalização</label>
         <select
           id="arte"
@@ -268,7 +285,7 @@ function updateFilter(
   pathname: string,
   router: { replace: (href: string, options?: { scroll?: boolean }) => void },
   startTransition: (callback: () => void) => void,
-  key: keyof Pick<FichaFilters, "arte" | "busca" | "dataFim" | "dataInicio" | "evento"> | "status",
+  key: keyof Pick<FichaFilters, "arte" | "autor" | "busca" | "dataFim" | "dataInicio" | "evento"> | "status",
   value: string,
 ) {
   const params = new URLSearchParams(searchParams.toString());
