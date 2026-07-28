@@ -229,14 +229,6 @@ export function FichasFilterToolbar({ authors, canExportPdf, filters, pdfHref }:
           }
         />
       </div>
-      <div className="fichas-toolbar__status" aria-live="polite">
-        {isPending ? (
-          <>
-            <span className="button-spinner" aria-hidden="true" />
-            <span>Atualizando…</span>
-          </>
-        ) : null}
-      </div>
       <div className="fichas-toolbar__export" ref={exportMenuRef}>
         <button
           aria-disabled={!canExportPdf || isExportingPdf}
@@ -260,6 +252,14 @@ export function FichasFilterToolbar({ authors, canExportPdf, filters, pdfHref }:
               Incluir atrasadas
             </button>
           </div>
+        ) : null}
+      </div>
+      <div className="fichas-toolbar__status" aria-live="polite">
+        {isPending ? (
+          <>
+            <span className="button-spinner" aria-hidden="true" />
+            <span>Atualizando…</span>
+          </>
         ) : null}
       </div>
     </form>

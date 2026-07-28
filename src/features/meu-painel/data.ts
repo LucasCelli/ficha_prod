@@ -3,7 +3,7 @@ import "server-only";
 import { addDaysToInput, getBusinessTodayInput } from "@/lib/dates";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { calculateComparison, normalizePersonalStatus, projectMonthlyTotal } from "./analytics";
+import { calculateComparison, normalizePersonalStatus } from "./analytics";
 
 export type PersonalFicha = {
   id: string;
@@ -24,7 +24,6 @@ export type PersonalDashboardData = {
   allTimeTotal: number;
   averageLeadDays: number | null;
   comparison: number | null;
-  goal: { fichas: number; pieces: number; currentFichas: number; currentPieces: number; projectedFichas: number; projectedPieces: number } | null;
   idle: PersonalFicha[];
   lastLoginAt: string | null;
   metrics: { atrasadas: number; canceladas: number; entregues: number; fichas: number; noPrazo: number; pendentes: number; pieces: number };
@@ -72,42 +71,30 @@ export async function getPersonalDashboardData(input: {
     else if (status !== "todos") listQuery = listQuery.eq("status", status);
     if (search) listQuery = listQuery.ilike("cliente_nome_snapshot", `%${search.replace(/[%_]/g, "")}%`);
 
-    const [periodRows, previousRows, monthRows, listResult, goalResult, userResult, allTimeResult] = await Promise.all([
+    const [periodRows, previousRows, listResult, userResult, allTimeResult] = await Promise.all([
       supabase.from("fichas").select(FICHA_SELECT).eq("created_by_user_id", input.userId).gte("created_at", `${since}T00:00:00Z`),
       supabase.from("fichas").select("id", { count: "exact", head: true }).eq("created_by_user_id", input.userId)
         .gte("created_at", `${previousSince}T00:00:00Z`).lt("created_at", `${since}T00:00:00Z`),
-      supabase.from("fichas").select(FICHA_SELECT).eq("created_by_user_id", input.userId).gte("created_at", `${monthStart}T00:00:00Z`),
       listQuery,
-      supabase.from("user_monthly_goals").select("fichas_target,pieces_target").eq("user_id", input.userId).eq("month", monthStart).maybeSingle(),
       supabase.from("app_users").select("last_login_at").eq("id", input.userId).maybeSingle(),
       supabase.from("fichas").select("id", { count: "exact", head: true }).eq("created_by_user_id", input.userId),
     ]);
-    const error = periodRows.error ?? previousRows.error ?? monthRows.error ?? listResult.error ?? goalResult.error ?? userResult.error ?? allTimeResult.error;
+    const error = periodRows.error ?? previousRows.error ?? listResult.error ?? userResult.error ?? allTimeResult.error;
     if (error) return { kind: "error", message: error.message };
 
     const periodFichas = mapRows(periodRows.data ?? []);
-    const monthFichas = mapRows(monthRows.data ?? []);
     const listFichas = mapRows(listResult.data ?? []);
     const delivered = periodFichas.filter((f) => f.status === "entregue");
     const leadDays = delivered.filter((f) => f.delivered_at)
       .map((f) => (new Date(f.delivered_at!).getTime() - new Date(f.created_at).getTime()) / 86_400_000);
     const previousCount = previousRows.count ?? 0;
     const currentCount = periodFichas.length;
-    const currentPieces = monthFichas.reduce((sum, ficha) => sum + ficha.pieces, 0);
-    const elapsedDays = Math.max(1, Number(today.slice(8, 10)));
-    const monthDays = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0)).getUTCDate();
     const staleBefore = addDaysToInput(today, -7);
 
     return { kind: "ok", data: {
       allTimeTotal: allTimeResult.count ?? 0,
       averageLeadDays: leadDays.length ? leadDays.reduce((sum, value) => sum + value, 0) / leadDays.length : null,
       comparison: calculateComparison(currentCount, previousCount),
-      goal: goalResult.data ? {
-        fichas: goalResult.data.fichas_target, pieces: goalResult.data.pieces_target,
-        currentFichas: monthFichas.length, currentPieces,
-        projectedFichas: projectMonthlyTotal(monthFichas.length, elapsedDays, monthDays),
-        projectedPieces: projectMonthlyTotal(currentPieces, elapsedDays, monthDays),
-      } : null,
       idle: periodFichas.filter((f) => f.status === "pendente" && f.updated_at.slice(0, 10) <= staleBefore).slice(0, 5),
       lastLoginAt: userResult.data?.last_login_at ?? null,
       metrics: {

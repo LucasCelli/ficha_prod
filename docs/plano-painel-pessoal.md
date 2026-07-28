@@ -11,7 +11,7 @@ Disponibilizar uma área pessoal em `/meu-painel` para cada usuário acompanhar 
 - Novas fichas e cartões manuais registram automaticamente o usuário da sessão.
 - Fichas antigas são associadas primeiro por nome/usuário exato e depois por similaridade única de alta confiança.
 - Casos ambíguos permanecem sem autor para revisão administrativa.
-- O superadministrador define metas mensais e pode corrigir autoria individualmente ou em lote por vendedor.
+- O superadministrador pode corrigir autoria individualmente ou em lote.
 - A entrega e a reabertura passam a gerar eventos de histórico.
 
 ## Implementação
@@ -19,10 +19,9 @@ Disponibilizar uma área pessoal em `/meu-painel` para cada usuário acompanhar 
 ### Banco de dados
 
 - `fichas.created_by_user_id`: relação nullable com `app_users`.
-- `user_monthly_goals`: metas mensais de fichas e peças.
 - `ficha_status_events`: histórico de entrega/reabertura e usuário responsável.
 - `ficha_ownership_audit`: auditoria de transferências de autoria.
-- Índices por autor/data, meta/mês e eventos.
+- Índices por autor/data e eventos.
 - Migração conservadora das fichas históricas usando `unaccent` e `pg_trgm`.
 
 ### Meu painel
@@ -31,14 +30,14 @@ Disponibilizar uma área pessoal em `/meu-painel` para cada usuário acompanhar 
 - Períodos de 7, 30 e 90 dias.
 - Indicadores de fichas, peças, pendências, entregas e atrasos.
 - Comparação com o período anterior, entregas no prazo e prazo médio.
-- Gráfico de evolução, metas mensais e próximas entregas.
+- Gráfico de evolução, distribuição por status e próximas entregas.
 - Lista paginada das próprias fichas, com busca por cliente e filtro de status.
 - Atalhos para criar e abrir fichas.
 - Consultas sempre limitadas pelo ID obtido da sessão no servidor.
 
 ### Administração
 
-- Tela `/usuarios/perfis` para configurar metas.
+- Tela `/usuarios/perfis` para revisar e transferir autoria.
 - Fila de fichas sem autor.
 - Atribuição individual e atribuição em lote para fichas com o mesmo vendedor.
 - Registro de auditoria com autor anterior, novo autor, administrador, motivo e data.
@@ -50,7 +49,6 @@ Disponibilizar uma área pessoal em `/meu-painel` para cada usuário acompanhar 
 - Cartões manuais também recebem autoria.
 - Entregar ou reabrir registra um evento com o usuário responsável.
 - Busca, status, período e paginação não removem o escopo do usuário da sessão.
-- Metas salvas pelo administrador aparecem no painel correspondente.
 - Atribuições administrativas atualizam o painel e geram auditoria.
 - Fichas históricas ambíguas não são atribuídas automaticamente.
 - TypeScript, lint e build devem concluir sem erros.

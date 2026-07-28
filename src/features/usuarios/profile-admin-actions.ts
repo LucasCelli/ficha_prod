@@ -4,16 +4,6 @@ import { redirect } from "next/navigation";
 import { requireSuperadmin } from "@/features/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export async function saveMonthlyGoalAction(formData: FormData) {
-  await requireSuperadmin();
-  const userId=text(formData,"userId"), month=text(formData,"month");
-  const fichas=Math.max(0,Number(text(formData,"fichas"))||0), pieces=Math.max(0,Number(text(formData,"pieces"))||0);
-  if(!userId||!/^\d{4}-\d{2}-01$/.test(month)) redirect("/usuarios/perfis?toast=invalid");
-  const {error}=await createServerSupabaseClient().from("user_monthly_goals").upsert({user_id:userId,month,fichas_target:fichas,pieces_target:pieces},{onConflict:"user_id,month"});
-  if(error) redirect(errorHref(error.message));
-  revalidateAll(); redirect("/usuarios/perfis?toast=goal-saved");
-}
-
 export async function assignFichaOwnerAction(formData: FormData) {
   const session=await requireSuperadmin();
   const userId=text(formData,"userId"), reason=text(formData,"reason");
@@ -34,8 +24,8 @@ export async function assignFichaOwnerAction(formData: FormData) {
     await Promise.all(changed.map((row)=>supabase.from("fichas").update({created_by_user_id:row.created_by_user_id}).eq("id",row.id)));
     redirect(errorHref(`Auditoria não registrada: ${auditError.message}`));
   }
-  revalidateAll(); redirect(`/usuarios/perfis?toast=${changed.length>1?"owners-saved":"owner-saved"}`);
+  revalidatePath("/meu-painel"); revalidatePath("/fichas"); revalidatePath("/usuarios/perfis");
+  redirect(`/usuarios/perfis?toast=${changed.length>1?"owners-saved":"owner-saved"}`);
 }
-function revalidateAll(){revalidatePath("/meu-painel");revalidatePath("/fichas");revalidatePath("/usuarios/perfis");}
 function errorHref(message:string){return `/usuarios/perfis?toast=error&message=${encodeURIComponent(message)}`;}
 function text(formData:FormData,key:string){return String(formData.get(key)??"").trim();}

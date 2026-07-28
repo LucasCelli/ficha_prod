@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { BarChart3, CalendarClock, CheckCircle2, Clock3, FilePlus2, FileText, Package } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock3, FilePlus2, FileText, Package } from "lucide-react";
 import { Badge, DataTable, EmptyState } from "@/components/ui";
 import { requireAppSession } from "@/features/auth/session";
 import { FichaRowActions } from "@/features/fichas/ficha-row-actions";
@@ -8,7 +8,7 @@ import { FichaRowThumbnail } from "@/features/fichas/ficha-row-thumbnail";
 import { getPersonalDashboardData } from "@/features/meu-painel/data";
 import { formatBusinessDateTime } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
-import styles from "./page.module.css";
+import styles from "./profile.module.css";
 import visual from "./visual.module.css";
 
 type Params = Record<string, string | string[] | undefined>;
@@ -66,11 +66,6 @@ export default async function MeuPainelPage({ searchParams }: { searchParams: Pr
         </div>
       </section>
       <aside className={styles.panel}>
-        <div className={styles.panelTitle}><div><p className="eyebrow">Meta mensal</p><h2>Progresso</h2></div><BarChart3 size={20}/></div>
-        {data.goal ? <div className={styles.goals}>
-          <Goal label="Fichas" current={data.goal.currentFichas} target={data.goal.fichas} projection={data.goal.projectedFichas}/>
-          <Goal label="Peças" current={data.goal.currentPieces} target={data.goal.pieces} projection={data.goal.projectedPieces}/>
-        </div> : <p className={styles.muted}>Nenhuma meta configurada para este mês.</p>}
         <h3 className={styles.subheading}>Próximas entregas</h3><FichaLinks rows={data.upcoming}/>
         {data.idle.length > 0 && <><h3 className={styles.subheading}>Sem movimentação há 7 dias</h3><FichaLinks rows={data.idle}/></>}
       </aside>
@@ -106,10 +101,6 @@ const personalColumns = [
   { key:"detalhes", label:"Detalhes", width:"18%" },
   { key:"acoes", label:"AÃ§Ãµes", width:"220px" },
 ];
-function Goal({label,current,target,projection}:{label:string;current:number;target:number;projection:number}) {
-  const progress=target?Math.min(100,(current/target)*100):0;
-  return <div><div className={styles.goalLabel}><span>{label}</span><strong>{current} / {target}</strong></div><progress max="100" value={progress}/><small>Projeção: {projection} no fim do mês</small></div>;
-}
 function Distribution({label,value,total}:{label:string;value:number;total:number}) { return <div><span>{label}</span><div><i style={{width:`${(value/total)*100}%`}}/></div><strong>{value}</strong></div>; }
 function FichaLinks({rows}:{rows:Array<{id:string;cliente_nome_snapshot:string;data_entrega:string}>}) { return <ul className={styles.upcoming}>{rows.map((f)=><li key={f.id}><Link href={`/fichas/${f.id}`}><strong>{f.cliente_nome_snapshot}</strong><span>{date(f.data_entrega)}</span></Link></li>)}</ul>; }
 function first(value:string|string[]|undefined){return Array.isArray(value)?value[0]:value;}

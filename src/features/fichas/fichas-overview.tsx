@@ -27,13 +27,13 @@ type FichasOverviewProps = {
 };
 
 const columns = [
-  { key: "cliente", label: "Ficha", width: "31%" },
-  { key: "entrega", label: "Entrega", width: "13%" },
-  { key: "status", label: "Status", width: "11%" },
-  { key: "personalizacao", label: "Etapas", width: "15%" },
-  { key: "responsavel", label: "Responsável", width: "12%" },
-  { key: "acao", label: "Ações", width: "236px" },
-  { key: "autor", label: "Autor", width: "12%" },
+  { key: "cliente", label: "Ficha", width: "27%" },
+  { key: "entrega", label: "Entrega", width: "11%" },
+  { key: "status", label: "Status", width: "10%" },
+  { key: "personalizacao", label: "Etapas", width: "13%" },
+  { key: "responsavel", label: "Responsável", width: "9%" },
+  { key: "autor", label: "Autor", width: "9%" },
+  { key: "acao", label: "Ações", width: "21%" },
 ];
 
 const statusLabels: Record<FichaStatus, string> = {
@@ -245,6 +245,7 @@ function renderFichasContent(result: FichaListResult, filters: FichaFilters) {
 
       <DataTable
         caption={`Lista principal de fichas operacionais`}
+        className="fichas-table"
         columns={columns}
       >
         <FichasMotionRows>
@@ -343,7 +344,7 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
 
   return (
     <FichaMotionRow>
-      <td>
+      <td data-label="Ficha">
         <div className="ficha-row__client">
           <FichaRowThumbnail alt={ficha.cliente_nome_snapshot} imageUrl={thumbUrl} />
           <span className="ui-table__primary">
@@ -374,18 +375,18 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
           </span>
         </div>
       </td>
-      <td>
+      <td data-label="Entrega">
         <span className="ui-table__primary">
           <span>{formatDate(ficha.data_entrega)}</span>
           {isOverdue ? <span className="ficha-overdue-note">{formatOverdueDays(overdueDays)}</span> : null}
         </span>
       </td>
-      <td>
+      <td data-label="Status">
         <div className="ficha-status-line">
           {showEventStar ? <Tooltip label="Evento">{statusBadge}</Tooltip> : statusBadge}
         </div>
       </td>
-      <td>
+      <td data-label="Etapas">
         <span className="ui-table__primary ficha-stage-cell">
           <strong className="ficha-stage-cell__type">{normalizePersonalizacaoLabel(ficha.arte)}</strong>
           <Badge aria-label={`Etapa: ${kanbanStageLabel}`} className="ficha-stage-cell__badge" tone="info">
@@ -393,9 +394,9 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
           </Badge>
         </span>
       </td>
-      <td>{ficha.vendedor ?? <span className="ui-table__muted">—</span>}</td>
-      <td>{ficha.author?.display_name ?? <span className="ui-table__muted">Sem autor</span>}</td>
-      <td>
+      <td data-label="Responsável">{ficha.vendedor ?? <span className="ui-table__muted">—</span>}</td>
+      <td data-label="Autor">{ficha.author?.display_name ?? <span className="ui-table__muted">Sem autor</span>}</td>
+      <td data-label="Ações">
         <FichaRowActions
           fichaId={ficha.id}
           fichaLabel={ficha.cliente_nome_snapshot}

@@ -48,7 +48,7 @@ export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverview
             {result.operadores.length} cadastrados
           </span>
           <Link className="ui-button ui-button--secondary" href="/usuarios/perfis">
-            Metas e autoria
+            Gestão de autoria
           </Link>
           <Link className="ui-button ui-button--primary" href="/usuarios?modal=novo">
             <UserPlus aria-hidden="true" size={18} />

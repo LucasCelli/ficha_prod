@@ -41,8 +41,16 @@ export function FloatingMenu({ children, label, trigger }: FloatingMenuProps) {
     const rootStyles = window.getComputedStyle(rootElement);
     const minWidth = rootStyles.getPropertyValue("--floating-menu-min-width").trim() || "232px";
     const menuWidth = menuRef.current?.offsetWidth || Number.parseFloat(minWidth) || 232;
+    const menuHeight = menuRef.current?.offsetHeight || 0;
     const viewportPadding = 8;
-    const top = Math.min(triggerRect.bottom + 8, window.innerHeight - viewportPadding);
+    const gap = 8;
+    const availableBelow = window.innerHeight - triggerRect.bottom - gap - viewportPadding;
+    const availableAbove = triggerRect.top - gap - viewportPadding;
+    const openAbove = menuHeight > availableBelow && availableAbove > availableBelow;
+    const top = openAbove
+      ? Math.max(viewportPadding, triggerRect.top - menuHeight - gap)
+      : triggerRect.bottom + gap;
+    const availableHeight = Math.max(120, openAbove ? availableAbove : availableBelow);
     const left = Math.min(
       Math.max(viewportPadding, triggerRect.right - menuWidth),
       Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding),
@@ -51,6 +59,7 @@ export function FloatingMenu({ children, label, trigger }: FloatingMenuProps) {
     setMenuPosition({
       "--floating-menu-min-width": minWidth,
       left,
+      maxHeight: availableHeight,
       top,
     } as CSSProperties);
   }, []);
