@@ -10151,3 +10151,124 @@ html[data-theme="dark"] .quadro-producao-card {
 .image-cropper__file-input { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 @media (max-width: 760px) { .image-cropper__workspace { grid-template-columns: 1fr; } .image-cropper__actions { grid-template-columns: 1fr 1fr; } .image-cropper__actions > div, .image-cropper__actions > .image-cropper__download { grid-column: 1 / -1; } }
 @media (max-width: 480px) { .image-cropper__upload { min-height: 300px; padding: 24px 16px; } .image-cropper__editor-card { padding: 12px; } .image-cropper__actions { grid-template-columns: 1fr; } .image-cropper__actions > * { grid-column: 1; } }
+
+.image-cropper__side {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.image-filters {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  padding: 18px;
+}
+
+.image-filters__heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.image-filters__heading h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+}
+
+.image-filters__heading p {
+  margin: 4px 0 0;
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+}
+
+.image-filters__clear,
+.image-filters__reset {
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  padding: 2px;
+}
+
+.image-filters__toolbar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.image-filters__toolbar .ui-tooltip {
+  display: block;
+}
+
+.image-filters__toolbar button {
+  display: grid;
+  width: 100%;
+  min-height: 42px;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--easing-standard), border-color var(--duration-fast) var(--easing-standard), color var(--duration-fast) var(--easing-standard);
+}
+
+.image-filters__toolbar button:hover,
+.image-filters__toolbar button:focus-visible {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.image-filters__toolbar button.is-active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+
+.image-filters__controls {
+  display: grid;
+  gap: 13px;
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 14px;
+}
+
+.image-filters__control {
+  display: grid;
+  gap: 5px;
+}
+
+.image-filters__control > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.image-filters__control output {
+  min-width: 34px;
+  color: var(--color-muted);
+  font-weight: 500;
+  text-align: end;
+}
+
+.image-filters__control input {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
+.image-filters__reset {
+  justify-self: start;
+  margin-top: 2px;
+}
