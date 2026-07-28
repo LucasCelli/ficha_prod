@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { Badge, EmptyState } from "@/components/ui";
 import { requireSuperadmin } from "@/features/auth/session";
-import { formatBusinessDateTime } from "@/lib/dates";
-import { assignFichaOwnerAction } from "@/features/usuarios/profile-admin-actions";
 import { getProfileAdminData, OWNERSHIP_PAGE_SIZE } from "@/features/usuarios/profile-admin";
 import { OwnershipSelection } from "./ownership-selection";
 import styles from "./ownership.module.css";
@@ -18,8 +16,7 @@ export default async function PerfisAdminPage({searchParams}:{searchParams:Promi
     <section className={styles.panel}>
       <div className={styles.title}><div><h2>Fichas e responsáveis</h2><p>Selecione uma ou mais fichas, inclusive já atribuídas.</p></div><Badge>{result.total}</Badge></div>
       <form className={styles.search}><input name="busca" defaultValue={busca} placeholder="Buscar cliente…"/><select name="autor" defaultValue={autor} aria-label="Filtrar por autor"><option value="">Todos os autores</option>{result.users.map((u)=><option value={u.id} key={u.id}>{u.display_name}</option>)}</select><label><input type="checkbox" name="semAutor" value="true" defaultChecked={semAutor}/> Somente sem autor</label><button className="ui-button ui-button--secondary">Filtrar</button></form>
-      <form action={assignFichaOwnerAction} className={styles.bulk} id="bulk-owner-form"><select name="userId" required defaultValue=""><option value="" disabled>Novo autor</option>{result.users.map((u)=><option value={u.id} key={u.id}>{u.display_name}</option>)}</select><input name="reason" required minLength={5} placeholder="Motivo da transferência"/><label><input type="checkbox" name="confirmed" required/> Confirmo a alteração e a auditoria</label><button className="ui-button ui-button--primary">Aplicar selecionadas</button></form>
-      {result.fichas.length?<OwnershipSelection><div className={styles.rows}>{result.fichas.map((ficha)=><article key={ficha.id}><input aria-label={`Selecionar ${ficha.cliente_nome_snapshot}`} form="bulk-owner-form" name="fichaIds" type="checkbox" value={ficha.id}/><div><strong>{ficha.cliente_nome_snapshot}</strong><small>Vendedor: {ficha.vendedor??"não informado"} · {formatBusinessDateTime(new Date(ficha.created_at))}</small></div><Badge tone={ficha.author?"info":"warning"}>{ficha.author?.display_name??"Sem autor"}</Badge><Link href={`/fichas/${ficha.id}`}>Abrir</Link></article>)}</div></OwnershipSelection>:<EmptyState title="Nenhuma ficha encontrada" description="Ajuste os filtros."/>}
+      {result.fichas.length?<OwnershipSelection fichas={result.fichas} users={result.users}/>:<EmptyState title="Nenhuma ficha encontrada" description="Ajuste os filtros."/>}
       <div className={styles.pagination}>{page>1&&<Link href={href(params,page-1)}>Anterior</Link>}<span>Página {page} de {Math.max(1,Math.ceil(result.total/OWNERSHIP_PAGE_SIZE))}</span>{page*OWNERSHIP_PAGE_SIZE<result.total&&<Link href={href(params,page+1)}>Próxima</Link>}</div>
     </section>
   </section>;

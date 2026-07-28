@@ -6,7 +6,7 @@ export async function getProfileAdminData(input: { page?: number; busca?: string
   const supabase = createServerSupabaseClient();
   const page = Math.max(1, input.page ?? 1);
   let fichasQuery = supabase.from("fichas")
-    .select("id,cliente_nome_snapshot,vendedor,created_at,created_by_user_id,author:app_users!fichas_created_by_user_id_fkey(display_name)", { count: "exact" })
+    .select("id,cliente_nome_snapshot,vendedor,created_at,created_by_user_id,ficha_imagens(url),author:app_users!fichas_created_by_user_id_fkey(display_name)", { count: "exact" })
     .order("created_at", { ascending: false })
     .range((page - 1) * OWNERSHIP_PAGE_SIZE, page * OWNERSHIP_PAGE_SIZE - 1);
   if (input.semAutor) fichasQuery = fichasQuery.is("created_by_user_id", null);

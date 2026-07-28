@@ -1,31 +1,60 @@
 "use server";
+
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { requireSuperadmin } from "@/features/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export async function assignFichaOwnerAction(formData: FormData) {
-  const session=await requireSuperadmin();
-  const userId=text(formData,"userId"), reason=text(formData,"reason");
-  const ids=[...new Set(formData.getAll("fichaIds").map(String).map((v)=>v.trim()).filter(Boolean))];
-  if(!userId||!ids.length||reason.length<5||formData.get("confirmed")!=="on") redirect("/usuarios/perfis?toast=invalid");
-  const supabase=createServerSupabaseClient();
-  const {data:rows,error:lookupError}=await supabase.from("fichas").select("id,created_by_user_id").in("id",ids);
-  if(lookupError) redirect(errorHref(lookupError.message));
-  const changed=(rows??[]).filter((row)=>row.created_by_user_id!==userId);
-  if(!changed.length) redirect("/usuarios/perfis?toast=unchanged");
-  const changedIds=changed.map((row)=>row.id);
-  const {error}=await supabase.from("fichas").update({created_by_user_id:userId}).in("id",changedIds);
-  if(error) redirect(errorHref(error.message));
-  const {error:auditError}=await supabase.from("ficha_ownership_audit").insert(changed.map((row)=>({
-    ficha_id:row.id,previous_user_id:row.created_by_user_id,new_user_id:userId,changed_by_user_id:session.user.id,reason,
-  })));
-  if(auditError) {
-    await Promise.all(changed.map((row)=>supabase.from("fichas").update({created_by_user_id:row.created_by_user_id}).eq("id",row.id)));
-    redirect(errorHref(`Auditoria não registrada: ${auditError.message}`));
+const ADMIN_REASON = "Transferência administrativa pela gestão de autoria";
+
+type AssignOwnerInput = { userId: string; fichaIds: string[] };
+type AssignOwnerResult =
+  | { ok: true; changedIds: string[]; userId: string; message: string }
+  | { ok: false; message: string };
+
+export async function assignFichaOwnerAction(input: AssignOwnerInput): Promise<AssignOwnerResult> {
+  const session = await requireSuperadmin();
+  const userId = input.userId.trim();
+  const ids = [...new Set(input.fichaIds.map((id) => id.trim()).filter(Boolean))];
+  if (!userId || !ids.length) return { ok: false, message: "Selecione um autor e ao menos uma ficha." };
+
+  const supabase = createServerSupabaseClient();
+  const { data: rows, error: lookupError } = await supabase
+    .from("fichas")
+    .select("id,created_by_user_id")
+    .in("id", ids);
+  if (lookupError) return { ok: false, message: lookupError.message };
+
+  const changed = (rows ?? []).filter((row) => row.created_by_user_id !== userId);
+  if (!changed.length) return { ok: false, message: "As fichas selecionadas já pertencem a esse autor." };
+
+  const changedIds = changed.map((row) => row.id);
+  const { error } = await supabase.from("fichas").update({ created_by_user_id: userId }).in("id", changedIds);
+  if (error) return { ok: false, message: error.message };
+
+  const { error: auditError } = await supabase.from("ficha_ownership_audit").insert(
+    changed.map((row) => ({
+      ficha_id: row.id,
+      previous_user_id: row.created_by_user_id,
+      new_user_id: userId,
+      changed_by_user_id: session.user.id,
+      reason: ADMIN_REASON,
+    })),
+  );
+  if (auditError) {
+    await Promise.all(
+      changed.map((row) =>
+        supabase.from("fichas").update({ created_by_user_id: row.created_by_user_id }).eq("id", row.id),
+      ),
+    );
+    return { ok: false, message: `Auditoria não registrada: ${auditError.message}` };
   }
-  revalidatePath("/meu-painel"); revalidatePath("/fichas"); revalidatePath("/usuarios/perfis");
-  redirect(`/usuarios/perfis?toast=${changed.length>1?"owners-saved":"owner-saved"}`);
+
+  revalidatePath("/meu-painel");
+  revalidatePath("/fichas");
+  return {
+    ok: true,
+    changedIds,
+    userId,
+    message: changed.length > 1 ? "Autores atualizados." : "Autor atualizado.",
+  };
 }
-function errorHref(message:string){return `/usuarios/perfis?toast=error&message=${encodeURIComponent(message)}`;}
-function text(formData:FormData,key:string){return String(formData.get(key)??"").trim();}
