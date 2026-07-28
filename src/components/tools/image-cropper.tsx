@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent, type WheelEvent } from "react";
 import { Crop, Download, ImagePlus, RotateCcw, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { IMAGE_CROPPER_WATERMARK } from "./image-cropper-watermark";
 
 const OUTPUT_WIDTH = 1080;
 const OUTPUT_HEIGHT = 1440;
@@ -15,12 +16,14 @@ export function ImageCropper() {
   const frameRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const dragRef = useRef<{ origin: Point; offset: Point } | null>(null);
+  const downloadCountRef = useRef(0);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState("imagem");
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [isOver, setIsOver] = useState(false);
+  const [naturalAspect, setNaturalAspect] = useState(3 / 4);
 
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
 
@@ -35,6 +38,7 @@ export function ImageCropper() {
     if (file.size > MAX_FILE_SIZE) return void toast.error("A imagem deve ter no máximo 25 MB.");
     setImageUrl(URL.createObjectURL(file));
     setFileName(file.name.replace(/\.[^.]+$/, "") || "imagem");
+    downloadCountRef.current = 0;
     resetCrop();
   }
 
@@ -74,8 +78,22 @@ export function ImageCropper() {
   }
 
   function changeZoom(value: number) {
-    setZoom(value);
-    setOffset((current) => clampOffset(current, value));
+    const nextZoom = Math.max(1, Math.min(3, value));
+    setZoom(nextZoom);
+    setOffset((current) => clampOffset(current, nextZoom));
+  }
+
+  function handleWheel(event: WheelEvent<HTMLDivElement>) {
+    event.preventDefault();
+    changeZoom(zoom + (event.deltaY < 0 ? 0.1 : -0.1));
+  }
+
+  function handleImageLoad() {
+    const image = imageRef.current;
+    if (image?.naturalWidth && image.naturalHeight) {
+      setNaturalAspect(image.naturalWidth / image.naturalHeight);
+    }
+    resetCrop();
   }
 
   function downloadCrop() {
@@ -95,16 +113,25 @@ export function ImageCropper() {
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
     context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT);
-    canvas.toBlob((blob) => {
-      if (!blob) return void toast.error("Não foi possível gerar o arquivo.");
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${fileName}-3x4.jpg`;
-      link.click();
-      URL.revokeObjectURL(url);
-      toast.success("Imagem recortada e baixada.");
-    }, "image/jpeg", 0.94);
+    const watermark = new Image();
+    watermark.onload = () => {
+      const watermarkWidth = 150;
+      const watermarkHeight = (watermark.height / watermark.width) * watermarkWidth;
+      context.drawImage(watermark, canvas.width - watermarkWidth - 50, canvas.height - watermarkHeight - 50, watermarkWidth, watermarkHeight);
+      canvas.toBlob((blob) => {
+        if (!blob) return void toast.error("Não foi possível gerar o arquivo.");
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        downloadCountRef.current += 1;
+        link.download = `${fileName}_instagram_${downloadCountRef.current}.png`;
+        link.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        toast.success("Imagem recortada e baixada.");
+      }, "image/png");
+    };
+    watermark.onerror = () => toast.error("Não foi possível aplicar a marca-d’água.");
+    watermark.src = IMAGE_CROPPER_WATERMARK;
   }
 
   function handleDrop(event: DragEvent<HTMLButtonElement>) {
@@ -137,15 +164,15 @@ export function ImageCropper() {
         <div className="image-cropper__workspace">
           <div className="image-cropper__editor-card">
             <div className="image-cropper__format"><span>Formato retrato 3:4</span><strong>{OUTPUT_WIDTH} × {OUTPUT_HEIGHT} px</strong></div>
-            <div aria-label="Área de recorte. Arraste a imagem para reposicioná-la." className={`image-cropper__frame${isDragging ? " is-dragging" : ""}`} onPointerCancel={endDrag} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} ref={frameRef} role="img">
+            <div aria-label="Área de recorte. Arraste a imagem para reposicioná-la." className={`image-cropper__frame${isDragging ? " is-dragging" : ""}`} onPointerCancel={endDrag} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} onWheel={handleWheel} ref={frameRef} role="img">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img alt="" draggable={false} onLoad={resetCrop} ref={imageRef} src={imageUrl} style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})` }} />
+              <img alt="" draggable={false} onLoad={handleImageLoad} ref={imageRef} src={imageUrl} style={{ height: naturalAspect >= 3 / 4 ? "100%" : `${((3 / 4) / naturalAspect) * 100}%`, left: `calc(50% + ${offset.x}px)`, top: `calc(50% + ${offset.y}px)`, transform: `translate(-50%, -50%) scale(${zoom})`, width: naturalAspect >= 3 / 4 ? `${(naturalAspect / (3 / 4)) * 100}%` : "100%" }} />
               <div className="image-cropper__grid" aria-hidden="true" />
             </div>
             <label className="image-cropper__zoom"><span>Zoom</span><input aria-label="Zoom da imagem" max="3" min="1" onChange={(event) => changeZoom(Number(event.target.value))} step="0.01" type="range" value={zoom} /><output>{Math.round(zoom * 100)}%</output></label>
           </div>
           <aside className="image-cropper__actions">
-            <div><h2>Ajuste o enquadramento</h2><p>Arraste a imagem e use o controle de zoom. O arquivo é processado somente neste navegador.</p></div>
+            <div><h2>Ajuste o enquadramento</h2><p>Arraste a imagem e use o controle ou a roda do mouse para aplicar zoom. O arquivo é processado somente neste navegador.</p></div>
             <Button className="image-cropper__download" onClick={downloadCrop}><Download size={18} />Cortar e baixar</Button>
             <Button onClick={resetCrop} variant="secondary"><RotateCcw size={17} />Redefinir corte</Button>
             <Button onClick={() => inputRef.current?.click()} variant="secondary"><Upload size={17} />Trocar imagem</Button>
