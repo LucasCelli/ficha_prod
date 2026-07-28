@@ -8,11 +8,13 @@ export const metadata: Metadata = {
 
 const tools = [
   {
+    description: "Ajuste enquadramento e proporção antes de publicar suas imagens.",
     href: "/ferramentas/cortar-imagem",
     icon: Crop,
     label: "Cortar imagem para Instagram",
   },
   {
+    description: "Organize listas de nomes, tamanhos e observações com auxílio da IA.",
     href: "/ferramentas/organizar-nomes-ia",
     icon: WandSparkles,
     label: "Organizar nomes com IA",
@@ -35,10 +37,13 @@ export default function FerramentasPage() {
             <li key={tool.href}>
               <Link className="tools-page__card" href={tool.href}>
                 <span className="tools-page__icon" aria-hidden="true">
-                  <Icon size={20} />
+                  <Icon size={24} />
                 </span>
-                <strong>{tool.label}</strong>
-                <ArrowRight size={16} aria-hidden="true" />
+                <ArrowRight className="tools-page__arrow" size={18} aria-hidden="true" />
+                <span className="tools-page__copy">
+                  <strong>{tool.label}</strong>
+                  <span>{tool.description}</span>
+                </span>
               </Link>
             </li>
           );
