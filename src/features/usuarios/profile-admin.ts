@@ -2,7 +2,7 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const OWNERSHIP_PAGE_SIZE = 25;
-export async function getProfileAdminData(input: { page?: number; busca?: string; semAutor?: boolean } = {}) {
+export async function getProfileAdminData(input: { page?: number; busca?: string; autor?: string; semAutor?: boolean } = {}) {
   const supabase = createServerSupabaseClient();
   const page = Math.max(1, input.page ?? 1);
   let fichasQuery = supabase.from("fichas")
@@ -10,6 +10,7 @@ export async function getProfileAdminData(input: { page?: number; busca?: string
     .order("created_at", { ascending: false })
     .range((page - 1) * OWNERSHIP_PAGE_SIZE, page * OWNERSHIP_PAGE_SIZE - 1);
   if (input.semAutor) fichasQuery = fichasQuery.is("created_by_user_id", null);
+  else if (input.autor?.trim()) fichasQuery = fichasQuery.eq("created_by_user_id", input.autor.trim());
   if (input.busca?.trim()) fichasQuery = fichasQuery.ilike("cliente_nome_snapshot", `%${input.busca.trim().replace(/[%_]/g, "")}%`);
   const [users, fichas] = await Promise.all([
     supabase.from("app_users").select("id,display_name,username,active").order("display_name"),
