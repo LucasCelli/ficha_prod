@@ -181,7 +181,7 @@ export function ImageCropper() {
           </div>
           <div className="image-cropper__side">
             <aside className="image-cropper__actions">
-              <div><h2>Ajuste o enquadramento</h2><p>Arraste a imagem e use o controle ou a roda do mouse para aplicar zoom. O arquivo é processado somente neste navegador.</p></div>
+              <div><h2>Ajuste o enquadramento</h2></div>
               <Button className="image-cropper__download" onClick={downloadCrop}><Download size={18} />Cortar e baixar</Button>
               <Button onClick={resetCrop} variant="secondary"><RotateCcw size={17} />Redefinir corte</Button>
               <Button onClick={() => inputRef.current?.click()} variant="secondary"><Upload size={17} />Trocar imagem</Button>

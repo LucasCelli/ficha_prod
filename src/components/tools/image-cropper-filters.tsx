@@ -1,6 +1,6 @@
 "use client";
 
-import { Palette, SlidersHorizontal, Sparkles } from "lucide-react";
+import { Contrast, Palette, SlidersHorizontal } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 
 export type FilterMode = "none" | "skin" | "vibrant" | "custom";
@@ -24,7 +24,7 @@ export const DEFAULT_FILTER_SETTINGS: FilterSettings = {
 
 export function getImageFilter(mode: FilterMode, settings: FilterSettings) {
   if (mode === "skin") return "brightness(1.03) contrast(1.02) saturate(0.88) hue-rotate(-5deg)";
-  if (mode === "vibrant") return "contrast(1.04) saturate(1.22)";
+  if (mode === "vibrant") return "brightness(0.96) contrast(1.14) saturate(0.82) hue-rotate(-8deg)";
   if (mode !== "custom") return "none";
 
   const saturation = Math.max(0, (1 + settings.saturation / 100) * (1 + settings.vibrance / 200));
@@ -70,8 +70,8 @@ export function ImageCropperFilters({ mode, onModeChange, onSettingsChange, sett
         <Tooltip label="Tom de pele natural">
           <button aria-label="Tom de pele natural" aria-pressed={mode === "skin"} className={mode === "skin" ? "is-active" : undefined} onClick={() => toggleMode("skin")} type="button"><Palette size={19} /></button>
         </Tooltip>
-        <Tooltip label="Aumentar vibracao">
-          <button aria-label="Aumentar vibracao" aria-pressed={mode === "vibrant"} className={mode === "vibrant" ? "is-active" : undefined} onClick={() => toggleMode("vibrant")} type="button"><Sparkles size={19} /></button>
+        <Tooltip label="Pretos intensos e pele natural">
+          <button aria-label="Pretos intensos e pele natural" aria-pressed={mode === "vibrant"} className={mode === "vibrant" ? "is-active" : undefined} onClick={() => toggleMode("vibrant")} type="button"><Contrast size={19} /></button>
         </Tooltip>
         <Tooltip label="Ajuste personalizado">
           <button aria-label="Ajuste personalizado" aria-pressed={mode === "custom"} className={mode === "custom" ? "is-active" : undefined} onClick={() => toggleMode("custom")} type="button"><SlidersHorizontal size={19} /></button>
