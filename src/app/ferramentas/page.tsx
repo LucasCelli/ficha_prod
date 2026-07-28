@@ -1,12 +1,17 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRight, WandSparkles } from "lucide-react";
+import { ArrowRight, Crop, WandSparkles } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Ferramentas | Fichas Tecnicas",
 };
 
 const tools = [
+  {
+    href: "/ferramentas/cortar-imagem",
+    icon: Crop,
+    label: "Cortar imagem para Instagram",
+  },
   {
     href: "/ferramentas/organizar-nomes-ia",
     icon: WandSparkles,

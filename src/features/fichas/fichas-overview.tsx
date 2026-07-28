@@ -21,19 +21,17 @@ import {
 } from "./data";
 
 type FichasOverviewProps = {
-  authors: { id: string; display_name: string }[];
   filters: FichaFilters;
   result: FichaListResult;
 };
 
 const columns = [
-  { key: "cliente", label: "Ficha", width: "27%" },
-  { key: "entrega", label: "Entrega", width: "11%" },
-  { key: "status", label: "Status", width: "10%" },
-  { key: "personalizacao", label: "Etapas", width: "13%" },
-  { key: "responsavel", label: "Responsável", width: "9%" },
-  { key: "autor", label: "Autor", width: "9%" },
-  { key: "acao", label: "Ações", width: "21%" },
+  { key: "cliente", label: "Ficha", width: "29%" },
+  { key: "entrega", label: "Entrega", width: "12%" },
+  { key: "status", label: "Status", width: "11%" },
+  { key: "personalizacao", label: "Etapas", width: "15%" },
+  { key: "responsavel", label: "Responsável", width: "11%" },
+  { key: "acao", label: "Ações", width: "22%" },
 ];
 
 const statusLabels: Record<FichaStatus, string> = {
@@ -48,7 +46,7 @@ const statusTones: Record<FichaStatus, "danger" | "pending" | "success"> = {
   pendente: "pending",
 };
 
-export function FichasOverview({ authors, filters, result }: FichasOverviewProps) {
+export function FichasOverview({ filters, result }: FichasOverviewProps) {
   const shortcuts = buildOperationalShortcuts();
 
   return (
@@ -88,7 +86,6 @@ export function FichasOverview({ authors, filters, result }: FichasOverviewProps
       </nav>
 
       <FichasFilterToolbar
-        authors={authors}
         canExportPdf={result.kind === "ok" && result.total > 0}
         filters={filters}
         pdfHref={hrefForPdf(filters)}
@@ -270,7 +267,6 @@ function renderFichasContent(result: FichaListResult, filters: FichaFilters) {
 
 function getFichaPaginationParams(filters: FichaFilters) {
   return {
-    autor: filters.autor,
     busca: filters.busca,
     dataFim: filters.dataFim,
     dataInicio: filters.dataInicio,
@@ -394,8 +390,15 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
           </Badge>
         </span>
       </td>
-      <td data-label="Responsável">{ficha.vendedor ?? <span className="ui-table__muted">—</span>}</td>
-      <td data-label="Autor">{ficha.author?.display_name ?? <span className="ui-table__muted">Sem autor</span>}</td>
+      <td data-label="Responsável">
+        {ficha.vendedor ? (
+          <Tooltip label={`Autor da ficha: ${ficha.author?.display_name ?? "Sem autor"}`}>
+            <span className="ficha-responsavel" tabIndex={0}>{ficha.vendedor}</span>
+          </Tooltip>
+        ) : (
+          <span className="ui-table__muted">—</span>
+        )}
+      </td>
       <td data-label="Ações">
         <FichaRowActions
           fichaId={ficha.id}

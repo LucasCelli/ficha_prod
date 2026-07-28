@@ -12,7 +12,6 @@ import {
   type FichaDetailResult,
   getFichaById,
   listFichas,
-  listFichaAuthors,
   normalizeBooleanFilter,
   normalizeDateFilter,
   normalizeFichaStatus,
@@ -40,7 +39,6 @@ export default async function FichasPage({ searchParams }: FichasPageProps) {
 
   const filters = {
     arte: normalizeTextFilter(params?.arte),
-    autor: normalizeTextFilter(params?.autor),
     busca,
     dataFim: normalizeDateFilter(params?.dataFim),
     dataInicio: normalizeDateFilter(params?.dataInicio),
@@ -48,7 +46,7 @@ export default async function FichasPage({ searchParams }: FichasPageProps) {
     page: normalizePageFilter(params?.page),
     status: normalizeFichaStatus(params?.status),
   };
-  const [result, authors] = await Promise.all([listFichas(filters), listFichaAuthors()]);
+  const result = await listFichas(filters);
 
   const searchParamsObj = new URLSearchParams();
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -64,7 +62,7 @@ export default async function FichasPage({ searchParams }: FichasPageProps) {
 
   return (
     <>
-      <FichasOverview authors={authors} filters={filters} result={result} />
+      <FichasOverview filters={filters} result={result} />
       {printId ? (
         <Modal onCloseHref={onCloseHref} size="print" title="Prévia de impressão">
           <FichaPrintPreviewShell
