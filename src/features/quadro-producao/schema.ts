@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { INSUMO_STATUS_VALUES } from "./config";
 
 function trimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -35,11 +34,6 @@ export const createManualKanbanCardSchema = z.object({
     z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe uma data válida."),
   ),
   evento: z.boolean().default(false),
-  insumoStatus: z.enum(INSUMO_STATUS_VALUES).default("tudo_ok"),
   material: z.preprocess(optionalTrimmedString, z.string().optional()),
   title: z.preprocess(trimmedString, z.string().min(1, "Informe o título do cartão.")),
-});
-
-export const updateKanbanCardInsumoSchema = z.object({
-  insumoStatus: z.enum(INSUMO_STATUS_VALUES),
 });

@@ -10,18 +10,8 @@ export const BASE_KANBAN_COLUMN_SLUGS = [
 
 export const KANBAN_COLUMN_COLOR_TONES = ["primary", "info", "success", "warning", "danger"] as const;
 
-export const INSUMO_STATUS_VALUES = ["tudo_ok", "sem_tecido", "sem_tinta", "sem_papel", "pendencias"] as const;
-
 export type BaseKanbanColumnSlug = (typeof BASE_KANBAN_COLUMN_SLUGS)[number];
-export type InsumoStatus = Database["public"]["Enums"]["insumo_status"];
 
-export const INSUMO_STATUS_LABELS: Record<InsumoStatus, string> = {
-  tudo_ok: "Tudo OK",
-  sem_tecido: "Sem tecido",
-  sem_tinta: "Sem tinta",
-  sem_papel: "Sem papel",
-  pendencias: "Pendências",
-};
 
 export const BASE_COLUMN_LABELS: Record<BaseKanbanColumnSlug, string> = {
   pendente: "Preparando Arte",

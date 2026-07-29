@@ -40,8 +40,6 @@ import {
 import { Button, Modal, Tooltip } from "@/components/ui";
 import { formatDateInput, formatShortDateInput, getBusinessTodayInput, getDateInputDifferenceInDays } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
-import type { InsumoStatus } from "./config";
-import { INSUMO_STATUS_LABELS, INSUMO_STATUS_VALUES } from "./config";
 import type {
   KanbanBoardColumn,
   KanbanCardSummary,
@@ -50,7 +48,6 @@ import type {
 } from "./data";
 import {
   fetchQuadroProducao,
-  patchKanbanCardInsumoStatus,
   patchKanbanCardMove,
   patchKanbanColumn,
   postKanbanCardEntregar,
@@ -71,7 +68,6 @@ type ManualCardDraft = {
   columnId: string;
   dataEntrega: string;
   evento: boolean;
-  insumoStatus: InsumoStatus;
   material: string;
   title: string;
 };
@@ -150,7 +146,6 @@ function areQuadroFiltersEqual(left: QuadroProducaoFilters, right: QuadroProduca
   return (
     left.arte === right.arte &&
     left.busca === right.busca &&
-    left.insumo === right.insumo &&
     left.semana === right.semana &&
     left.tecido === right.tecido
   );
@@ -259,7 +254,6 @@ function getEmptyManualCardDraft(columnId: string): ManualCardDraft {
     columnId,
     dataEntrega: getBusinessTodayInput(),
     evento: false,
-    insumoStatus: "tudo_ok",
     material: "",
     title: "",
   };
@@ -396,34 +390,6 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
     },
   });
 
-  const insumoMutation = useMutation({
-    mutationFn: (input: { cardId: string; insumoStatus: InsumoStatus }) =>
-      patchKanbanCardInsumoStatus(input.cardId, input.insumoStatus),
-    onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: [BOARD_QUERY_KEY] });
-      const previous = queryClient.getQueriesData<QuadroProducaoResult>({ queryKey: [BOARD_QUERY_KEY] });
-      const updateColumns = (currentColumns: KanbanBoardColumn[]) =>
-        currentColumns.map((column) => ({
-          ...column,
-          cards: column.cards.map((card) =>
-            card.id === input.cardId ? { ...card, insumoStatus: input.insumoStatus } : card,
-          ),
-        }));
-
-      setLocalColumns((currentColumns) => updateColumns(currentColumns ?? canonicalColumns));
-      queryClient.setQueriesData<QuadroProducaoResult>({ queryKey: [BOARD_QUERY_KEY] }, (result) =>
-        updateQueryResult(result, updateColumns),
-      );
-      return { previous };
-    },
-    onError: (error, _input, context) => {
-      context?.previous.forEach(([key, value]) => queryClient.setQueryData(key, value));
-      toast.error(error.message);
-    },
-    onSettled: () => {
-      setLocalColumns(null);
-    },
-  });
 
   const deliverMutation = useMutation({
     mutationFn: (cardId: string) => postKanbanCardEntregar(cardId),
@@ -509,7 +475,6 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
     void setFilters({
       arte: null,
       busca: null,
-      insumo: null,
       semana: null,
       tecido: null,
     });
@@ -705,19 +670,6 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                   </option>
                 ))}
               </select>
-              <select
-                aria-label="Filtrar por status"
-                className="quadro-producao-select"
-                onChange={(event) => void setFilters({ insumo: event.target.value || null })}
-                value={filters.insumo}
-              >
-                <option value="">Todos os status</option>
-                {(filterOptions?.insumos ?? []).map((insumo) => (
-                  <option key={insumo.value} value={insumo.value}>
-                    {insumo.label}
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
         </div>
@@ -798,11 +750,9 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                 columnIndex={index}
                 columns={columns}
                 deliverPending={deliverMutation.isPending}
-                insumoPending={insumoMutation.isPending}
                 isCardDragging={Boolean(dragStart)}
                 isDropColumn={dropColumnId === column.id}
                 key={column.id}
-                onChangeInsumo={(card, insumoStatus) => insumoMutation.mutate({ cardId: card.id, insumoStatus })}
                 onDeliverCard={(card) => deliverMutation.mutate(card.id)}
                 onMoveNextCard={moveToNextColumn}
                 onOpenManualCard={openManualCardModal}
@@ -920,22 +870,6 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                 value={manualCardDraft.material}
               />
             </label>
-            <label className="quadro-producao-field">
-              <span>Status</span>
-              <select
-                className="quadro-producao-select"
-                onChange={(event) =>
-                  setManualCardDraft((draft) => ({ ...draft, insumoStatus: event.target.value as InsumoStatus }))
-                }
-                value={manualCardDraft.insumoStatus}
-              >
-                {INSUMO_STATUS_VALUES.map((value) => (
-                  <option key={value} value={value}>
-                    {INSUMO_STATUS_LABELS[value as InsumoStatus]}
-                  </option>
-                ))}
-              </select>
-            </label>
             <label className="quadro-producao-checkbox">
               <input
                 checked={manualCardDraft.evento}
@@ -961,8 +895,6 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
           card={viewCard}
           columns={columns}
           deliverPending={deliverMutation.isPending}
-          insumoPending={insumoMutation.isPending}
-          onChangeInsumo={(card, insumoStatus) => insumoMutation.mutate({ cardId: card.id, insumoStatus })}
           onClose={() => setViewCard(null)}
           onDeliverCard={(card) => deliverMutation.mutate(card.id)}
           onMoveNextCard={moveToNextColumn}
@@ -977,10 +909,8 @@ type KanbanColumnProps = {
   columnIndex: number;
   columns: KanbanBoardColumn[];
   deliverPending: boolean;
-  insumoPending: boolean;
   isCardDragging: boolean;
   isDropColumn: boolean;
-  onChangeInsumo: (card: KanbanCardSummary, insumoStatus: InsumoStatus) => void;
   onDeliverCard: (card: KanbanCardSummary) => void;
   onMoveNextCard: (card: KanbanCardSummary) => void;
   onOpenManualCard: (columnId: string) => void;
@@ -995,10 +925,8 @@ function KanbanColumn({
   columnIndex,
   columns,
   deliverPending,
-  insumoPending,
   isCardDragging,
   isDropColumn,
-  onChangeInsumo,
   onDeliverCard,
   onMoveNextCard,
   onOpenManualCard,
@@ -1089,11 +1017,9 @@ function KanbanColumn({
             cardIndex={cardIndex}
             columnId={column.id}
             deliverPending={deliverPending}
-            insumoPending={insumoPending}
             isCardDragging={isCardDragging}
             isLastColumn={columnIndex === columns.length - 1}
             key={card.id}
-            onChangeInsumo={onChangeInsumo}
             onDeliverCard={onDeliverCard}
             onMoveNextCard={onMoveNextCard}
             onOpenView={onOpenView}
@@ -1116,10 +1042,8 @@ type KanbanCardProps = {
   cardIndex: number;
   columnId: string;
   deliverPending: boolean;
-  insumoPending: boolean;
   isCardDragging: boolean;
   isLastColumn: boolean;
-  onChangeInsumo: (card: KanbanCardSummary, insumoStatus: InsumoStatus) => void;
   onDeliverCard: (card: KanbanCardSummary) => void;
   onMoveNextCard: (card: KanbanCardSummary) => void;
   onOpenView: (card: KanbanCardSummary) => void;
@@ -1130,10 +1054,8 @@ const KanbanCard = memo(function KanbanCard({
   cardIndex,
   columnId,
   deliverPending,
-  insumoPending,
   isCardDragging,
   isLastColumn,
-  onChangeInsumo,
   onDeliverCard,
   onMoveNextCard,
   onOpenView,
@@ -1190,26 +1112,6 @@ const KanbanCard = memo(function KanbanCard({
               {formatCount(card.itemQuantity)} {card.itemQuantity === 1 ? "item" : "itens"}
             </span>
           ) : null}
-          <label className="quadro-producao-status-chip" data-status={card.insumoStatus}>
-            <span className="sr-only">Status</span>
-            <select
-              aria-label={`Status de ${card.clienteNome}`}
-              disabled={insumoPending}
-              onChange={(event) => onChangeInsumo(card, event.target.value as InsumoStatus)}
-              onClick={stopCardDrag}
-              onMouseDownCapture={stopCardDrag}
-              onMouseDown={stopCardDrag}
-              onPointerDownCapture={stopCardDrag}
-              onPointerDown={stopCardDrag}
-              value={card.insumoStatus}
-            >
-              {INSUMO_STATUS_VALUES.map((value) => (
-                <option key={value} value={value}>
-                  {INSUMO_STATUS_LABELS[value as InsumoStatus]}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
 
         <div className="quadro-producao-card__footer">
@@ -1363,8 +1265,6 @@ type CardDetailsModalProps = {
   card: KanbanCardSummary;
   columns: KanbanBoardColumn[];
   deliverPending: boolean;
-  insumoPending: boolean;
-  onChangeInsumo: (card: KanbanCardSummary, insumoStatus: InsumoStatus) => void;
   onClose: () => void;
   onDeliverCard: (card: KanbanCardSummary) => void;
   onMoveNextCard: (card: KanbanCardSummary) => void;
@@ -1374,8 +1274,6 @@ function CardDetailsModal({
   card,
   columns,
   deliverPending,
-  insumoPending,
-  onChangeInsumo,
   onClose,
   onDeliverCard,
   onMoveNextCard,
@@ -1429,21 +1327,6 @@ function CardDetailsModal({
           </dl>
 
           <div className="quadro-producao-view-modal__actions">
-            <label className="quadro-producao-view-modal__status">
-              <span>Status</span>
-              <select
-                className="quadro-producao-select"
-                disabled={insumoPending}
-                onChange={(event) => onChangeInsumo(card, event.target.value as InsumoStatus)}
-                value={card.insumoStatus}
-              >
-                {INSUMO_STATUS_VALUES.map((value) => (
-                  <option key={value} value={value}>
-                    {INSUMO_STATUS_LABELS[value as InsumoStatus]}
-                  </option>
-                ))}
-              </select>
-            </label>
             {isLastColumn ? (
               <Button
                 className="quadro-producao-view-modal__move quadro-producao-view-modal__move--deliver"

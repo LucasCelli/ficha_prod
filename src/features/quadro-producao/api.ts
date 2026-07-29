@@ -1,5 +1,4 @@
 import type { QuadroProducaoFilters, QuadroProducaoResult } from "./data";
-import type { InsumoStatus } from "./config";
 
 function buildBoardQuery(filters: QuadroProducaoFilters) {
   const params = new URLSearchParams();
@@ -7,7 +6,6 @@ function buildBoardQuery(filters: QuadroProducaoFilters) {
   if (filters.busca) params.set("busca", filters.busca);
   if (filters.arte) params.set("arte", filters.arte);
   if (filters.tecido) params.set("tecido", filters.tecido);
-  if (filters.insumo) params.set("insumo", filters.insumo);
   if (filters.semana) params.set("semana", "true");
 
   const query = params.toString();
@@ -85,7 +83,6 @@ export async function postManualKanbanCard(payload: {
   columnId: string;
   dataEntrega: string;
   evento: boolean;
-  insumoStatus: InsumoStatus;
   material?: string;
   title: string;
 }) {
@@ -114,18 +111,6 @@ export async function patchKanbanCardMove(id: string, destinationColumnId: strin
   return parseJsonResponse<{ ok: true }>(response);
 }
 
-export async function patchKanbanCardInsumoStatus(id: string, insumoStatus: InsumoStatus) {
-  const response = await fetch(`/api/quadro-producao/cards/${encodeURIComponent(id)}/insumo-status`, {
-    body: JSON.stringify({ insumoStatus }),
-    credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    method: "PATCH",
-  });
-
-  return parseJsonResponse<{ ok: true }>(response);
-}
 
 export async function postKanbanCardEntregar(id: string) {
   const response = await fetch(`/api/quadro-producao/cards/${encodeURIComponent(id)}/entregar`, {

@@ -6,14 +6,12 @@ import type { Database } from "@/lib/supabase/database.types";
 import {
   getKanbanColumnLabel,
   getLegacyKanbanStatusFromSlug,
-  INSUMO_STATUS_LABELS,
   isKanbanColumnHiddenForPersonalizacao,
 } from "./config";
 
 type KanbanColumnRow = Database["public"]["Tables"]["kanban_columns"]["Row"];
 type FichaStatus = Database["public"]["Enums"]["ficha_status"];
 type KanbanStatus = Database["public"]["Enums"]["kanban_status"];
-type InsumoStatus = Database["public"]["Enums"]["insumo_status"];
 
 type BoardFichaRow = Pick<
   Database["public"]["Tables"]["fichas"]["Row"],
@@ -23,7 +21,6 @@ type BoardFichaRow = Pick<
   | "data_entrega"
   | "evento"
   | "id"
-  | "insumo_status"
   | "is_manual_card"
   | "kanban_column_id"
   | "kanban_ordem"
@@ -40,7 +37,6 @@ type BoardFichaRow = Pick<
 export type QuadroProducaoFilters = {
   arte: string;
   busca: string;
-  insumo: string;
   semana: boolean;
   tecido: string;
 };
@@ -52,7 +48,6 @@ export type KanbanCardSummary = {
   dataEntrega: string;
   evento: boolean;
   id: string;
-  insumoStatus: InsumoStatus;
   itemQuantity: number;
   isManualCard: boolean;
   kanbanColumnId: string;
@@ -76,7 +71,6 @@ export type QuadroProducaoSnapshot = {
   fetchedAt: string;
   filterOptions: {
     artes: string[];
-    insumos: Array<{ label: string; value: InsumoStatus }>;
     tecidos: string[];
   };
   totalVisible: number;
@@ -102,7 +96,6 @@ export type CreateManualKanbanCardInput = {
   columnId: string;
   dataEntrega: string;
   evento: boolean;
-  insumoStatus: InsumoStatus;
   material?: string;
   title: string;
 };
@@ -135,7 +128,6 @@ function mapBoardCard(row: BoardFichaRow): KanbanCardSummary {
     dataEntrega: row.data_entrega,
     evento: row.evento,
     id: row.id,
-    insumoStatus: row.insumo_status,
     itemQuantity: (row.ficha_itens ?? []).reduce((total, item) => total + Number(item.quantidade || 0), 0),
     isManualCard: row.is_manual_card,
     kanbanColumnId: row.kanban_column_id,
@@ -171,10 +163,6 @@ function matchesBoardFilters(card: KanbanCardSummary, filters: QuadroProducaoFil
     return false;
   }
 
-  if (filters.insumo && card.insumoStatus !== filters.insumo) {
-    return false;
-  }
-
   return true;
 }
 
@@ -202,7 +190,7 @@ async function getOpenBoardCards() {
   const { data, error } = await supabase
     .from("fichas")
     .select(
-      "id, cliente_nome_snapshot, cliente_auxiliar, numero_venda, data_entrega, evento, arte, material, status, insumo_status, kanban_column_id, kanban_ordem, kanban_status, is_manual_card, vendedor, ficha_imagens(url,ordem), ficha_itens(quantidade)",
+      "id, cliente_nome_snapshot, cliente_auxiliar, numero_venda, data_entrega, evento, arte, material, status, kanban_column_id, kanban_ordem, kanban_status, is_manual_card, vendedor, ficha_imagens(url,ordem), ficha_itens(quantidade)",
     )
     .eq("status", "pendente")
     .order("kanban_ordem", { ascending: true })
@@ -254,10 +242,6 @@ export async function getQuadroProducaoSnapshot(
 
     const filterOptions = {
       artes: sortText(mappedCards.map((card) => card.arte ?? "")),
-      insumos: Object.entries(INSUMO_STATUS_LABELS).map(([value, label]) => ({
-        label,
-        value: value as InsumoStatus,
-      })),
       tecidos: sortText(mappedCards.map((card) => card.material ?? "")),
     };
 
@@ -383,16 +367,6 @@ export async function moveKanbanCard(cardId: string, destinationColumnId: string
   }
 }
 
-export async function updateKanbanCardInsumoStatus(cardId: string, insumoStatus: InsumoStatus) {
-  const { error } = await createServerSupabaseClient()
-    .from("fichas")
-    .update({ insumo_status: insumoStatus })
-    .eq("id", cardId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-}
 
 export async function markKanbanCardDelivered(cardId: string, changedByUserId: string) {
   const supabase = createServerSupabaseClient();
@@ -446,7 +420,7 @@ export async function createManualKanbanCard(input: CreateManualKanbanCardInput,
       data_entrega: input.dataEntrega,
       data_inicio: getBusinessTodayInput(),
       evento: input.evento,
-      insumo_status: input.insumoStatus,
+      insumo_status: "tudo_ok",
       is_manual_card: true,
       created_by_user_id: createdByUserId,
       kanban_column_id: input.columnId,
