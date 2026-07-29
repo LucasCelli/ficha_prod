@@ -57,6 +57,7 @@ export async function getPersonalDashboardData(input: {
     const previousMonthDate = new Date(`${monthStart}T12:00:00Z`);
     previousMonthDate.setUTCMonth(previousMonthDate.getUTCMonth() - 1);
     const previousMonthStart = previousMonthDate.toISOString().slice(0, 10);
+    const isAllTime = input.period === "total";
     const selectedDays = input.period === "7" || input.period === "90" ? Number(input.period) : null;
     const since = selectedDays ? addDaysToInput(today, -(selectedDays - 1)) : monthStart;
     const previousSince = selectedDays ? addDaysToInput(since, -selectedDays) : previousMonthStart;
@@ -71,8 +72,11 @@ export async function getPersonalDashboardData(input: {
     else if (status !== "todos") listQuery = listQuery.eq("status", status);
     if (search) listQuery = listQuery.ilike("cliente_nome_snapshot", `%${search.replace(/[%_]/g, "")}%`);
 
+    let periodQuery = supabase.from("fichas").select(FICHA_SELECT).eq("created_by_user_id", input.userId);
+    if (!isAllTime) periodQuery = periodQuery.gte("created_at", `${since}T00:00:00Z`);
+
     const [periodRows, previousRows, listResult, userResult, allTimeResult] = await Promise.all([
-      supabase.from("fichas").select(FICHA_SELECT).eq("created_by_user_id", input.userId).gte("created_at", `${since}T00:00:00Z`),
+      periodQuery,
       supabase.from("fichas").select("id", { count: "exact", head: true }).eq("created_by_user_id", input.userId)
         .gte("created_at", `${previousSince}T00:00:00Z`).lt("created_at", `${since}T00:00:00Z`),
       listQuery,
@@ -94,7 +98,7 @@ export async function getPersonalDashboardData(input: {
     return { kind: "ok", data: {
       allTimeTotal: allTimeResult.count ?? 0,
       averageLeadDays: leadDays.length ? leadDays.reduce((sum, value) => sum + value, 0) / leadDays.length : null,
-      comparison: calculateComparison(currentCount, previousCount),
+      comparison: isAllTime ? null : calculateComparison(currentCount, previousCount),
       idle: periodFichas.filter((f) => f.status === "pendente" && f.updated_at.slice(0, 10) <= staleBefore).slice(0, 5),
       lastLoginAt: userResult.data?.last_login_at ?? null,
       metrics: {
@@ -106,7 +110,7 @@ export async function getPersonalDashboardData(input: {
         pendentes: periodFichas.filter((f) => f.status === "pendente").length,
         pieces: periodFichas.reduce((sum, f) => sum + f.pieces, 0),
       },
-      page, pageSize: PAGE_SIZE, recent: listFichas, series: buildSeries(periodFichas, since, today),
+      page, pageSize: PAGE_SIZE, recent: listFichas, series: buildSeries(periodFichas, isAllTime ? firstCreatedDate(periodFichas, today) : since, today),
       total: listResult.count ?? 0,
       upcoming: periodFichas.filter((f) => f.status === "pendente").sort((a, b) => a.data_entrega.localeCompare(b.data_entrega)).slice(0, 5),
       user: { displayName: input.displayName, role: input.role, username: input.username },
@@ -133,4 +137,8 @@ function buildSeries(rows: PersonalFicha[], since: string, today: string) {
   for (let cursor = since; cursor <= today; cursor = addDaysToInput(cursor, 1)) buckets.set(cursor, 0);
   rows.forEach((row) => { const key = row.created_at.slice(0, 10); if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1); });
   return Array.from(buckets, ([date, total]) => ({ date, total }));
+}
+
+function firstCreatedDate(rows: PersonalFicha[], fallback: string) {
+  return rows.reduce((earliest, row) => row.created_at.slice(0, 10) < earliest ? row.created_at.slice(0, 10) : earliest, fallback);
 }

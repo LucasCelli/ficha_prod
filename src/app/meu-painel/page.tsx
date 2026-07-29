@@ -6,6 +6,7 @@ import { requireAppSession } from "@/features/auth/session";
 import { FichaRowActions } from "@/features/fichas/ficha-row-actions";
 import { FichaRowThumbnail } from "@/features/fichas/ficha-row-thumbnail";
 import { getPersonalDashboardData } from "@/features/meu-painel/data";
+import { PersonalProductivityChart, PersonalStatusChart } from "@/features/meu-painel/personal-charts";
 import { formatBusinessDateTime } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import styles from "./profile.module.css";
@@ -24,31 +25,31 @@ export default async function MeuPainelPage({ searchParams }: { searchParams: Pr
   });
   if (result.kind !== "ok") return <EmptyState title="Meu perfil indisponível" description={result.kind === "error" ? result.message : "Configure o banco de dados."} />;
   const { data } = result;
-  const maxPoint = Math.max(1, ...data.series.map((point) => point.total));
   const metrics = [
     ["Fichas", data.metrics.fichas, FileText], ["Peças", data.metrics.pieces, Package],
     ["Pendentes", data.metrics.pendentes, Clock3], ["Entregues", data.metrics.entregues, CheckCircle2],
     ["Atrasadas", data.metrics.atrasadas, CalendarClock],
   ] as const;
-  const distributionTotal = Math.max(1, data.metrics.pendentes + data.metrics.entregues + data.metrics.canceladas);
 
   return <section className={`${styles.page} ${visual.visual}`} aria-labelledby="personal-title">
     <header className={styles.hero}>
       <div className={styles.identity}><span className={styles.avatar}>{initials(data.user.displayName)}</span><div>
         <p className="eyebrow">Meu perfil</p><h1 id="personal-title">{data.user.displayName}</h1>
-        <div className={styles.periods}>
+        <div className={styles.userMeta}>
           <Badge tone="neutral">@{data.user.username}</Badge>
           <Badge tone="info">{data.user.role === "superadmin" ? "Superadministrador" : "Operador"}</Badge>
+          <small>Último acesso: {data.lastLoginAt ? formatBusinessDateTime(new Date(data.lastLoginAt)) : "primeiro acesso"}</small>
         </div>
-        <small>Último acesso: {data.lastLoginAt ? formatBusinessDateTime(new Date(data.lastLoginAt)) : "primeiro acesso"}</small>
       </div></div>
       <Link className="ui-button ui-button--primary" href="/fichas/nova"><FilePlus2 size={17}/> Nova ficha</Link>
     </header>
 
-    <nav className={styles.periods} aria-label="Período das estatísticas">
-      {[["mes","Mês atual"],["7","7 dias"],["30","30 dias"],["90","90 dias"]].map(([value,label]) =>
+    <div className={styles.periodFilter}>
+      <span>Período</span><nav className={styles.periods} aria-label="Período das estatísticas">
+      {[["mes","Mês atual"],["7","7 dias"],["90","90 dias"],["total","Total"]].map(([value,label]) =>
         <Link className={period === value ? styles.activePeriod : ""} href={withParams(params,{period:value,page:null})} key={value}>{label}</Link>)}
-    </nav>
+      </nav>
+    </div>
     <div className={styles.metrics}>{metrics.map(([label,value,Icon],index) =>
       <article className={`${styles.metric} ${visual.metric}`} key={label} style={{"--metric-accent":["var(--color-info)","var(--color-primary)","var(--color-pending)","var(--color-success)","var(--color-danger)"][index]} as CSSProperties}><span className={visual.metricIcon}><Icon size={20}/></span><span>{label}</span><strong>{number(value)}</strong></article>)}</div>
 
@@ -56,14 +57,14 @@ export default async function MeuPainelPage({ searchParams }: { searchParams: Pr
       <section className={styles.panel}>
         <div className={styles.panelTitle}><div><p className="eyebrow">Produtividade</p><h2>Evolução no período</h2></div>
           <Badge tone={data.comparison !== null && data.comparison >= 0 ? "success" : "danger"}>{data.comparison === null ? "Sem comparação" : `${data.comparison >= 0 ? "+" : ""}${data.comparison.toFixed(0)}%`}</Badge></div>
-        <div className={styles.chart}>{data.series.map((point) => <span key={point.date} title={`${point.date}: ${point.total}`} style={{height:`${Math.max(4,(point.total/maxPoint)*100)}%`}}/>)}</div>
+        <PersonalProductivityChart data={data.series} />
         <div className={styles.insights}><span><strong>{data.metrics.noPrazo}</strong> entregas no prazo</span><span><strong>{data.averageLeadDays === null ? "—" : data.averageLeadDays.toFixed(1)}</strong> dias médios</span><span><strong>{data.allTimeTotal}</strong> fichas no histórico</span></div>
         <h3 className={styles.subheading}>Distribuição por status</h3>
-        <div className={styles.distribution}>
-          <Distribution label="Pendentes" value={data.metrics.pendentes} total={distributionTotal}/>
-          <Distribution label="Entregues" value={data.metrics.entregues} total={distributionTotal}/>
-          <Distribution label="Canceladas" value={data.metrics.canceladas} total={distributionTotal}/>
-        </div>
+        <PersonalStatusChart data={[
+          { label: "Pendentes", value: data.metrics.pendentes, color: "var(--color-pending-chart)" },
+          { label: "Entregues", value: data.metrics.entregues, color: "var(--color-success)" },
+          { label: "Canceladas", value: data.metrics.canceladas, color: "var(--color-danger)" },
+        ]}/>
       </section>
       <aside className={styles.panel}>
         <h3 className={styles.subheading}>Próximas entregas</h3><FichaLinks rows={data.upcoming}/>
@@ -101,7 +102,6 @@ const personalColumns = [
   { key:"detalhes", label:"Detalhes", width:"18%" },
   { key:"acoes", label:"AÃ§Ãµes", width:"220px" },
 ];
-function Distribution({label,value,total}:{label:string;value:number;total:number}) { return <div><span>{label}</span><div><i style={{width:`${(value/total)*100}%`}}/></div><strong>{value}</strong></div>; }
 function FichaLinks({rows}:{rows:Array<{id:string;cliente_nome_snapshot:string;data_entrega:string}>}) { return <ul className={styles.upcoming}>{rows.map((f)=><li key={f.id}><Link href={`/fichas/${f.id}`}><strong>{f.cliente_nome_snapshot}</strong><span>{date(f.data_entrega)}</span></Link></li>)}</ul>; }
 function first(value:string|string[]|undefined){return Array.isArray(value)?value[0]:value;}
 function withParams(current:Params,updates:Record<string,string|null>){const p=new URLSearchParams();Object.entries(current).forEach(([k,v])=>{const x=first(v);if(x)p.set(k,x)});Object.entries(updates).forEach(([k,v])=>v===null?p.delete(k):p.set(k,v));return `/meu-painel?${p}`;}

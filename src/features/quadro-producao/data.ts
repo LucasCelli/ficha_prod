@@ -205,7 +205,8 @@ async function getOpenBoardCards() {
       "id, cliente_nome_snapshot, cliente_auxiliar, numero_venda, data_entrega, evento, arte, material, status, insumo_status, kanban_column_id, kanban_ordem, kanban_status, is_manual_card, vendedor, ficha_imagens(url,ordem), ficha_itens(quantidade)",
     )
     .eq("status", "pendente")
-    .order("kanban_ordem", { ascending: true });
+    .order("kanban_ordem", { ascending: true })
+    .order("id", { ascending: true });
 
   if (error) {
     throw new Error(error.message);
@@ -239,7 +240,9 @@ export async function getQuadroProducaoSnapshot(
     const boardColumns = columns
       .filter((column) => !isKanbanColumnHiddenForPersonalizacao(column.slug, filters.arte))
       .map<KanbanBoardColumn>((column) => {
-        const cards = (cardsByColumnId.get(column.id) ?? []).sort((left, right) => left.kanbanOrder - right.kanbanOrder);
+        const cards = (cardsByColumnId.get(column.id) ?? []).sort(
+          (left, right) => left.kanbanOrder - right.kanbanOrder || left.id.localeCompare(right.id),
+        );
 
         return {
           ...column,

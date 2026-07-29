@@ -15,7 +15,7 @@ import {
 import { createPortal } from "react-dom";
 import { DragDropProvider, useDroppable } from "@dnd-kit/react";
 import { isSortable, useSortable } from "@dnd-kit/react/sortable";
-import { Feedback, type Droppable } from "@dnd-kit/dom";
+import type { Droppable } from "@dnd-kit/dom";
 import { SortableKeyboardPlugin } from "@dnd-kit/dom/sortable";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryStates } from "nuqs";
@@ -92,12 +92,7 @@ const DND_TIMING = {
   duration: 130,
   easing: "cubic-bezier(0.2, 0, 0, 1)",
 };
-const CARD_SORTABLE_PLUGINS = [
-  SortableKeyboardPlugin,
-  Feedback.configure({
-    dropAnimation: DND_TIMING,
-  }),
-];
+const CARD_SORTABLE_PLUGINS = [SortableKeyboardPlugin];
 
 function formatDate(value: string) {
   return formatShortDateInput(value);
@@ -165,23 +160,20 @@ function getResultColumns(result: QuadroProducaoResult) {
   return result.kind === "ok" ? result.snapshot.columns : [];
 }
 
-function cloneColumns(columns: KanbanBoardColumn[]) {
-  return columns.map((column) => ({
+function normalizeCards(column: KanbanBoardColumn, cards: KanbanCardSummary[]) {
+  return {
     ...column,
-    cards: column.cards.map((card) => ({ ...card })),
-  }));
-}
-
-function normalizeColumnCounts(columns: KanbanBoardColumn[]) {
-  return columns.map((column) => ({
-    ...column,
-    cards: column.cards.map((card, index) => ({
+    cards: cards.map((card, index) => ({
       ...card,
       kanbanColumnId: column.id,
       kanbanOrder: index,
     })),
-    openCount: column.cards.length,
-  }));
+    openCount: cards.length,
+  };
+}
+
+function normalizeColumnCounts(columns: KanbanBoardColumn[]) {
+  return columns.map((column) => normalizeCards(column, column.cards));
 }
 
 function findCardLocation(columns: KanbanBoardColumn[], cardId: string): DragDestination | null {
@@ -197,31 +189,41 @@ function findCardLocation(columns: KanbanBoardColumn[], cardId: string): DragDes
 }
 
 function moveCard(columns: KanbanBoardColumn[], cardId: string, destination: DragDestination) {
-  const next = cloneColumns(columns);
-  const source = findCardLocation(next, cardId);
+  const source = findCardLocation(columns, cardId);
 
-  if (!source) {
-    return columns;
+  if (!source) return columns;
+
+  const sourceColumn = columns.find((column) => column.id === source.columnId);
+  const destinationColumn = columns.find((column) => column.id === destination.columnId);
+
+  if (!sourceColumn || !destinationColumn) return columns;
+
+  if (sourceColumn.id === destinationColumn.id) {
+    const cards = [...sourceColumn.cards];
+    const [card] = cards.splice(source.index, 1);
+    if (!card) return columns;
+
+    const insertAt = Math.max(0, Math.min(destination.index, cards.length));
+    cards.splice(insertAt, 0, card);
+
+    return columns.map((column) =>
+      column.id === sourceColumn.id ? normalizeCards(column, cards) : column,
+    );
   }
 
-  const sourceColumn = next.find((column) => column.id === source.columnId);
-  const destinationColumn = next.find((column) => column.id === destination.columnId);
+  const sourceCards = [...sourceColumn.cards];
+  const [card] = sourceCards.splice(source.index, 1);
+  if (!card) return columns;
 
-  if (!sourceColumn || !destinationColumn) {
-    return columns;
-  }
+  const destinationCards = [...destinationColumn.cards];
+  const insertAt = Math.max(0, Math.min(destination.index, destinationCards.length));
+  destinationCards.splice(insertAt, 0, card);
 
-  const [card] = sourceColumn.cards.splice(source.index, 1);
-
-  if (!card) {
-    return columns;
-  }
-
-  const sameColumn = sourceColumn.id === destinationColumn.id;
-  const insertAt = Math.max(0, Math.min(destination.index, destinationColumn.cards.length));
-  destinationColumn.cards.splice(insertAt, 0, sameColumn ? card : { ...card, kanbanColumnId: destinationColumn.id });
-
-  return normalizeColumnCounts(next);
+  return columns.map((column) => {
+    if (column.id === sourceColumn.id) return normalizeCards(column, sourceCards);
+    if (column.id === destinationColumn.id) return normalizeCards(column, destinationCards);
+    return column;
+  });
 }
 
 function getDestination(target: Droppable | null, columns: KanbanBoardColumn[]): DragDestination | null {
@@ -315,7 +317,19 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
   const [createManualCardOpen, setCreateManualCardOpen] = useState(false);
   const [manualCardDraft, setManualCardDraft] = useState<ManualCardDraft>(() => getEmptyManualCardDraft(""));
   const lastDestinationRef = useRef<DragDestination | null>(null);
+  const pendingDestinationRef = useRef<DragDestination | null>(null);
+  const dragFrameRef = useRef<number | null>(null);
   const queryClient = useQueryClient();
+
+  const cancelPendingDragFrame = useCallback(() => {
+    if (dragFrameRef.current !== null) {
+      window.cancelAnimationFrame(dragFrameRef.current);
+      dragFrameRef.current = null;
+    }
+    pendingDestinationRef.current = null;
+  }, []);
+
+  useEffect(() => cancelPendingDragFrame, [cancelPendingDragFrame]);
 
   useEffect(() => {
     if (searchDraft === filters.busca) return;
@@ -334,6 +348,10 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
     placeholderData: keepPreviousData,
     queryFn: () => fetchQuadroProducao(filters),
     queryKey,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    staleTime: Number.POSITIVE_INFINITY,
   });
 
   const currentResult = boardQuery.data ?? initialResult;
@@ -353,28 +371,27 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
   }, [queryClient]);
 
   const moveCardMutation = useMutation({
-    mutationFn: (input: { cardId: string; destinationColumnId: string; destinationIndex: number }) =>
-      patchKanbanCardMove(input.cardId, input.destinationColumnId, input.destinationIndex),
+    mutationFn: (input: {
+      cardId: string;
+      destinationColumnId: string;
+      destinationIndex: number;
+      optimisticColumns: KanbanBoardColumn[];
+    }) => patchKanbanCardMove(input.cardId, input.destinationColumnId, input.destinationIndex),
     onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: [BOARD_QUERY_KEY] });
-      const previous = queryClient.getQueriesData<QuadroProducaoResult>({ queryKey: [BOARD_QUERY_KEY] });
-      queryClient.setQueriesData<QuadroProducaoResult>({ queryKey: [BOARD_QUERY_KEY] }, (result) =>
-        updateQueryResult(result, (currentColumns) =>
-          moveCard(currentColumns, input.cardId, {
-            columnId: input.destinationColumnId,
-            index: input.destinationIndex,
-          }),
-        ),
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<QuadroProducaoResult>(queryKey);
+      queryClient.setQueryData<QuadroProducaoResult>(queryKey, (result) =>
+        updateQueryResult(result, () => input.optimisticColumns),
       );
       return { previous };
     },
     onError: (error, _input, context) => {
-      context?.previous.forEach(([key, value]) => queryClient.setQueryData(key, value));
+      queryClient.setQueryData(queryKey, context?.previous);
+      setLocalColumns(null);
       toast.error(error.message);
     },
-    onSettled: () => {
+    onSuccess: () => {
       setLocalColumns(null);
-      refreshBoard();
     },
   });
 
@@ -404,7 +421,6 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
     },
     onSettled: () => {
       setLocalColumns(null);
-      refreshBoard();
     },
   });
 
@@ -434,7 +450,6 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
     onSuccess: () => toast.success("Pedido entregue."),
     onSettled: () => {
       setLocalColumns(null);
-      refreshBoard();
     },
   });
 
@@ -534,6 +549,10 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
       cardId: card.id,
       destinationColumnId: nextColumn.id,
       destinationIndex: nextColumn.cards.length,
+      optimisticColumns: moveCard(columns, card.id, {
+        columnId: nextColumn.id,
+        index: nextColumn.cards.length,
+      }),
     });
   }, [columns, moveCardMutation]);
 
@@ -595,7 +614,11 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
   }
 
   return (
-    <section className="quadro-producao-view" data-density="compact" data-version="fiel">
+    <section
+      className={`quadro-producao-view${dragStart ? " is-dragging-card" : ""}`}
+      data-density="compact"
+      data-version="fiel"
+    >
       <header className="quadro-producao-toolbar-card">
         <div className="quadro-producao-toolbar">
           <div className="quadro-producao-toolbar__top">
@@ -717,18 +740,31 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
           if (!destination || sameDestination(lastDestinationRef.current, destination)) return;
 
           lastDestinationRef.current = destination;
-          setLocalColumns((currentColumns) => moveCard(currentColumns ?? columns, dragStart.cardId, destination));
+          pendingDestinationRef.current = destination;
+
+          if (dragFrameRef.current !== null) return;
+
+          dragFrameRef.current = window.requestAnimationFrame(() => {
+            dragFrameRef.current = null;
+            const pendingDestination = pendingDestinationRef.current;
+            pendingDestinationRef.current = null;
+
+            if (!pendingDestination) return;
+            setLocalColumns((currentColumns) =>
+              moveCard(currentColumns ?? columns, dragStart.cardId, pendingDestination),
+            );
+          });
         }}
         onDragEnd={(event) => {
           if (!dragStart) return;
 
           const destination = event.canceled ? null : lastDestinationRef.current ?? findCardLocation(columns, dragStart.cardId);
+          cancelPendingDragFrame();
           lastDestinationRef.current = null;
           setDragStart(null);
 
           if (!destination) {
             setLocalColumns(null);
-            refreshBoard();
             return;
           }
 
@@ -741,6 +777,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
             cardId: dragStart.cardId,
             destinationColumnId: destination.columnId,
             destinationIndex: destination.index,
+            optimisticColumns: moveCard(columns, dragStart.cardId, destination),
           });
         }}
       >
