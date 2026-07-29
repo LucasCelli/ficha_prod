@@ -9506,18 +9506,28 @@ html[data-theme="dark"] body .app-nav__link[aria-current="page"] {
   scrollbar-color: var(--color-border) transparent;
 }
 
-.quadro-producao-column__list.is-over {
-  background: color-mix(in srgb, var(--quadro-column-accent) 7%, transparent);
+.quadro-producao-column.is-drop-target {
+  border-color: color-mix(in srgb, var(--quadro-column-accent) 78%, var(--color-border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--quadro-column-accent) 30%, transparent);
 }
 
-.quadro-producao-empty-column {
-  border: 1px dashed var(--color-border);
-  border-radius: 10px;
+.quadro-producao-column__drop-zone {
+  display: grid;
+  min-height: 16px;
+  flex: 1 0 16px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
   color: var(--color-text-muted);
   font-size: 0.76rem;
-  padding: 12px;
   text-align: center;
 }
+
+.quadro-producao-column__drop-zone:has(span) {
+  min-height: 72px;
+  padding: 12px;
+}
+
 
 .quadro-producao-card {
   display: flex;

@@ -309,6 +309,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
   const [searchDraft, setSearchDraft] = useState(filters.busca);
   const [localColumns, setLocalColumns] = useState<KanbanBoardColumn[] | null>(null);
   const [dragStart, setDragStart] = useState<DragStart | null>(null);
+  const [dropColumnId, setDropColumnId] = useState<string | null>(null);
   const [viewCard, setViewCard] = useState<KanbanCardSummary | null>(null);
   const [createColumnOpen, setCreateColumnOpen] = useState(false);
   const [createColumnName, setCreateColumnName] = useState("");
@@ -731,6 +732,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
           if (!location) return;
 
           lastDestinationRef.current = location;
+          setDropColumnId(null);
           setDragStart({ cardId, columnId: location.columnId, index: location.index });
         }}
         onDragOver={(event) => {
@@ -741,6 +743,9 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
 
           lastDestinationRef.current = destination;
           pendingDestinationRef.current = destination;
+          setDropColumnId((currentColumnId) =>
+            currentColumnId === destination.columnId ? currentColumnId : destination.columnId,
+          );
 
           if (dragFrameRef.current !== null) return;
 
@@ -761,6 +766,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
           const destination = event.canceled ? null : lastDestinationRef.current ?? findCardLocation(columns, dragStart.cardId);
           cancelPendingDragFrame();
           lastDestinationRef.current = null;
+          setDropColumnId(null);
           setDragStart(null);
 
           if (!destination) {
@@ -794,6 +800,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                 deliverPending={deliverMutation.isPending}
                 insumoPending={insumoMutation.isPending}
                 isCardDragging={Boolean(dragStart)}
+                isDropColumn={dropColumnId === column.id}
                 key={column.id}
                 onChangeInsumo={(card, insumoStatus) => insumoMutation.mutate({ cardId: card.id, insumoStatus })}
                 onDeliverCard={(card) => deliverMutation.mutate(card.id)}
@@ -972,6 +979,7 @@ type KanbanColumnProps = {
   deliverPending: boolean;
   insumoPending: boolean;
   isCardDragging: boolean;
+  isDropColumn: boolean;
   onChangeInsumo: (card: KanbanCardSummary, insumoStatus: InsumoStatus) => void;
   onDeliverCard: (card: KanbanCardSummary) => void;
   onMoveNextCard: (card: KanbanCardSummary) => void;
@@ -989,6 +997,7 @@ function KanbanColumn({
   deliverPending,
   insumoPending,
   isCardDragging,
+  isDropColumn,
   onChangeInsumo,
   onDeliverCard,
   onMoveNextCard,
@@ -998,14 +1007,17 @@ function KanbanColumn({
   onShiftColumn,
   onSortByDate,
 }: KanbanColumnProps) {
-  const { isDropTarget, ref } = useDroppable({
+  const { ref } = useDroppable({
     accept: "card",
     id: column.id,
     type: "column",
   });
 
   return (
-    <section className="quadro-producao-column" style={getColumnAccentStyle(column.order_index)}>
+    <section
+      className={`quadro-producao-column${isDropColumn ? " is-drop-target" : ""}`}
+      style={getColumnAccentStyle(column.order_index)}
+    >
       <header className="quadro-producao-column__header">
         <div className="quadro-producao-column__topline">
           <div className="quadro-producao-column__heading">
@@ -1070,8 +1082,7 @@ function KanbanColumn({
         </div>
       </header>
 
-      <div className={`quadro-producao-column__list${isDropTarget ? " is-over" : ""}`} ref={ref}>
-        {column.cards.length === 0 ? <div className="quadro-producao-empty-column">Nenhum cartao.</div> : null}
+      <div className="quadro-producao-column__list">
         {column.cards.map((card, cardIndex) => (
           <KanbanCard
             card={card}
@@ -1088,6 +1099,13 @@ function KanbanColumn({
             onOpenView={onOpenView}
           />
         ))}
+        <div
+          aria-label={column.cards.length === 0 ? `Soltar cartao em ${column.displayName}` : undefined}
+          className="quadro-producao-column__drop-zone"
+          ref={ref}
+        >
+          {column.cards.length === 0 ? <span>Nenhum cartao.</span> : null}
+        </div>
       </div>
     </section>
   );
