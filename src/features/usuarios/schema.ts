@@ -3,13 +3,14 @@ import { z } from "zod";
 export const operadorSchema = z
   .object({
     active: z.coerce.boolean().default(false),
-    displayName: z.string().trim().min(2, "Informe o nome exibido."),
-    id: z.string().trim().optional(),
-    pin: z.string().trim().regex(/^\d+$/, "Use apenas números no PIN.").optional(),
+    displayName: z.string().trim().min(2, "Informe o nome exibido.").max(120, "Nome muito longo."),
+    id: z.string().trim().uuid("Usuário inválido.").optional(),
+    pin: z.string().trim().regex(/^\d+$/, "Use apenas números no PIN.").max(12, "PIN muito longo.").optional(),
     username: z
       .string()
       .trim()
       .min(2, "Informe o usuário.")
+      .max(120, "Usuário muito longo.")
       .regex(/^[a-zA-Z0-9._-]+$/, "Use apenas letras, números, ponto, hífen ou sublinhado."),
   })
   .superRefine((values, context) => {

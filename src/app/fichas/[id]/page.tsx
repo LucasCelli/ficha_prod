@@ -6,6 +6,7 @@ import { FichaForm } from "@/features/fichas/ficha-form";
 import { FichaStatusActions } from "@/features/fichas/ficha-status-actions";
 import { getFichaById } from "@/features/fichas/data";
 import { listFichaFormOptions } from "@/features/fichas/form-options";
+import { requireAppSession } from "@/features/auth/session";
 
 type FichaPageProps = {
   params: Promise<{
@@ -14,6 +15,7 @@ type FichaPageProps = {
 };
 
 export async function generateMetadata({ params }: FichaPageProps): Promise<Metadata> {
+  await requireAppSession();
   const { id } = await params;
   const result = await getFichaById(id);
 
@@ -29,6 +31,7 @@ export async function generateMetadata({ params }: FichaPageProps): Promise<Meta
 }
 
 export default async function FichaPage({ params }: FichaPageProps) {
+  await requireAppSession();
   const { id } = await params;
   const [result, formOptions] = await Promise.all([getFichaById(id), listFichaFormOptions()]);
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowRight, Crop, WandSparkles } from "lucide-react";
+import { requireAppSession } from "@/features/auth/session";
 
 export const metadata: Metadata = {
   title: "Ferramentas | Fichas Tecnicas",
@@ -21,7 +22,9 @@ const tools = [
   },
 ];
 
-export default function FerramentasPage() {
+export default async function FerramentasPage() {
+  await requireAppSession();
+
   return (
     <section className="tools-page" aria-labelledby="tools-title">
       <header className="tools-page__header">

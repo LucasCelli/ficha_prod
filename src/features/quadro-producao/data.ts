@@ -1,5 +1,5 @@
 import { getServerErrorMessage } from "@/lib/server/boundaries";
-import { getBusinessWeekRange, isDateInputWithinRange } from "@/lib/dates";
+import { getBusinessWeekRange } from "@/lib/dates";
 import { normalizeNameOrCompany } from "@/lib/name-normalizer";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -13,26 +13,7 @@ type KanbanColumnRow = Database["public"]["Tables"]["kanban_columns"]["Row"];
 type FichaStatus = Database["public"]["Enums"]["ficha_status"];
 type KanbanStatus = Database["public"]["Enums"]["kanban_status"];
 
-type BoardFichaRow = Pick<
-  Database["public"]["Tables"]["fichas"]["Row"],
-  | "arte"
-  | "cliente_auxiliar"
-  | "cliente_nome_snapshot"
-  | "data_entrega"
-  | "evento"
-  | "id"
-  | "is_manual_card"
-  | "kanban_column_id"
-  | "kanban_ordem"
-  | "kanban_status"
-  | "material"
-  | "numero_venda"
-  | "status"
-  | "vendedor"
-> & {
-  ficha_imagens?: Array<Pick<Database["public"]["Tables"]["ficha_imagens"]["Row"], "ordem" | "url">>;
-  ficha_itens?: Array<Pick<Database["public"]["Tables"]["ficha_itens"]["Row"], "quantidade">>;
-};
+type BoardFichaRow = Database["public"]["Functions"]["get_kanban_board_cards"]["Returns"][number];
 
 export type QuadroProducaoFilters = {
   arte: string;
@@ -100,10 +81,6 @@ export type CreateManualKanbanCardInput = {
   title: string;
 };
 
-function isWithinCurrentWeek(value: string) {
-  return isDateInputWithinRange(value, getBusinessWeekRange());
-}
-
 function normalizeForSearch(value: string | null | undefined) {
   return (value ?? "")
     .normalize("NFD")
@@ -119,8 +96,6 @@ function sortText(values: Iterable<string>) {
 }
 
 function mapBoardCard(row: BoardFichaRow): KanbanCardSummary {
-  const orderedImages = [...(row.ficha_imagens ?? [])].sort((left, right) => left.ordem - right.ordem);
-
   return {
     arte: row.arte,
     clienteAuxiliar: row.cliente_auxiliar,
@@ -128,7 +103,7 @@ function mapBoardCard(row: BoardFichaRow): KanbanCardSummary {
     dataEntrega: row.data_entrega,
     evento: row.evento,
     id: row.id,
-    itemQuantity: (row.ficha_itens ?? []).reduce((total, item) => total + Number(item.quantidade || 0), 0),
+    itemQuantity: Number(row.item_quantity || 0),
     isManualCard: row.is_manual_card,
     kanbanColumnId: row.kanban_column_id,
     kanbanOrder: row.kanban_ordem,
@@ -136,34 +111,9 @@ function mapBoardCard(row: BoardFichaRow): KanbanCardSummary {
     material: row.material,
     numeroVenda: row.numero_venda,
     status: row.status,
-    thumbUrl: orderedImages[0]?.url ?? null,
+    thumbUrl: row.thumb_url,
     vendedor: row.vendedor,
   };
-}
-
-function matchesBoardFilters(card: KanbanCardSummary, filters: QuadroProducaoFilters) {
-  if (filters.busca) {
-    const haystack = normalizeForSearch(
-      [card.clienteNome, card.numeroVenda, card.material, card.arte, card.vendedor].filter(Boolean).join(" "),
-    );
-    if (!haystack.includes(normalizeForSearch(filters.busca))) {
-      return false;
-    }
-  }
-
-  if (filters.semana && !isWithinCurrentWeek(card.dataEntrega)) {
-    return false;
-  }
-
-  if (filters.tecido && normalizeForSearch(card.material) !== normalizeForSearch(filters.tecido)) {
-    return false;
-  }
-
-  if (filters.arte && normalizeForSearch(card.arte) !== normalizeForSearch(filters.arte)) {
-    return false;
-  }
-
-  return true;
 }
 
 function slugifyColumnName(name: string) {
@@ -185,22 +135,32 @@ async function getKanbanColumns() {
   return data ?? [];
 }
 
-async function getOpenBoardCards() {
+async function getOpenBoardCards(filters: QuadroProducaoFilters) {
   const supabase = createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("fichas")
-    .select(
-      "id, cliente_nome_snapshot, cliente_auxiliar, numero_venda, data_entrega, evento, arte, material, status, kanban_column_id, kanban_ordem, kanban_status, is_manual_card, vendedor, ficha_imagens(url,ordem), ficha_itens(quantidade)",
-    )
-    .eq("status", "pendente")
-    .order("kanban_ordem", { ascending: true })
-    .order("id", { ascending: true });
+  const week = filters.semana ? getBusinessWeekRange() : null;
+  const { data, error } = await supabase.rpc("get_kanban_board_cards", {
+    p_arte: filters.arte || null,
+    p_material: filters.tecido || null,
+    p_search: filters.busca || null,
+    p_week_end: week?.end ?? null,
+    p_week_start: week?.start ?? null,
+  });
 
   if (error) {
     throw new Error(error.message);
   }
 
   return (data ?? []) as BoardFichaRow[];
+}
+
+async function getOpenBoardFilterOptions() {
+  const { data, error } = await createServerSupabaseClient()
+    .from("fichas")
+    .select("arte, material")
+    .eq("status", "pendente");
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
 }
 
 export async function getQuadroProducaoSnapshot(
@@ -214,9 +174,12 @@ export async function getQuadroProducaoSnapshot(
   }
 
   try {
-    const [columns, openCards] = await Promise.all([getKanbanColumns(), getOpenBoardCards()]);
-    const mappedCards = openCards.map(mapBoardCard);
-    const filteredCards = mappedCards.filter((card) => matchesBoardFilters(card, filters));
+    const [columns, openCards, optionRows] = await Promise.all([
+      getKanbanColumns(),
+      getOpenBoardCards(filters),
+      getOpenBoardFilterOptions(),
+    ]);
+    const filteredCards = openCards.map(mapBoardCard);
     const cardsByColumnId = new Map<string, KanbanCardSummary[]>();
 
     filteredCards.forEach((card) => {
@@ -241,8 +204,8 @@ export async function getQuadroProducaoSnapshot(
       });
 
     const filterOptions = {
-      artes: sortText(mappedCards.map((card) => card.arte ?? "")),
-      tecidos: sortText(mappedCards.map((card) => card.material ?? "")),
+      artes: sortText(optionRows.map((card) => card.arte ?? "")),
+      tecidos: sortText(optionRows.map((card) => card.material ?? "")),
     };
 
     return {

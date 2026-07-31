@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import { Badge, Card } from "@/components/ui";
 import { ClienteForm } from "@/features/clientes/cliente-form";
+import { requireAppSession } from "@/features/auth/session";
 
 export const metadata: Metadata = {
   title: "Novo cliente | Fichas Técnicas",
 };
 
-export default function NovoClientePage() {
+export default async function NovoClientePage() {
+  await requireAppSession();
+
   return (
     <section className="cliente-create" aria-labelledby="cliente-create-title">
       <header className="cliente-create__header">

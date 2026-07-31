@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/ui";
 import { getFichaById } from "@/features/fichas/data";
 import { PrintFicha } from "@/features/fichas/print-ficha";
 import { PrintOnLoad } from "@/features/fichas/print-on-load";
-import { getCurrentSession } from "@/features/auth/session";
+import { requireAppSession } from "@/features/auth/session";
 
 type PrintFichaPageProps = {
   params: Promise<{
@@ -17,6 +17,7 @@ type PrintFichaPageProps = {
 };
 
 export async function generateMetadata({ params }: PrintFichaPageProps): Promise<Metadata> {
+  await requireAppSession();
   const { id } = await params;
   const result = await getFichaById(id);
 
@@ -32,10 +33,10 @@ export async function generateMetadata({ params }: PrintFichaPageProps): Promise
 }
 
 export default async function PrintFichaPage({ params, searchParams }: PrintFichaPageProps) {
+  const session = await requireAppSession();
   const { id } = await params;
   const query = searchParams ? await searchParams : {};
   const result = await getFichaById(id);
-  const session = await getCurrentSession();
 
   if (result.kind === "not-found") {
     notFound();

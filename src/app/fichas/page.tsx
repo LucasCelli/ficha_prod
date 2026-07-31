@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Modal } from "@/components/ui/modal";
 import { FichasOverview } from "@/features/fichas/fichas-overview";
+import { requireAppSession } from "@/features/auth/session";
 import {
   FichaPrintPreviewContent,
   FichaPrintPreviewError,
@@ -28,6 +29,7 @@ type FichasPageProps = {
 };
 
 export default async function FichasPage({ searchParams }: FichasPageProps) {
+  await requireAppSession();
   const params = await searchParams;
   const printId =
     typeof params?.print === "string"

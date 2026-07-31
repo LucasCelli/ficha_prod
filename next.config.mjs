@@ -24,6 +24,7 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  serverExternalPackages: ["exceljs"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

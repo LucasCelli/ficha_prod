@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Badge, Card, EmptyState } from "@/components/ui";
 import { ClienteForm } from "@/features/clientes/cliente-form";
 import { getClienteById } from "@/features/clientes/data";
+import { requireAppSession } from "@/features/auth/session";
 
 type EditarClientePageProps = {
   params: Promise<{
@@ -10,6 +11,7 @@ type EditarClientePageProps = {
 };
 
 export async function generateMetadata({ params }: EditarClientePageProps): Promise<Metadata> {
+  await requireAppSession();
   const { id } = await params;
   const result = await getClienteById(id);
 
@@ -25,6 +27,7 @@ export async function generateMetadata({ params }: EditarClientePageProps): Prom
 }
 
 export default async function EditarClientePage({ params }: EditarClientePageProps) {
+  await requireAppSession();
   const { id } = await params;
   const result = await getClienteById(id);
 

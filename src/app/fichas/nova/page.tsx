@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge, Card } from "@/components/ui";
-import { getCurrentSession } from "@/features/auth/session";
+import { requireAppSession } from "@/features/auth/session";
 import { getFichaById } from "@/features/fichas/data";
 import { FichaForm } from "@/features/fichas/ficha-form";
 import { mapFichaToInitialData } from "@/features/fichas/ficha-form-seed";
@@ -18,7 +18,7 @@ type NovaFichaPageProps = {
 export default async function NovaFichaPage({ searchParams }: NovaFichaPageProps) {
   const params = await searchParams;
   const duplicateId = typeof params?.duplicar === "string" ? params.duplicar.trim() : "";
-  const session = await getCurrentSession();
+  const session = await requireAppSession();
   const [formOptions, duplicateResult] = await Promise.all([
     listFichaFormOptions(),
     duplicateId ? getFichaById(duplicateId) : Promise.resolve(null),

@@ -625,7 +625,44 @@ export type Database = {
           p_status: string | null;
         };
         Returns: Json;
-      };      get_personal_dashboard_summary: {
+      };
+      get_kanban_board_cards: {
+        Args: {
+          p_arte?: string | null;
+          p_material?: string | null;
+          p_search?: string | null;
+          p_week_end?: string | null;
+          p_week_start?: string | null;
+        };
+        Returns: Array<{
+          arte: string | null;
+          cliente_auxiliar: string | null;
+          cliente_nome_snapshot: string;
+          data_entrega: string;
+          evento: boolean;
+          id: string;
+          is_manual_card: boolean;
+          item_quantity: number;
+          kanban_column_id: string;
+          kanban_ordem: number;
+          kanban_status: Database["public"]["Enums"]["kanban_status"];
+          material: string | null;
+          numero_venda: string | null;
+          status: Database["public"]["Enums"]["ficha_status"];
+          thumb_url: string | null;
+          vendedor: string | null;
+        }>;
+      };
+      cleanup_application_retention: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          audit_deleted: number;
+          login_limits_deleted: number;
+          operation_limits_deleted: number;
+          sessions_deleted: number;
+        }>;
+      };
+      get_personal_dashboard_summary: {
         Args: { p_previous_since: string; p_since: string | null; p_today: string; p_user_id: string };
         Returns: Json;
       };

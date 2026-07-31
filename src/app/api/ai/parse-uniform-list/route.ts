@@ -7,6 +7,8 @@ import { getAiModel, getSelectedAiModelOption, hasAiModelApiKey } from "@/lib/ai
 import { buildUniformListPrompt, UNIFORM_LIST_SYSTEM_PROMPT } from "@/lib/ai/prompts/uniform-list";
 import { UniformListSchema, type UniformList } from "@/lib/ai/schemas/uniform-list";
 import { applyUniformListSourceSections, normalizeUniformListGroups } from "@/lib/ai/uniform-list-groups";
+import { consumeOperationQuota } from "@/lib/operation-quota";
+import { mapWithConcurrency } from "@/lib/promise-pool";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -19,6 +21,7 @@ const CHUNK_TEXT_LENGTH = 3_500;
 const CHUNK_LINE_COUNT = 35;
 const GROQ_CHUNK_TEXT_LENGTH = 1_800;
 const GROQ_CHUNK_LINE_COUNT = 20;
+const MAX_CHUNK_CONCURRENCY = 2;
 const JSON_FALLBACK_SYSTEM_PROMPT = `${UNIFORM_LIST_SYSTEM_PROMPT}
 
 Retorne apenas JSON valido, sem markdown, sem comentario e sem texto antes ou depois.
@@ -274,7 +277,7 @@ async function parseUniformList(text: string, modelValue?: string): Promise<Unif
     return applyUniformListSourceSections(normalizeUniformListGroups(await parseUniformText(chunks[0], modelValue)), text);
   }
 
-  const results = await Promise.all(chunks.map((chunk) => parseUniformText(chunk, modelValue)));
+  const results = await mapWithConcurrency(chunks, MAX_CHUNK_CONCURRENCY, (chunk) => parseUniformText(chunk, modelValue));
 
   return applyUniformListSourceSections(
     normalizeUniformListGroups({ items: results.flatMap((result) => result.items) }),
@@ -314,6 +317,24 @@ async function handlePOST(request: Request) {
 
   if (fallbackModels.length === 0) {
     return errorResponse("IA não configurada.", 503);
+  }
+
+  const quota = await consumeOperationQuota({
+    limit: 20,
+    scope: "ai-uniform-list",
+    subject: session.user.id,
+    windowSeconds: 60 * 60,
+  });
+
+  if (quota.status === "unavailable") {
+    return errorResponse("IA temporariamente indisponível.", 503);
+  }
+
+  if (quota.status === "limited") {
+    return Response.json(
+      { success: false, error: "Limite temporário de listas atingido.", code: "ai_rate_limit" },
+      { headers: { "Retry-After": String(quota.retryAfterSeconds) }, status: 429 },
+    );
   }
 
   let lastError: unknown;

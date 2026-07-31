@@ -87,6 +87,7 @@ export type FichaDetailResult =
     };
 
 export const FICHAS_PAGE_SIZE = 25;
+const OPERATIONAL_PDF_BATCH_SIZE = 500;
 
 export async function listFichas(filters: FichaFilters = {}): Promise<FichaListResult> {
   if (!getSupabaseConfigStatus().hasServerConfig) {
@@ -149,34 +150,46 @@ export async function listFichasForOperationalPdf(filters: FichaFilters = {}): P
 
   try {
     const supabase = createServerSupabaseClient();
-    const query = applyFichaFilters(
-      supabase
-        .from("fichas")
-        .select(
-          "id, cliente_nome_snapshot, cliente_auxiliar, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, kanban_column:kanban_columns(name,slug)",
-          { count: "exact" },
-        )
-        .order("created_at", { ascending: false })
-        .order("data_entrega", { ascending: false })
-        .range(getOffset(filters.page, FICHAS_PAGE_SIZE), getOffset(filters.page, FICHAS_PAGE_SIZE) + FICHAS_PAGE_SIZE - 1),
-      filters,
-    );
+    const fichas: FichaListItem[] = [];
+    let offset = 0;
+    let total: number | null = null;
 
-    const { data, error, count } = await query;
+    while (total === null || fichas.length < total) {
+      const query = applyFichaFilters(
+        supabase
+          .from("fichas")
+          .select(
+            "id, cliente_nome_snapshot, cliente_auxiliar, data_inicio, data_entrega, status, kanban_status, insumo_status, arte, vendedor, numero_venda, evento, kanban_column:kanban_columns(name,slug)",
+            { count: offset === 0 ? "exact" : undefined },
+          )
+          .order("created_at", { ascending: false })
+          .order("data_entrega", { ascending: false })
+          .range(offset, offset + OPERATIONAL_PDF_BATCH_SIZE - 1),
+        { ...filters, page: undefined },
+      );
 
-    if (error) {
-      return {
-        kind: "error",
-        fichas: [],
-        total: 0,
-        message: getServerErrorMessage("fichas.load", error, "Não foi possível consultar as fichas."),
-      };
+      const { data, error, count } = await query;
+
+      if (error) {
+        return {
+          kind: "error",
+          fichas: [],
+          total: 0,
+          message: getServerErrorMessage("fichas.load", error, "Não foi possível consultar as fichas."),
+        };
+      }
+
+      if (total === null) total = count ?? data?.length ?? 0;
+      fichas.push(...(data ?? []));
+
+      if (!data || data.length < OPERATIONAL_PDF_BATCH_SIZE) break;
+      offset += data.length;
     }
 
     return {
       kind: "ok",
-      fichas: data ?? [],
-      total: count ?? 0,
+      fichas,
+      total: total ?? fichas.length,
     };
   } catch (error) {
     return {

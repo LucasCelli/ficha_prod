@@ -8,6 +8,7 @@ import {
   TECHNICAL_DESCRIPTION_SYSTEM_PROMPT,
 } from "@/lib/ai/prompts/technical-description";
 import { TechnicalDescriptionSchema } from "@/lib/ai/schemas/technical-description";
+import { consumeOperationQuota } from "@/lib/operation-quota";
 
 export const runtime = "nodejs";
 
@@ -70,6 +71,24 @@ async function handlePOST(request: Request) {
 
   if (!parsed.success) {
     return errorResponse("Dados obrigatórios ausentes ou fora do limite.", 400);
+  }
+
+  const quota = await consumeOperationQuota({
+    limit: 60,
+    scope: "ai-technical-description",
+    subject: session.user.id,
+    windowSeconds: 60 * 60,
+  });
+
+  if (quota.status === "unavailable") {
+    return errorResponse("IA temporariamente indisponível.", 503);
+  }
+
+  if (quota.status === "limited") {
+    return Response.json(
+      { success: false, error: "Limite temporário de descrições atingido." },
+      { headers: { "Retry-After": String(quota.retryAfterSeconds) }, status: 429 },
+    );
   }
 
   try {

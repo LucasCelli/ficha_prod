@@ -2130,3 +2130,25 @@
 - Decisão: o bloqueio de publicação foi encerrado, mas nenhum deploy na Vercel foi realizado; publicação continua fora deste ciclo até solicitação explícita.
 - Caveat histórico: antes deste ciclo, `supabase_migrations.schema_migrations` continha somente uma versão antiga de `app_auth`, apesar do schema remoto possuir migrations posteriores. As duas versões novas foram registradas, mas o histórico legado não foi reescrito de forma destrutiva.
 - Arquivos atualizados: `TODO.md` e `registro-alteracoes.md`.
+
+## 2026-07-31 - Correções da auditoria de código
+
+- Fase/módulos: segurança, autenticação, fichas/PDF, IA, Kanban, Supabase, dependências e garantia de qualidade.
+- Segurança: observações ricas passaram por sanitização allowlist (p, br, strong, em, u, ul, ol, li, sem atributos) antes da persistência e novamente na impressão. O legado foi consolidado em observacoes, observacoes_html foi limpo e um trigger impede novas divergências. Todas as páginas privadas agora chamam requireAppSession() ou requireSuperadmin() sem depender do header do Proxy.
+- Integridade: schemas receberam limites de tamanho/cardinalidade, a RPC de ficha limita 200 itens, JSON inválido do Kanban retorna validação 400, exclusão deriva o código do UUID no servidor e mutações verificam ausência do registro.
+- Escala: o PDF operacional busca todo o filtro em lotes de 500 e ignora a página da listagem. IA usa cotas persistentes de 60 descrições/hora e 20 listas/hora por usuário, com 429, Retry-After, falha fechada e no máximo dois chunks concorrentes.
+- Kanban: get_kanban_board_cards filtra e agrega quantidade/miniatura no Postgres; índices parciais atendem status, ordem, entrega, tecido e arte. Cards fora da viewport usam content-visibility, desabilitado durante drag.
+- Retenção: cleanup_application_retention() mantém auditoria por 90 dias e remove sessões/rate limits sem atividade há 7 dias. O job ficha-prod-application-retention roda diariamente às 03:17 UTC. A primeira execução removeu 256 sessões inativas e nenhum evento/rate limit ainda elegível.
+- Banco remoto: 20260731203921_code_review_hardening.sql foi executada no projeto fichas_primalhas, registrada em supabase_migrations.schema_migrations e validada com zero linhas em observacoes_html, 102 cartões pela RPC agregada, um job de retenção e o contrato público de save_ficha_atomic presente. O host não possui Docker, portanto não foi possível iniciar uma segunda instância Supabase local; o arquivo versionado é exatamente o SQL executado no remoto.
+- Dependências: Next.js e eslint-config-next foram atualizados para 16.2.11. Overrides compatíveis corrigiram postcss, sharp, ws, dompurify, tmp, tar, uuid, archiver, unzipper, brace-expansion e js-yaml; exceljs ficou externo ao bundle do servidor. npm audit --omit=dev retornou zero vulnerabilidades. Resta um advisory baixo em @babel/core usado pelo lint, sem versão corrigida publicada; não entra no runtime de produção.
+- Manutenção: impressão de rascunho, utilitários do parser de uniformes e modal de detalhe do Kanban foram extraídos. A suíte HTML legada saiu do checkout ativo para um backup recuperável em %TEMP%\ficha-prod-legacy-visual-tests-20260731; o novo Playwright rastreado cobre seis rotas App Router e o modal de cliente em desktop/mobile, light/dark.
+- Arquivos principais: src/lib/sanitize-observations.ts, src/lib/promise-pool.ts, src/features/fichas, src/features/quadro-producao, src/components/ai, src/app/api/ai, páginas privadas, a migration, quality-tests, playwright.config.js, package.json e TODO.md.
+- Validação: typecheck, lint, build, supabase:check, encoding:check, test:quality (23 testes), test:visual (27 testes), npm audit --omit=dev e smoke SQL remoto passaram. A CSP ainda mantém unsafe-inline para compatibilidade com scripts/estilos do Next; a superfície de HTML controlado pelo usuário está mitigada pela allowlist e object-src none.
+
+## 2026-07-31 - Higiene de arquivos versionados
+
+- Módulo: configuração do repositório e garantia de qualidade.
+- Ajuste: `.gitignore` passou a cobrir logs rotacionados, diretórios de logs, PIDs, relatórios JUnit/LCOV, estado do Playwright, caches de ferramentas, arquivos temporários, pacotes locais e configurações particulares de IDE.
+- Decisão: `quality-tests/`, seus testes visuais e snapshots permanecem versionáveis porque são código e baselines de regressão; somente resultados e caches gerados durante a execução são ignorados.
+- Arquivos alterados: `.gitignore` e `registro-alteracoes.md`.
+- Validação: regras conferidas com `git check-ignore`, verificação UTF-8 e `git diff --check`.

@@ -5,11 +5,13 @@ import { getActionError, requireAuthenticatedAction } from "@/lib/server/boundar
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { normalizeNameOrCompany } from "@/lib/name-normalizer";
+import { sanitizeObservationHtml } from "@/lib/sanitize-observations";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import type { Json } from "@/lib/supabase/database.types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FichaDeleteActionState, FichaFormState, FichaStatusActionState, FieldErrors } from "./form-state";
 import { fichaFormSchema, type FichaFormValues } from "./schema";
+import { getFichaDeleteConfirmationCode } from "./delete-confirmation";
 
 function getFichaFormInput(formData: FormData) {
   return {
@@ -103,7 +105,7 @@ function getFichaPayload(values: FichaFormValues): Json {
     manga: nullableText(values.manga),
     material: nullableText(values.material),
     numero_venda: nullableText(values.numeroVenda),
-    observacoes: nullableText(values.observacoes),
+    observacoes: nullableText(values.observacoes ? sanitizeObservationHtml(values.observacoes) : undefined),
     reforco_gola: nullableText(values.reforcoGola),
     vendedor: values.vendedor,
   };
@@ -333,7 +335,6 @@ export async function deleteFichaAction(
   await requireAuthenticatedAction();
 
   const id = String(formData.get("id") ?? "").trim();
-  const confirmationCode = String(formData.get("confirmationCode") ?? "").trim().toUpperCase();
   const confirmationInput = String(formData.get("confirmationInput") ?? "").trim().toUpperCase();
   const returnTo = getSafeReturnPath(formData.get("returnTo"));
 
@@ -343,6 +344,8 @@ export async function deleteFichaAction(
       status: "error",
     };
   }
+
+  const confirmationCode = getFichaDeleteConfirmationCode(id);
 
   if (!confirmationCode || confirmationInput !== confirmationCode) {
     return {
@@ -358,10 +361,17 @@ export async function deleteFichaAction(
     };
   }
 
-  const { error } = await createServerSupabaseClient().from("fichas").delete().eq("id", id);
+  const { data, error } = await createServerSupabaseClient().from("fichas").delete().eq("id", id).select("id").maybeSingle();
 
   if (error) {
     return getActionError("fichas.delete", error, "Não foi possível excluir a ficha.");
+  }
+
+  if (!data) {
+    return {
+      message: "Ficha não encontrada.",
+      status: "error",
+    };
   }
   revalidatePath("/fichas");
   revalidatePath("/relatorios");
@@ -393,10 +403,17 @@ async function removeFichaListaField(
   }
 
   const updatePayload = field === "lista_ia" ? { lista_ia: null } : { lista_nomes_raw: null };
-  const { error } = await createServerSupabaseClient().from("fichas").update(updatePayload).eq("id", id);
+  const { data, error } = await createServerSupabaseClient().from("fichas").update(updatePayload).eq("id", id).select("id").maybeSingle();
 
   if (error) {
     return getActionError("fichas.remove-list", error, "Não foi possível remover a lista.");
+  }
+
+  if (!data) {
+    return {
+      message: "Ficha não encontrada.",
+      status: "error",
+    };
   }
 
   revalidatePath("/fichas");

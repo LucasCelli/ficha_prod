@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { RelatoriosOverview } from "@/features/relatorios/relatorios-overview";
+import { requireAppSession } from "@/features/auth/session";
 import {
   getRelatorioData,
   normalizeRelatorioDate,
@@ -17,6 +18,7 @@ type RelatoriosPageProps = {
 };
 
 export default async function RelatoriosPage({ searchParams }: RelatoriosPageProps) {
+  await requireAppSession();
   const params = await searchParams;
   const filters = {
     dataFim: normalizeRelatorioDate(params.dataFim),

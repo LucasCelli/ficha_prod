@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { RouteToast, type RouteToastMessage } from "@/components/ui/route-toast";
 import { ClienteDetail } from "@/features/clientes/cliente-detail";
 import { getClienteById } from "@/features/clientes/data";
+import { requireAppSession } from "@/features/auth/session";
 
 type ClienteDetailPageProps = {
   params: Promise<{
@@ -11,6 +12,7 @@ type ClienteDetailPageProps = {
 };
 
 export async function generateMetadata({ params }: ClienteDetailPageProps): Promise<Metadata> {
+  await requireAppSession();
   const { id } = await params;
   const result = await getClienteById(id);
 
@@ -26,6 +28,7 @@ export async function generateMetadata({ params }: ClienteDetailPageProps): Prom
 }
 
 export default async function ClienteDetailPage({ params }: ClienteDetailPageProps) {
+  await requireAppSession();
   const { id } = await params;
   const result = await getClienteById(id);
 

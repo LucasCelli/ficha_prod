@@ -5,14 +5,21 @@ function emptyToUndefined(value: unknown) {
   return text || undefined;
 }
 
-function requiredText(label: string) {
+function requiredText(label: string, maxLength = 200) {
   return z.preprocess(
     (value) => (typeof value === "string" ? value.trim() : ""),
-    z.string().min(1, `${label} é obrigatório.`),
+    z.string().min(1, `${label} é obrigatório.`).max(maxLength, `${label} excede o limite de ${maxLength} caracteres.`),
   );
 }
 
-const optionalText = z.preprocess(emptyToUndefined, z.string().optional());
+function optionalTextWithMax(maxLength = 500) {
+  return z.preprocess(
+    emptyToUndefined,
+    z.string().max(maxLength, `O campo excede o limite de ${maxLength} caracteres.`).optional(),
+  );
+}
+
+const optionalText = optionalTextWithMax();
 const optionalDate = z.preprocess(emptyToUndefined, z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe uma data válida.").optional());
 const optionalComNomes = z.preprocess((value) => {
   const text = typeof value === "string" ? value.trim() : "";
@@ -37,15 +44,16 @@ const itensJsonSchema = z.preprocess((value) => {
   } catch {
     return null;
   }
-}, z.array(fichaItemSchema).min(1, "Adicione pelo menos um produto para salvar a ficha."));
+}, z.array(fichaItemSchema).min(1, "Adicione pelo menos um produto para salvar a ficha.").max(200, "Adicione no máximo 200 produtos."));
 
 const managedCloudinaryPublicId = z.preprocess(
   (value) => (typeof value === "string" ? value.trim() : ""),
-  z.string().regex(/^fichas\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/, "Imagem inválida."),
+  z.string().max(500, "Imagem inválida.").regex(/^fichas\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/, "Imagem inválida."),
 );
 
 const cloudinarySecureUrl = z
   .string()
+  .max(2048, "Imagem inválida.")
   .url("Imagem inválida.")
   .refine((value) => {
     const url = new URL(value);
@@ -115,8 +123,8 @@ export const fichaFormSchema = z.object({
   comNomes: optionalComNomes,
   imagens: imagensJsonSchema,
   itens: itensJsonSchema,
-  listaNomesRaw: optionalText,
-  observacoes: optionalText,
+  listaNomesRaw: optionalTextWithMax(100_000),
+  observacoes: optionalTextWithMax(20_000),
   evento: z.preprocess((value) => value === "on" || value === "sim", z.boolean()),
 });
 

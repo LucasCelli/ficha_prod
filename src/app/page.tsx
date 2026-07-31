@@ -16,7 +16,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { Badge } from "@/components/ui";
-import { getCurrentSession } from "@/features/auth/session";
+import { requireAppSession } from "@/features/auth/session";
 import { DashboardCalendar } from "@/features/dashboard/dashboard-calendar";
 import { getDashboardGreeting } from "@/features/dashboard/greeting";
 import { DashboardWeekChart } from "@/features/dashboard/dashboard-week-chart";
@@ -55,7 +55,7 @@ const SHORTCUTS: { desc: string; href: string; icon: LucideIcon; label: string }
 ];
 
 export default async function HomePage() {
-  const [result, session] = await Promise.all([getDashboardData(), getCurrentSession()]);
+  const [result, session] = await Promise.all([getDashboardData(), requireAppSession()]);
   const firstName = getFirstName(session?.user.displayName);
   const todayInput = getBusinessTodayInput();
   const greeting = firstName ? getDashboardGreeting(firstName) : null;

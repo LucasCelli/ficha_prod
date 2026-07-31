@@ -9458,6 +9458,13 @@ html[data-theme="dark"] body .app-nav__link[aria-current="page"] {
   user-select: none;
 }
 
+@supports (content-visibility: auto) {
+  .quadro-producao-view:not(.is-dragging-card) .quadro-producao-card {
+    contain-intrinsic-block-size: auto 132px;
+    content-visibility: auto;
+  }
+}
+
 html[data-theme="dark"] .quadro-producao-card {
   background: var(--color-surface-2);
 }

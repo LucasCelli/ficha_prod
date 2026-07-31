@@ -10,6 +10,33 @@ Backlog vivo de correções, refinos e decisões futuras. Itens concluídos est�
 - O acesso por PIN permanece válido para operadores e superadmin.
 - O fluxo operacional possui apenas `pendente`, `atrasada` e `entregue`; `atrasada` é derivada de ficha pendente cuja data de entrega já passou.
 
+## Auditoria de código de 2026-07-31
+
+### Segurança e fronteiras
+
+- [x] Eliminar XSS armazenado nas observações com sanitização HTML por allowlist no servidor, incluindo dados legados.
+- [x] Tornar a autenticação independente do header injetado pelo Proxy, exigindo sessão em cada página protegida.
+- [x] Atualizar Next.js e dependências vulneráveis; aplicar overrides compatíveis e documentar qualquer risco residual.
+  - Produção ficou com zero vulnerabilidades; resta um advisory baixo de Babel no toolchain, sem release corrigida disponível.
+- [x] Derivar a confirmação de exclusão de ficha no servidor e distinguir registros inexistentes de mutações bem-sucedidas.
+- [x] Aplicar limites de tamanho e cardinalidade nas entradas e tratar JSON malformado com resposta `400` estável.
+
+### Correção, escala e banco
+
+- [x] Fazer o PDF operacional carregar todo o recorte filtrado, sem truncar na página atual ou em 25 fichas.
+- [x] Proteger endpoints de IA com cotas persistentes e limitar a concorrência do processamento em lotes.
+- [x] Reduzir o payload e o trabalho em memória do Kanban, movendo filtros e agregações para o Postgres.
+- [x] Criar e validar retenção automática: auditoria por 90 dias; sessões e rate limits inativos por 7 dias.
+- [x] Aplicar a migration de endurecimento no banco local e no Supabase remoto, com smoke dos contratos.
+  - O arquivo local versionado foi executado integralmente no remoto e registrado no histórico; o host não possui Docker para iniciar uma instância Supabase local separada.
+
+### Manutenção e garantia de qualidade
+
+- [x] Remover a ambiguidade entre `observacoes` e `observacoes_html` sem perder o conteúdo legado.
+- [x] Extrair responsabilidades ainda concentradas nos maiores componentes sem ampliar fronteiras client-side.
+- [x] Substituir a suíte visual legada ignorada pelo Git por testes rastreados das rotas ativas do App Router.
+- [x] Cobrir as correções com testes de regressão e concluir `typecheck`, `lint`, `build`, `test:quality`, `supabase:check`, auditoria e encoding.
+
 ## Pré-requisito de publicação concluído
 
 - [x] Aplicar, nesta ordem, as migrations abaixo no Supabase antes de publicar o código na Vercel:

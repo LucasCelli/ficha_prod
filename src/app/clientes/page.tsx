@@ -3,6 +3,7 @@ import { Modal } from "@/components/ui";
 import { RouteToast, type RouteToastMessage } from "@/components/ui/route-toast";
 import { ClienteForm } from "@/features/clientes/cliente-form";
 import { ClientesOverview } from "@/features/clientes/clientes-overview";
+import { requireAppSession } from "@/features/auth/session";
 import {
   getClienteById,
   getClientesStats,
@@ -22,6 +23,7 @@ type ClientesPageProps = {
 };
 
 export default async function ClientesPage({ searchParams }: ClientesPageProps) {
+  await requireAppSession();
   const params = await searchParams;
   const filters = {
     page: normalizeClientePage(params?.page),

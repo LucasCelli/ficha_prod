@@ -161,8 +161,6 @@ function hrefForPdf(filters: FichaFilters) {
   if (filters.status) params.set("status", filters.status);
   if (filters.dataInicio) params.set("dataInicio", filters.dataInicio);
   if (filters.dataFim) params.set("dataFim", filters.dataFim);
-  if (filters.page && filters.page > 1) params.set("page", String(filters.page));
-
   const query = params.toString();
   return query ? `/fichas/pdf?${query}` : "/fichas/pdf";
 }

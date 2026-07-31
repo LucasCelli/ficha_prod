@@ -11,7 +11,7 @@ async function handlePOST(request: Request) {
     return Response.json({ error: "Não autenticado." }, { status: 401 });
   }
 
-  const parsed = createKanbanColumnSchema.safeParse(await request.json());
+  const parsed = createKanbanColumnSchema.safeParse(await request.json().catch(() => null));
 
   if (!parsed.success) {
     return Response.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, { status: 400 });

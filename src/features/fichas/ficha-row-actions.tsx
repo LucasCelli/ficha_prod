@@ -17,6 +17,7 @@ import type { FichaStatus } from "./data";
 import { FichaNameListBadge } from "./ficha-name-list-badge";
 import { getInitialFichaDeleteActionState, getInitialFichaStatusActionState } from "./form-state";
 import { PrintTriggerButton } from "./print-trigger-button";
+import { getFichaDeleteConfirmationCode } from "./delete-confirmation";
 
 type FichaRowActionsProps = {
   fichaId: string;
@@ -30,10 +31,6 @@ type FichaRowActionsProps = {
   returnTo: string;
   status: FichaStatus;
 };
-
-function createConfirmationCode() {
-  return Math.random().toString(36).slice(2, 6).toUpperCase();
-}
 
 export function FichaRowActions({
   fichaId,
@@ -49,7 +46,7 @@ export function FichaRowActions({
 }: FichaRowActionsProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [revertOpen, setRevertOpen] = useState(false);
-  const [confirmationCode, setConfirmationCode] = useState(() => createConfirmationCode());
+  const confirmationCode = getFichaDeleteConfirmationCode(fichaId);
   const [deleteState, deleteFormAction] = useActionState(deleteFichaAction, getInitialFichaDeleteActionState());
   const [removeListaIaState, removeListaIaFormAction] = useActionState(removeFichaListaIaAction, getInitialFichaStatusActionState());
   const [removeListaRawState, removeListaRawFormAction] = useActionState(removeFichaListaNomesRawAction, getInitialFichaStatusActionState());
@@ -83,7 +80,6 @@ export function FichaRowActions({
   }, [revertState.message, revertState.status]);
 
   function openDeleteModal() {
-    setConfirmationCode(createConfirmationCode());
     setDeleteOpen(true);
   }
 
@@ -354,8 +350,6 @@ function DeleteFichaDialog({
         <form action={formAction} className="confirm-dialog__form">
           <input name="id" type="hidden" value={fichaId} />
           <input name="returnTo" type="hidden" value={returnTo} />
-          <input name="confirmationCode" type="hidden" value={confirmationCode} />
-
           <div className="confirm-dialog__code" aria-label="Código de confirmação">
             {confirmationCode}
           </div>

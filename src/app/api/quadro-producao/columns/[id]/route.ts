@@ -16,7 +16,7 @@ async function handlePATCH(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const parsed = renameKanbanColumnSchema.safeParse(await request.json());
+  const parsed = renameKanbanColumnSchema.safeParse(await request.json().catch(() => null));
 
   if (!parsed.success) {
     return Response.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, { status: 400 });

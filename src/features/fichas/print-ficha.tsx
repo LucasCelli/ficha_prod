@@ -1,5 +1,6 @@
 import { formatBusinessDateTime, formatDateInput } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
+import { sanitizeObservationHtml } from "@/lib/sanitize-observations";
 import {
   ArrowLeftRight,
   Bookmark,
@@ -194,7 +195,7 @@ export function PrintFicha({ ficha, includeRawNameList = false, printedBy }: Pri
           <div
             id="print-observacoes"
             className="print-observacoes"
-            dangerouslySetInnerHTML={{ __html: sanitizeObservationHtml(ficha.observacoes_html || ficha.observacoes || "Nenhuma") }}
+            dangerouslySetInnerHTML={{ __html: sanitizeObservationHtml(ficha.observacoes || ficha.observacoes_html || "Nenhuma") }}
           />
         </section>
 
@@ -420,14 +421,6 @@ function getImagesClassNames(count: number) {
   ]
     .filter(Boolean)
     .join(" ");
-}
-
-function sanitizeObservationHtml(value: string) {
-  const withoutScripts = value.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "");
-  return withoutScripts
-    .replace(/\son\w+="[^"]*"/gi, "")
-    .replace(/\son\w+='[^']*'/gi, "")
-    .replace(/\sjavascript:/gi, "");
 }
 
 function formatCliente(ficha: FichaDetail) {

@@ -6,7 +6,6 @@ import {
   normalizeBooleanFilter,
   normalizeDateFilter,
   normalizeFichaStatus,
-  normalizePageFilter,
   normalizeTextFilter,
 } from "@/features/fichas/data";
 import { generateOperationalFichasPdf } from "@/features/fichas/operational-pdf";
@@ -30,7 +29,6 @@ async function handleGET(request: NextRequest) {
     dataInicio: normalizeDateFilter(request.nextUrl.searchParams.get("dataInicio") ?? undefined),
     evento: normalizeBooleanFilter(request.nextUrl.searchParams.get("evento") ?? undefined),
     id: normalizeTextFilter(request.nextUrl.searchParams.get("id") ?? undefined),
-    page: normalizePageFilter(request.nextUrl.searchParams.get("page") ?? undefined),
     status: normalizeFichaStatus(request.nextUrl.searchParams.get("status") ?? undefined),
   };
   const result = await listFichasForOperationalPdf(filters);
@@ -65,7 +63,6 @@ function buildFileName(
     dataFim?: string;
     dataInicio?: string;
     evento?: boolean;
-    page?: number;
     status?: string;
   },
   weeklyMode?: WeeklyPdfMode,
@@ -81,7 +78,6 @@ function buildFileName(
     filters.busca ? sanitizeFileSegment(filters.busca) : "",
     filters.dataInicio ? formatFileDate(filters.dataInicio) : "",
     filters.dataFim ? formatFileDate(filters.dataFim) : "",
-    filters.page && filters.page > 1 ? `pagina-${filters.page}` : "",
   ].filter(Boolean);
 
   return `${parts.join("_")}.pdf`;
