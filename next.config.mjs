@@ -8,6 +8,7 @@ const contentSecurityPolicy = [
   "font-src 'self' data:",
   "connect-src 'self' https://api.cloudinary.com https://res.cloudinary.com https://*.supabase.co wss://*.supabase.co",
   "worker-src 'self' blob:",
+  "frame-src 'self' blob:",
   "frame-ancestors 'none'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -23,10 +24,25 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
 ];
 
+const printRouteSecurityHeaders = securityHeaders.map((header) => {
+  if (header.key === "Content-Security-Policy") {
+    return { ...header, value: contentSecurityPolicy.replace("frame-ancestors 'none'", "frame-ancestors 'self'") };
+  }
+
+  if (header.key === "X-Frame-Options") {
+    return { ...header, value: "SAMEORIGIN" };
+  }
+
+  return header;
+});
+
 const nextConfig = {
   serverExternalPackages: ["exceljs"],
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      { source: "/fichas/:id/imprimir", headers: printRouteSecurityHeaders },
+    ];
   },
   images: {
     remotePatterns: [

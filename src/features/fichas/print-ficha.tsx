@@ -1,6 +1,5 @@
 import { formatBusinessDateTime, formatDateInput } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
-import { sanitizeObservationHtml } from "@/lib/sanitize-observations";
 import {
   ArrowLeftRight,
   Bookmark,
@@ -36,6 +35,7 @@ import type { FichaDetail } from "./data";
 type PrintFichaProps = {
   ficha: FichaDetail;
   includeRawNameList?: boolean;
+  observationHtml: string;
   printedBy?: string;
 };
 
@@ -50,7 +50,7 @@ type PrintProductRow = {
 const MAX_PRINT_IMAGES = 4;
 const RAW_NAME_LIST_SINGLE_COLUMN_LINE_LIMIT = 51;
 
-export function PrintFicha({ ficha, includeRawNameList = false, printedBy }: PrintFichaProps) {
+export function PrintFicha({ ficha, includeRawNameList = false, observationHtml, printedBy }: PrintFichaProps) {
   const products = buildProductRows(ficha);
   const productSummary = buildProductSummary(products);
   const rawNameList = ficha.lista_nomes_raw?.trim() ?? "";
@@ -195,7 +195,7 @@ export function PrintFicha({ ficha, includeRawNameList = false, printedBy }: Pri
           <div
             id="print-observacoes"
             className="print-observacoes"
-            dangerouslySetInnerHTML={{ __html: sanitizeObservationHtml(ficha.observacoes || ficha.observacoes_html || "Nenhuma") }}
+            dangerouslySetInnerHTML={{ __html: observationHtml || "Nenhuma" }}
           />
         </section>
 

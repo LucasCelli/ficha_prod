@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Modal } from "@/components/ui/modal";
+import { sanitizeObservationHtml } from "@/lib/sanitize-observations";
 import { FichasOverview } from "@/features/fichas/fichas-overview";
 import { requireAppSession } from "@/features/auth/session";
 import {
@@ -88,5 +89,9 @@ async function FichaPrintPreviewModalSlot({ printId }: { printId: string }) {
     return <FichaPrintPreviewError />;
   }
 
-  return <FichaPrintPreviewContent ficha={printResult.ficha} />;
+  const observationHtml = sanitizeObservationHtml(
+    printResult.ficha.observacoes || printResult.ficha.observacoes_html || "Nenhuma",
+  );
+
+  return <FichaPrintPreviewContent ficha={printResult.ficha} observationHtml={observationHtml} />;
 }

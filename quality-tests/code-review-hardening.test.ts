@@ -15,6 +15,22 @@ test("sanitização mantém apenas a formatação permitida", () => {
   assert.doesNotMatch(output, /script|svg|onload|onclick|data-x/i);
 });
 
+test("impressão permite o frame blob sem levar sanitizador server-side ao cliente", () => {
+  const config = readFileSync("next.config.mjs", "utf8");
+  const printFicha = readFileSync("src/features/fichas/print-ficha.tsx", "utf8");
+  const previewPage = readFileSync("src/app/fichas/page.tsx", "utf8");
+  const printPdf = readFileSync("src/features/fichas/print-pdf.ts", "utf8");
+
+  assert.match(config, /frame-src 'self' blob:/);
+  assert.match(config, /contentSecurityPolicy\.replace\("frame-ancestors 'none'", "frame-ancestors 'self'"\)/);
+  assert.match(config, /source: "\/fichas\/:id\/imprimir", headers: printRouteSecurityHeaders/);
+  assert.match(config, /value: "SAMEORIGIN"/);
+  assert.doesNotMatch(printFicha, /sanitize-observations|sanitize-html/);
+  assert.match(previewPage, /sanitizeObservationHtml/);
+  assert.match(printPdf, /PRINT_FRAME_LOAD_FALLBACK_MS[\s\S]+?resolve\(\)/);
+  assert.doesNotMatch(printPdf, /Tempo esgotado ao carregar a impressão/);
+});
+
 test("confirmação de exclusão deriva do UUID", () => {
   assert.equal(getFichaDeleteConfirmationCode("123e4567-e89b-12d3-a456-426614174000"), "4000");
   assert.equal(getFichaDeleteConfirmationCode("não-é-uuid"), "");

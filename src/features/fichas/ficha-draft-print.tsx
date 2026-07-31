@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { normalizeNameOrCompany } from "@/lib/name-normalizer";
+import { sanitizeObservationHtmlInBrowser } from "@/lib/sanitize-observations.client";
 import type { FichaDetail } from "./data";
 import type { FichaFormClientValues } from "./ficha-form-seed";
 import { PrintFicha } from "./print-ficha";
@@ -34,7 +35,11 @@ export function DraftPrintLayer({
 
   return createPortal(
     <div className="draft-print-root" aria-hidden="true">
-      <PrintFicha ficha={ficha} includeRawNameList={includeRawNameList} />
+      <PrintFicha
+        ficha={ficha}
+        includeRawNameList={includeRawNameList}
+        observationHtml={ficha.observacoes || ficha.observacoes_html || "Nenhuma"}
+      />
     </div>,
     document.body,
   );
@@ -124,7 +129,7 @@ export function buildDraftPrintFicha(form: HTMLFormElement, values: FichaFormCli
     material: values.material || null,
     metadados: null,
     numero_venda: text("numeroVenda") || null,
-    observacoes: values.observacoes || null,
+    observacoes: values.observacoes ? sanitizeObservationHtmlInBrowser(values.observacoes) : null,
     observacoes_html: null,
     reforco_gola: values.reforcoGola || null,
     status: "pendente",

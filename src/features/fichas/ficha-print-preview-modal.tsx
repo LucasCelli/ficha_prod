@@ -18,6 +18,7 @@ type FichaPrintPreviewShellProps = {
 
 type FichaPrintPreviewContentProps = {
   ficha: FichaDetail;
+  observationHtml: string;
 };
 
 const PREVIEW_PRINT_TOAST_ID = "ficha-print-preview";
@@ -88,10 +89,10 @@ export function FichaPrintPreviewShell({ children, duplicateHref, printHref }: F
   );
 }
 
-export function FichaPrintPreviewContent({ ficha }: FichaPrintPreviewContentProps) {
+export function FichaPrintPreviewContent({ ficha, observationHtml }: FichaPrintPreviewContentProps) {
   return (
     <div className="ficha-print-preview__body">
-      <PrintFicha ficha={ficha} />
+      <PrintFicha ficha={ficha} observationHtml={observationHtml} />
     </div>
   );
 }

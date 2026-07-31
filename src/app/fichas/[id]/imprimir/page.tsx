@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EmptyState } from "@/components/ui";
+import { sanitizeObservationHtml } from "@/lib/sanitize-observations";
 import { getFichaById } from "@/features/fichas/data";
 import { PrintFicha } from "@/features/fichas/print-ficha";
 import { PrintOnLoad } from "@/features/fichas/print-on-load";
@@ -77,7 +78,12 @@ export default async function PrintFichaPage({ params, searchParams }: PrintFich
   return (
     <>
       <PrintOnLoad />
-      <PrintFicha ficha={result.ficha} includeRawNameList={isTruthyQueryValue(query.listaNomesRaw)} printedBy={session?.user.displayName.split(" ")[0]} />
+      <PrintFicha
+        ficha={result.ficha}
+        includeRawNameList={isTruthyQueryValue(query.listaNomesRaw)}
+        observationHtml={sanitizeObservationHtml(result.ficha.observacoes || result.ficha.observacoes_html || "Nenhuma")}
+        printedBy={session?.user.displayName.split(" ")[0]}
+      />
     </>
   );
 }

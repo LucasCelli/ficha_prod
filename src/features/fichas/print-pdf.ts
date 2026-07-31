@@ -5,7 +5,7 @@ const PRINT_RENDER_WIDTH_PX = 794;
 const PRINT_RENDER_SCALE = 1.6;
 const PRINT_PAGE_MARGIN_MM = 6;
 const PRINT_FRAME_CLEANUP_MS = 60_000;
-const PRINT_FRAME_LOAD_TIMEOUT_MS = 15_000;
+const PRINT_FRAME_LOAD_FALLBACK_MS = 1_500;
 const PRINT_FRAME_PRINT_DELAY_MS = 500;
 
 type ManagedStyle = Pick<CSSStyleDeclaration, "height" | "margin" | "maxHeight" | "minHeight" | "overflow" | "padding" | "width">;
@@ -166,13 +166,13 @@ function createPrintFrame(): ManagedFrame {
 
 function waitForFrameLoad(iframe: HTMLIFrameElement, blobUrl: string) {
   return new Promise<void>((resolve, reject) => {
-    const timeout = window.setTimeout(() => {
+    const fallback = window.setTimeout(() => {
       cleanup();
-      reject(new Error("Tempo esgotado ao carregar a impressão."));
-    }, PRINT_FRAME_LOAD_TIMEOUT_MS);
+      resolve();
+    }, PRINT_FRAME_LOAD_FALLBACK_MS);
 
     function cleanup() {
-      window.clearTimeout(timeout);
+      window.clearTimeout(fallback);
       iframe.removeEventListener("error", handleError);
       iframe.removeEventListener("load", handleLoad);
     }

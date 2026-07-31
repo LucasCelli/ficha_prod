@@ -2163,3 +2163,15 @@
 - Cobertura: teste estrutural impede reintroduzir `requestAnimationFrame`, refs de frame, `content-visibility` ou duração superior à adotada no caminho do Kanban.
 - Validação: `npm run typecheck`, `npm run lint`, `npm run build` e `npm run test:quality` passaram. O Playwright headless carregou o quadro com 102 cards, mas o sensor do `@dnd-kit` não iniciou o gesto com eventos sintéticos; nenhuma chamada de movimento chegou à API e nenhum dado remoto foi alterado. A confirmação tátil final permanece no navegador real.
 - Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `src/features/quadro-producao/quadro-producao-state.ts`, `src/styles/globals.css`, `quality-tests/code-review-hardening.test.ts`, `TODO.md` e `registro-alteracoes.md`.
+
+## 2026-07-31 - Correção da impressão individual e da prévia em PDF
+
+- Módulo: `/fichas`, prévia modal, rota `/fichas/[id]/imprimir` e geração client-side do PDF.
+- Causa do modal/PDF: a política de conteúdo permitia `blob:` para imagens e workers, mas não em `frame-src`; o PDF gerado pelo `jsPDF` era atribuído a um iframe `blob:` e podia ser bloqueado antes da impressão.
+- Causa do botão de ações: a rota de impressão era aberta em um iframe oculto, porém os headers globais `frame-ancestors 'none'` e `X-Frame-Options: DENY` impediam a própria aplicação de incorporá-la. O `PrintOnLoad` não executava e o toast permanecia em “Preparando impressão”.
+- Correção: `blob:` foi autorizado somente como origem de frame; a rota individual de impressão recebeu exceção restrita à mesma origem (`frame-ancestors 'self'` e `SAMEORIGIN`), enquanto todas as demais rotas continuam com bloqueio total de enquadramento.
+- Robustez: a geração deixou de depender exclusivamente do evento `load` do visualizador PDF nativo, que não é emitido de forma consistente. Após o blob estar pronto, um fallback curto libera a chamada de impressão sem aguardar o timeout anterior de 15 segundos.
+- Segurança e desempenho: `sanitize-html` saiu do bundle do modal. Observações persistidas são sanitizadas no Server Component e o rascunho usa allowlist equivalente no navegador, preservando a proteção contra XSS sem carregar o parser server-side no cliente.
+- Cobertura: adicionado teste Playwright para a prévia modal e para o botão direto da tabela, além de contratos para CSP, exceção same-origin, fallback do visualizador e fronteira do sanitizador.
+- Arquivos alterados: `next.config.mjs`, `src/app/fichas/page.tsx`, `src/app/fichas/[id]/imprimir/page.tsx`, `src/features/fichas/print-ficha.tsx`, `src/features/fichas/ficha-print-preview-modal.tsx`, `src/features/fichas/ficha-draft-print.tsx`, `src/features/fichas/print-pdf.ts`, `src/lib/sanitize-observations.client.ts`, `quality-tests/code-review-hardening.test.ts`, `quality-tests/visual/pdf-regression.spec.js`, `playwright.config.js` e `registro-alteracoes.md`.
+- Validação: `npm run typecheck`, `npm run lint`, `npm run test:quality` (25 testes), `npm run build` e Playwright desktop (prévia e impressão direta) passaram. Os headers efetivos da rota foram confirmados como `SAMEORIGIN`, `frame-ancestors 'self'` e `frame-src 'self' blob:`.
