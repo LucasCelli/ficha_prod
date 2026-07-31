@@ -1,3 +1,4 @@
+import { withAuthenticatedRoute } from "@/lib/server/boundaries";
 import type { NextRequest } from "next/server";
 import { getCurrentSession } from "@/features/auth/session";
 import {
@@ -10,7 +11,7 @@ import {
 import { generateRelatorioPdf } from "@/features/relatorios/relatorio-pdf";
 import { getBusinessTodayInput } from "@/lib/dates";
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -46,3 +47,5 @@ export async function GET(request: NextRequest) {
     },
   });
 }
+
+export const GET = withAuthenticatedRoute(handleGET, "src/app/relatorios/pdf/route.ts");

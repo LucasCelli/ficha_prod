@@ -1,9 +1,10 @@
+import { reportServerError, withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/session";
 import { createManualKanbanCard } from "@/features/quadro-producao/data";
 import { createManualKanbanCardSchema } from "@/features/quadro-producao/schema";
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -23,9 +24,12 @@ export async function POST(request: Request) {
     revalidatePath("/meu-painel");
     return Response.json({ card });
   } catch (error) {
+    const requestId = reportServerError("src/app/api/quadro-producao/cards/manual/route.ts", error);
     return Response.json(
-      { error: error instanceof Error ? error.message : "Falha ao criar cartão manual." },
+      { error: "Não foi possível criar o cartão manual.", requestId },
       { status: 500 },
     );
   }
 }
+
+export const POST = withAuthenticatedRoute(handlePOST, "src/app/api/quadro-producao/cards/manual/route.ts");

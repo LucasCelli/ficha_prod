@@ -138,7 +138,6 @@ function PeriodForm({ filters }: { filters: RelatorioFilters }) {
             <option value="">Todos</option>
             <option value="pendente">Pendente</option>
             <option value="entregue">Entregue</option>
-            <option value="cancelado">Cancelado</option>
           </select>
         </div>
         <div className="field">

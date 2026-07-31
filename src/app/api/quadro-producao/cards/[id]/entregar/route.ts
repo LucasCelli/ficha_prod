@@ -1,3 +1,4 @@
+import { reportServerError, withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/session";
 import { markKanbanCardDelivered } from "@/features/quadro-producao/data";
@@ -6,7 +7,7 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function POST(_request: Request, context: RouteContext) {
+async function handlePOST(_request: Request, context: RouteContext) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -24,9 +25,12 @@ export async function POST(_request: Request, context: RouteContext) {
     revalidatePath(`/fichas/${id}`);
     return Response.json({ ok: true });
   } catch (error) {
+    const requestId = reportServerError("src/app/api/quadro-producao/cards/[id]/entregar/route.ts", error);
     return Response.json(
-      { error: error instanceof Error ? error.message : "Falha ao entregar cartão." },
+      { error: "Não foi possível entregar o cartão.", requestId },
       { status: 500 },
     );
   }
 }
+
+export const POST = withAuthenticatedRoute(handlePOST, "src/app/api/quadro-producao/cards/[id]/entregar/route.ts");

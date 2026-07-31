@@ -188,7 +188,7 @@ export default async function HomePage() {
                       </span>
                       <Badge
                         className="home-recent-list__badge"
-                        tone={ficha.status === "entregue" ? "success" : ficha.status === "cancelado" ? "danger" : "pending"}
+                        tone={ficha.status === "entregue" ? "success" : "pending"}
                       >
                         {formatStatus(ficha.status)}
                       </Badge>
@@ -287,7 +287,6 @@ function formatNumber(value: number) {
 
 function formatStatus(status: Database["public"]["Enums"]["ficha_status"]) {
   const labels = {
-    cancelado: "Cancelada",
     entregue: "Entregue",
     pendente: "Pendente",
   };

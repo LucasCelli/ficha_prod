@@ -1,56 +1,74 @@
 # TODO
 
-Backlog vivo para features, refinos e decisoes futuras. Itens concluidos devem ser marcados aqui e detalhados em `registro-alteracoes.md`.
+Backlog vivo de correções, refinos e decisões futuras. Itens concluídos estão marcados e detalhados em `registro-alteracoes.md`.
 
-## Fichas
+## Premissas
 
-- [x] Fechar paridade fina do auto-preenchimento de observacoes contra exemplos reais da versao anterior.
-- [x] Decidir se o editor de observacoes deve migrar de `contentEditable` para Tiptap.
-- [x] Botao "Descartar" rascunho no toast nao esta funcionando. Nada acontece ao clicar nele.
-- [x] Permitir vincular uma lista organizada pela IA a uma ficha, salvando o JSON revisado junto da ficha para consulta, reexportacao e auditoria posterior.
-- [x] Mostrar total de produtos no editor de ficha e permitir imprimir a lista de nomes anexada junto da ficha.
+- Produção em Next.js na Vercel, com Functions efêmeras e potencialmente concorrentes.
+- Persistência, coordenação e rate limit não dependem de memória local, processo residente ou filesystem da Function.
+- Supabase/Postgres é a fonte de verdade para transações, locks, auditoria e agregações.
+- O acesso por PIN permanece válido para operadores e superadmin.
+- O fluxo operacional possui apenas `pendente`, `atrasada` e `entregue`; `atrasada` é derivada de ficha pendente cuja data de entrega já passou.
 
-## Listas de nomes
+## Pré-requisito de publicação concluído
 
-- [x] Permitir remover uma lista de nomes anexada.
-- [x] Permitir organizar a lista de nomes diretamente pela listagem de fichas.
-- [x] Mostrar a quantidade de itens nas listas de nomes.
-- [x] Adicionar uma exibicao dupla para comparar a lista bruta e a lista organizada.
-- [x] Permitir exibir opcionalmente o conteudo bruto junto da lista organizada.
-- [x] Simplificar o modal de listas, permitir selecionar todas as linhas no cabecalho e abrir o organizador a partir da lista bruta.
-- [x] Otimizar selecao e renderizacao das listas grandes, evitando buscas lineares e rerender de todas as linhas.
-- [x] Reconhecer grupos como cor ou caracteristica, selecionar por grupo e exportar CSVs separados.
+- [x] Aplicar, nesta ordem, as migrations abaixo no Supabase antes de publicar o código na Vercel:
+  1. `20260731032229_critical_integrity_hardening.sql`
+  2. `20260731034518_complete_todo_hardening.sql`
+  - [x] As 18 migrations do repositório foram executadas em ordem num PostgreSQL WASM descartável e as RPCs críticas passaram por smoke funcional com dados reais.
+  - [x] Dashboard autenticado no projeto `fichas_primalhas`; as duas migrations foram aplicadas, registradas no histórico remoto e validadas por smoke dos contratos.
+  - [x] Login por PIN, fichas, Kanban, painel pessoal, relatórios e exportações PDF/Excel foram exercitados localmente contra o Supabase remoto.
+  - O deploy na Vercel não foi executado; publicação permanece uma ação separada e explícita.
 
-## IA
+## Prioridade alta
 
-- [x] Usar Gemini Flash como principal, tentar outras variacoes Gemini e depois os demais provedores como fallback.
-- [x] Remover o seletor manual de IA e mostrar no resultado qual provedor/modelo organizou a lista.
+- [x] Proteger o login por PIN contra força bruta sem remover o PIN do superadmin.
+  - Rate limit persistente e progressivo por conta, origem e par conta-origem, com dimensões SHA-256.
+  - Trilha histórica de falhas sem PIN, IP ou usuário em texto puro.
+  - Falha fechada quando a proteção persistente estiver indisponível e revogação de sessões após alteração de PIN/estado ativo.
 
-## Exportacao
+- [x] Tornar criação e edição de ficha atômicas no Postgres.
+  - Cabeçalho, cliente, itens e imagens passam pela RPC `save_ficha_atomic` em uma transação.
 
-- [x] Corrigir a exportacao das listas de nomes e padronizar o nome do CSV pelo cliente da ficha.
-- [x] Controlar por checkboxes quais linhas entram no CSV, permitindo selecionar os nomes individualmente.
+- [x] Corrigir a consistência dos agregados de clientes.
+  - Triggers recalculam `total_fichas`, `primeira_ficha` e `ultima_ficha`, com locks por cliente.
 
-## Quadro de producao
+- [x] Restringir upload e exclusão de imagens no Cloudinary.
+  - Namespace gerenciado pelo servidor, validação de referências e cotas persistentes com `429`/`Retry-After`.
 
-- [x] Mostrar a quantidade total de itens em cada card do quadro.
+- [x] Escalar relatórios e exportações.
+  - Agregações em `get_report_summary`, detalhes paginados em `get_report_details_page` e Excel escrito como stream, sem acumular todas as linhas na memória da Function.
 
-## Bibliotecas e arquitetura
+## Prioridade média
 
-- [x] Avaliar `@tanstack/react-table` quando sorting, filtros compostos e paginacao ficarem mais exigentes em fichas, clientes e catalogos.
-- [x] Avaliar `recharts` para relatorios visuais.
-- [x] Avaliar `zustand` para preferencias locais e estado interativo do quadro quando o estado local atual deixar de ser suficiente.
-- [x] Warning no Radix `AlertDialogContent` requires a description para dialogs sem `aria-describedby`.
-- [x] Warning: Missing `Description` or `aria-describedby={undefined}` for {AlertDialogContent}.
+- [x] Unificar status operacional.
+  - Persistência limitada a `pendente` e `entregue`; atraso é derivado por data em `America/Cuiaba`; resíduos `cancelado` migram para `pendente`.
 
-## Motion e interacoes
+- [x] Corrigir timezone e escala do `/meu-painel`.
+  - Resumo agregado e lista paginada no banco; apenas soma dos itens e primeira miniatura trafegam para a Function.
 
-- [x] Centralizar presets de Motion nos primitivos compartilhados.
-- [x] Migrar popovers, loading, modal, alerta, tooltip, datalist e menu para Motion compartilhado.
-- [x] Corrigir flashes e estado inconsistente ao mover cards no quadro migrando o Kanban para `@dnd-kit/react`.
-- [x] Reduzir travamento do card no quadro durante colisao com outros cards/colunas.
-- [x] Reconstruir `/quadro-producao` com `@dnd-kit/react` como controlador unico dos cards e visual fiel compacto baseado em `kanban-ideia/`.
-- [x] Animar saida de fichas na listagem ao entregar/deletar.
-- [x] Revisar Motion do quadro sem competir com DnD Kit.
-- [x] Migrar ordenacao por tamanho e autopreenchimento de observacoes para feedback Motion.
-- [x] Remover keyframes/transicoes manuais obsoletas restantes do CSS global.
+- [x] Serializar movimentações concorrentes do Kanban.
+  - Locks transacionais, criação atômica sem `COUNT` seguido de `INSERT` e recomposição de ordem densa.
+
+- [x] Reduzir escritas de `last_seen_at` por navegação.
+  - Sessão deduplicada por request e atualização idempotente no banco apenas após cinco minutos.
+
+- [x] Endurecer as fronteiras que usam `service_role`.
+  - Wrappers autenticados para Route Handlers e Server Actions; operações administrativas exigem superadmin; teste detecta rota sem fronteira.
+
+- [x] Padronizar erros server-side.
+  - Mensagens estáveis ao cliente, correlação por UUID e logs técnicos sanitizados para o runtime da Vercel.
+
+## Qualidade e manutenção
+
+- [x] Corrigir mojibake visível e adicionar verificação automatizada de encoding.
+  - `npm run encoding:check` cobre fontes, scripts e testes.
+
+- [x] Dividir componentes e módulos excessivamente grandes por responsabilidade.
+  - Controles do formulário, estado do Kanban e watermark binário foram extraídos sem ampliar fronteiras client-side.
+
+- [x] Ampliar testes automatizados das regras críticas.
+  - `npm run test:quality` cobre rate limit, atomicidade, agregados, Cloudinary, locks/ordem do Kanban, timezone, paginação SQL, status e autenticação das rotas.
+
+- [x] Adicionar headers HTTP defensivos compatíveis com Vercel, Next.js, Supabase e Cloudinary.
+  - CSP, `frame-ancestors`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` e `X-Frame-Options` configurados no `next.config.mjs`.

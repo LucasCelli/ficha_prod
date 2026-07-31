@@ -7,13 +7,11 @@ import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { getFichaById, type FichaDetail, type FichaStatus } from "./data";
 
 const statusTones: Record<FichaStatus, "danger" | "pending" | "success"> = {
-  cancelado: "danger",
   entregue: "success",
   pendente: "pending",
 };
 
 const statusLabels: Record<FichaStatus, string> = {
-  cancelado: "Cancelada",
   entregue: "Entregue",
   pendente: "Pendente",
 };

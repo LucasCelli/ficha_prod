@@ -1,8 +1,9 @@
 "use server";
 
+import { getActionError, requireSuperadminAction } from "@/lib/server/boundaries";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireSuperadmin } from "@/features/auth/session";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { CatalogoDeleteActionState, CatalogoFieldErrors, CatalogoFormState } from "./form-state";
@@ -79,7 +80,7 @@ function withToastParam(path: string, value: string) {
 }
 
 export async function saveCatalogItemAction(_previousState: CatalogoFormState, formData: FormData): Promise<CatalogoFormState> {
-  await requireSuperadmin();
+  await requireSuperadminAction();
 
   const parsed = catalogItemSchema.safeParse(getCatalogItemInput(formData));
 
@@ -116,7 +117,7 @@ export async function saveCatalogItemAction(_previousState: CatalogoFormState, f
 
   if (result.error) {
     return {
-      message: result.error.message,
+      message: getActionError("catalogos.save", result.error, "Não foi possível salvar o item.").message,
       status: "error",
     };
   }
@@ -138,20 +139,20 @@ export async function deleteCatalogItemAction(
   _previousState: CatalogoDeleteActionState,
   formData: FormData,
 ): Promise<CatalogoDeleteActionState> {
-  await requireSuperadmin();
+  await requireSuperadminAction();
 
   const id = String(formData.get("id") ?? "").trim();
 
   if (!id) {
     return {
-      message: "Item invalido para exclusao.",
+      message: "Item inválido para exclusão.",
       status: "error",
     };
   }
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Catalogos indisponiveis.",
+      message: "Catálogos indisponíveis.",
       status: "error",
     };
   }
@@ -160,7 +161,7 @@ export async function deleteCatalogItemAction(
 
   if (error) {
     return {
-      message: error.message,
+      message: getActionError("catalogos.delete", error, "Não foi possível excluir o item.").message,
       status: "error",
     };
   }
@@ -171,21 +172,21 @@ export async function deleteCatalogItemAction(
 }
 
 export async function deleteCatalogItemsAction(kind: CatalogKind, itemIds: string[]) {
-  await requireSuperadmin();
+  await requireSuperadminAction();
 
   const parsedKind = parseCatalogKind(kind);
   const ids = itemIds.map((id) => id.trim()).filter(Boolean);
 
   if (!parsedKind || ids.length === 0 || ids.length !== itemIds.length || new Set(ids).size !== ids.length) {
     return {
-      message: "Itens invalidos para exclusao.",
+      message: "Itens inválidos para exclusao.",
       status: "error" as const,
     };
   }
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Catalogos indisponiveis.",
+      message: "Catálogos indisponíveis.",
       status: "error" as const,
     };
   }
@@ -199,14 +200,14 @@ export async function deleteCatalogItemsAction(kind: CatalogKind, itemIds: strin
 
   if (existingError) {
     return {
-      message: existingError.message,
+      message: getActionError("catalogos.validate", existingError, "Não foi possível validar os itens.").message,
       status: "error" as const,
     };
   }
 
   if ((existingItems?.length ?? 0) !== ids.length) {
     return {
-      message: "Itens invalidos para esta categoria.",
+      message: "Itens inválidos para esta categoria.",
       status: "error" as const,
     };
   }
@@ -215,7 +216,7 @@ export async function deleteCatalogItemsAction(kind: CatalogKind, itemIds: strin
 
   if (error) {
     return {
-      message: error.message,
+      message: getActionError("catalogos.delete", error, "Não foi possível excluir o item.").message,
       status: "error" as const,
     };
   }
@@ -230,21 +231,21 @@ export async function deleteCatalogItemsAction(kind: CatalogKind, itemIds: strin
 }
 
 export async function saveCatalogItemOrderAction(kind: CatalogKind, itemIds: string[]) {
-  await requireSuperadmin();
+  await requireSuperadminAction();
 
   const parsedKind = parseCatalogKind(kind);
   const ids = itemIds.map((id) => id.trim()).filter(Boolean);
 
   if (!parsedKind || ids.length !== itemIds.length || new Set(ids).size !== ids.length) {
     return {
-      message: "Ordem invalida.",
+      message: "Ordem inválida.",
       status: "error" as const,
     };
   }
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Catalogos indisponiveis.",
+      message: "Catálogos indisponíveis.",
       status: "error" as const,
     };
   }
@@ -258,14 +259,14 @@ export async function saveCatalogItemOrderAction(kind: CatalogKind, itemIds: str
 
   if (existingError) {
     return {
-      message: existingError.message,
+      message: getActionError("catalogos.validate", existingError, "Não foi possível validar os itens.").message,
       status: "error" as const,
     };
   }
 
   if ((existingItems?.length ?? 0) !== ids.length) {
     return {
-      message: "Itens invalidos para esta categoria.",
+      message: "Itens inválidos para esta categoria.",
       status: "error" as const,
     };
   }
@@ -282,7 +283,7 @@ export async function saveCatalogItemOrderAction(kind: CatalogKind, itemIds: str
 
   if (failed?.error) {
     return {
-      message: failed.error.message,
+      message: getActionError("catalogos.reorder", failed.error, "Não foi possível salvar a ordem.").message,
       status: "error" as const,
     };
   }

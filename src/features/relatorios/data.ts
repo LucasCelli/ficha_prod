@@ -1,12 +1,10 @@
+import { getServerErrorMessage } from "@/lib/server/boundaries";
 import { addDaysToInput, createUtcDateFromInput, formatDateInput, formatUtcDateInput, getBusinessTodayInput } from "@/lib/dates";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 
-type SupabaseServerClient = ReturnType<typeof createServerSupabaseClient>;
-
 export type RelatorioPeriodo = "ano" | "customizado" | "mes" | "ultimo_mes";
-
 export type RelatorioGranularidade = "dia" | "mes" | "semana";
 
 export type RelatorioFilters = {
@@ -16,15 +14,6 @@ export type RelatorioFilters = {
   periodo: RelatorioPeriodo;
   status?: Database["public"]["Enums"]["ficha_status"];
 };
-
-type FichaRow = Pick<
-  Database["public"]["Tables"]["fichas"]["Row"],
-  "id" | "cliente_nome_snapshot" | "data_inicio" | "data_entrega" | "delivered_at" | "material" | "status" | "arte" | "vendedor" | "evento"
->;
-
-type FichaItemRow = Pick<Database["public"]["Tables"]["ficha_itens"]["Row"], "ficha_id" | "produto" | "quantidade" | "tamanho">;
-
-type ClienteRow = Pick<Database["public"]["Tables"]["clientes"]["Row"], "primeira_ficha">;
 
 export type RelatorioRankItem = {
   label: string;
@@ -72,19 +61,11 @@ export type RelatorioComparativoTotais = {
 };
 
 export type RelatorioData = {
-  comparativo: {
-    clientes: number;
-    fichas: number;
-    itens: number;
-    taxaEntrega: number;
-  };
+  comparativo: RelatorioComparativoTotais;
   comparativoAnterior: RelatorioComparativoTotais;
   comparativoAtual: RelatorioComparativoTotais;
   detalhes: RelatorioDetalhe[];
-  eventos: {
-    avulsos: number;
-    eventos: number;
-  };
+  eventos: { avulsos: number; eventos: number };
   filtros: RelatorioFilters;
   granularidade: RelatorioGranularidade;
   periodoLabel: string;
@@ -92,7 +73,6 @@ export type RelatorioData = {
   resumo: {
     entregasAnoAtual: number;
     entregasRecorteAnterior: number;
-    fichasCanceladas: number;
     fichasEntregues: number;
     fichasPendentes: number;
     itensConfeccionados: number;
@@ -115,140 +95,263 @@ export type RelatorioData = {
 };
 
 export type RelatorioResult =
-  | {
-      data: RelatorioData;
-      kind: "ok";
-    }
-  | {
-      data: null;
-      kind: "not-configured";
-    }
-  | {
-      data: null;
-      kind: "error";
-      message: string;
-    };
+  | { data: RelatorioData; kind: "ok" }
+  | { data: null; kind: "not-configured" }
+  | { data: null; kind: "error"; message: string };
 
-const MAX_ROWS = 1200;
-const ITENS_CHUNK_SIZE = 150;
+type AggregateTotals = {
+  clientes: number;
+  entregues: number;
+  fichas: number;
+  itens: number;
+  itensConfeccionados?: number;
+  pendentes: number;
+  prazoMedioEntrega?: number | null;
+};
 
+type RankRow = {
+  label: string;
+  total_fichas: number;
+  total_itens: number;
+};
+
+type SellerRankRow = RankRow & { entregues: number; pendentes: number };
+
+type ReportSummary = {
+  current: AggregateTotals;
+  deliveryYearCount: number;
+  events: { avulsos: number; eventos: number };
+  previous: AggregateTotals;
+  rankings: {
+    clientes: RankRow[];
+    materiais: RankRow[];
+    personalizacoes: RankRow[];
+    produtos: RankRow[];
+    tamanhos: RankRow[];
+    vendedores: SellerRankRow[];
+  };
+  trend: Array<{ criadas: number; date: string; entregues: number; itens: number; pendentes: number }>;
+};
+
+type ReportDetailRow = {
+  cliente: string;
+  data: string | null;
+  id: string;
+  material: string;
+  quantidade: number;
+  status: Database["public"]["Enums"]["ficha_status"];
+  total_count: number;
+  vendedor: string;
+};
+
+const DETAIL_PAGE_SIZE = 1_000;
 const STATUS_LABELS: Record<Database["public"]["Enums"]["ficha_status"], string> = {
-  cancelado: "Canceladas",
   entregue: "Entregues",
   pendente: "Pendentes",
 };
 
 export async function getRelatorioData(filters: RelatorioFilters): Promise<RelatorioResult> {
-  if (!getSupabaseConfigStatus().hasServerConfig) {
-    return {
-      data: null,
-      kind: "not-configured",
-    };
-  }
+  if (!getSupabaseConfigStatus().hasServerConfig) return { data: null, kind: "not-configured" };
 
   try {
     const range = getPeriodRange(filters);
     const previousRange = getPreviousPeriodRange(range);
     const deliveryYearRange = getYearToDateRange();
     const supabase = createServerSupabaseClient();
-
-    const [fichasResult, clientesResult, previousFichasResult, previousClientesResult, deliveryYearResult] = await withRetry(() =>
-      Promise.all([
-        fetchFichas(supabase, range, filters),
-        supabase.from("clientes").select("primeira_ficha").gte("primeira_ficha", range.start).lte("primeira_ficha", range.end).limit(MAX_ROWS),
-        fetchFichas(supabase, previousRange, filters),
-        supabase
-          .from("clientes")
-          .select("primeira_ficha")
-          .gte("primeira_ficha", previousRange.start)
-          .lte("primeira_ficha", previousRange.end)
-          .limit(MAX_ROWS),
-        fetchFichas(supabase, deliveryYearRange, filters),
-      ]),
+    const summaryResult = await withRetry(() =>
+      supabase.rpc("get_report_summary", {
+        p_delivery_year_end: deliveryYearRange.end,
+        p_delivery_year_start: deliveryYearRange.start,
+        p_end: range.end,
+        p_evento: filters.evento ?? null,
+        p_previous_end: previousRange.end,
+        p_previous_start: previousRange.start,
+        p_start: range.start,
+        p_status: filters.status ?? null,
+      }),
     );
 
-    const error =
-      fichasResult.error ??
-      clientesResult.error ??
-      previousFichasResult.error ??
-      previousClientesResult.error ??
-      deliveryYearResult.error;
-
-    if (error) {
+    if (summaryResult.error || !summaryResult.data) {
       return {
         data: null,
         kind: "error",
-        message: error.message,
+        message: getServerErrorMessage(
+          "relatorios.summary",
+          summaryResult.error ?? new Error("Missing report summary"),
+          "Não foi possível carregar o relatório.",
+        ),
       };
     }
 
-    const fichas = fichasResult.fichas;
-    const previousFichas = previousFichasResult.fichas;
-    const [itens, previousItens] = await withRetry(() =>
-      Promise.all([
-        fetchItens(supabase, fichas.map((ficha) => ficha.id)),
-        fetchItens(supabase, previousFichas.map((ficha) => ficha.id)),
-      ]),
-    );
+    const summary = summaryResult.data as unknown as ReportSummary;
 
-    if (itens.error ?? previousItens.error) {
-      return {
-        data: null,
-        kind: "error",
-        message: itens.error?.message ?? previousItens.error?.message ?? "Falha ao carregar itens do relatório.",
-      };
-    }
-
-    const data = buildRelatorioData({
-      clientes: clientesResult.data ?? [],
-      filters: {
+    return {
+      data: buildReportData(summary, [], {
         ...filters,
         dataFim: range.end,
         dataInicio: range.start,
-      },
-      fichas,
-      itens: itens.itens,
-      previousClientes: previousClientesResult.data ?? [],
-      previousFichas,
-      previousItens: previousItens.itens,
-      range,
-      deliveryYearFichas: deliveryYearResult.fichas,
-    });
-
-    return {
-      data,
+      }, range),
       kind: "ok",
     };
   } catch (error) {
-    const raw = error instanceof Error ? error.message : "";
-    const isNetwork = /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|network/i.test(raw);
-
-    return {
-      data: null,
-      kind: "error",
-      message: isNetwork
-        ? "Não foi possível conectar ao banco de dados. Verifique a conexão e tente novamente."
-        : raw || "Falha ao carregar relatório.",
-    };
+    return { data: null, kind: "error", message: getServerErrorMessage("relatorios.load", error, "Não foi possível carregar o relatório.") };
   }
 }
 
-// Reexecuta leituras idempotentes em caso de falha de rede transitória (ex.: "fetch failed" do undici).
-async function withRetry<T>(run: () => Promise<T>, attempts = 2): Promise<T> {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      return await run();
-    } catch (error) {
-      lastError = error;
-      if (attempt < attempts - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
-      }
-    }
+export async function* iterateRelatorioDetalhes(filters: RelatorioFilters): AsyncGenerator<RelatorioDetalhe[]> {
+  if (!getSupabaseConfigStatus().hasServerConfig) {
+    throw new Error("Supabase server configuration is unavailable.");
   }
 
-  throw lastError;
+  const range = getPeriodRange(filters);
+  const supabase = createServerSupabaseClient();
+
+  for (let offset = 0; ; offset += DETAIL_PAGE_SIZE) {
+    const result = await withRetry(() =>
+      supabase.rpc("get_report_details_page", {
+        p_end: range.end,
+        p_evento: filters.evento ?? null,
+        p_limit: DETAIL_PAGE_SIZE,
+        p_offset: offset,
+        p_start: range.start,
+        p_status: filters.status ?? null,
+      }),
+    );
+
+    if (result.error) throw result.error;
+    const page = (result.data ?? []) as ReportDetailRow[];
+    const total = Number(page[0]?.total_count ?? offset + page.length);
+
+    yield page.map(({ total_count, ...row }) => {
+      void total_count;
+      return { ...row, quantidade: Number(row.quantidade) };
+    });
+
+    if (offset + page.length >= total || page.length < DETAIL_PAGE_SIZE) break;
+  }
+}
+function buildReportData(
+  summary: ReportSummary,
+  detalhes: RelatorioDetalhe[],
+  filters: RelatorioFilters,
+  range: { end: string; start: string },
+): RelatorioData {
+  const current = normalizeTotals(summary.current);
+  const previous = normalizeTotals(summary.previous);
+  const taxaEntrega = getPercent(current.entregues, current.entregues + current.pendentes);
+  const previousTaxaEntrega = getPercent(previous.entregues, previous.entregues + previous.pendentes);
+  const comparativoAtual = toComparativo(current, taxaEntrega);
+  const comparativoAnterior = toComparativo(previous, previousTaxaEntrega);
+
+  return {
+    comparativo: {
+      clientes: comparativoAtual.clientes - comparativoAnterior.clientes,
+      fichas: comparativoAtual.fichas - comparativoAnterior.fichas,
+      itens: comparativoAtual.itens - comparativoAnterior.itens,
+      taxaEntrega: comparativoAtual.taxaEntrega - comparativoAnterior.taxaEntrega,
+    },
+    comparativoAnterior,
+    comparativoAtual,
+    detalhes,
+    eventos: {
+      avulsos: Number(summary.events.avulsos),
+      eventos: Number(summary.events.eventos),
+    },
+    filtros: filters,
+    granularidade: getGranularidade(range),
+    periodoLabel: formatPeriodLabel(filters.periodo, range),
+    personalizacoes: mapRanks(summary.rankings.personalizacoes, formatPersonalizacaoLabel),
+    rankings: {
+      clientes: mapRanks(summary.rankings.clientes),
+      materiais: mapRanks(summary.rankings.materiais),
+      produtos: mapRanks(summary.rankings.produtos),
+      tamanhos: mapRanks(summary.rankings.tamanhos),
+      vendedores: mapSellers(summary.rankings.vendedores),
+    },
+    resumo: {
+      entregasAnoAtual: Number(summary.deliveryYearCount),
+      entregasRecorteAnterior: previous.entregues,
+      fichasEntregues: current.entregues,
+      fichasPendentes: current.pendentes,
+      itensConfeccionados: Number(summary.current.itensConfeccionados ?? 0),
+      itensPorFicha: current.fichas > 0 ? Math.round((current.itens / current.fichas) * 10) / 10 : 0,
+      novosClientes: current.clientes,
+      prazoMedioEntrega: summary.current.prazoMedioEntrega === null || summary.current.prazoMedioEntrega === undefined
+        ? null
+        : Math.round(Number(summary.current.prazoMedioEntrega) * 10) / 10,
+      taxaEntrega,
+      totalFichas: current.fichas,
+      totalItens: current.itens,
+    },
+    statusDistribuicao: buildStatusDistribution(current.entregues, current.pendentes),
+    tendencia: buildTrend(summary.trend, range),
+  };
+}
+
+function normalizeTotals(value: AggregateTotals) {
+  return {
+    clientes: Number(value.clientes),
+    entregues: Number(value.entregues),
+    fichas: Number(value.fichas),
+    itens: Number(value.itens),
+    pendentes: Number(value.pendentes),
+  };
+}
+
+function toComparativo(value: ReturnType<typeof normalizeTotals>, taxaEntrega: number): RelatorioComparativoTotais {
+  return { clientes: value.clientes, fichas: value.fichas, itens: value.itens, taxaEntrega };
+}
+
+function mapRanks(rows: RankRow[] = [], formatLabel: (value: string) => string = normalizeRankLabel): RelatorioRankItem[] {
+  const normalized = rows.map((row) => ({
+    label: formatLabel(row.label),
+    totalFichas: Number(row.total_fichas),
+    totalItens: Number(row.total_itens),
+  }));
+  const maxItens = Math.max(1, ...normalized.map((row) => row.totalItens));
+  return normalized.map((row) => ({ ...row, percent: Math.round((row.totalItens / maxItens) * 100) }));
+}
+
+function mapSellers(rows: SellerRankRow[] = []): RelatorioVendedor[] {
+  const maxFichas = Math.max(1, ...rows.map((row) => Number(row.total_fichas)));
+  return rows.map((row) => ({
+    entregues: Number(row.entregues),
+    label: normalizeRankLabel(row.label),
+    pendentes: Number(row.pendentes),
+    percent: Math.round((Number(row.total_fichas) / maxFichas) * 100),
+    totalFichas: Number(row.total_fichas),
+    totalItens: Number(row.total_itens),
+  }));
+}
+
+function buildStatusDistribution(entregues: number, pendentes: number): RelatorioStatusFatia[] {
+  const total = entregues + pendentes;
+  return ([{ status: "entregue", value: entregues }, { status: "pendente", value: pendentes }] as const)
+    .filter((slice) => slice.value > 0)
+    .map((slice) => ({
+      label: STATUS_LABELS[slice.status],
+      percent: getPercent(slice.value, total),
+      status: slice.status,
+      value: slice.value,
+    }));
+}
+
+function buildTrend(rows: ReportSummary["trend"], range: { end: string; start: string }) {
+  const granularity = getGranularidade(range);
+  const buckets = new Map<string, RelatorioTrendPoint>();
+  for (const bucket of getBucketKeys(range, granularity)) {
+    buckets.set(bucket, { bucket, criadas: 0, entregues: 0, itens: 0, label: formatBucketLabel(bucket, granularity), pendentes: 0 });
+  }
+
+  for (const row of rows ?? []) {
+    const bucket = buckets.get(getBucketKey(row.date, granularity));
+    if (!bucket) continue;
+    bucket.criadas += Number(row.criadas);
+    bucket.entregues += Number(row.entregues);
+    bucket.itens += Number(row.itens);
+    bucket.pendentes += Number(row.pendentes);
+  }
+  return Array.from(buckets.values());
 }
 
 export function normalizeRelatorioPeriodo(value: string | string[] | undefined): RelatorioPeriodo {
@@ -265,7 +368,7 @@ export function normalizeRelatorioDate(value: string | string[] | undefined) {
 
 export function normalizeRelatorioStatus(value: string | string[] | undefined): RelatorioFilters["status"] {
   const raw = Array.isArray(value) ? value[0] : value;
-  if (raw === "pendente" || raw === "entregue" || raw === "cancelado") return raw;
+  if (raw === "pendente" || raw === "entregue") return raw;
   return undefined;
 }
 
@@ -286,359 +389,41 @@ export function buildRelatorioSearchParams(filters: RelatorioFilters) {
   return params;
 }
 
-async function fetchFichas(
-  supabase: SupabaseServerClient,
-  range: { end: string; start: string },
-  filters: Pick<RelatorioFilters, "evento" | "status"> = {},
-) {
-  let query = supabase
-    .from("fichas")
-    .select("id, cliente_nome_snapshot, data_inicio, data_entrega, delivered_at, material, status, arte, vendedor, evento")
-    .gte("data_inicio", range.start)
-    .lte("data_inicio", range.end)
-    .order("data_inicio", { ascending: false })
-    .limit(MAX_ROWS);
-
-  if (filters.status) {
-    query = query.eq("status", filters.status);
-  }
-
-  if (typeof filters.evento === "boolean") {
-    query = query.eq("evento", filters.evento);
-  }
-
-  const { data, error } = await query;
-
-  return {
-    error,
-    fichas: data ?? [],
-  };
-}
-
-async function fetchItens(supabase: SupabaseServerClient, fichaIds: string[]) {
-  if (fichaIds.length === 0) {
-    return {
-      error: null,
-      itens: [] as FichaItemRow[],
-    };
-  }
-
-  // Fragmenta o filtro `in` para não gerar uma URL gigante (periodos longos com muitas fichas
-  // estouram o limite de tamanho da requisição e causam "fetch failed").
-  const chunks: string[][] = [];
-  for (let index = 0; index < fichaIds.length; index += ITENS_CHUNK_SIZE) {
-    chunks.push(fichaIds.slice(index, index + ITENS_CHUNK_SIZE));
-  }
-
-  const results = await Promise.all(
-    chunks.map((chunk) =>
-      supabase.from("ficha_itens").select("ficha_id, produto, quantidade, tamanho").in("ficha_id", chunk).limit(ITENS_CHUNK_SIZE * 12),
-    ),
-  );
-
-  const error = results.find((result) => result.error)?.error ?? null;
-  const itens = results.flatMap((result) => result.data ?? []);
-
-  return {
-    error,
-    itens,
-  };
-}
-
-function buildRelatorioData(input: {
-  clientes: ClienteRow[];
-  filters: RelatorioFilters;
-  fichas: FichaRow[];
-  itens: FichaItemRow[];
-  previousClientes: ClienteRow[];
-  previousFichas: FichaRow[];
-  previousItens: FichaItemRow[];
-  range: { end: string; start: string };
-  deliveryYearFichas: FichaRow[];
-}): RelatorioData {
-  const itensPorFicha = groupItensByFicha(input.itens);
-  const totalFichas = input.fichas.length;
-  const totalItens = sumItens(input.itens);
-  const fichasEntregues = input.fichas.filter((ficha) => ficha.status === "entregue").length;
-  const fichasPendentes = input.fichas.filter((ficha) => ficha.status === "pendente").length;
-  const fichasCanceladas = input.fichas.filter((ficha) => ficha.status === "cancelado").length;
-  const itensConfeccionados = sumItensForFichas(
-    input.itens,
-    new Set(input.fichas.filter((ficha) => ficha.status === "entregue").map((ficha) => ficha.id)),
-  );
-  const taxaEntrega = getPercent(fichasEntregues, fichasEntregues + fichasPendentes);
-  const previousTaxaEntrega = getPercent(
-    input.previousFichas.filter((ficha) => ficha.status === "entregue").length,
-    input.previousFichas.filter((ficha) => ficha.status === "entregue" || ficha.status === "pendente").length,
-  );
-  const vendedores = buildVendedores(input.fichas, itensPorFicha);
-
-  const comparativoAtual: RelatorioComparativoTotais = {
-    clientes: input.clientes.length,
-    fichas: totalFichas,
-    itens: totalItens,
-    taxaEntrega,
-  };
-  const comparativoAnterior: RelatorioComparativoTotais = {
-    clientes: input.previousClientes.length,
-    fichas: input.previousFichas.length,
-    itens: sumItens(input.previousItens),
-    taxaEntrega: previousTaxaEntrega,
-  };
-
-  return {
-    comparativo: {
-      clientes: comparativoAtual.clientes - comparativoAnterior.clientes,
-      fichas: comparativoAtual.fichas - comparativoAnterior.fichas,
-      itens: comparativoAtual.itens - comparativoAnterior.itens,
-      taxaEntrega: comparativoAtual.taxaEntrega - comparativoAnterior.taxaEntrega,
-    },
-    comparativoAnterior,
-    comparativoAtual,
-    detalhes: input.fichas.map((ficha) => ({
-      cliente: ficha.cliente_nome_snapshot,
-      data: ficha.data_inicio,
-      id: ficha.id,
-      material: ficha.material ?? "Não especificado",
-      quantidade: sumItens(itensPorFicha.get(ficha.id) ?? []),
-      status: ficha.status,
-      vendedor: ficha.vendedor ?? "Sem vendedor",
-    })),
-    eventos: {
-      avulsos: input.fichas.filter((ficha) => !ficha.evento).length,
-      eventos: input.fichas.filter((ficha) => ficha.evento).length,
-    },
-    filtros: input.filters,
-    granularidade: getGranularidade(input.range),
-    periodoLabel: formatPeriodLabel(input.filters.periodo, input.range),
-    personalizacoes: buildRank(input.fichas, itensPorFicha, (ficha) => formatPersonalizacaoLabel(ficha.arte)),
-    rankings: {
-      clientes: buildRank(input.fichas, itensPorFicha, (ficha) => ficha.cliente_nome_snapshot),
-      materiais: buildRank(input.fichas, itensPorFicha, (ficha) => ficha.material ?? "Não especificado"),
-      produtos: buildItemRank(input.itens, (item) => item.produto ?? "Não especificado"),
-      tamanhos: buildItemRank(input.itens, (item) => item.tamanho ?? "Sem tamanho"),
-      vendedores,
-    },
-    resumo: {
-      entregasAnoAtual: countDelivered(input.deliveryYearFichas),
-      entregasRecorteAnterior: countDelivered(input.previousFichas),
-      fichasCanceladas,
-      fichasEntregues,
-      fichasPendentes,
-      itensConfeccionados,
-      itensPorFicha: totalFichas > 0 ? Math.round((totalItens / totalFichas) * 10) / 10 : 0,
-      novosClientes: input.clientes.length,
-      prazoMedioEntrega: getAverageLeadTime(input.fichas),
-      taxaEntrega,
-      totalFichas,
-      totalItens,
-    },
-    statusDistribuicao: buildStatusDistribuicao(fichasEntregues, fichasPendentes, fichasCanceladas),
-    tendencia: buildTendencia(input.fichas, itensPorFicha, input.range),
-  };
-}
-
-function buildStatusDistribuicao(entregues: number, pendentes: number, canceladas: number): RelatorioStatusFatia[] {
-  const total = entregues + pendentes + canceladas;
-
-  return (
-    [
-      { status: "entregue", value: entregues },
-      { status: "pendente", value: pendentes },
-      { status: "cancelado", value: canceladas },
-    ] as const
-  )
-    .filter((fatia) => fatia.value > 0)
-    .map((fatia) => ({
-      label: STATUS_LABELS[fatia.status],
-      percent: getPercent(fatia.value, total),
-      status: fatia.status,
-      value: fatia.value,
-    }));
-}
-
-function buildTendencia(
-  fichas: FichaRow[],
-  itensPorFicha: Map<string, FichaItemRow[]>,
-  range: { end: string; start: string },
-): RelatorioTrendPoint[] {
-  const granularidade = getGranularidade(range);
-  const buckets = new Map<string, RelatorioTrendPoint>();
-
-  for (const bucket of getBucketKeys(range, granularidade)) {
-    buckets.set(bucket, {
-      bucket,
-      criadas: 0,
-      entregues: 0,
-      itens: 0,
-      label: formatBucketLabel(bucket, granularidade),
-      pendentes: 0,
-    });
-  }
-
-  for (const ficha of fichas) {
-    if (!ficha.data_inicio) continue;
-    const key = getBucketKey(ficha.data_inicio, granularidade);
-    const point = buckets.get(key);
-    if (!point) continue;
-
-    point.criadas += 1;
-    point.itens += sumItens(itensPorFicha.get(ficha.id) ?? []);
-    if (ficha.status === "entregue") {
-      point.entregues += 1;
-    } else if (ficha.status === "pendente") {
-      point.pendentes += 1;
+async function withRetry<T>(run: () => PromiseLike<T>, attempts = 2): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts - 1) await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
     }
   }
-
-  return Array.from(buckets.values());
+  throw lastError;
 }
 
-function buildVendedores(fichas: FichaRow[], itensPorFicha: Map<string, FichaItemRow[]>): RelatorioVendedor[] {
-  const grouped = new Map<string, FichaRow[]>();
-
-  for (const ficha of fichas) {
-    const label = ficha.vendedor?.trim() || "Sem vendedor";
-    grouped.set(label, [...(grouped.get(label) ?? []), ficha]);
-  }
-
-  const maxFichas = Math.max(...Array.from(grouped.values()).map((group) => group.length), 1);
-
-  return Array.from(grouped.entries())
-    .map(([label, group]) => ({
-      entregues: group.filter((ficha) => ficha.status === "entregue").length,
-      label,
-      pendentes: group.filter((ficha) => ficha.status === "pendente").length,
-      percent: Math.round((group.length / maxFichas) * 100),
-      totalFichas: group.length,
-      totalItens: sumItensForFichas(itensPorFicha, new Set(group.map((ficha) => ficha.id))),
-    }))
-    .sort((a, b) => b.totalFichas - a.totalFichas || a.label.localeCompare(b.label, "pt-BR"))
-    .slice(0, 12);
+function normalizeRankLabel(value: string) {
+  return value.replaceAll("_", " ").trim() || "Não especificado";
 }
 
-function buildRank(fichas: FichaRow[], itensPorFicha: Map<string, FichaItemRow[]>, getLabel: (ficha: FichaRow) => string) {
-  const grouped = new Map<string, FichaRow[]>();
-
-  for (const ficha of fichas) {
-    const label = getLabel(ficha).replaceAll("_", " ").trim() || "Não especificado";
-    grouped.set(label, [...(grouped.get(label) ?? []), ficha]);
-  }
-
-  const maxItens = Math.max(...Array.from(grouped.values()).map((group) => sumItensForFichas(itensPorFicha, new Set(group.map((ficha) => ficha.id)))), 1);
-
-  return Array.from(grouped.entries())
-    .map(([label, group]) => {
-      const totalItens = sumItensForFichas(itensPorFicha, new Set(group.map((ficha) => ficha.id)));
-      return {
-        label,
-        percent: Math.round((totalItens / maxItens) * 100),
-        totalFichas: group.length,
-        totalItens,
-      };
-    })
-    .sort((a, b) => b.totalItens - a.totalItens || b.totalFichas - a.totalFichas || a.label.localeCompare(b.label, "pt-BR"))
-    .slice(0, 12);
-}
-
-function buildItemRank(itens: FichaItemRow[], getLabel: (item: FichaItemRow) => string) {
-  const grouped = new Map<string, FichaItemRow[]>();
-
-  for (const item of itens) {
-    const label = getLabel(item).trim() || "Não especificado";
-    grouped.set(label, [...(grouped.get(label) ?? []), item]);
-  }
-
-  const maxItens = Math.max(...Array.from(grouped.values()).map(sumItens), 1);
-
-  return Array.from(grouped.entries())
-    .map(([label, group]) => ({
-      label,
-      percent: Math.round((sumItens(group) / maxItens) * 100),
-      totalFichas: new Set(group.map((item) => item.ficha_id)).size,
-      totalItens: sumItens(group),
-    }))
-    .sort((a, b) => b.totalItens - a.totalItens || a.label.localeCompare(b.label, "pt-BR"))
-    .slice(0, 12);
-}
-
-function formatPersonalizacaoLabel(value: string | null) {
-  const normalized = value?.replaceAll("_", " ").replaceAll("-", " ").trim().toLocaleLowerCase("pt-BR");
-
-  if (!normalized) {
-    return "Sem Personalização";
-  }
-
-  const labels = new Map([
-    ["bordado", "Bordado"],
-    ["dtf", "DTF"],
-    ["dtf textil", "DTF Têxtil"],
-    ["serigrafia", "Serigrafia"],
-    ["silk", "Silk"],
-    ["silk screen", "Silk Screen"],
-    ["sublimacao", "Sublimação"],
-    ["sublimação", "Sublimação"],
-  ]);
-
-  return labels.get(normalized) ?? toTitleCase(normalized);
-}
-
-function toTitleCase(value: string) {
-  return value.replace(/\p{L}[\p{L}\p{M}]*/gu, (word) => {
-    if (word.length <= 3 && word === word.toLocaleUpperCase("pt-BR").toLocaleLowerCase("pt-BR")) {
-      return word.toLocaleUpperCase("pt-BR");
-    }
-
-    return word.charAt(0).toLocaleUpperCase("pt-BR") + word.slice(1);
-  });
-}
-
-function groupItensByFicha(itens: FichaItemRow[]) {
-  const grouped = new Map<string, FichaItemRow[]>();
-
-  for (const item of itens) {
-    grouped.set(item.ficha_id, [...(grouped.get(item.ficha_id) ?? []), item]);
-  }
-
-  return grouped;
-}
-
-function sumItens(input: FichaItemRow[]) {
-  return input.reduce((total, item) => total + (Number(item.quantidade) || 0), 0);
-}
-
-function sumItensForFichas(input: FichaItemRow[] | Map<string, FichaItemRow[]>, fichaIds: Set<string>) {
-  if (input instanceof Map) {
-    return Array.from(fichaIds).reduce((total, fichaId) => total + sumItens(input.get(fichaId) ?? []), 0);
-  }
-
-  return input.reduce((total, item) => total + (fichaIds.has(item.ficha_id) ? Number(item.quantidade) || 0 : 0), 0);
+function formatPersonalizacaoLabel(value: string) {
+  const normalized = value.trim().toLocaleLowerCase("pt-BR");
+  if (!normalized || normalized === "sem personalizacao") return "Sem Personalização";
+  const labels: Record<string, string> = {
+    bordado: "Bordado",
+    dtf: "DTF",
+    "dtf textil": "DTF Têxtil",
+    serigrafia: "Serigrafia",
+    silk: "Silk",
+    "silk screen": "Silk Screen",
+    sublimacao: "Sublimação",
+    "sublimação": "Sublimação",
+  };
+  return labels[normalized] ?? normalized.replace(/\p{L}[\p{L}\p{M}]*/gu, (word) => word.charAt(0).toLocaleUpperCase("pt-BR") + word.slice(1));
 }
 
 function getPercent(value: number, total: number) {
   return total > 0 ? Math.round((value / total) * 100) : 0;
-}
-
-function getAverageLeadTime(fichas: FichaRow[]): number | null {
-  const prazos: number[] = [];
-
-  for (const ficha of fichas) {
-    if (ficha.status !== "entregue" || !ficha.data_inicio) continue;
-
-    const entrega = (ficha.delivered_at ?? ficha.data_entrega)?.slice(0, 10);
-    if (!entrega) continue;
-
-    const dias = Math.round((createUtcDateFromInput(entrega).getTime() - createUtcDateFromInput(ficha.data_inicio).getTime()) / 86_400_000);
-    if (Number.isFinite(dias) && dias >= 0) {
-      prazos.push(dias);
-    }
-  }
-
-  if (prazos.length === 0) {
-    return null;
-  }
-
-  return Math.round((prazos.reduce((sum, dias) => sum + dias, 0) / prazos.length) * 10) / 10;
 }
 
 function getGranularidade(range: { end: string; start: string }): RelatorioGranularidade {
@@ -648,22 +433,16 @@ function getGranularidade(range: { end: string; start: string }): RelatorioGranu
   return "mes";
 }
 
-function getBucketKeys(range: { end: string; start: string }, granularidade: RelatorioGranularidade): string[] {
+function getBucketKeys(range: { end: string; start: string }, granularidade: RelatorioGranularidade) {
   const keys: string[] = [];
   const seen = new Set<string>();
   let cursor = getBucketKey(range.start, granularidade);
   const lastKey = getBucketKey(range.end, granularidade);
-
-  // Garante terminação mesmo com intervalos atípicos.
   for (let guard = 0; guard < 800; guard += 1) {
-    if (!seen.has(cursor)) {
-      seen.add(cursor);
-      keys.push(cursor);
-    }
+    if (!seen.has(cursor)) { seen.add(cursor); keys.push(cursor); }
     if (cursor >= lastKey) break;
     cursor = advanceBucket(cursor, granularidade);
   }
-
   return keys;
 }
 
@@ -676,7 +455,6 @@ function getBucketKey(value: string, granularidade: RelatorioGranularidade) {
 function advanceBucket(value: string, granularidade: RelatorioGranularidade) {
   if (granularidade === "dia") return addDaysToInput(value, 1);
   if (granularidade === "semana") return addDaysToInput(value, 7);
-
   const date = createUtcDateFromInput(value);
   return formatUtcDateInput(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)));
 }
@@ -686,15 +464,13 @@ function formatBucketLabel(value: string, granularidade: RelatorioGranularidade)
     const label = formatDateInput(value, { month: "short", year: "2-digit" }).replace(".", "");
     return label.charAt(0).toLocaleUpperCase("pt-BR") + label.slice(1);
   }
-
   return formatDateInput(value, { day: "2-digit", month: "2-digit" });
 }
 
 function startOfWeek(value: string) {
   const date = createUtcDateFromInput(value);
   const day = date.getUTCDay();
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  return addDaysToInput(value, mondayOffset);
+  return addDaysToInput(value, day === 0 ? -6 : 1 - day);
 }
 
 function getRangeSpanDays(range: { end: string; start: string }) {
@@ -703,60 +479,28 @@ function getRangeSpanDays(range: { end: string; start: string }) {
 
 function getPeriodRange(filters: RelatorioFilters) {
   const today = getBusinessTodayInput();
-  const current = createDateFromInput(today);
-
-  if (filters.periodo === "ano") {
-    return {
-      end: `${current.getUTCFullYear()}-12-31`,
-      start: `${current.getUTCFullYear()}-01-01`,
-    };
-  }
-
-  if (filters.periodo === "ultimo_mes") {
-    const previous = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() - 1, 1));
-    return monthRange(previous);
-  }
-
-  if (filters.periodo === "customizado" && filters.dataInicio && filters.dataFim) {
-    return {
-      end: filters.dataFim,
-      start: filters.dataInicio,
-    };
-  }
-
+  const current = createUtcDateFromInput(today);
+  if (filters.periodo === "ano") return { end: `${current.getUTCFullYear()}-12-31`, start: `${current.getUTCFullYear()}-01-01` };
+  if (filters.periodo === "ultimo_mes") return monthRange(new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() - 1, 1)));
+  if (filters.periodo === "customizado" && filters.dataInicio && filters.dataFim) return { end: filters.dataFim, start: filters.dataInicio };
   return monthRange(current);
 }
 
 function getPreviousPeriodRange(range: { end: string; start: string }) {
-  const start = createDateFromInput(range.start);
-  const end = createDateFromInput(range.end);
-  const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
-  const previousEnd = addDays(range.start, -1);
-  const previousStart = addDays(previousEnd, -(days - 1));
-
-  return {
-    end: previousEnd,
-    start: previousStart,
-  };
+  const days = getRangeSpanDays(range);
+  const end = addDaysToInput(range.start, -1);
+  return { end, start: addDaysToInput(end, -(days - 1)) };
 }
 
 function getYearToDateRange() {
   const today = getBusinessTodayInput();
-  const current = createDateFromInput(today);
-
-  return {
-    end: today,
-    start: `${current.getUTCFullYear()}-01-01`,
-  };
+  return { end: today, start: `${today.slice(0, 4)}-01-01` };
 }
 
 function monthRange(date: Date) {
-  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
-
   return {
-    end: formatUtcDateInput(end),
-    start: formatUtcDateInput(start),
+    end: formatUtcDateInput(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0))),
+    start: formatUtcDateInput(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1))),
   };
 }
 
@@ -764,25 +508,5 @@ function formatPeriodLabel(periodo: RelatorioPeriodo, range: { end: string; star
   if (periodo === "mes") return "Este mês";
   if (periodo === "ultimo_mes") return "Último mês";
   if (periodo === "ano") return "Este ano";
-  return `${formatDate(range.start)} até ${formatDate(range.end)}`;
-}
-
-function addDays(value: string, amount: number) {
-  return addDaysToInput(value, amount);
-}
-
-function createDateFromInput(value: string) {
-  return createUtcDateFromInput(value);
-}
-
-function countDelivered(fichas: FichaRow[]) {
-  return fichas.filter((ficha) => ficha.status === "entregue").length;
-}
-
-function formatDate(value: string) {
-  return formatDateInput(value, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return `${formatDateInput(range.start)} até ${formatDateInput(range.end)}`;
 }

@@ -18,13 +18,11 @@ const columns = [
 ];
 
 const statusLabels: Record<FichaStatus, string> = {
-  cancelado: "Cancelada",
   entregue: "Entregue",
   pendente: "Pendente",
 };
 
 const statusTones: Record<FichaStatus, "danger" | "pending" | "success"> = {
-  cancelado: "danger",
   entregue: "success",
   pendente: "pending",
 };

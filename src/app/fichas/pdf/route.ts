@@ -1,3 +1,4 @@
+import { withAuthenticatedRoute } from "@/lib/server/boundaries";
 import type { NextRequest } from "next/server";
 import { getCurrentSession } from "@/features/auth/session";
 import {
@@ -13,7 +14,7 @@ import { getBusinessWeekRange } from "@/lib/dates";
 
 type WeeklyPdfMode = "current-week" | "next-week";
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -119,3 +120,5 @@ function sanitizeFileSegment(value: string) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
 }
+
+export const GET = withAuthenticatedRoute(handleGET, "src/app/fichas/pdf/route.ts");

@@ -2071,3 +2071,62 @@
 - Decisao: manter datas persistidas como `YYYY-MM-DD` para campos de negocio e timestamps ISO para eventos/auditoria; o helper separa essas duas naturezas para evitar drift de timezone.
 - Arquivos alterados: `AGENTS.md`, `src/lib/dates.ts`, `src/app/relatorios/excel/route.ts`, `src/features/clientes/cliente-detail.tsx`, `src/features/clientes/clientes-overview.tsx`, `src/features/fichas/data.ts`, `src/features/fichas/ficha-form.tsx`, `src/features/fichas/ficha-preview.tsx`, `src/features/fichas/fichas-overview.tsx`, `src/features/fichas/operational-pdf.ts`, `src/features/fichas/print-ficha.tsx`, `src/features/quadro-producao/data.ts`, `src/features/quadro-producao/quadro-producao-client.tsx`, `src/features/relatorios/data.ts`, `src/features/relatorios/relatorios-legado-overview.tsx`, `src/features/relatorios/relatorios-overview.tsx`, `src/features/usuarios/usuarios-overview.tsx`, `plano-migracao-next-supabase.md`, `registro-migracao-next.md`.
 - Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check` e `git diff --check` passaram.
+
+## 2026-07-30 - Consolidação do backlog após revisão técnica
+
+- Módulo: documentação técnica, segurança, integridade de dados, desempenho e qualidade.
+- Ajuste: `TODO.md` foi limpo dos itens concluídos e passou a conter somente as pendências encontradas na revisão técnica do checkout atual.
+- Autenticação: o uso de PIN foi mantido para operadores e superadmin; a pendência é adicionar proteção persistente contra força bruta, compatível com Functions efêmeras e concorrentes da Vercel.
+- Status: documentado que o fluxo operacional usa apenas `pendente`, `atrasada` e `entregue`; `atrasada` é uma condição derivada de ficha pendente pela data de entrega. A revisão futura deve remover dependências de `cancelado` e condições genéricas `status != entregue`.
+- Vercel: todas as recomendações passaram a evitar memória local, processo residente e filesystem da Function como fonte de verdade. Transações, locks, agregações, rate limit e auditoria devem usar Supabase/Postgres ou serviço persistente apropriado.
+- Escopo: nenhuma correção de código ou migration foi aplicada nesta etapa; os achados foram apenas priorizados e documentados.
+- Arquivos alterados: `TODO.md`, `registro-alteracoes.md`.
+- Validação: revisão do diff, `git diff --check` e varredura de mojibake nos trechos adicionados.
+
+## 2026-07-30 - Endurecimento dos pontos críticos
+
+- Fase/modulo: autenticação, fichas, clientes, Cloudinary, relatórios e infraestrutura Supabase/Vercel.
+- Autenticação: o login por PIN, inclusive do superadmin, foi preservado e recebeu rate limit persistente por conta, origem e par conta-origem. As dimensões são armazenadas como hashes SHA-256, o bloqueio é progressivo no Postgres e falhas da proteção bloqueiam o login de forma segura.
+- Fichas: criação e edição passaram a usar a RPC `save_ficha_atomic`, que grava cabeçalho, cliente, itens e imagens em uma única transação. Foi removido o rollback compensatório da Function.
+- Clientes: triggers recalculam `total_fichas`, `primeira_ficha` e `ultima_ficha` após inclusão, edição, troca de cliente ou exclusão, com locks transacionais por cliente.
+- Cloudinary: o servidor passou a gerar `public_id`, restringir IDs e URLs ao namespace gerenciado, consultar referências de imagem no Postgres e ignorar qualquer autorização de exclusão vinda do cliente. Upload e exclusão receberam cotas persistentes por usuário com `429` e `Retry-After`.
+- Relatórios: leituras agora têm paginação e ordem estável; resultados acima dos limites explícitos retornam erro em vez de truncamento silencioso. A busca de itens foi dividida em lotes com concorrência limitada para conter uso de memória e conexões nas Functions da Vercel.
+- Testes: adicionados contratos para rate limit, privilégios das RPCs, atomicidade de fichas e autorização do Cloudinary.
+- Arquivos alterados: `src/features/auth/actions.ts`, `src/features/auth/login-rate-limit.ts`, `src/features/fichas/actions.ts`, `src/features/fichas/ficha-form.tsx`, `src/features/fichas/schema.ts`, `src/features/relatorios/data.ts`, `src/app/api/cloudinary/signature/route.ts`, `src/app/api/cloudinary/image/[...publicId]/route.ts`, `src/lib/operation-quota.ts`, `src/lib/supabase/database.types.ts`, `supabase/migrations/20260731032229_critical_integrity_hardening.sql`, `quality-tests/login-rate-limit.test.ts`, `quality-tests/critical-hardening-contracts.test.ts` e `TODO.md`.
+- Validação: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check`, oito testes Node e `git diff --check` passaram durante a etapa.
+- Caveat de publicação: a migration foi criada, mas não aplicada. O CLI não está vinculado a um project ref e o Docker local não está disponível; a migration deve ser validada/aplicada antes de publicar o código na Vercel. A agregação SQL completa dos relatórios e uma trilha histórica de falhas de login permanecem no `TODO.md`.
+## 2026-07-30 - Conclusão local do backlog técnico
+
+- Fase/módulos: autenticação e sessões, fichas/clientes, Kanban, meu painel, relatórios, APIs, segurança HTTP e manutenção.
+- Banco: criada `20260731034518_complete_todo_hardening.sql`, com auditoria hash de falhas de login, resolução de sessão com throttle de cinco minutos, remoção do status persistido `cancelado`, mutações atômicas/serializadas do Kanban e RPCs agregadas/paginadas de `/meu-painel` e `/relatorios`.
+- Vercel: toda coordenação permanece no Postgres; nenhuma regra crítica usa memória ou filesystem efêmero. Relatórios comuns transferem apenas agregados e exportações consomem detalhes em páginas de 1.000 registros.
+- Autorização/erros: Route Handlers passaram pela fronteira autenticada; Server Actions comuns e administrativas usam wrappers distintos. Erros técnicos são registrados no servidor com UUID de correlação e sanitização de tokens, enquanto o cliente recebe mensagens estáveis.
+- Status: removidas referências de produto a `cancelado`; `atrasada` é calculada apenas para `pendente` pela data de negócio em `America/Cuiaba`.
+- Qualidade: extraídos `ficha-form-controls.tsx` e `quadro-producao-state.ts`; a marca d'água base64 virou `public/assets/image-cropper-watermark.png`; mojibake visível foi corrigido e `scripts/check-encoding.mjs` passou a impedir regressões.
+- Segurança HTTP: `next.config.mjs` ganhou CSP compatível com Cloudinary/Supabase, `frame-ancestors 'none'`, `X-Frame-Options`, `nosniff`, política de referência e política de permissões.
+- Testes: `quality-tests/todo-hardening-contracts.test.ts` verifica auditoria de login, enum de status, throttle de sessão, locks/ordem densa, RPCs paginadas, timezone, fronteiras das rotas e headers. As 18 migrations foram executadas em ordem num PostgreSQL WASM descartável.
+- Arquivos principais: `supabase/migrations/20260731032229_critical_integrity_hardening.sql`, `supabase/migrations/20260731034518_complete_todo_hardening.sql`, `src/lib/server/boundaries.ts`, `src/features/auth/*`, `src/features/fichas/*`, `src/features/quadro-producao/*`, `src/features/meu-painel/*`, `src/features/relatorios/*`, `next.config.mjs`, `scripts/check-encoding.mjs`, `quality-tests/*`, `TODO.md`.
+- Validação: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check`, `npm run encoding:check`, `npm run test:quality` (16 testes) e `git diff --check` passaram.
+- Caveat obrigatório: as migrations ainda não foram aplicadas no projeto remoto. A CLI Supabase não possui token, o token local da Vercel expirou e o dashboard solicitou autenticação. Não publicar este código na Vercel até autenticar, aplicar as duas migrations e executar o smoke remoto.
+
+## 2026-07-31 - Auditoria funcional do endurecimento crítico
+
+- Fase/módulos: fichas, Kanban, autenticação, relatórios, migrations e compatibilidade com Vercel.
+- Integridade: `save_ficha_atomic` passou a usar o mesmo advisory lock global das demais mutações antes de calcular `kanban_ordem`, evitando que duas fichas novas recebam a mesma posição na coluna inicial.
+- Relatórios: a exportação Excel passou a usar `ExcelJS.stream.xlsx.WorkbookWriter` sobre um stream Node e a consumir páginas de 1.000 registros por `AsyncGenerator`; as linhas são confirmadas conforme escritas e não ficam todas retidas na memória da Function. O PDF usa somente o resumo agregado, pois não consome detalhes.
+- Observabilidade: falhas ao registrar auditoria de login, atualizar `last_login_at` ou remover a sessão no logout agora geram log sanitizado com correlação, sem alterar as mensagens estáveis apresentadas ao usuário.
+- Smoke SQL: as 18 migrations foram reaplicadas em ordem num PostgreSQL WASM descartável. Em seguida foram exercitados criação atômica de duas fichas, triggers de agregados do cliente, movimento e criação manual no Kanban, entrega atômica, ordem densa, resolução de sessão, auditoria de login e RPCs paginadas/agregadas de painel e relatórios.
+- Arquivos principais: `supabase/migrations/20260731032229_critical_integrity_hardening.sql`, `src/features/relatorios/data.ts`, `src/app/relatorios/excel/route.ts`, `src/app/relatorios/pdf/route.ts`, `src/features/auth/actions.ts`, `quality-tests/todo-hardening-contracts.test.ts`, `TODO.md` e `registro-alteracoes.md`.
+- Validação: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run supabase:check`, `npm run encoding:check`, `npm run test:quality` (16 testes), smoke funcional das migrations e `git diff --check` passaram.
+- Caveat obrigatório: o projeto remoto ainda não expõe as novas RPCs. É necessário autenticar o dashboard/CLI do Supabase, aplicar as duas migrations na ordem documentada e executar o smoke remoto antes de publicar na Vercel.
+
+## 2026-07-31 - Aplicação remota e encerramento do TODO técnico
+
+- Projeto: dashboard autenticado e projeto `fichas_primalhas` confirmado pelo ref `qgqoxzbncbcmuaqmytou` antes de qualquer execução.
+- Migrations: `20260731032229_critical_integrity_hardening.sql` e `20260731034518_complete_todo_hardening.sql` foram carregadas integralmente no SQL Editor com role `postgres`, validadas por SHA-256 antes da execução e aplicadas nessa ordem; ambas retornaram `Success. No rows returned`.
+- Histórico: as duas versões foram registradas em `supabase_migrations.schema_migrations` sem apagar o registro legado existente. O conteúdo armazenado possui uma entrada por migration, comprimentos de 18.673 e 33.273 caracteres e MD5 idênticos aos arquivos locais normalizados.
+- Smoke remoto: a chave `service_role` confirmou rate limit, auditoria de falhas, resolução de sessão, enum limitado a `pendente`/`entregue`, agregações e paginação de relatórios, painel pessoal, contratos atômicos de ficha e contratos serializados do Kanban. Registros sintéticos de rate limit e auditoria foram removidos e a limpeza foi verificada.
+- Smoke da aplicação: login por PIN com o usuário de teste passou contra o Supabase remoto. `/`, `/fichas`, `/quadro-producao`, `/meu-painel` e `/relatorios` carregaram sem estado de erro. Exportações retornaram Excel válido (`PK`, 15.590 bytes) e PDF válido (`%PDF`, 34.263 bytes), ambos com HTTP 200 e MIME correto.
+- Decisão: o bloqueio de publicação foi encerrado, mas nenhum deploy na Vercel foi realizado; publicação continua fora deste ciclo até solicitação explícita.
+- Caveat histórico: antes deste ciclo, `supabase_migrations.schema_migrations` continha somente uma versão antiga de `app_auth`, apesar do schema remoto possuir migrations posteriores. As duas versões novas foram registradas, mas o histórico legado não foi reescrito de forma destrutiva.
+- Arquivos atualizados: `TODO.md` e `registro-alteracoes.md`.

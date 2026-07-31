@@ -1,3 +1,4 @@
+import { getServerErrorMessage } from "@/lib/server/boundaries";
 import { addDaysToInput, getBusinessTodayInput } from "@/lib/dates";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -109,7 +110,7 @@ export async function getDashboardData(): Promise<DashboardResult> {
       upcomingResult.error;
 
     if (error) {
-      return { kind: "error", message: error.message };
+      return { kind: "error", message: getServerErrorMessage("dashboard.load", error, "Não foi possível carregar a visão geral.") };
     }
 
     return {
@@ -132,7 +133,7 @@ export async function getDashboardData(): Promise<DashboardResult> {
   } catch (error) {
     return {
       kind: "error",
-      message: error instanceof Error ? error.message : "Falha ao carregar a visão geral.",
+      message: getServerErrorMessage("dashboard.load", error, "Não foi possível carregar a visão geral."),
     };
   }
 }

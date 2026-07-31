@@ -1,9 +1,10 @@
+import { reportServerError, withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/session";
 import { createKanbanColumn } from "@/features/quadro-producao/data";
 import { createKanbanColumnSchema } from "@/features/quadro-producao/schema";
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -21,9 +22,12 @@ export async function POST(request: Request) {
     revalidatePath("/quadro-producao");
     return Response.json({ column });
   } catch (error) {
+    const requestId = reportServerError("src/app/api/quadro-producao/columns/route.ts", error);
     return Response.json(
-      { error: error instanceof Error ? error.message : "Falha ao criar coluna." },
+      { error: "Não foi possível criar a coluna.", requestId },
       { status: 500 },
     );
   }
 }
+
+export const POST = withAuthenticatedRoute(handlePOST, "src/app/api/quadro-producao/columns/route.ts");

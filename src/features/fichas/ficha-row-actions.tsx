@@ -68,7 +68,7 @@ export function FichaRowActions({
   useEffect(() => {
     const errorMessage = removeListaIaState.message ?? removeListaRawState.message;
     if ((removeListaIaState.status === "error" || removeListaRawState.status === "error") && errorMessage) {
-      toast.error("NÃ£o foi possÃ­vel remover lista", {
+      toast.error("Não foi possível remover lista", {
         description: errorMessage,
       });
     }

@@ -1,3 +1,4 @@
+import { reportServerError, withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/session";
 import { renameKanbanColumn } from "@/features/quadro-producao/data";
@@ -7,7 +8,7 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function PATCH(request: Request, context: RouteContext) {
+async function handlePATCH(request: Request, context: RouteContext) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -26,9 +27,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     revalidatePath("/quadro-producao");
     return Response.json({ column });
   } catch (error) {
+    const requestId = reportServerError("src/app/api/quadro-producao/columns/[id]/route.ts", error);
     return Response.json(
-      { error: error instanceof Error ? error.message : "Falha ao renomear coluna." },
+      { error: "Não foi possível renomear a coluna.", requestId },
       { status: 500 },
     );
   }
 }
+
+export const PATCH = withAuthenticatedRoute(handlePATCH, "src/app/api/quadro-producao/columns/[id]/route.ts");

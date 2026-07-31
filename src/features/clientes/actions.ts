@@ -1,8 +1,9 @@
 "use server";
 
+import { getActionError, requireAuthenticatedAction } from "@/lib/server/boundaries";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAppSession } from "@/features/auth/session";
 import { normalizeNameOrCompany } from "@/lib/name-normalizer";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -56,7 +57,7 @@ function getValidationState(fieldErrors: ClienteFieldErrors): ClienteFormState {
 }
 
 export async function createClienteAction(_previousState: ClienteFormState, formData: FormData): Promise<ClienteFormState> {
-  await requireAppSession();
+  await requireAuthenticatedAction();
 
   const parsed = clienteFormSchema.safeParse(getClienteFormInput(formData));
 
@@ -100,10 +101,7 @@ export async function createClienteAction(_previousState: ClienteFormState, form
     .single();
 
   if (error) {
-    return {
-      message: error.message,
-      status: "error",
-    };
+    return getActionError("clientes.create", error, "Não foi possível salvar o cliente.");
   }
 
   revalidatePath("/clientes");
@@ -111,7 +109,7 @@ export async function createClienteAction(_previousState: ClienteFormState, form
 }
 
 export async function updateClienteAction(_previousState: ClienteFormState, formData: FormData): Promise<ClienteFormState> {
-  await requireAppSession();
+  await requireAuthenticatedAction();
 
   const id = String(formData.get("id") ?? "").trim();
   const parsed = clienteFormSchema.safeParse(getClienteFormInput(formData));
@@ -161,10 +159,7 @@ export async function updateClienteAction(_previousState: ClienteFormState, form
   const { error } = await supabase.from("clientes").update(payload).eq("id", id);
 
   if (error) {
-    return {
-      message: error.message,
-      status: "error",
-    };
+    return getActionError("clientes.update", error, "Não foi possível salvar o cliente.");
   }
 
   if (shouldRenameLinkedFichas(formData)) {
@@ -174,10 +169,7 @@ export async function updateClienteAction(_previousState: ClienteFormState, form
       .eq("cliente_id", id);
 
     if (fichasError) {
-      return {
-        message: fichasError.message,
-        status: "error",
-      };
+      return getActionError("clientes.rename-linked", fichasError, "O cliente foi salvo, mas as fichas vinculadas não foram renomeadas.");
     }
   }
 
@@ -193,20 +185,20 @@ export async function deleteClienteAction(
   _previousState: ClienteDeleteActionState,
   formData: FormData,
 ): Promise<ClienteDeleteActionState> {
-  await requireAppSession();
+  await requireAuthenticatedAction();
 
   const id = String(formData.get("id") ?? "").trim();
 
   if (!id) {
     return {
-      message: "Cliente invalido para exclusao.",
+      message: "Cliente inválido para exclusão.",
       status: "error",
     };
   }
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Clientes indisponiveis.",
+      message: "Clientes indisponíveis.",
       status: "error",
     };
   }
@@ -214,10 +206,7 @@ export async function deleteClienteAction(
   const { error } = await createServerSupabaseClient().from("clientes").delete().eq("id", id);
 
   if (error) {
-    return {
-      message: error.message,
-      status: "error",
-    };
+    return getActionError("clientes.delete", error, "Não foi possível excluir o cliente.");
   }
 
   revalidatePath("/clientes");

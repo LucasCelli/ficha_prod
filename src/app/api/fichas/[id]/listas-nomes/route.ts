@@ -1,5 +1,5 @@
+import { getServerErrorMessage, withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { z } from "zod";
-import { getCurrentSession } from "@/features/auth/session";
 import { UniformListSchema } from "@/lib/ai/schemas/uniform-list";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -49,19 +49,14 @@ function getFichaLabel(row: { cliente_nome_snapshot: string; numero_venda: strin
   return `${row.numero_venda ? `Venda ${row.numero_venda}` : "Sem venda"} - ${row.cliente_nome_snapshot}`;
 }
 
-export async function GET(request: Request, { params }: RouteParams) {
-  const session = await getCurrentSession();
-
-  if (!session) {
-    return errorResponse("Nao autenticado.", 401);
-  }
+async function handleGET(request: Request, { params }: RouteParams) {
 
   const { id } = await params;
   const { searchParams } = new URL(request.url);
   const tipo = searchParams.get("tipo");
 
   if (tipo !== "organizada" && tipo !== "bruta") {
-    return errorResponse("Tipo de lista invalido.", 400);
+    return errorResponse("Tipo de lista inválido.", 400);
   }
 
   const supabase = createServerSupabaseClient();
@@ -73,11 +68,11 @@ export async function GET(request: Request, { params }: RouteParams) {
       .eq("id", id)
       .maybeSingle<OrganizedListRow>();
 
-    if (error) return errorResponse(error.message, 500);
-    if (!data) return errorResponse("Ficha nao encontrada.", 404);
+    if (error) return errorResponse(getServerErrorMessage("api.fichas.listas-nomes", error, "Não foi possível consultar a lista."), 500);
+    if (!data) return errorResponse("Ficha não encontrada.", 404);
 
     const parsed = SavedUniformListSchema.safeParse(data.lista_ia);
-    if (!parsed.success) return errorResponse("Lista organizada nao encontrada.", 404);
+    if (!parsed.success) return errorResponse("Lista organizada não encontrada.", 404);
 
     return Response.json({
       success: true,
@@ -97,11 +92,11 @@ export async function GET(request: Request, { params }: RouteParams) {
     .eq("id", id)
     .maybeSingle<RawListRow>();
 
-  if (error) return errorResponse(error.message, 500);
-  if (!data) return errorResponse("Ficha nao encontrada.", 404);
+  if (error) return errorResponse(getServerErrorMessage("api.fichas.listas-nomes", error, "Não foi possível consultar a lista."), 500);
+  if (!data) return errorResponse("Ficha não encontrada.", 404);
 
   const raw = data.lista_nomes_raw?.trim();
-  if (!raw) return errorResponse("Lista bruta nao encontrada.", 404);
+  if (!raw) return errorResponse("Lista bruta não encontrada.", 404);
 
   return Response.json({
     success: true,
@@ -114,3 +109,5 @@ export async function GET(request: Request, { params }: RouteParams) {
     tipo,
   });
 }
+
+export const GET = withAuthenticatedRoute(handleGET, "src/app/api/fichas/[id]/listas-nomes/route.ts");

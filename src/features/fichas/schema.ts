@@ -39,12 +39,25 @@ const itensJsonSchema = z.preprocess((value) => {
   }
 }, z.array(fichaItemSchema).min(1, "Adicione pelo menos um produto para salvar a ficha."));
 
+const managedCloudinaryPublicId = z.preprocess(
+  (value) => (typeof value === "string" ? value.trim() : ""),
+  z.string().regex(/^fichas\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/, "Imagem inválida."),
+);
+
+const cloudinarySecureUrl = z
+  .string()
+  .url("Imagem inválida.")
+  .refine((value) => {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === "res.cloudinary.com";
+  }, "Imagem inválida.");
+
 const fichaImageSchema = z.object({
   altText: optionalText,
   bytes: z.number().int().min(0).optional(),
   height: z.number().int().positive().optional(),
-  publicId: requiredText("Imagem"),
-  secureUrl: z.string().url("Imagem inválida."),
+  publicId: managedCloudinaryPublicId,
+  secureUrl: cloudinarySecureUrl,
   width: z.number().int().positive().optional(),
 });
 

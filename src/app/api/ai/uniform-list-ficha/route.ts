@@ -1,3 +1,4 @@
+import { getServerErrorMessage, withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { z } from "zod";
 import { getCurrentSession } from "@/features/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -78,7 +79,7 @@ function normalizeSearchText(value: string) {
     .trim();
 }
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -97,7 +98,7 @@ export async function GET(request: Request) {
       .maybeSingle<FichaListLinkRow>();
 
     if (error) {
-      return errorResponse(error.message, 500);
+      return errorResponse(getServerErrorMessage("api.uniform-list-ficha", error, "Não foi possível processar a lista."), 500);
     }
 
     if (!data) {
@@ -125,7 +126,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabaseQuery.returns<FichaListOptionRow[]>();
 
   if (error) {
-    return errorResponse(error.message, 500);
+    return errorResponse(getServerErrorMessage("api.uniform-list-ficha", error, "Não foi possível processar a lista."), 500);
   }
 
   return Response.json({
@@ -134,7 +135,7 @@ export async function GET(request: Request) {
   });
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -177,7 +178,7 @@ export async function POST(request: Request) {
     .maybeSingle<FichaListLinkRow>();
 
   if (error) {
-    return errorResponse(error.message, 500);
+    return errorResponse(getServerErrorMessage("api.uniform-list-ficha", error, "Não foi possível processar a lista."), 500);
   }
 
   if (!data) {
@@ -189,3 +190,6 @@ export async function POST(request: Request) {
     ficha: mapFicha(data),
   });
 }
+
+export const GET = withAuthenticatedRoute(handleGET, "src/app/api/ai/uniform-list-ficha/route.ts");
+export const POST = withAuthenticatedRoute(handlePOST, "src/app/api/ai/uniform-list-ficha/route.ts");

@@ -84,7 +84,6 @@ const COLORS = {
 };
 
 const STATUS_LABELS: Record<FichaStatus, string> = {
-  cancelado: "Cancelado",
   entregue: "Entregue",
   pendente: "Pendente",
 };
@@ -486,8 +485,7 @@ function getStatusTone(status: FichaStatus): BadgeTone {
   switch (status) {
     case "entregue":
       return "success";
-    case "cancelado":
-      return "neutral";
+
     default:
       return "warning";
   }
@@ -642,10 +640,6 @@ function formatStatusFilter(status: FichaFilters["status"]) {
 
   if (status === "entregue") {
     return "Entregues";
-  }
-
-  if (status === "cancelado") {
-    return "Canceladas";
   }
 
   return status ?? "";

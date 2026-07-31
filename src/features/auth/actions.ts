@@ -1,11 +1,13 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getActionError, reportServerError } from "@/lib/server/boundaries";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createSessionToken, hashSessionToken, verifyPin } from "./crypto";
 import type { LoginFormState } from "./form-state";
+import { getLoginAttemptKeys, getLoginRateLimitMessage } from "./login-rate-limit";
 import { APP_SESSION_COOKIE, getSessionExpiresAt } from "./session";
 import { loginSchema } from "./schema";
 
@@ -48,6 +50,22 @@ export async function loginAction(_previousState: LoginFormState, formData: Form
   }
 
   const supabase = createServerSupabaseClient();
+  const attemptKeys = getLoginAttemptKeys(parsed.data.username, await headers());
+  const { data: retryAfterSeconds, error: rateLimitError } = await supabase.rpc("consume_login_attempt", {
+    p_attempt_keys: attemptKeys,
+  });
+
+  if (rateLimitError) {
+    return getActionError("auth.login.rate-limit", rateLimitError, "Acesso indisponível.");
+  }
+
+  if ((retryAfterSeconds ?? 0) > 0) {
+    return {
+      message: getLoginRateLimitMessage(retryAfterSeconds ?? 0),
+      status: "error",
+    };
+  }
+
   const { data: user, error } = await supabase
     .from("app_users")
     .select("id,username,pin_salt,pin_hash,active")
@@ -55,21 +73,29 @@ export async function loginAction(_previousState: LoginFormState, formData: Form
     .maybeSingle();
 
   if (error) {
+    return getActionError("auth.login.lookup", error, "Acesso indisponível.");
+  }
+
+  if (!user?.active || !verifyPin(parsed.data.pin, user.pin_salt, user.pin_hash)) {
+    const { error: auditError } = await supabase.rpc("record_login_failure", { p_attempt_keys: attemptKeys });
+    if (auditError) reportServerError("auth.login.audit", auditError);
+
     return {
-      message: error.message,
+      fieldErrors: {
+        pin: "Usuário ou PIN inválido.",
+        username: "Usuário ou PIN inválido.",
+      },
+      message: "Não foi possível entrar com esses dados.",
       status: "error",
     };
   }
 
-  if (!user?.active || !verifyPin(parsed.data.pin, user.pin_salt, user.pin_hash)) {
-    return {
-      fieldErrors: {
-        pin: "Usuario ou PIN invalido.",
-        username: "Usuario ou PIN invalido.",
-      },
-      message: "Nao foi possivel entrar com esses dados.",
-      status: "error",
-    };
+  const { error: clearAttemptsError } = await supabase.rpc("clear_login_attempts", {
+    p_attempt_keys: attemptKeys,
+  });
+
+  if (clearAttemptsError) {
+    return getActionError("auth.login.clear-rate-limit", clearAttemptsError, "Acesso indisponível.");
   }
 
   const token = createSessionToken();
@@ -81,13 +107,14 @@ export async function loginAction(_previousState: LoginFormState, formData: Form
   });
 
   if (sessionError) {
-    return {
-      message: sessionError.message,
-      status: "error",
-    };
+    return getActionError("auth.login.session", sessionError, "Acesso indisponível.");
   }
 
-  await supabase.from("app_users").update({ last_login_at: new Date().toISOString() }).eq("id", user.id);
+  const { error: lastLoginError } = await supabase
+    .from("app_users")
+    .update({ last_login_at: new Date().toISOString() })
+    .eq("id", user.id);
+  if (lastLoginError) reportServerError("auth.login.last-seen", lastLoginError);
 
   const cookieStore = await cookies();
   cookieStore.set(APP_SESSION_COOKIE, token, {
@@ -106,7 +133,11 @@ export async function logoutAction() {
   const token = cookieStore.get(APP_SESSION_COOKIE)?.value;
 
   if (token && getSupabaseConfigStatus().hasServerConfig) {
-    await createServerSupabaseClient().from("app_sessions").delete().eq("token_hash", hashSessionToken(token));
+    const { error } = await createServerSupabaseClient()
+      .from("app_sessions")
+      .delete()
+      .eq("token_hash", hashSessionToken(token));
+    if (error) reportServerError("auth.logout", error);
   }
 
   cookieStore.set(APP_SESSION_COOKIE, "", {

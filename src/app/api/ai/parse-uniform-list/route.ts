@@ -1,3 +1,4 @@
+import { reportServerError, withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { APICallError, generateText, NoObjectGeneratedError, Output } from "ai";
 import { z } from "zod";
 import { getCurrentSession } from "@/features/auth/session";
@@ -32,8 +33,8 @@ const RequestSchema = z.object({
     .refine((value) => value.trim().length > 0),
 });
 
-function errorResponse(message: string, status: number, code?: string) {
-  return Response.json({ success: false, error: message, code }, { status });
+function errorResponse(message: string, status: number, code?: string, requestId?: string) {
+  return Response.json({ success: false, error: message, code, requestId }, { status });
 }
 
 function getAiError(error: unknown) {
@@ -281,7 +282,7 @@ async function parseUniformList(text: string, modelValue?: string): Promise<Unif
   );
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -326,6 +327,9 @@ export async function POST(request: Request) {
     }
   }
 
+  const requestId = reportServerError("api.ai.parse-uniform-list", lastError);
   const aiError = getAiError(lastError);
-  return errorResponse(aiError.message, aiError.status, aiError.code);
+  return errorResponse(aiError.message, aiError.status, aiError.code, requestId);
 }
+
+export const POST = withAuthenticatedRoute(handlePOST, "src/app/api/ai/parse-uniform-list/route.ts");

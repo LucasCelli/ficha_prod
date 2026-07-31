@@ -1,11 +1,11 @@
-import { getBusinessTodayInput, getBusinessWeekRange, isDateInputWithinRange } from "@/lib/dates";
+import { getServerErrorMessage } from "@/lib/server/boundaries";
+import { getBusinessWeekRange, isDateInputWithinRange } from "@/lib/dates";
 import { normalizeNameOrCompany } from "@/lib/name-normalizer";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import {
   getKanbanColumnLabel,
-  getLegacyKanbanStatusFromSlug,
   isKanbanColumnHiddenForPersonalizacao,
 } from "./config";
 
@@ -257,7 +257,7 @@ export async function getQuadroProducaoSnapshot(
   } catch (error) {
     return {
       kind: "error",
-      message: error instanceof Error ? error.message : "Falha ao carregar o quadro de produção.",
+      message: getServerErrorMessage("quadro.snapshot", error, "Não foi possível carregar o quadro de produção."),
       snapshot: null,
     };
   }
@@ -280,43 +280,18 @@ export async function resolveDefaultKanbanColumnId(preferredSlug = "pendente") {
 
 export async function createKanbanColumn(name: string) {
   const supabase = createServerSupabaseClient();
-  const { data: columns, error: queryError } = await supabase
-    .from("kanban_columns")
-    .select("id, name, slug, order_index, is_system, color_token, created_at, updated_at")
-    .order("order_index", { ascending: true });
-
-  if (queryError) {
-    throw new Error(queryError.message);
-  }
-
   const baseSlug = slugifyColumnName(name) || "coluna";
-  const usedSlugs = new Set((columns ?? []).map((column) => column.slug));
-  let slug = baseSlug;
-  let suffix = 2;
+  const { data: columnId, error } = await supabase.rpc("create_kanban_column_atomic", {
+    p_base_slug: baseSlug,
+    p_name: name,
+  });
 
-  while (usedSlugs.has(slug)) {
-    slug = `${baseSlug}_${suffix}`;
-    suffix += 1;
+  if (error || !columnId) {
+    throw new Error(error?.message ?? "Coluna não criada.");
   }
 
-  const nextOrder = (columns?.length ?? 0) === 0 ? 0 : Math.max(...(columns ?? []).map((column) => column.order_index)) + 1;
-
-  const { data, error } = await supabase
-    .from("kanban_columns")
-    .insert({
-      color_token: null,
-      is_system: false,
-      name,
-      order_index: nextOrder,
-      slug,
-    })
-    .select("*")
-    .single();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
+  const { data, error: queryError } = await supabase.from("kanban_columns").select("*").eq("id", columnId).single();
+  if (queryError) throw new Error(queryError.message);
   return data;
 }
 
@@ -369,74 +344,29 @@ export async function moveKanbanCard(cardId: string, destinationColumnId: string
 
 
 export async function markKanbanCardDelivered(cardId: string, changedByUserId: string) {
-  const supabase = createServerSupabaseClient();
-  const { data: previous } = await supabase.from("fichas").select("status").eq("id", cardId).maybeSingle();
-  const { error } = await supabase
-    .from("fichas")
-    .update({
-      delivered_at: new Date().toISOString(),
-      status: "entregue",
-    })
-    .eq("id", cardId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-  await supabase.from("ficha_status_events").insert({
-    ficha_id: cardId,
-    changed_by_user_id: changedByUserId,
-    from_status: previous?.status ?? null,
-    to_status: "entregue",
+  const { error } = await createServerSupabaseClient().rpc("set_ficha_delivery_status_atomic", {
+    p_actor_id: changedByUserId,
+    p_delivered: true,
+    p_ficha_id: cardId,
   });
+
+  if (error) throw new Error(error.message);
 }
 
 export async function createManualKanbanCard(input: CreateManualKanbanCardInput, createdByUserId: string) {
-  const supabase = createServerSupabaseClient();
-  const { data: targetColumn, error: columnError } = await supabase
-    .from("kanban_columns")
-    .select("id, slug")
-    .eq("id", input.columnId)
-    .single();
+  const { data, error } = await createServerSupabaseClient().rpc("create_manual_kanban_card_atomic", {
+    p_actor_id: createdByUserId,
+    p_arte: input.arte ?? null,
+    p_column_id: input.columnId,
+    p_data_entrega: input.dataEntrega,
+    p_evento: input.evento,
+    p_material: input.material ?? null,
+    p_title: normalizeNameOrCompany(input.title),
+  });
 
-  if (columnError || !targetColumn) {
-    throw new Error(columnError?.message ?? "Coluna de destino não encontrada.");
+  if (error || !data) {
+    throw new Error(error?.message ?? "Cartão não criado.");
   }
 
-  const { count, error: countError } = await supabase
-    .from("fichas")
-    .select("id", { count: "exact", head: true })
-    .eq("kanban_column_id", input.columnId)
-    .eq("status", "pendente");
-
-  if (countError) {
-    throw new Error(countError.message);
-  }
-
-  const { data, error } = await supabase
-    .from("fichas")
-    .insert({
-      arte: input.arte ?? null,
-      cliente_nome_snapshot: normalizeNameOrCompany(input.title),
-      data_entrega: input.dataEntrega,
-      data_inicio: getBusinessTodayInput(),
-      evento: input.evento,
-      insumo_status: "tudo_ok",
-      is_manual_card: true,
-      created_by_user_id: createdByUserId,
-      kanban_column_id: input.columnId,
-      kanban_ordem: count ?? 0,
-      kanban_status: getLegacyKanbanStatusFromSlug(targetColumn.slug),
-      kanban_status_updated_at: new Date().toISOString(),
-      material: input.material ?? null,
-      observacoes: null,
-      status: "pendente",
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data;
+  return { id: data };
 }

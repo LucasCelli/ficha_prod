@@ -1,8 +1,9 @@
 "use server";
 
+import { getActionError, requireSuperadminAction } from "@/lib/server/boundaries";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireSuperadmin } from "@/features/auth/session";
 import { createPinHash } from "@/features/auth/crypto";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -92,7 +93,7 @@ function getOperadorInsertPayload(values: OperadorValues) {
 }
 
 export async function saveOperadorAction(_previousState: UsuarioFormState, formData: FormData): Promise<UsuarioFormState> {
-  await requireSuperadmin();
+  await requireSuperadminAction();
 
   const parsed = operadorSchema.safeParse(getUsuarioInput(formData));
   if (!parsed.success) {
@@ -116,13 +117,18 @@ export async function saveOperadorAction(_previousState: UsuarioFormState, formD
     const isDuplicate = result.error.code === "23505";
     return {
       fieldErrors: isDuplicate ? { username: "Este usuário já existe." } : undefined,
-      message: isDuplicate ? "Escolha outro usuário para o operador." : result.error.message,
+      message: isDuplicate
+        ? "Escolha outro usuário para o operador."
+        : getActionError("usuarios.save", result.error, "Não foi possível salvar o operador.").message,
       status: "error",
     };
   }
 
   if (id && (!parsed.data.active || parsed.data.pin)) {
-    await supabase.from("app_sessions").delete().eq("user_id", id);
+    const { error: revokeError } = await supabase.from("app_sessions").delete().eq("user_id", id);
+    if (revokeError) {
+      return getActionError("usuarios.revoke-sessions", revokeError, "O operador foi salvo, mas as sessões não foram revogadas.");
+    }
   }
 
   revalidatePath("/usuarios");

@@ -1,4 +1,5 @@
 import "server-only";
+import { getServerErrorMessage } from "@/lib/server/boundaries";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const OWNERSHIP_PAGE_SIZE = 25;
@@ -17,6 +18,6 @@ export async function getProfileAdminData(input: { page?: number; busca?: string
     fichasQuery,
   ]);
   const error = users.error ?? fichas.error;
-  if (error) return { kind:"error" as const, message:error.message, users:[], fichas:[], total:0, page };
+  if (error) return { kind:"error" as const, message:getServerErrorMessage("usuarios.profile-admin", error, "Não foi possível carregar os perfis."), users:[], fichas:[], total:0, page };
   return { kind:"ok" as const, users:users.data??[], fichas:fichas.data??[], total:fichas.count??0, page };
 }

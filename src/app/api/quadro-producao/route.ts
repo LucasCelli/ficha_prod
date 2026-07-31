@@ -1,8 +1,9 @@
+import { withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { loadQuadroProducaoSearchParams } from "@/features/quadro-producao/search-params";
 import { getQuadroProducaoSnapshot } from "@/features/quadro-producao/data";
 import { getCurrentSession } from "@/features/auth/session";
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -22,3 +23,5 @@ export async function GET(request: Request) {
 
   return Response.json(result);
 }
+
+export const GET = withAuthenticatedRoute(handleGET, "src/app/api/quadro-producao/route.ts");

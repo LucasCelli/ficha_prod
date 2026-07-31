@@ -50,7 +50,6 @@ const CATEGORY_COLORS = [
 ];
 
 const STATUS_COLORS: Record<RelatorioStatusFatia["status"], string> = {
-  cancelado: "var(--color-danger)",
   entregue: "var(--color-success)",
   pendente: "var(--color-pending-chart)",
 };

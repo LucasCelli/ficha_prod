@@ -7,7 +7,7 @@ import { FichaRowActions } from "@/features/fichas/ficha-row-actions";
 import { FichaRowThumbnail } from "@/features/fichas/ficha-row-thumbnail";
 import { getPersonalDashboardData } from "@/features/meu-painel/data";
 import { PersonalProductivityChart, PersonalStatusChart } from "@/features/meu-painel/personal-charts";
-import { formatBusinessDateTime } from "@/lib/dates";
+import { formatBusinessDateTime, formatShortDateInput, getBusinessTodayInput } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import styles from "./profile.module.css";
 import visual from "./visual.module.css";
@@ -25,6 +25,7 @@ export default async function MeuPainelPage({ searchParams }: { searchParams: Pr
   });
   if (result.kind !== "ok") return <EmptyState title="Meu perfil indisponível" description={result.kind === "error" ? result.message : "Configure o banco de dados."} />;
   const { data } = result;
+  const today = getBusinessTodayInput();
   const metrics = [
     ["Fichas", data.metrics.fichas, FileText], ["Peças", data.metrics.pieces, Package],
     ["Pendentes", data.metrics.pendentes, Clock3], ["Entregues", data.metrics.entregues, CheckCircle2],
@@ -63,7 +64,6 @@ export default async function MeuPainelPage({ searchParams }: { searchParams: Pr
         <PersonalStatusChart data={[
           { label: "Pendentes", value: data.metrics.pendentes, color: "var(--color-pending-chart)" },
           { label: "Entregues", value: data.metrics.entregues, color: "var(--color-success)" },
-          { label: "Canceladas", value: data.metrics.canceladas, color: "var(--color-danger)" },
         ]}/>
       </section>
       <aside className={styles.panel}>
@@ -75,17 +75,17 @@ export default async function MeuPainelPage({ searchParams }: { searchParams: Pr
     <section className={styles.panel}>
       <div className={styles.panelTitle}><div><p className="eyebrow">Controle pessoal</p><h2>Minhas fichas</h2></div><Badge>{data.total}</Badge></div>
       <form className={styles.filters}><input name="busca" defaultValue={busca} placeholder="Buscar cliente…"/><select name="status" defaultValue={status}>
-        <option value="todos">Todos os status</option><option value="pendente">Pendentes</option><option value="entregue">Entregues</option><option value="cancelado">Canceladas</option><option value="atrasado">Atrasadas</option>
+        <option value="todos">Todos os status</option><option value="pendente">Pendentes</option><option value="entregue">Entregues</option><option value="atrasado">Atrasadas</option>
       </select><input type="hidden" name="period" value={period}/><button className="ui-button ui-button--secondary">Aplicar</button></form>
       {data.recent.length ? <div className="fichas-list-container"><DataTable caption="Minhas fichas" columns={personalColumns}>
-        {data.recent.map((ficha)=>{const overdue=ficha.status!=="entregue"&&ficha.data_entrega<new Date().toISOString().slice(0,10);const previewHref=`/fichas/${ficha.id}`;return <tr key={ficha.id}>
+        {data.recent.map((ficha)=>{const overdue=ficha.status==="pendente"&&ficha.data_entrega<today;const previewHref=`/fichas/${ficha.id}`;return <tr key={ficha.id}>
           <td><div className="ficha-row__client"><FichaRowThumbnail alt={ficha.cliente_nome_snapshot} imageUrl={ficha.imageUrl}/><span className="ui-table__primary">
             <Link className="ui-table__link" href={previewHref}>{ficha.cliente_nome_snapshot}</Link><span className="ficha-row__meta">
               <Badge className="ficha-row__meta-badge" tone="neutral">{ficha.pieces} {ficha.pieces===1?"peça":"peças"}</Badge>
               <Badge className="ficha-row__meta-badge" tone="neutral">{ficha.numero_venda?`Venda ${ficha.numero_venda}`:"Sem venda"}</Badge>
             </span></span></div></td>
           <td><span className="ui-table__primary"><span>{date(ficha.data_entrega)}</span><small>{date(ficha.created_at.slice(0,10))} criação</small></span></td>
-          <td><Badge tone={overdue?"danger":ficha.status==="entregue"?"success":ficha.status==="cancelado"?"danger":"pending"}>{overdue?"Atrasada":statusLabel(ficha.status)}</Badge></td>
+          <td><Badge tone={overdue?"danger":ficha.status==="entregue"?"success":"pending"}>{overdue?"Atrasada":statusLabel(ficha.status)}</Badge></td>
           <td><span className="ui-table__primary"><strong>{normalizePersonalizacaoLabel(ficha.arte)}</strong><small>{ficha.vendedor??"Sem vendedor"}</small></span></td>
           <td><FichaRowActions fichaId={ficha.id} fichaLabel={ficha.cliente_nome_snapshot} canOrganizeNameList={false} fullDeliverButton={overdue} hasOrganizedNameList={false} hasRawNameList={false} printHref={`/fichas/${ficha.id}/imprimir`} previewHref={previewHref} returnTo="/meu-painel" status={ficha.status}/></td>
         </tr>})}
@@ -100,12 +100,12 @@ const personalColumns = [
   { key:"datas", label:"Entrega", width:"17%" },
   { key:"status", label:"Status", width:"13%" },
   { key:"detalhes", label:"Detalhes", width:"18%" },
-  { key:"acoes", label:"AÃ§Ãµes", width:"220px" },
+  { key:"acoes", label:"Ações", width:"220px" },
 ];
 function FichaLinks({rows}:{rows:Array<{id:string;cliente_nome_snapshot:string;data_entrega:string}>}) { return <ul className={styles.upcoming}>{rows.map((f)=><li key={f.id}><Link href={`/fichas/${f.id}`}><strong>{f.cliente_nome_snapshot}</strong><span>{date(f.data_entrega)}</span></Link></li>)}</ul>; }
 function first(value:string|string[]|undefined){return Array.isArray(value)?value[0]:value;}
 function withParams(current:Params,updates:Record<string,string|null>){const p=new URLSearchParams();Object.entries(current).forEach(([k,v])=>{const x=first(v);if(x)p.set(k,x)});Object.entries(updates).forEach(([k,v])=>v===null?p.delete(k):p.set(k,v));return `/meu-painel?${p}`;}
 function initials(name:string){return name.split(/\s+/).slice(0,2).map((p)=>p[0]).join("").toUpperCase();}
 function number(value:number){return new Intl.NumberFormat("pt-BR").format(value);}
-function date(value:string){return new Intl.DateTimeFormat("pt-BR",{timeZone:"UTC"}).format(new Date(`${value}T12:00:00Z`));}
-function statusLabel(status:"pendente"|"entregue"|"cancelado"){return {pendente:"Pendente",entregue:"Entregue",cancelado:"Cancelada"}[status];}
+function date(value:string){return formatShortDateInput(value);}
+function statusLabel(status:"pendente"|"entregue"){return {pendente:"Pendente",entregue:"Entregue"}[status];}

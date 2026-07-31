@@ -1,3 +1,4 @@
+import { getServerErrorMessage } from "@/lib/server/boundaries";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -109,7 +110,7 @@ export async function listClientes(filters: ClienteFilters = {}): Promise<Client
       return {
         clientes: [],
         kind: "error",
-        message: error.message,
+        message: getServerErrorMessage("clientes.load", error, "Não foi possível consultar os clientes."),
         total: 0,
       };
     }
@@ -123,7 +124,7 @@ export async function listClientes(filters: ClienteFilters = {}): Promise<Client
     return {
       clientes: [],
       kind: "error",
-      message: error instanceof Error ? error.message : "Falha ao consultar clientes.",
+      message: getServerErrorMessage("clientes.load", error, "Não foi possível consultar os clientes."),
       total: 0,
     };
   }
@@ -145,7 +146,7 @@ export async function getClienteById(id: string): Promise<ClienteDetailResult> {
       return {
         cliente: null,
         kind: "error",
-        message: error.message,
+        message: getServerErrorMessage("clientes.load", error, "Não foi possível consultar os clientes."),
       };
     }
 
@@ -182,7 +183,7 @@ export async function getClienteById(id: string): Promise<ClienteDetailResult> {
     return {
       cliente: null,
       kind: "error",
-      message: error instanceof Error ? error.message : "Falha ao carregar o cliente.",
+      message: getServerErrorMessage("clientes.load", error, "Não foi possível consultar os clientes."),
     };
   }
 }

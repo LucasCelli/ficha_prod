@@ -1,10 +1,11 @@
+import { withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/features/auth/session";
 import { getCloudinaryPublicConfig, isCloudinaryConfigured } from "@/lib/cloudinary";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+async function handleGET() {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -26,3 +27,5 @@ export async function GET() {
     configured: true,
   });
 }
+
+export const GET = withAuthenticatedRoute(handleGET, "src/app/api/cloudinary/config/route.ts");

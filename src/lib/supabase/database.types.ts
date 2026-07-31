@@ -3,6 +3,61 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      app_login_failure_events: {
+        Row: {
+          id: number;
+          account_key: string;
+          origin_key: string;
+          pair_key: string;
+          occurred_at: string;
+        };
+        Insert: {
+          id?: number;
+          account_key: string;
+          origin_key: string;
+          pair_key: string;
+          occurred_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["app_login_failure_events"]["Insert"]>;
+        Relationships: [];
+      };      app_login_rate_limits: {
+        Row: {
+          attempt_key: string;
+          blocked_until: string | null;
+          created_at: string;
+          failed_count: number;
+          updated_at: string;
+          window_started_at: string;
+        };
+        Insert: {
+          attempt_key: string;
+          blocked_until?: string | null;
+          created_at?: string;
+          failed_count?: number;
+          updated_at?: string;
+          window_started_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["app_login_rate_limits"]["Insert"]>;
+        Relationships: [];
+      };
+      app_operation_rate_limits: {
+        Row: {
+          quota_key: string;
+          request_count: number;
+          window_started_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          quota_key: string;
+          request_count?: number;
+          window_started_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["app_operation_rate_limits"]["Insert"]>;
+        Relationships: [];
+      };
       app_sessions: {
         Row: {
           id: string;
@@ -477,7 +532,128 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
-      move_kanban_card: {
+      clear_login_attempts: {
+        Args: {
+          p_attempt_keys: string[];
+        };
+        Returns: undefined;
+      };
+      consume_login_attempt: {
+        Args: {
+          p_attempt_keys: string[];
+        };
+        Returns: number;
+      };
+      consume_operation_quota: {
+        Args: {
+          p_limit: number;
+          p_quota_key: string;
+          p_window_seconds: number;
+        };
+        Returns: number;
+      };
+      create_kanban_column_atomic: {
+        Args: { p_base_slug: string; p_name: string };
+        Returns: string;
+      };
+      create_manual_kanban_card_atomic: {
+        Args: {
+          p_actor_id: string;
+          p_arte: string | null;
+          p_column_id: string;
+          p_data_entrega: string;
+          p_evento: boolean;
+          p_material: string | null;
+          p_title: string;
+        };
+        Returns: string;
+      };
+      record_login_failure: {
+        Args: { p_attempt_keys: string[] };
+        Returns: undefined;
+      };
+      resolve_app_session: {
+        Args: { p_seen_at: string; p_token_hash: string };
+        Returns: Array<{
+          active: boolean;
+          display_name: string;
+          expires_at: string;
+          last_seen_at: string;
+          role: Database["public"]["Enums"]["app_user_role"];
+          user_id: string;
+          username: string;
+        }>;
+      };      save_ficha_atomic: {
+        Args: {
+          p_actor_id: string;
+          p_ficha: Json;
+          p_ficha_id: string | null;
+          p_imagens: Json;
+          p_itens: Json;
+        };
+        Returns: string;
+      };
+      get_report_details_page: {
+        Args: {
+          p_end: string;
+          p_evento: boolean | null;
+          p_limit: number;
+          p_offset: number;
+          p_start: string;
+          p_status: string | null;
+        };
+        Returns: Array<{
+          cliente: string;
+          data: string | null;
+          id: string;
+          material: string;
+          quantidade: number;
+          status: Database["public"]["Enums"]["ficha_status"];
+          total_count: number;
+          vendedor: string;
+        }>;
+      };
+      get_report_summary: {
+        Args: {
+          p_delivery_year_end: string;
+          p_delivery_year_start: string;
+          p_end: string;
+          p_evento: boolean | null;
+          p_previous_end: string;
+          p_previous_start: string;
+          p_start: string;
+          p_status: string | null;
+        };
+        Returns: Json;
+      };      get_personal_dashboard_summary: {
+        Args: { p_previous_since: string; p_since: string | null; p_today: string; p_user_id: string };
+        Returns: Json;
+      };
+      get_personal_fichas_page: {
+        Args: {
+          p_limit: number;
+          p_offset: number;
+          p_search: string;
+          p_status: string;
+          p_today: string;
+          p_user_id: string;
+        };
+        Returns: Array<{
+          arte: string | null;
+          cliente_nome_snapshot: string;
+          created_at: string;
+          data_entrega: string;
+          delivered_at: string | null;
+          id: string;
+          image_url: string | null;
+          numero_venda: string | null;
+          pieces: number;
+          status: Database["public"]["Enums"]["ficha_status"];
+          total_count: number;
+          updated_at: string;
+          vendedor: string | null;
+        }>;
+      };      move_kanban_card: {
         Args: {
           p_ficha_id: string;
           p_kanban_column_id: string;
@@ -491,7 +667,10 @@ export type Database = {
         };
         Returns: undefined;
       };
-      sort_kanban_cards_by_delivery_date: {
+      set_ficha_delivery_status_atomic: {
+        Args: { p_actor_id: string; p_delivered: boolean; p_ficha_id: string };
+        Returns: undefined;
+      };      sort_kanban_cards_by_delivery_date: {
         Args: {
           p_kanban_column_id: string;
         };
@@ -510,7 +689,7 @@ export type Database = {
         | "gola"
         | "acabamento_gola"
         | "bolso";
-      ficha_status: "pendente" | "entregue" | "cancelado";
+      ficha_status: "pendente" | "entregue";
       kanban_status: "pendente" | "exportando" | "fila_impressao" | "sublimando" | "na_costura";
       insumo_status: "tudo_ok" | "sem_tecido" | "sem_tinta" | "sem_papel" | "pendencias";
     };

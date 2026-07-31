@@ -8,6 +8,8 @@
     "build": "node scripts/build-next.mjs",
     "start": "next start",
     "lint": "eslint .",
+    "encoding:check": "node scripts/check-encoding.mjs",
+    "test:quality": "node --test quality-tests/*.test.ts",
     "seed:auth-user": "node scripts/seed-auth-user.mjs",
     "seed:catalogos": "node scripts/seed-catalog-items.mjs",
     "prod:check": "node scripts/check-production-readiness.mjs",

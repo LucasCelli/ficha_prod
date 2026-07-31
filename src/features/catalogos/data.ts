@@ -1,3 +1,4 @@
+import { getServerErrorMessage } from "@/lib/server/boundaries";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { CustomDatalistOption } from "@/components/ui";
@@ -97,7 +98,7 @@ export async function listCatalogItems(): Promise<CatalogosResult> {
       return {
         itemsByKind,
         kind: "error",
-        message: error.message,
+        message: getServerErrorMessage("catalogos.list", error, "Não foi possível consultar os catálogos."),
         total: 0,
       };
     }
@@ -115,7 +116,7 @@ export async function listCatalogItems(): Promise<CatalogosResult> {
     return {
       itemsByKind,
       kind: "error",
-      message: error instanceof Error ? error.message : "Falha ao consultar catálogos.",
+      message: getServerErrorMessage("catalogos.list", error, "Não foi possível consultar os catálogos."),
       total: 0,
     };
   }

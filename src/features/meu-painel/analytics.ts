@@ -4,7 +4,7 @@ export function calculateComparison(current: number, previous: number) {
 }
 
 export function normalizePersonalStatus(value?: string) {
-  return value === "pendente" || value === "entregue" || value === "cancelado" || value === "atrasado"
+  return value === "pendente" || value === "entregue" || value === "atrasado"
     ? value
     : "todos";
 }

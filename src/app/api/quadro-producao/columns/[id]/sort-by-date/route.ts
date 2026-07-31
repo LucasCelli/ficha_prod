@@ -1,3 +1,4 @@
+import { reportServerError, withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { revalidatePath } from "next/cache";
 import { getCurrentSession } from "@/features/auth/session";
 import { sortKanbanColumnByDate } from "@/features/quadro-producao/data";
@@ -6,7 +7,7 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function POST(_request: Request, context: RouteContext) {
+async function handlePOST(_request: Request, context: RouteContext) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -20,9 +21,12 @@ export async function POST(_request: Request, context: RouteContext) {
     revalidatePath("/quadro-producao");
     return Response.json({ ok: true });
   } catch (error) {
+    const requestId = reportServerError("src/app/api/quadro-producao/columns/[id]/sort-by-date/route.ts", error);
     return Response.json(
-      { error: error instanceof Error ? error.message : "Falha ao ordenar a coluna." },
+      { error: "Não foi possível ordenar a coluna.", requestId },
       { status: 500 },
     );
   }
 }
+
+export const POST = withAuthenticatedRoute(handlePOST, "src/app/api/quadro-producao/columns/[id]/sort-by-date/route.ts");

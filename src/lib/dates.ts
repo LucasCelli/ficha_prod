@@ -78,6 +78,12 @@ export function addDaysToInput(value: string, amount: number) {
   return formatUtcDateInput(date);
 }
 
+export function addMonthsToInput(value: string, amount: number) {
+  const date = createUtcDateFromInput(value);
+  date.setUTCDate(1);
+  date.setUTCMonth(date.getUTCMonth() + amount);
+  return formatUtcDateInput(date);
+}
 export function createUtcDateFromInput(value: string) {
   return new Date(`${value}T00:00:00.000Z`);
 }

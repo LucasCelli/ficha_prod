@@ -1,11 +1,12 @@
 "use server";
 
+
+import { getActionError, requireAuthenticatedAction } from "@/lib/server/boundaries";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAppSession } from "@/features/auth/session";
-import { resolveDefaultKanbanColumnId } from "@/features/quadro-producao/data";
 import { normalizeNameOrCompany } from "@/lib/name-normalizer";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
+import type { Json } from "@/lib/supabase/database.types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FichaDeleteActionState, FichaFormState, FichaStatusActionState, FieldErrors } from "./form-state";
 import { fichaFormSchema, type FichaFormValues } from "./schema";
@@ -58,72 +59,87 @@ function getFichaFormInput(formData: FormData) {
   };
 }
 
-function getFichaPayload(values: FichaFormValues) {
+function nullableText(value: string | undefined) {
+  return value ?? null;
+}
+
+function getFichaPayload(values: FichaFormValues): Json {
   return {
-    acabamento_gola: values.acabamentoGola,
-    acabamento_manga: values.acabamentoManga,
-    abertura_lateral: values.aberturaLateral,
-    bolso: values.bolso,
-    com_nomes: values.comNomes,
-    composicao: values.composicao,
-    etiqueta: values.etiqueta,
-    cor_abertura_lateral: values.corAberturaLateral,
-    cor_acabamento_manga: values.corAcabamentoManga,
-    cor_botao: values.corBotao,
-    cor_detalhe_gola: values.corDetalheGola,
-    cor_gola: values.corGola,
-    cor_material: values.corMaterial,
-    cor_pe_de_gola_externo: values.corPeDeGolaExterno,
-    cor_pe_de_gola_interno: values.corPeDeGolaInterno,
-    cor_peitilho_externo: values.corPeitilhoExterno,
-    cor_peitilho_interno: values.corPeitilhoInterno,
-    cor_reforco: values.corReforco,
-    cor_sublimacao: values.corSublimacao,
-    faixa: values.faixa,
-    faixa_cor: values.faixaCor,
-    faixa_local: values.faixaLocal,
-    filete: values.filete,
-    filete_cor: values.fileteCor,
-    filete_local: values.fileteLocal,
-    gola: values.gola,
-    largura_gola: values.larguraGola,
-    largura_manga: values.larguraManga,
-    manga: values.manga,
-    material: values.material,
-    reforco_gola: values.reforcoGola,
+    acabamento_gola: nullableText(values.acabamentoGola),
+    acabamento_manga: nullableText(values.acabamentoManga),
+    abertura_lateral: nullableText(values.aberturaLateral),
+    arte: nullableText(values.arte),
+    bolso: nullableText(values.bolso),
+    cliente_auxiliar: nullableText(values.clienteAuxiliar),
+    cliente_nome_snapshot: normalizeNameOrCompany(values.cliente),
+    com_nomes: values.comNomes ?? null,
+    composicao: nullableText(values.composicao),
+    etiqueta: nullableText(values.etiqueta),
+    cor_abertura_lateral: nullableText(values.corAberturaLateral),
+    cor_acabamento_manga: nullableText(values.corAcabamentoManga),
+    cor_botao: nullableText(values.corBotao),
+    cor_detalhe_gola: nullableText(values.corDetalheGola),
+    cor_gola: nullableText(values.corGola),
+    cor_material: nullableText(values.corMaterial),
+    cor_pe_de_gola_externo: nullableText(values.corPeDeGolaExterno),
+    cor_pe_de_gola_interno: nullableText(values.corPeDeGolaInterno),
+    cor_peitilho_externo: nullableText(values.corPeitilhoExterno),
+    cor_peitilho_interno: nullableText(values.corPeitilhoInterno),
+    cor_reforco: nullableText(values.corReforco),
+    cor_sublimacao: nullableText(values.corSublimacao),
+    data_entrega: values.dataEntrega,
+    data_inicio: nullableText(values.dataInicio),
+    evento: values.evento,
+    faixa: nullableText(values.faixa),
+    faixa_cor: nullableText(values.faixaCor),
+    faixa_local: nullableText(values.faixaLocal),
+    filete: nullableText(values.filete),
+    filete_cor: nullableText(values.fileteCor),
+    filete_local: nullableText(values.fileteLocal),
+    gola: nullableText(values.gola),
+    largura_gola: nullableText(values.larguraGola),
+    largura_manga: nullableText(values.larguraManga),
+    lista_nomes_raw: nullableText(values.listaNomesRaw),
+    manga: nullableText(values.manga),
+    material: nullableText(values.material),
+    numero_venda: nullableText(values.numeroVenda),
+    observacoes: nullableText(values.observacoes),
+    reforco_gola: nullableText(values.reforcoGola),
+    vendedor: values.vendedor,
   };
 }
 
-function getFichaItensPayload(fichaId: string, values: FichaFormValues) {
-  return values.itens.map((item, index) => ({
-    descricao: item.produto,
-    detalhes_produto: item.detalhesProduto,
-    ficha_id: fichaId,
-    ordem: index,
+function getFichaItensPayload(values: FichaFormValues): Json {
+  return values.itens.map((item) => ({
+    detalhes_produto: nullableText(item.detalhesProduto),
     produto: item.produto,
     quantidade: item.quantidade,
-    tamanho: item.tamanho,
+    tamanho: nullableText(item.tamanho),
   }));
 }
 
-function getFichaImagensPayload(fichaId: string, values: FichaFormValues) {
-  return values.imagens.map((image, index) => ({
-    alt_text: image.altText,
-    bytes: image.bytes,
-    dados: {
-      publicId: image.publicId,
-    },
-    ficha_id: fichaId,
-    height: image.height,
-    ordem: index,
-    storage_path: image.publicId,
+function getFichaImagensPayload(values: FichaFormValues): Json {
+  return values.imagens.map((image) => ({
+    alt_text: nullableText(image.altText),
+    bytes: image.bytes ?? null,
+    height: image.height ?? null,
+    public_id: image.publicId,
     url: image.secureUrl,
-    width: image.width,
+    width: image.width ?? null,
   }));
 }
 
+async function saveFichaAtomic(fichaId: string | null, actorId: string, values: FichaFormValues) {
+  return createServerSupabaseClient().rpc("save_ficha_atomic", {
+    p_actor_id: actorId,
+    p_ficha: getFichaPayload(values),
+    p_ficha_id: fichaId,
+    p_imagens: getFichaImagensPayload(values),
+    p_itens: getFichaItensPayload(values),
+  });
+}
 export async function createFichaAction(_previousState: FichaFormState, formData: FormData): Promise<FichaFormState> {
-  const session = await requireAppSession();
+  const session = await requireAuthenticatedAction();
 
   const parsed = fichaFormSchema.safeParse(getFichaFormInput(formData));
 
@@ -149,80 +165,18 @@ export async function createFichaAction(_previousState: FichaFormState, formData
     };
   }
 
-  const supabase = createServerSupabaseClient();
-  const clienteNome = normalizeNameOrCompany(parsed.data.cliente);
-  const clienteId = await resolveClienteId(clienteNome, parsed.data.dataEntrega, "create");
-  const defaultKanbanColumnId = await resolveDefaultKanbanColumnId("pendente");
-  const { data: fichaCriada, error } = await supabase
-    .from("fichas")
-    .insert({
-      ...getFichaPayload(parsed.data),
-      arte: parsed.data.arte,
-      cliente_id: clienteId,
-      cliente_auxiliar: parsed.data.clienteAuxiliar,
-      cliente_nome_snapshot: clienteNome,
-      data_inicio: parsed.data.dataInicio,
-      data_entrega: parsed.data.dataEntrega,
-      evento: parsed.data.evento,
-      kanban_column_id: defaultKanbanColumnId ?? undefined,
-      kanban_ordem: 0,
-      kanban_status: "pendente",
-      kanban_status_updated_at: new Date().toISOString(),
-      numero_venda: parsed.data.numeroVenda,
-      lista_nomes_raw: parsed.data.listaNomesRaw,
-      observacoes: parsed.data.observacoes,
-      created_by_user_id: session.user.id,
-      vendedor: parsed.data.vendedor,
-    })
-    .select("id")
-    .single();
+  const { error } = await saveFichaAtomic(null, session.user.id, parsed.data);
 
   if (error) {
-    return {
-      message: error.message,
-      status: "error",
-    };
+    return getActionError("fichas.save", error, "Não foi possível salvar a ficha.");
   }
-
-  if (fichaCriada?.id) {
-    const { error: itensError } = await supabase.from("ficha_itens").insert(getFichaItensPayload(fichaCriada.id, parsed.data));
-
-    if (itensError) {
-      await rollbackCreatedFicha(fichaCriada.id);
-      return {
-        message: itensError.message,
-        status: "error",
-      };
-    }
-
-    if (parsed.data.imagens.length > 0) {
-      const { error: imagensError } = await supabase
-        .from("ficha_imagens")
-        .insert(getFichaImagensPayload(fichaCriada.id, parsed.data));
-
-      if (imagensError) {
-        await rollbackCreatedFicha(fichaCriada.id);
-        return {
-          message: imagensError.message,
-          status: "error",
-        };
-      }
-    }
-  }
-
   revalidatePath("/fichas");
   redirect("/fichas?saved=created");
 }
 
-async function rollbackCreatedFicha(id: string) {
-  const supabase = createServerSupabaseClient();
-  await supabase.from("ficha_imagens").delete().eq("ficha_id", id);
-  await supabase.from("ficha_itens").delete().eq("ficha_id", id);
-  await supabase.from("fichas").delete().eq("id", id);
-}
 
 export async function updateFichaAction(_previousState: FichaFormState, formData: FormData): Promise<FichaFormState> {
-  await requireAppSession();
+  const session = await requireAuthenticatedAction();
 
   const id = String(formData.get("id") ?? "").trim();
   const parsed = fichaFormSchema.safeParse(getFichaFormInput(formData));
@@ -256,72 +210,11 @@ export async function updateFichaAction(_previousState: FichaFormState, formData
     };
   }
 
-  const supabase = createServerSupabaseClient();
-  const clienteNome = normalizeNameOrCompany(parsed.data.cliente);
-  const clienteId = await resolveClienteId(clienteNome, parsed.data.dataEntrega, "update");
-  const { error } = await supabase
-    .from("fichas")
-    .update({
-      ...getFichaPayload(parsed.data),
-      arte: parsed.data.arte,
-      cliente_id: clienteId,
-      cliente_auxiliar: parsed.data.clienteAuxiliar,
-      cliente_nome_snapshot: clienteNome,
-      data_inicio: parsed.data.dataInicio,
-      data_entrega: parsed.data.dataEntrega,
-      evento: parsed.data.evento,
-      numero_venda: parsed.data.numeroVenda,
-      lista_nomes_raw: parsed.data.listaNomesRaw,
-      observacoes: parsed.data.observacoes,
-      vendedor: parsed.data.vendedor,
-    })
-    .eq("id", id);
+  const { error } = await saveFichaAtomic(id, session.user.id, parsed.data);
 
   if (error) {
-    return {
-      message: error.message,
-      status: "error",
-    };
+    return getActionError("fichas.save", error, "Não foi possível salvar a ficha.");
   }
-
-  const { error: deleteItensError } = await supabase.from("ficha_itens").delete().eq("ficha_id", id);
-
-  if (deleteItensError) {
-    return {
-      message: deleteItensError.message,
-      status: "error",
-    };
-  }
-
-  const { error: itensError } = await supabase.from("ficha_itens").insert(getFichaItensPayload(id, parsed.data));
-
-  if (itensError) {
-    return {
-      message: itensError.message,
-      status: "error",
-    };
-  }
-
-  const { error: deleteImagensError } = await supabase.from("ficha_imagens").delete().eq("ficha_id", id);
-
-  if (deleteImagensError) {
-    return {
-      message: deleteImagensError.message,
-      status: "error",
-    };
-  }
-
-  if (parsed.data.imagens.length > 0) {
-    const { error: imagensError } = await supabase.from("ficha_imagens").insert(getFichaImagensPayload(id, parsed.data));
-
-    if (imagensError) {
-      return {
-        message: imagensError.message,
-        status: "error",
-      };
-    }
-  }
-
   revalidatePath("/fichas");
   revalidatePath(`/fichas/${id}`);
   redirect("/fichas?saved=updated");
@@ -331,7 +224,7 @@ export async function markFichaEntregueAction(
   _previousState: FichaStatusActionState,
   formData: FormData,
 ): Promise<FichaStatusActionState> {
-  const session = await requireAppSession();
+  const session = await requireAuthenticatedAction();
 
   const id = String(formData.get("id") ?? "").trim();
   const returnTo = getSafeReturnPath(formData.get("returnTo"));
@@ -350,29 +243,18 @@ export async function markFichaEntregueAction(
     };
   }
 
-  const supabase = createServerSupabaseClient();
-  const { data: previous } = await supabase.from("fichas").select("status").eq("id", id).maybeSingle();
-  const { error } = await supabase
-    .from("fichas")
-    .update({
-      delivered_at: new Date().toISOString(),
-      status: "entregue",
-    })
-    .eq("id", id);
+  const { error } = await createServerSupabaseClient().rpc("set_ficha_delivery_status_atomic", {
+    p_actor_id: session.user.id,
+    p_delivered: true,
+    p_ficha_id: id,
+  });
 
   if (error) {
     return {
-      message: error.message,
+      message: "Não foi possível marcar a ficha como entregue.",
       status: "error",
     };
   }
-
-  await supabase.from("ficha_status_events").insert({
-    ficha_id: id,
-    changed_by_user_id: session.user.id,
-    from_status: previous?.status ?? null,
-    to_status: "entregue",
-  });
   revalidatePath("/meu-painel");
   revalidatePath("/fichas");
   revalidatePath("/relatorios");
@@ -388,7 +270,7 @@ export async function revertFichaToPendenteAction(
   _previousState: FichaStatusActionState,
   formData: FormData,
 ): Promise<FichaStatusActionState> {
-  const session = await requireAppSession();
+  const session = await requireAuthenticatedAction();
 
   const id = String(formData.get("id") ?? "").trim();
   const returnTo = getSafeReturnPath(formData.get("returnTo"));
@@ -407,29 +289,18 @@ export async function revertFichaToPendenteAction(
     };
   }
 
-  const supabase = createServerSupabaseClient();
-  const { data: previous } = await supabase.from("fichas").select("status").eq("id", id).maybeSingle();
-  const { error } = await supabase
-    .from("fichas")
-    .update({
-      delivered_at: null,
-      status: "pendente",
-    })
-    .eq("id", id);
+  const { error } = await createServerSupabaseClient().rpc("set_ficha_delivery_status_atomic", {
+    p_actor_id: session.user.id,
+    p_delivered: false,
+    p_ficha_id: id,
+  });
 
   if (error) {
     return {
-      message: error.message,
+      message: "Não foi possível reabrir a ficha.",
       status: "error",
     };
   }
-
-  await supabase.from("ficha_status_events").insert({
-    ficha_id: id,
-    changed_by_user_id: session.user.id,
-    from_status: previous?.status ?? null,
-    to_status: "pendente",
-  });
   revalidatePath("/meu-painel");
   revalidatePath("/fichas");
   revalidatePath("/relatorios");
@@ -459,7 +330,7 @@ export async function deleteFichaAction(
   _previousState: FichaDeleteActionState,
   formData: FormData,
 ): Promise<FichaDeleteActionState> {
-  await requireAppSession();
+  await requireAuthenticatedAction();
 
   const id = String(formData.get("id") ?? "").trim();
   const confirmationCode = String(formData.get("confirmationCode") ?? "").trim().toUpperCase();
@@ -487,34 +358,11 @@ export async function deleteFichaAction(
     };
   }
 
-  const supabase = createServerSupabaseClient();
-  const { error: imagensError } = await supabase.from("ficha_imagens").delete().eq("ficha_id", id);
-
-  if (imagensError) {
-    return {
-      message: imagensError.message,
-      status: "error",
-    };
-  }
-
-  const { error: itensError } = await supabase.from("ficha_itens").delete().eq("ficha_id", id);
-
-  if (itensError) {
-    return {
-      message: itensError.message,
-      status: "error",
-    };
-  }
-
-  const { error } = await supabase.from("fichas").delete().eq("id", id);
+  const { error } = await createServerSupabaseClient().from("fichas").delete().eq("id", id);
 
   if (error) {
-    return {
-      message: error.message,
-      status: "error",
-    };
+    return getActionError("fichas.delete", error, "Não foi possível excluir a ficha.");
   }
-
   revalidatePath("/fichas");
   revalidatePath("/relatorios");
   redirect(withToastParam(returnTo ?? "/fichas", "ficha-deleted"));
@@ -525,21 +373,21 @@ async function removeFichaListaField(
   field: "lista_ia" | "lista_nomes_raw",
   toast: "lista-ia-removed" | "lista-raw-removed",
 ): Promise<FichaStatusActionState> {
-  await requireAppSession();
+  await requireAuthenticatedAction();
 
   const id = String(formData.get("id") ?? "").trim();
   const returnTo = getSafeReturnPath(formData.get("returnTo"));
 
   if (!id) {
     return {
-      message: "Ficha invÃ¡lida.",
+      message: "Ficha inválida.",
       status: "error",
     };
   }
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Fichas indisponÃ­veis.",
+      message: "Fichas indisponíveis.",
       status: "error",
     };
   }
@@ -548,10 +396,7 @@ async function removeFichaListaField(
   const { error } = await createServerSupabaseClient().from("fichas").update(updatePayload).eq("id", id);
 
   if (error) {
-    return {
-      message: error.message,
-      status: "error",
-    };
+    return getActionError("fichas.remove-list", error, "Não foi possível remover a lista.");
   }
 
   revalidatePath("/fichas");
@@ -572,42 +417,4 @@ function withToastParam(path: string, value: string) {
   params.set("toast", value);
   const nextQuery = params.toString();
   return nextQuery ? `${pathname}?${nextQuery}` : pathname;
-}
-
-async function resolveClienteId(nome: string, dataEntrega: string, mode: "create" | "update") {
-  const supabase = createServerSupabaseClient();
-  const nomeCliente = normalizeNameOrCompany(nome);
-  const nomeNormalizado = nomeCliente.toLocaleLowerCase("pt-BR");
-  const { data: cliente } = await supabase
-    .from("clientes")
-    .select("id, total_fichas, primeira_ficha")
-    .eq("nome_normalizado", nomeNormalizado)
-    .maybeSingle();
-
-  if (cliente) {
-    if (mode === "create") {
-      await supabase
-        .from("clientes")
-        .update({
-          total_fichas: cliente.total_fichas + 1,
-          ultima_ficha: dataEntrega,
-        })
-        .eq("id", cliente.id);
-    }
-
-    return cliente.id;
-  }
-
-  const { data: novoCliente } = await supabase
-    .from("clientes")
-    .insert({
-      nome: nomeCliente,
-      primeira_ficha: dataEntrega,
-      ultima_ficha: dataEntrega,
-      total_fichas: 1,
-    })
-    .select("id")
-    .single();
-
-  return novoCliente?.id ?? null;
 }

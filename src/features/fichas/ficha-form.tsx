@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { createPortal, flushSync, useFormStatus } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useDragAndDrop } from "fluid-dnd/react";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -15,8 +15,6 @@ import { normalizeNameOrCompany } from "@/lib/name-normalizer";
 import {
   Bold,
   CheckCircle2,
-  CircleAlert,
-  CircleX,
   Cog,
   GripVertical,
   Images,
@@ -30,7 +28,6 @@ import {
   Plus,
   Printer,
   RotateCcw,
-  Save,
   Trash2,
   Underline,
   Upload,
@@ -49,15 +46,10 @@ import {
 } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
 import { compareUniformSizeAndBabyLookText } from "@/lib/uniform-sizes";
-import {
-  addDaysToInput,
-  createUtcDateFromInput,
-  getBusinessTodayInput,
-  getDateInputDifferenceInDays,
-} from "@/lib/dates";
 import { useFluidDndEventTargetGuard } from "@/lib/fluid-dnd-event-target-guard";
 import { createFichaAction, updateFichaAction } from "./actions";
 import { DatePickerField } from "./date-picker-field";
+import { DeliveryDeadlineAlert, Field, SubmitButton, sumProductQuantities } from "./ficha-form-controls";
 import type { FichaDetail } from "./data";
 import { clearCreateFichaDraftSnapshot, CREATE_FICHA_DRAFT_STORAGE_KEY } from "./ficha-draft-storage";
 import type { FichaFormClientValues, FichaFormInitialData, ImageFormItem, ProductFormItem } from "./ficha-form-seed";
@@ -842,6 +834,7 @@ function FichaFormInner({
       apiKey: string;
       cloudName: string;
       folder: string;
+      publicId: string;
       signature: string;
       timestamp: number;
       transformation: string;
@@ -852,6 +845,7 @@ function FichaFormInner({
     uploadData.append("timestamp", String(signatureData.timestamp));
     uploadData.append("signature", signatureData.signature);
     uploadData.append("folder", signatureData.folder);
+    uploadData.append("public_id", signatureData.publicId);
     uploadData.append("transformation", signatureData.transformation);
     uploadData.append("context", `alt=${uploadAltText}`);
     uploadData.append("tags", "ficha_prod,next");
@@ -984,8 +978,7 @@ function FichaFormInner({
     }
 
     try {
-      const query = mode === "edit" && ficha?.id ? `?excludeFichaId=${encodeURIComponent(ficha.id)}` : "";
-      await fetch(`/api/cloudinary/image/${getCloudinaryImagePath(image.publicId)}${query}`, {
+      await fetch(`/api/cloudinary/image/${getCloudinaryImagePath(image.publicId)}`, {
         method: "DELETE",
       });
     } catch {
@@ -2996,130 +2989,4 @@ function buildDraftPrintFicha(form: HTMLFormElement, values: FichaFormClientValu
     updated_at: new Date().toISOString(),
     vendedor: text("vendedor") || null,
   } as FichaDetail;
-}
-
-type FieldProps = {
-  children: React.ReactNode;
-  error?: string;
-  full?: boolean;
-  label: string;
-  name: string;
-  required?: boolean;
-};
-
-function DeliveryDeadlineAlert({ deliveryDate }: { deliveryDate: string }) {
-  const daysRemaining = getDateInputDifferenceInDays(deliveryDate);
-
-  if (!deliveryDate || daysRemaining === null) return null;
-
-  const tone = getDeadlineTone(daysRemaining);
-  const Icon = tone === "success" ? CheckCircle2 : tone === "warning" ? CircleAlert : CircleX;
-  const message = getDeadlineMessage(daysRemaining, tone);
-  const businessDaysRemaining = daysRemaining >= 0 ? getBusinessDaysRemaining(deliveryDate) : null;
-
-  return (
-    <div className="delivery-deadline-alert" data-tone={tone} role="status">
-      <Icon aria-hidden="true" size={18} />
-      <span>
-        {message}
-        {businessDaysRemaining !== null ? (
-          <>
-            {" "}
-            <strong>({formatBusinessDayCount(businessDaysRemaining)}!)</strong>
-          </>
-        ) : null}
-      </span>
-    </div>
-  );
-}
-
-function getDeadlineTone(daysRemaining: number) {
-  if (daysRemaining <= 7) return "danger";
-  if (daysRemaining <= 14) return "warning";
-  return "success";
-}
-
-function getDeadlineMessage(daysRemaining: number, tone: "danger" | "success" | "warning") {
-  if (daysRemaining < 0) {
-    return `Prazo vencido! Entrega atrasada há ${formatDayCount(Math.abs(daysRemaining))}.`;
-  }
-
-  const remaining = formatDayCount(daysRemaining);
-
-  if (tone === "danger") {
-    return `Prazo curto! Restam ${remaining} para a entrega desse pedido!`;
-  }
-
-  if (tone === "warning") {
-    return `Prazo Moderado. Restam ${remaining} para a entrega desse pedido!`;
-  }
-
-  return `Restam ${remaining} para a entrega desse pedido!`;
-}
-
-function formatDayCount(value: number) {
-  return `${value} ${value === 1 ? "dia" : "dias"}`;
-}
-
-function formatBusinessDayCount(value: number) {
-  return `${value} ${value === 1 ? "dia útil" : "dias úteis"}`;
-}
-
-function getBusinessDaysRemaining(target: string) {
-  const calendarDays = getDateInputDifferenceInDays(target);
-  if (calendarDays === null || calendarDays < 0) return null;
-
-  let businessDays = 0;
-  const today = getBusinessTodayInput();
-
-  for (let offset = 1; offset <= calendarDays; offset += 1) {
-    const date = createUtcDateFromInput(addDaysToInput(today, offset));
-    const day = date.getUTCDay();
-    if (day !== 0 && day !== 6) {
-      businessDays += 1;
-    }
-  }
-
-  return businessDays;
-}
-
-function Field({ children, error, full = false, label, name, required = false }: FieldProps) {
-  return (
-    <div className={full ? "field field--full" : "field"}>
-      <label htmlFor={name}>
-        {label}
-        {required ? " *" : ""}
-      </label>
-      {children}
-      {error ? (
-        <p className="field-error" id={`${name}-error`}>
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function SubmitButton({ isUploading, label }: { isUploading: boolean; label: string }) {
-  const { pending } = useFormStatus();
-  const isPending = pending || isUploading;
-  const pendingLabel = isUploading
-    ? "Enviando imagens..."
-    : label === "Salvar alterações"
-      ? "Salvando alterações..."
-      : "Salvando ficha...";
-
-  return (
-    <Button aria-disabled={isPending} disabled={isPending} type="submit">
-      {isPending ? <span className="button-spinner" aria-hidden="true" /> : <Save aria-hidden="true" size={18} />}
-      {isPending ? pendingLabel : label}
-    </Button>
-  );
-}
-
-function sumProductQuantities(items: ProductFormItem[]) {
-  return items.reduce((total, item) => {
-    const quantity = Number.parseInt(String(item.quantidade ?? "").trim(), 10);
-    return total + (Number.isFinite(quantity) ? quantity : 0);
-  }, 0);
 }

@@ -1,3 +1,4 @@
+import { getServerErrorMessage } from "@/lib/server/boundaries";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Operador } from "./types";
@@ -36,7 +37,7 @@ export async function listOperadores(): Promise<UsuariosResult> {
     if (error) {
       return {
         kind: "error",
-        message: error.message,
+        message: getServerErrorMessage("usuarios.list", error, "Não foi possível consultar os operadores."),
         operadores: [],
       };
     }
@@ -48,7 +49,7 @@ export async function listOperadores(): Promise<UsuariosResult> {
   } catch (error) {
     return {
       kind: "error",
-      message: error instanceof Error ? error.message : "Falha ao consultar operadores.",
+      message: getServerErrorMessage("usuarios.list", error, "Não foi possível consultar os operadores."),
       operadores: [],
     };
   }

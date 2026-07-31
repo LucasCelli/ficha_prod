@@ -1,3 +1,4 @@
+import { getServerErrorMessage } from "@/lib/server/boundaries";
 import { getBusinessTodayInput, getDateInputDifferenceInDays } from "@/lib/dates";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -118,7 +119,7 @@ export async function listFichas(filters: FichaFilters = {}): Promise<FichaListR
         kind: "error",
         fichas: [],
         total: 0,
-        message: error.message,
+        message: getServerErrorMessage("fichas.load", error, "Não foi possível consultar as fichas."),
       };
     }
 
@@ -132,7 +133,7 @@ export async function listFichas(filters: FichaFilters = {}): Promise<FichaListR
       kind: "error",
       fichas: [],
       total: 0,
-      message: error instanceof Error ? error.message : "Falha ao consultar fichas.",
+      message: getServerErrorMessage("fichas.load", error, "Não foi possível consultar as fichas."),
     };
   }
 }
@@ -168,7 +169,7 @@ export async function listFichasForOperationalPdf(filters: FichaFilters = {}): P
         kind: "error",
         fichas: [],
         total: 0,
-        message: error.message,
+        message: getServerErrorMessage("fichas.load", error, "Não foi possível consultar as fichas."),
       };
     }
 
@@ -182,7 +183,7 @@ export async function listFichasForOperationalPdf(filters: FichaFilters = {}): P
       kind: "error",
       fichas: [],
       total: 0,
-      message: error instanceof Error ? error.message : "Falha ao consultar fichas para PDF.",
+      message: getServerErrorMessage("fichas.load", error, "Não foi possível consultar as fichas."),
     };
   }
 }
@@ -203,7 +204,7 @@ export async function getFichaById(id: string): Promise<FichaDetailResult> {
       return {
         ficha: null,
         kind: "error",
-        message: error.message,
+        message: getServerErrorMessage("fichas.load", error, "Não foi possível consultar as fichas."),
       };
     }
 
@@ -254,7 +255,7 @@ export async function getFichaById(id: string): Promise<FichaDetailResult> {
     return {
       ficha: null,
       kind: "error",
-      message: error instanceof Error ? error.message : "Falha ao carregar a ficha.",
+      message: getServerErrorMessage("fichas.load", error, "Não foi possível consultar as fichas."),
     };
   }
 }

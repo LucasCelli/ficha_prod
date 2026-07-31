@@ -14,13 +14,11 @@ type FichaStatusActionsProps = {
 };
 
 const statusTone: Record<FichaStatus, "danger" | "pending" | "success"> = {
-  cancelado: "danger",
   entregue: "success",
   pendente: "pending",
 };
 
 const statusLabel: Record<FichaStatus, string> = {
-  cancelado: "Cancelada",
   entregue: "Entregue",
   pendente: "Pendente",
 };

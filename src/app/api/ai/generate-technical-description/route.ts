@@ -1,3 +1,4 @@
+import { reportServerError, withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { getCurrentSession } from "@/features/auth/session";
@@ -46,7 +47,7 @@ function getAiErrorMessage(error: unknown) {
   return "Não foi possível gerar a descrição agora.";
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -83,6 +84,9 @@ export async function POST(request: Request) {
 
     return Response.json({ success: true, data: output });
   } catch (error) {
-    return errorResponse(getAiErrorMessage(error), 502);
+    const requestId = reportServerError("api.ai.generate-technical-description", error);
+    return Response.json({ success: false, error: getAiErrorMessage(error), requestId }, { status: 502 });
   }
 }
+
+export const POST = withAuthenticatedRoute(handlePOST, "src/app/api/ai/generate-technical-description/route.ts");
