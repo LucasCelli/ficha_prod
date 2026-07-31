@@ -82,19 +82,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
   const [createManualCardOpen, setCreateManualCardOpen] = useState(false);
   const [manualCardDraft, setManualCardDraft] = useState<ManualCardDraft>(() => getEmptyManualCardDraft(""));
   const lastDestinationRef = useRef<DragDestination | null>(null);
-  const pendingDestinationRef = useRef<DragDestination | null>(null);
-  const dragFrameRef = useRef<number | null>(null);
   const queryClient = useQueryClient();
-
-  const cancelPendingDragFrame = useCallback(() => {
-    if (dragFrameRef.current !== null) {
-      window.cancelAnimationFrame(dragFrameRef.current);
-      dragFrameRef.current = null;
-    }
-    pendingDestinationRef.current = null;
-  }, []);
-
-  useEffect(() => cancelPendingDragFrame, [cancelPendingDragFrame]);
 
   useEffect(() => {
     if (searchDraft === filters.busca) return;
@@ -123,14 +111,13 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
 
   const canonicalColumns = useMemo(() => getResultColumns(currentResult), [currentResult]);
   const columns = localColumns ?? canonicalColumns;
+  const columnsRef = useRef(columns);
+  useLayoutEffect(() => {
+    columnsRef.current = columns;
+  }, [columns]);
   const currentTotalVisible = columns.reduce((total, column) => total + column.openCount, 0);
   const filterOptions = currentResult.kind === "ok" ? currentResult.snapshot.filterOptions : null;
   const defaultColumnId = columns[0]?.id ?? "";
-  const activeCard = useMemo(
-    () => (dragStart ? columns.flatMap((column) => column.cards).find((card) => card.id === dragStart.cardId) ?? null : null),
-    [columns, dragStart],
-  );
-
   const refreshBoard = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: [BOARD_QUERY_KEY] });
   }, [queryClient]);
@@ -240,6 +227,11 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
     },
   });
 
+  const mutateMoveCard = moveCardMutation.mutate;
+  const mutateDeliverCard = deliverMutation.mutate;
+  const mutateReorderColumns = reorderColumnsMutation.mutate;
+  const mutateSortColumn = sortColumnMutation.mutate;
+
   const clearFilters = useCallback(() => {
     setSearchDraft("");
     void setFilters({
@@ -252,7 +244,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
 
   const shiftColumn = useCallback((columnId: string, direction: "left" | "right") => {
     setLocalColumns((currentColumns) => {
-      const sourceColumns = currentColumns ?? columns;
+      const sourceColumns = currentColumns ?? columnsRef.current;
       const from = sourceColumns.findIndex((column) => column.id === columnId);
       const to = direction === "left" ? from - 1 : from + 1;
 
@@ -263,39 +255,48 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
       const next = [...sourceColumns];
       const [column] = next.splice(from, 1);
       next.splice(to, 0, column);
-      const columnIds = next.map((item) => item.id);
-      reorderColumnsMutation.mutate(columnIds);
+      mutateReorderColumns(next.map((item) => item.id));
       return next.map((item, index) => ({ ...item, order_index: index }));
     });
-  }, [columns, reorderColumnsMutation]);
+  }, [mutateReorderColumns]);
 
   const moveToNextColumn = useCallback((card: KanbanCardSummary) => {
-    const columnIndex = columns.findIndex((column) => column.id === card.kanbanColumnId);
-    const nextColumn = columns[columnIndex + 1];
+    const boardColumns = columnsRef.current;
+    const columnIndex = boardColumns.findIndex((column) => column.id === card.kanbanColumnId);
+    const nextColumn = boardColumns[columnIndex + 1];
 
     if (!nextColumn) return;
 
-    setLocalColumns((currentColumns) =>
-      moveCard(currentColumns ?? columns, card.id, {
-        columnId: nextColumn.id,
-        index: nextColumn.cards.length,
-      }),
-    );
-    moveCardMutation.mutate({
+    const optimisticColumns = moveCard(boardColumns, card.id, {
+      columnId: nextColumn.id,
+      index: nextColumn.cards.length,
+    });
+    setLocalColumns(optimisticColumns);
+    mutateMoveCard({
       cardId: card.id,
       destinationColumnId: nextColumn.id,
       destinationIndex: nextColumn.cards.length,
-      optimisticColumns: moveCard(columns, card.id, {
-        columnId: nextColumn.id,
-        index: nextColumn.cards.length,
-      }),
+      optimisticColumns,
     });
-  }, [columns, moveCardMutation]);
+  }, [mutateMoveCard]);
 
   const openManualCardModal = useCallback((columnId = defaultColumnId) => {
     setManualCardDraft(getEmptyManualCardDraft(columnId));
     setCreateManualCardOpen(true);
   }, [defaultColumnId]);
+
+  const deliverCard = useCallback((card: KanbanCardSummary) => {
+    mutateDeliverCard(card.id);
+  }, [mutateDeliverCard]);
+
+  const openRenameColumn = useCallback((column: KanbanBoardColumn) => {
+    setRenameTarget(column);
+    setRenameColumnName(column.name);
+  }, []);
+
+  const sortColumnByDate = useCallback((columnId: string) => {
+    mutateSortColumn(columnId);
+  }, [mutateSortColumn]);
 
   const handleCreateColumn = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -464,29 +465,17 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
           if (!destination || sameDestination(lastDestinationRef.current, destination)) return;
 
           lastDestinationRef.current = destination;
-          pendingDestinationRef.current = destination;
           setDropColumnId((currentColumnId) =>
             currentColumnId === destination.columnId ? currentColumnId : destination.columnId,
           );
-
-          if (dragFrameRef.current !== null) return;
-
-          dragFrameRef.current = window.requestAnimationFrame(() => {
-            dragFrameRef.current = null;
-            const pendingDestination = pendingDestinationRef.current;
-            pendingDestinationRef.current = null;
-
-            if (!pendingDestination) return;
-            setLocalColumns((currentColumns) =>
-              moveCard(currentColumns ?? columns, dragStart.cardId, pendingDestination),
-            );
-          });
+          setLocalColumns((currentColumns) =>
+            moveCard(currentColumns ?? columns, dragStart.cardId, destination),
+          );
         }}
         onDragEnd={(event) => {
           if (!dragStart) return;
 
           const destination = event.canceled ? null : lastDestinationRef.current ?? findCardLocation(columns, dragStart.cardId);
-          cancelPendingDragFrame();
           lastDestinationRef.current = null;
           setDropColumnId(null);
           setDragStart(null);
@@ -501,7 +490,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
             return;
           }
 
-          moveCardMutation.mutate({
+          mutateMoveCard({
             cardId: dragStart.cardId,
             destinationColumnId: destination.columnId,
             destinationIndex: destination.index,
@@ -516,29 +505,24 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
           >
             {columns.map((column, index) => (
               <KanbanColumn
+                canShiftLeft={index > 0}
+                canShiftRight={index < columns.length - 1}
                 column={column}
-                columnIndex={index}
-                columns={columns}
                 deliverPending={deliverMutation.isPending}
-                isCardDragging={Boolean(dragStart)}
                 isDropColumn={dropColumnId === column.id}
+                isLastColumn={index === columns.length - 1}
                 key={column.id}
-                onDeliverCard={(card) => deliverMutation.mutate(card.id)}
+                onDeliverCard={deliverCard}
                 onMoveNextCard={moveToNextColumn}
                 onOpenManualCard={openManualCardModal}
-                onOpenRename={(columnToRename) => {
-                  setRenameTarget(columnToRename);
-                  setRenameColumnName(columnToRename.name);
-                }}
+                onOpenRename={openRenameColumn}
                 onOpenView={setViewCard}
                 onShiftColumn={shiftColumn}
-                onSortByDate={(columnId) => sortColumnMutation.mutate(columnId)}
+                onSortByDate={sortColumnByDate}
               />
             ))}
           </div>
         </div>
-
-        <DragPreviewCard card={activeCard} />
       </DragDropProvider>
 
       {createColumnOpen ? (
@@ -675,12 +659,12 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
 }
 
 type KanbanColumnProps = {
+  canShiftLeft: boolean;
+  canShiftRight: boolean;
   column: KanbanBoardColumn;
-  columnIndex: number;
-  columns: KanbanBoardColumn[];
   deliverPending: boolean;
-  isCardDragging: boolean;
   isDropColumn: boolean;
+  isLastColumn: boolean;
   onDeliverCard: (card: KanbanCardSummary) => void;
   onMoveNextCard: (card: KanbanCardSummary) => void;
   onOpenManualCard: (columnId: string) => void;
@@ -690,13 +674,13 @@ type KanbanColumnProps = {
   onSortByDate: (columnId: string) => void;
 };
 
-function KanbanColumn({
+const KanbanColumn = memo(function KanbanColumn({
+  canShiftLeft,
+  canShiftRight,
   column,
-  columnIndex,
-  columns,
   deliverPending,
-  isCardDragging,
   isDropColumn,
+  isLastColumn,
   onDeliverCard,
   onMoveNextCard,
   onOpenManualCard,
@@ -729,7 +713,7 @@ function KanbanColumn({
             <button
               aria-label="Mover coluna para a esquerda"
               className="quadro-producao-icon-button"
-              disabled={columnIndex === 0}
+              disabled={!canShiftLeft}
               onClick={() => onShiftColumn(column.id, "left")}
               type="button"
             >
@@ -740,7 +724,7 @@ function KanbanColumn({
             <button
               aria-label="Mover coluna para a direita"
               className="quadro-producao-icon-button"
-              disabled={columnIndex === columns.length - 1}
+              disabled={!canShiftRight}
               onClick={() => onShiftColumn(column.id, "right")}
               type="button"
             >
@@ -787,8 +771,7 @@ function KanbanColumn({
             cardIndex={cardIndex}
             columnId={column.id}
             deliverPending={deliverPending}
-            isCardDragging={isCardDragging}
-            isLastColumn={columnIndex === columns.length - 1}
+            isLastColumn={isLastColumn}
             key={card.id}
             onDeliverCard={onDeliverCard}
             onMoveNextCard={onMoveNextCard}
@@ -805,14 +788,13 @@ function KanbanColumn({
       </div>
     </section>
   );
-}
+});
 
 type KanbanCardProps = {
   card: KanbanCardSummary;
   cardIndex: number;
   columnId: string;
   deliverPending: boolean;
-  isCardDragging: boolean;
   isLastColumn: boolean;
   onDeliverCard: (card: KanbanCardSummary) => void;
   onMoveNextCard: (card: KanbanCardSummary) => void;
@@ -824,7 +806,6 @@ const KanbanCard = memo(function KanbanCard({
   cardIndex,
   columnId,
   deliverPending,
-  isCardDragging,
   isLastColumn,
   onDeliverCard,
   onMoveNextCard,
@@ -891,7 +872,7 @@ const KanbanCard = memo(function KanbanCard({
             <span>Entrega {formatDate(card.dataEntrega)}</span>
           </div>
           <div className="quadro-producao-card__actions">
-            <CardImagePreviewButton card={card} isCardDragging={isCardDragging} onOpenView={onOpenView} />
+            <CardImagePreviewButton card={card} onOpenView={onOpenView} />
             {isLastColumn ? (
               <Tooltip label="Marcar como entregue">
                 <button
@@ -929,11 +910,10 @@ const KanbanCard = memo(function KanbanCard({
 
 type CardImagePreviewButtonProps = {
   card: KanbanCardSummary;
-  isCardDragging: boolean;
   onOpenView: (card: KanbanCardSummary) => void;
 };
 
-function CardImagePreviewButton({ card, isCardDragging, onOpenView }: CardImagePreviewButtonProps) {
+function CardImagePreviewButton({ card, onOpenView }: CardImagePreviewButtonProps) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<CSSProperties | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -984,23 +964,16 @@ function CardImagePreviewButton({ card, isCardDragging, onOpenView }: CardImageP
         aria-label={`Visualizar imagem de ${card.clienteNome}`}
         className="quadro-producao-icon-button"
         onBlur={closePreview}
-        onClick={() => {
-          if (!isCardDragging) onOpenView(card);
-        }}
-        onFocus={() => {
-          if (!isCardDragging) setOpen(true);
-        }}
+        onClick={() => onOpenView(card)}
+        onFocus={() => setOpen(true)}
         onMouseDown={stopCardDrag}
         onPointerDown={stopCardDrag}
         onPointerEnter={(event) => {
-          if (isCardDragging) return;
           setOpen(true);
           updatePointerPosition(event.clientX, event.clientY);
         }}
         onPointerLeave={closePreview}
-        onPointerMove={(event) => {
-          if (!isCardDragging) updatePointerPosition(event.clientX, event.clientY);
-        }}
+        onPointerMove={(event) => updatePointerPosition(event.clientX, event.clientY)}
         ref={triggerRef}
         type="button"
       >
@@ -1015,18 +988,5 @@ function CardImagePreviewButton({ card, isCardDragging, onOpenView }: CardImageP
         )
         : null}
     </>
-  );
-}
-
-function DragPreviewCard({ card }: { card: KanbanCardSummary | null }) {
-  if (!card) {
-    return null;
-  }
-
-  return (
-    <div className="quadro-producao-drag-preview" aria-hidden="true">
-      <span>{card.clienteNome}</span>
-      <small>{normalizePersonalizacaoLabel(card.arte)}</small>
-    </div>
   );
 }

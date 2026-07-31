@@ -73,6 +73,17 @@ test("Kanban converte JSON inválido em falha de validação", () => {
   ]) assert.match(readFileSync(route, "utf8"), /request\.json\(\)\.catch\(\(\) => null\)/);
 });
 
+test("Kanban mantem dimensoes estaveis e atualiza o destino sem atraso artificial", () => {
+  const client = readFileSync("src/features/quadro-producao/quadro-producao-client.tsx", "utf8");
+  const state = readFileSync("src/features/quadro-producao/quadro-producao-state.ts", "utf8");
+  const styles = readFileSync("src/styles/globals.css", "utf8");
+
+  assert.match(client, /const KanbanColumn = memo/);
+  assert.doesNotMatch(client, /requestAnimationFrame|pendingDestinationRef|dragFrameRef|isCardDragging/);
+  assert.match(state, /DND_TIMING = \{ duration: 90,/);
+  assert.doesNotMatch(styles, /contain-intrinsic-block-size|content-visibility/);
+});
+
 function listFiles(root: string): string[] {
   return readdirSync(root).flatMap((name) => {
     const path = join(root, name);

@@ -9458,13 +9458,6 @@ html[data-theme="dark"] body .app-nav__link[aria-current="page"] {
   user-select: none;
 }
 
-@supports (content-visibility: auto) {
-  .quadro-producao-view:not(.is-dragging-card) .quadro-producao-card {
-    contain-intrinsic-block-size: auto 132px;
-    content-visibility: auto;
-  }
-}
-
 html[data-theme="dark"] .quadro-producao-card {
   background: var(--color-surface-2);
 }
@@ -9634,10 +9627,6 @@ html[data-theme="dark"] .quadro-producao-card {
   aspect-ratio: 16 / 9;
   border-radius: 8px;
   object-fit: cover;
-}
-
-.quadro-producao-drag-preview {
-  display: none;
 }
 
 .quadro-producao-modal-form {

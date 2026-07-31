@@ -10,6 +10,13 @@ Backlog vivo de correções, refinos e decisões futuras. Itens concluídos est�
 - O acesso por PIN permanece válido para operadores e superadmin.
 - O fluxo operacional possui apenas `pendente`, `atrasada` e `entregue`; `atrasada` é derivada de ficha pendente cuja data de entrega já passou.
 
+## Desempenho do quadro de produção - 2026-07-31
+
+- [x] Remover a oscilação de altura do card após o drop, eliminando `content-visibility` e a altura intrínseca estimada incompatíveis com o ciclo de medição do DnD.
+- [x] Tornar a reordenação durante o arraste imediata, sem o frame adicional de `requestAnimationFrame`, e reduzir a transição dos cards de 130 ms para 90 ms.
+- [x] Reduzir rerenders durante o gesto com colunas memoizadas, callbacks estáveis e props locais, preservando o estado apenas nas colunas afetadas.
+- [x] Cobrir a regressão com teste estrutural e concluir `typecheck`, `lint`, `build`, testes de qualidade, encoding e integridade do diff.
+
 ## Auditoria de código de 2026-07-31
 
 ### Segurança e fronteiras

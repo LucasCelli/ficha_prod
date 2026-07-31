@@ -18,7 +18,7 @@ export type DragStart = { cardId: string; columnId: string; index: number };
 export type DragDestination = { columnId: string; index: number };
 
 export const BOARD_QUERY_KEY = "quadro-producao";
-export const DND_TIMING = { duration: 130, easing: "cubic-bezier(0.2, 0, 0, 1)" };
+export const DND_TIMING = { duration: 90, easing: "cubic-bezier(0.2, 0, 0, 1)" };
 export const CARD_SORTABLE_PLUGINS = [SortableKeyboardPlugin];
 
 export function formatDate(value: string) {

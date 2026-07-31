@@ -2152,3 +2152,14 @@
 - Decisão: `quality-tests/`, seus testes visuais e snapshots permanecem versionáveis porque são código e baselines de regressão; somente resultados e caches gerados durante a execução são ignorados.
 - Arquivos alterados: `.gitignore` e `registro-alteracoes.md`.
 - Validação: regras conferidas com `git check-ignore`, verificação UTF-8 e `git diff --check`.
+
+## 2026-07-31 - Fluidez do drag-and-drop no quadro de produção
+
+- Módulo: `/quadro-producao`, animações e desempenho client-side.
+- Causa visual: `content-visibility: auto` era desligado no início do drag e reativado imediatamente no drop com uma altura intrínseca estimada de 132 px. Essa troca obrigava o navegador a recalcular todos os cards e podia exibir a estimativa no lugar da altura real durante uma fração de tempo.
+- Causa do atraso: o destino do `onDragOver` era adiado por `requestAnimationFrame`, acrescentando até um frame antes de atualizar a ordem visual; callbacks recriados e o array completo de colunas também ampliavam os rerenders durante o gesto.
+- Correção: removida a contenção por altura estimada; a reordenação passa a ocorrer diretamente quando o destino realmente muda; a transição caiu de 130 ms para 90 ms; `KanbanColumn` foi memoizada e passou a receber apenas flags locais e callbacks estáveis.
+- Manutenção: removidos refs, preview invisível e props globais de drag que não eram necessários. O algoritmo `moveCard` continua preservando referências das colunas não afetadas, permitindo que a memoização evite trabalho fora da origem e do destino.
+- Cobertura: teste estrutural impede reintroduzir `requestAnimationFrame`, refs de frame, `content-visibility` ou duração superior à adotada no caminho do Kanban.
+- Validação: `npm run typecheck`, `npm run lint`, `npm run build` e `npm run test:quality` passaram. O Playwright headless carregou o quadro com 102 cards, mas o sensor do `@dnd-kit` não iniciou o gesto com eventos sintéticos; nenhuma chamada de movimento chegou à API e nenhum dado remoto foi alterado. A confirmação tátil final permanece no navegador real.
+- Arquivos alterados: `src/features/quadro-producao/quadro-producao-client.tsx`, `src/features/quadro-producao/quadro-producao-state.ts`, `src/styles/globals.css`, `quality-tests/code-review-hardening.test.ts`, `TODO.md` e `registro-alteracoes.md`.
