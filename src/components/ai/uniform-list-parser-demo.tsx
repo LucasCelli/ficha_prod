@@ -16,7 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Badge, Button, CustomDatalist, DataTable, type CustomDatalistOption } from "@/components/ui";
+import { Badge, Button, CustomDatalist, DataTable, Tooltip, type CustomDatalistOption } from "@/components/ui";
 import { findAiModelOption } from "@/lib/ai/model-options";
 import { buildUniformCorelCsv, buildUniformCorelCsvFilename } from "@/lib/ai/uniform-list-csv";
 import { printUniformList } from "@/lib/ai/uniform-list-print";
@@ -140,10 +140,12 @@ function ConfidenceDot({ value }: { value: string }) {
   const label = formatConfidence(value);
 
   return (
-    <span className={`confidence-dot confidence-dot--${value}`} title={`Confiança: ${label}`}>
-      <span aria-hidden="true" className="confidence-dot__mark" />
-      <span className="sr-only">{label}</span>
-    </span>
+    <Tooltip label={`Confiança: ${label}`}>
+      <span className={`confidence-dot confidence-dot--${value}`}>
+        <span aria-hidden="true" className="confidence-dot__mark" />
+        <span className="sr-only">{label}</span>
+      </span>
+    </Tooltip>
   );
 }
 
@@ -573,11 +575,14 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
 
   return (
     <section className="ai-demo" aria-labelledby={`${textareaId}-title`}>
+      <h1 className="sr-only" id={`${textareaId}-title`}>
+        Organizar nomes com IA
+      </h1>
       <div className="ai-demo__workspace">
         <form className="ai-demo__form" onSubmit={handleSubmit}>
           <div className="ai-demo__header">
             <div>
-              <h2 id={`${textareaId}-title`}>Organizar lista</h2>
+              <h2>Organizar lista</h2>
               <p>{REVIEW_MESSAGE}</p>
             </div>
             <div className="ai-demo__actions">
@@ -651,18 +656,18 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
             <div className="ai-demo__toolbar-start">
               <div className="format-toolbar" role="group" aria-label="Formato dos nomes">
                 {NAME_CASE_OPTIONS.map(({ icon: Icon, label: optionLabel, mode }) => (
-                  <button
-                    aria-label={optionLabel}
-                    className={["format-toolbar__button", nameCaseMode === mode ? "is-active" : null].filter(Boolean).join(" ")}
-                    data-active={nameCaseMode === mode ? "true" : undefined}
-                    disabled={!hasItems || isEditingResult}
-                    key={mode}
-                    onClick={() => transformResultNames(mode)}
-                    title={optionLabel}
-                    type="button"
-                  >
-                    <Icon aria-hidden="true" size={16} />
-                  </button>
+                  <Tooltip key={mode} label={optionLabel}>
+                    <button
+                      aria-label={optionLabel}
+                      className={["format-toolbar__button", nameCaseMode === mode ? "is-active" : null].filter(Boolean).join(" ")}
+                      data-active={nameCaseMode === mode ? "true" : undefined}
+                      disabled={!hasItems || isEditingResult}
+                      onClick={() => transformResultNames(mode)}
+                      type="button"
+                    >
+                      <Icon aria-hidden="true" size={16} />
+                    </button>
+                  </Tooltip>
                 ))}
               </div>
               <Button

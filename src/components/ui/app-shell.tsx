@@ -7,6 +7,7 @@ import type { AppSession } from "@/features/auth/types";
 import { AppNavigation } from "./app-navigation";
 import { MotionPage } from "./motion-page";
 import { ThemeToggle } from "./theme-toggle";
+import { IconButton } from "./icon-button";
 import { PriscilaIcon } from "./branding";
 
 type AppShellProps = {
@@ -41,18 +42,18 @@ export function AppShell({ children, session, title }: AppShellProps) {
               Fichas Tecnicas
             </span>
           </Link>
-          <button
+          <IconButton
+            appearance="bare"
             className="app-sidebar__toggle"
+            label={collapsed ? "Expandir menu" : "Recolher menu"}
             onClick={toggle}
-            type="button"
-            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            tooltipSide="right"
           >
             {collapsed
               ? <ArrowRightFromLine size={16} aria-hidden="true" />
               : <PanelLeft size={16} aria-hidden="true" />
             }
-          </button>
+          </IconButton>
         </div>
         <AppNavigation role={session?.user.role ?? "operador"} collapsed={collapsed} />
         <div className="app-sidebar__footer">
@@ -66,14 +67,16 @@ export function AppShell({ children, session, title }: AppShellProps) {
           <ThemeToggle />
           {session ? (
             <form action="/logout" method="post">
-              <button
-                className="app-logout"
-                type="submit"
-                title={collapsed ? "Sair" : undefined}
-              >
-                <LogOut aria-hidden="true" size={16} />
-                {!collapsed && <span>Sair</span>}
-              </button>
+              {collapsed ? (
+                <IconButton appearance="bare" className="app-logout" label="Sair" tooltipSide="right" type="submit">
+                  <LogOut aria-hidden="true" size={16} />
+                </IconButton>
+              ) : (
+                <button className="app-logout" type="submit">
+                  <LogOut aria-hidden="true" size={16} />
+                  <span>Sair</span>
+                </button>
+              )}
             </form>
           ) : null}
         </div>

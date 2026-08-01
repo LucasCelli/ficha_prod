@@ -25,6 +25,7 @@ export default defineConfig({
     {
       name: "desktop-chromium",
       dependencies: ["setup"],
+      testIgnore: /admin\.spec\.js/,
       use: {
         ...devices["Desktop Chrome"],
         storageState: "test-results/.auth/user.json",
@@ -32,11 +33,37 @@ export default defineConfig({
       },
     },
     {
+      // Faixa 768-1024: e onde a tabela de fichas troca para cards e onde a
+      // toolbar do quadro quebra. Sem este viewport, o corte `lg` nao tinha
+      // nenhuma baseline cobrindo os dois lados da transicao.
+      name: "tablet-chromium",
+      dependencies: ["setup"],
+      testIgnore: /admin\.spec\.js/,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "test-results/.auth/user.json",
+        viewport: { height: 1000, width: 900 },
+      },
+    },
+    {
       name: "mobile-chromium",
       dependencies: ["setup"],
+      testIgnore: /admin\.spec\.js/,
       use: {
         ...devices["Pixel 5"],
         storageState: "test-results/.auth/user.json",
+      },
+    },
+    {
+      // Superficies restritas a superadmin. Sessao propria porque a conta usada
+      // nos demais projetos e operador e seria redirecionada para a home.
+      name: "superadmin-chromium",
+      dependencies: ["setup"],
+      testMatch: /admin\.spec\.js/,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "test-results/.auth/superadmin.json",
+        viewport: { height: 900, width: 1440 },
       },
     },
   ],

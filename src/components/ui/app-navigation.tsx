@@ -12,6 +12,7 @@ import {
   Columns3,
   Wrench,
   CircleUserRound,
+  Palette,
 } from "lucide-react";
 import { mainNavigation } from "@/lib/navigation";
 import type { AppUserRole } from "@/features/auth/types";
@@ -27,6 +28,7 @@ const iconMap: Record<string, typeof Home> = {
   "/catalogos": Database,
   "/usuarios": UserCog,
   "/relatorios": BarChart3,
+  "/design-system": Palette,
 };
 
 type AppNavigationProps = {

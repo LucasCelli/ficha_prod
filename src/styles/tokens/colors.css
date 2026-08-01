@@ -20,6 +20,21 @@
   --color-primary-active: #0958d9;
   --color-primary-bg: #e6f4ff;
   --color-primary-contrast: #ffffff;
+  /* Azul destinado a texto: 6.16:1 sobre branco, 5.5:1 sobre --color-primary-bg. */
+  --color-primary-text: #0958d9;
+
+  /* Foco */
+  --color-focus-ring: rgb(22 119 255 / 15%);
+
+  /* Paleta de graficos (ordem estavel de series) */
+  --color-chart-1: #1677ff;
+  --color-chart-2: #13a8a8;
+  --color-chart-3: #722ed1;
+  --color-chart-4: #d4380d;
+  --color-chart-5: #237804;
+  --color-chart-6: #c41d7f;
+  --color-chart-7: #d48806;
+  --color-chart-8: #08979c;
 
   /* Status */
   --color-success: #237804;
@@ -110,6 +125,20 @@ html[data-theme="dark"] {
   --color-primary-active: #1677ff;
   --color-primary-bg: #111d2c;
   --color-primary-contrast: #0a0e17;
+  --color-primary-text: #69b1ff;
+
+  /* Foco */
+  --color-focus-ring: rgb(64 150 255 / 25%);
+
+  /* Paleta de graficos (ordem estavel de series) */
+  --color-chart-1: #4096ff;
+  --color-chart-2: #58d1c9;
+  --color-chart-3: #b37feb;
+  --color-chart-4: #ff9c6e;
+  --color-chart-5: #95de64;
+  --color-chart-6: #ff85c0;
+  --color-chart-7: #ffd666;
+  --color-chart-8: #5cdbd3;
 
   /* Status */
   --color-success: #6abe39;

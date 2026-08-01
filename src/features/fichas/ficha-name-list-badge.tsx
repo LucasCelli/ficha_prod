@@ -13,7 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { DataTable, Modal } from "@/components/ui";
+import { DataTable, Modal, Tooltip } from "@/components/ui";
 import { buildUniformCorelCsv, buildUniformCorelCsvFilename } from "@/lib/ai/uniform-list-csv";
 import { printUniformList } from "@/lib/ai/uniform-list-print";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
@@ -116,10 +116,12 @@ function ConfidenceDot({ value }: { value: string }) {
   const label = formatConfidence(value);
 
   return (
-    <span className={`confidence-dot confidence-dot--${value}`} title={`Confiança: ${label}`}>
-      <span aria-hidden="true" className="confidence-dot__mark" />
-      <span className="sr-only">{label}</span>
-    </span>
+    <Tooltip label={`Confiança: ${label}`}>
+      <span className={`confidence-dot confidence-dot--${value}`}>
+        <span aria-hidden="true" className="confidence-dot__mark" />
+        <span className="sr-only">{label}</span>
+      </span>
+    </Tooltip>
   );
 }
 
@@ -356,19 +358,19 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
                     <>
                       <div className="format-toolbar" role="group" aria-label="Formato dos nomes">
                         {NAME_CASE_OPTIONS.map(({ icon: Icon, label: optionLabel, mode }) => (
-                          <button
-                            aria-label={optionLabel}
-                            className={["format-toolbar__button", nameCaseMode === mode ? "is-active" : null]
-                              .filter(Boolean)
-                              .join(" ")}
-                            data-active={nameCaseMode === mode ? "true" : undefined}
-                            key={mode}
-                            onClick={() => setNameCaseMode(mode)}
-                            title={optionLabel}
-                            type="button"
-                          >
-                            <Icon aria-hidden="true" size={16} />
-                          </button>
+                          <Tooltip key={mode} label={optionLabel}>
+                            <button
+                              aria-label={optionLabel}
+                              className={["format-toolbar__button", nameCaseMode === mode ? "is-active" : null]
+                                .filter(Boolean)
+                                .join(" ")}
+                              data-active={nameCaseMode === mode ? "true" : undefined}
+                              onClick={() => setNameCaseMode(mode)}
+                              type="button"
+                            >
+                              <Icon aria-hidden="true" size={16} />
+                            </button>
+                          </Tooltip>
                         ))}
                       </div>
                       {rawText ? (

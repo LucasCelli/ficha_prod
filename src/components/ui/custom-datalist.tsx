@@ -96,7 +96,14 @@ export function CustomDatalist({
   }
 
   return (
-    <div className="custom-datalist">
+    <div
+      className="custom-datalist"
+      onBlur={(event) => {
+        // Fecha apenas quando o foco sai do combobox inteiro. Sem timers:
+        // nada e removido debaixo do elemento que acabou de receber foco.
+        if (!event.currentTarget.contains(event.relatedTarget)) setIsOpen(false);
+      }}
+    >
       <input
         aria-activedescendant={isOpen && filteredOptions[activeIndex] ? `${listboxId}-${activeIndex}` : undefined}
         aria-autocomplete="list"
@@ -111,10 +118,7 @@ export function CustomDatalist({
         id={id}
         inputMode={inputMode}
         name={name}
-        onBlur={(event) => {
-          onBlur?.(event);
-          window.setTimeout(() => setIsOpen(false), 120);
-        }}
+        onBlur={onBlur}
         onChange={(event) => {
           setValue(event.currentTarget.value);
           setActiveIndex(0);
@@ -173,7 +177,10 @@ export function CustomDatalist({
           >
           {filteredOptions.length ? (
             filteredOptions.map((option, index) => (
-              <button
+              // As opcoes nao entram na ordem de Tab: o foco permanece no input e a
+              // opcao ativa e anunciada por aria-activedescendant. Isso evita que o
+              // fechamento por blur remova o elemento que acabou de receber foco.
+              <div
                 aria-selected={index === activeIndex}
                 className="custom-datalist__option"
                 id={`${listboxId}-${index}`}
@@ -182,11 +189,11 @@ export function CustomDatalist({
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => selectOption(option)}
                 role="option"
-                type="button"
+                tabIndex={-1}
               >
                 <span>{option.label}</span>
                 {option.details?.length ? <small>{option.details.join(", ")}</small> : null}
-              </button>
+              </div>
             ))
           ) : (
             <div className="custom-datalist__empty">Nenhuma sugestão</div>

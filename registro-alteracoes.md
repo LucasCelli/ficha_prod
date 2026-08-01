@@ -1,3 +1,168 @@
+## 2026-08-01 (2) - IconButton/IconLink, cobertura de superadmin e ajustes de UI reportados
+
+- Modulo: primitivos de acao icon-only, catalogos, quadro, toasts, cabecalhos e suite de testes.
+
+### Cobertura que faltava: /catalogos e /usuarios
+
+- A conta usada nos testes (`lucas`) e operador, entao as telas de superadmin nunca tinham sido abertas em navegador. Com as credenciais de `nhx`, `auth.setup.js` passou a gravar duas sessoes e o projeto `superadmin-chromium` roda `admin.spec.js` com a sessao certa.
+- 17 testes novos: acesso as rotas, presenca dos modulos administrativos na navegacao, reordenacao por teclado do catalogo, instrucoes de teclado unicas, `h1`/`title` por rota, labels dos filtros de `/usuarios/perfis`, ausencia de scroll horizontal e baseline visual das tres telas em light e dark.
+- `AGENTS.md` estava desatualizado: registrava `lucas` como login de teste sem dizer que e operador. Agora lista as duas contas e explica por que existem dois projetos de teste.
+
+### Dois bugs reais encontrados por essa cobertura
+
+- A reordenacao por teclado do catalogo, escrita as cegas no ciclo anterior, nunca tinha sido executada. O teste mostrou que ela funcionava, mas que o **foco era perdido a cada movimento**: os handles ficam `disabled` durante o save, e um botao desabilitado nao mantem foco, entao o usuario de teclado nao conseguia mover o mesmo item duas vezes seguidas. Movimentos consecutivos deixaram de ser bloqueados (cada um persiste a lista inteira, a ultima escrita vale) e o handle nao e mais desabilitado.
+- O marcador de hidratacao usado nos testes (`__reactFiber` no `.app-frame`) era raso demais: o shell hidrata antes dos componentes cliente mais profundos, entao teclado e clique em `/catalogos` chegavam antes do handler existir. Foi criado `waitForHandler`, que espera o proprio controle ter o handler React anexado.
+
+### IconButton e IconLink
+
+- `IconButton` ganhou `appearance="bare"`, que aplica so o contrato do primitivo (rotulo acessivel, tooltip do design system, pending, alvo de 44px) e deixa o visual com o CSS ja existente do controle.
+- Criado `IconLink`: boa parte das acoes icon-only do produto e navegacao, e troca-las por `<button>` quebraria abrir em nova aba, copiar endereco e prefetch.
+- Migrados: fechar modal, recolher sidebar, sair, acoes de linha de ficha (previa, editar, reverter, entregar), acoes de item de catalogo, limpar busca de clientes, navegacao do calendario e os botoes de informacao (`field-info-button`) das tres telas que os usam.
+- `controls.css` deixou de listar os controles migrados. Restam cinco entradas, documentadas como pendencia.
+- O `position: relative` do extensor de toque passou para `:where()`: com a classe dobrada ele vencia `.clientes-search-field__clear` e `.modal-close`, que sao `position: absolute`. **Isso corrigiu um bug real**: no mobile o botao de fechar do modal saia do canto e inflava o dialogo em 32px.
+
+### Ajustes reportados durante a revisao
+
+- **Tooltip com texto longo**: `IconButton`/`IconLink` usavam o `aria-label` como texto do tooltip, e o rotulo inclui o nome do registro ("Abrir previa de impressao da ficha Fulano"). Novo prop `tooltipLabel` separa o rotulo acessivel do texto visual.
+- **Tooltip cobrindo o proprio controle**: o posicionamento usava offset fixo de 40px; com tooltip de duas linhas o balao ficava por cima do botao. Agora sai da altura medida, com folga de 10px.
+- **Toast de carregamento**: o slot do icone desenhava um circulo com fundo e o loader dentro estava escondido, resultando em um circulo vazio; e a barra de progresso estava inset e concorria com o `::after`. O slot inteiro passou a ser ocultado e a barra virou uma faixa de 3px no rodape do toast, visivel sem hover.
+- **Hover do menu de acoes no dark**: `--color-primary-bg` no tema escuro e quase a cor do proprio menu. Passou a usar `color-mix(30% primary, surface-3)`, com destaque claro nos dois temas.
+- **Chips do card do quadro**: faltava `gap` entre o icone e a contagem, e o azul destacado competia com o nome do cliente e com o status. Agora sao neutros (`surface-2` + `text-secondary`) e o `title=""` nativo virou `Tooltip`.
+- **Cursor do titulo do card**: o nome do cliente e uma `<div>`, nao um controle, mas herdava `cursor: pointer` da geracao antiga de estilos. Removido; o cursor volta a ser `grab`, coerente com o card arrastavel.
+- **Eyebrows redundantes**: removidos os `<p class="eyebrow">` que apenas repetiam o titulo logo abaixo (Fichas, Clientes, Catalogos, Usuarios, Ferramentas, Relatorios) ou o nome do modulo dentro dos modais. Os que agregam contexto ficaram: "Meu perfil" sobre o nome do usuario, "Administracao" sobre "Gestao de autoria" e os rotulos de secao da home.
+
+### Suite visual
+
+- Novo projeto `tablet-chromium` (900x1000). A faixa 768-1024 e onde a tabela de fichas troca para cards e a toolbar do quadro quebra, e nao tinha baseline nenhuma dos dois lados da transicao.
+- Total: 173 testes por execucao.
+
+- Arquivos alterados: `playwright.config.js`, `AGENTS.md`, `quality-tests/visual/{auth.setup.js,admin.spec.js,flows.spec.js}`, `src/components/ui/{icon-button,icon-link,modal,app-shell,tooltip,floating-menu,index}`, `src/styles/primitives/controls.css`, `src/styles/domains/{base,primitives,quadro-producao}.css`, `src/features/catalogos/{catalog-item-actions,catalog-items-table,catalogo-form,catalogos-overview}.tsx`, `src/features/fichas/{ficha-row-actions,fichas-overview}.tsx`, `src/features/clientes/{clientes-overview,clientes-search-toolbar}.tsx`, `src/features/dashboard/dashboard-calendar.tsx`, `src/features/quadro-producao/quadro-producao-client.tsx`, `src/features/relatorios/relatorios-overview.tsx`, `src/features/usuarios/usuarios-overview.tsx`, `src/components/tools/image-cropper.tsx`, `src/app/{clientes,ferramentas}/page.tsx`, baselines de `pages.spec.js-snapshots` e `admin.spec.js-snapshots`, `TODO.md`, `registro-alteracoes.md`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run test:quality` (25/25), `npm run encoding:check` e `npx playwright test` (173/173).
+- Caveats:
+  - Em quatro execucoes da suite, tres deram 173/173 e uma teve 2 falhas cuja identidade nao foi capturada. O modo de falha conhecido e a janela de hidratacao do App Router (o primeiro clique e descartado); os testes de interacao ja absorvem isso com `expect(...).toPass()`, mas a instabilidade nao pode ser dada como eliminada.
+  - A tentativa de unificar as duas geracoes de estilo do quadro foi feita e revertida nesta sessao; o diagnostico esta no cabecalho de `domains/quadro-producao.css`.
+  - `format-toolbar__button`, `image-upload-card__remove` e os tres controles do quadro continuam fora do primitivo, ainda listados em `controls.css`.
+
+## 2026-08-01 - Split de CSS por dominio, breakpoints unicos, fluxo canonico de cliente e correcao de regressao no quadro
+
+- Modulo: estilos globais, quadro de producao, clientes, design system, navegacao e suite de testes.
+
+### Regressao propria corrigida
+
+- A deduplicacao do quadro feita em 2026-07-31 estava errada. O script removia regras cujo seletor tambem existia no bloco "rebuild", assumindo substituicao total; mas a regra nova so sobrescreve as propriedades que redeclara. Comparando conjunto de propriedades por seletor, 75 seletores tinham perdido declaracoes.
+- Efeito visivel: `.quadro-producao-image-preview` perdeu `position`, `z-index` e `pointer-events`, entao a previa de imagem saia do fluxo fixo, capturava o ponteiro e oscilava entre aberta e fechada; `.quadro-producao-icon-button` perdeu `align-items`, `justify-content` e `flex-shrink`, desalinhando os icones dentro dos botoes.
+- Correcao: `globals.css` foi restaurado do HEAD e todas as edicoes intencionais foram reaplicadas por script, uma a uma. As 383 linhas nao foram removidas de novo. Verificado no navegador: icone centralizado (dx=0, dy=0), previa `position: fixed` com `pointer-events: none` e zero oscilacoes em 2s de ponteiro parado.
+- As duas geracoes de estilo do quadro continuam no arquivo, agora com comentario explicito de que a ordem entre elas define a cascata e nao pode ser alterada sem conferencia propriedade a propriedade.
+
+### Item 8 - split de globals.css por dominio
+
+- `globals.css` virou apenas uma lista de imports. Os estilos foram distribuidos em `src/styles/domains/`: `base`, `primitives`, `shell`, `home`, `fichas`, `clientes`, `catalogos`, `relatorios`, `quadro-producao`, `tools`, `responsive` e `print`.
+- Regras de particionamento:
+  - a ordem interna de cada arquivo e a ordem original;
+  - blocos `@media` sao particionados por dominio: a parte do quadro fica em `quadro-producao.css` (onde a ordem entre as duas geracoes importa), o restante vai para `responsive.css`, importado depois de todos os dominios;
+  - `@media print` fica isolado em `print.css`, por ultimo.
+- Verificacao: comparacao de `(seletor, propriedade, valor)` entre o monolito e a soma dos arquivos deu 0 declaracoes ausentes e 0 extras. Alem disso, o estilo computado de todos os elementos de 10 rotas x 2 viewports foi capturado antes e depois; sobraram 3 causas de diferenca, todas intencionais:
+  - `.fichas-toolbar__search-control input { padding-inline-end: 42px }` passou a valer (antes os primitivos vinham depois e anulavam a folga do botao de limpar);
+  - `.modal-form` passou a usar o padding mobile de 18px em vez de 32px em telas de 393px;
+  - `.quadro-producao-card__delivery` subiu para `--font-size-meta`, que e a mudanca do item 5.
+- Duas iteracoes intermediarias foram descartadas porque o bucketing movia blocos mistos para o arquivo errado (o override mobile de `/ferramentas` deixava de valer e o do quadro passava a valer indevidamente). Ambas foram detectadas pela comparacao de estilo computado, nao por inspecao.
+
+### Item 12 - breakpoints consolidados
+
+- De 13 cortes (460, 480, 560, 640, 680, 760, 768, 850, 860, 900, 980, 1100, 1200) para 4 documentados: sm 480, md 768, lg 1024, xl 1280, mais o complemento `min-width: 1025px`.
+- Mapeamento pelo corte oficial mais proximo, com uma excecao deliberada: 860 subiu para 1024. A tabela de fichas tem `min-width: 1040px` e nao cabe sem scroll horizontal abaixo disso, entao o modo cards precisa entrar antes.
+- Verificado que a fusao nao criou conflito novo: a unica sobreposicao de seletor entre blocos que passaram a compartilhar a mesma largura ja existia antes (dois blocos de 980px).
+- Novo teste em `flows.spec.js` le as media queries em runtime e falha se aparecer qualquer corte fora do conjunto oficial, ignorando as folhas de `react-day-picker` e `sonner`.
+
+### Item 16 - fluxo canonico de cliente
+
+- Criar e editar cliente agora acontecem apenas no modal roteavel. `/clientes/novo` e `/clientes/[id]/editar` viraram redirecionamentos para `?modal=novo` e `?edit=<id>`, preservando links salvos.
+- O link de edicao na tela de detalhe passou a apontar para o modal. O CSS de `.cliente-create*`, que so servia as duas paginas removidas, foi excluido.
+- Os redirecionamentos mantem `requireAppSession()` para respeitar o contrato de "toda pagina privada valida a sessao".
+
+### Design system
+
+- A pagina foi refeita: o grid multi-coluna espremia specimens de tamanhos muito diferentes. Agora e uma coluna unica de 980px, com specimens agrupados em Acoes, Conteudo e dados, Entrada e filtros, e Sobreposicao e feedback, mais um indice de secoes no topo.
+- O link vive na navegacao lateral, visivel apenas para `superadmin`. A rota em si continua acessivel a qualquer sessao autenticada: e documentacao, nao dado sensivel.
+
+### Achado sobre estabilidade de teste
+
+- O App Router descarta silenciosamente o primeiro clique quando ele cai na janela entre `load` e o router ficar pronto: o handler do `next/link` ja preveniu o default mas a navegacao nao acontece. Reproduzido em ~40% das execucoes com clique imediato apos `load`, mesmo com o DOM ja hidratado (`__reactFiber` presente no `.app-frame`).
+- Nao e especifico do modal nem introduzido aqui: vale para qualquer link. Os testes de interacao passaram a usar `expect(...).toPass()` em volta do clique, e `openPage` espera a hidratacao. Suite executada tres vezes seguidas com 105/105.
+
+- Arquivos alterados: `src/styles/globals.css`, `src/styles/domains/*` (novo), `src/styles/primitives/controls.css`, `src/app/meu-painel/{profile,visual}.module.css`, `src/app/usuarios/perfis/ownership.module.css`, `src/app/clientes/novo/page.tsx`, `src/app/clientes/[id]/editar/page.tsx`, `src/app/ferramentas/page.tsx`, `src/app/design-system/page.tsx`, `src/features/clientes/cliente-detail.tsx`, `src/features/design-system/*`, `src/lib/navigation.ts`, `src/components/ui/app-navigation.tsx`, `quality-tests/visual/{flows,pages}.spec.js`, baselines de `pages.spec.js-snapshots`, `TODO.md`, `registro-alteracoes.md`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run test:quality` (25/25), `npm run encoding:check`, `npm run supabase:check` e `npx playwright test` (105/105, tres execucoes) passaram.
+- Caveats:
+  - As duas geracoes de estilo do quadro continuam coexistindo em `domains/quadro-producao.css`. A reconciliacao exige comparar propriedade a propriedade e e uma decisao de design, nao uma limpeza mecanica; a tentativa mecanica ja falhou uma vez.
+  - `860 -> 1024` muda o comportamento entre 860px e 1024px: a tabela de fichas passa a virar cards nessa faixa. E o efeito pretendido, mas nao ha viewport nessa faixa na suite visual (que roda em 1440 e 393).
+  - Container queries continuam nao adotadas. Os breakpoints estao documentados como cortes de viewport; a migracao de paineis reutilizaveis para container queries segue no TODO.
+
+## 2026-07-31 - Design system, tokens semanticos e acessibilidade da UI
+
+- Modulo: primitivos compartilhados, tokens, quadro de producao, fichas, meu-painel, catalogos, relatorios e suite de testes.
+
+### Diagnostico corrigido do backlog
+
+- O item 1 do TODO ("modais nao abrem no runtime") estava mal diagnosticado. Os tres estados (`/clientes?modal=novo`, `/clientes?edit=<id>`, `/fichas?print=<id>`) sempre funcionaram no build de producao; isso foi confirmado rodando a verificacao contra o build ANTES de qualquer alteracao no `Modal`.
+- A causa real e que `next dev` bloqueava os recursos internos servidos em `127.0.0.1` (`allowedDevOrigins` ausente). Em desenvolvimento a aplicacao carregava o HTML mas **nao hidratava**: 0 de 1110 elementos com fiber React, `localStorage` intocado ao clicar, nenhum portal do Radix montado. Qualquer auditoria feita em `next dev` veria todos os modais e todas as interacoes como quebrados.
+- Correcao: `allowedDevOrigins: ["127.0.0.1", "localhost"]` em `next.config.mjs`.
+
+### Bug real encontrado durante a verificacao
+
+- `Modal` fazia a limpeza da URL depender de `AnimatePresence.onExitComplete`. Quando a saida interrompia a animacao de entrada, o callback nao disparava e a URL ficava presa em `?modal=novo` mesmo com o dialogo fechado. Reproduzido em 2 de 4 execucoes.
+- Correcao: `requestClose` agenda um fallback de 400ms, guardado por ref para nao empilhar navegacoes. Verificado com 5 execucoes consecutivas estaveis.
+
+### Tokens (itens 2, 6, 17)
+
+- `--color-border-soft` e `--color-text-muted` eram usados em 54 pontos sem nunca terem sido definidos. Em vez de criar aliases, os nomes divergentes foram substituidos pelos canonicos (`--color-border-subtle`, `--color-muted`).
+- `--color-focus-ring` passou a existir de fato, com par claro/escuro.
+- Contraste: criado `--color-primary-text` (`#0958d9`, 6.16:1 sobre branco). As 67 ocorrencias de `color: var(--color-primary)` migraram para ele; `border-color`, `accent-color` e fundos continuam usando o azul de marca.
+- Criada a paleta `--color-chart-1` a `--color-chart-8` com variante dark; `#9254de`, `#eb2f96` e `#13c2c2` hardcoded sairam de `relatorios-charts.tsx`.
+- Novos tokens de controle: `--control-size-sm/md/lg`, `--touch-target-min`, `--font-size-meta` e os quatro breakpoints oficiais.
+
+### Primitivos novos
+
+- `IconButton` (rotulo obrigatorio, Tooltip do design system, pending, tons semanticos).
+- `PageHeader` (um unico nivel de titulo por rota).
+- `FilterBar` / `FilterField` / `FilterChip` (label persistente, alvo de 44px).
+- `ChartFrame` e `ChartDataTable` (canvas `aria-hidden` + tabela real lida por leitores de tela).
+- `SortableHandle` / `SortableInstructions` (`<button>` real, setas, Home e End, foco acompanha o item).
+- `DataTable` ganhou `responsiveMode="scroll" | "cards"`.
+- `StatusPanel` ganhou `headingLevel` e `id`: antes fixava `<h1 id="status-panel-title">`, o que impedia usa-lo mais de uma vez ou dentro de tela que ja tem `h1`.
+
+### Correcoes por item do TODO
+
+- Item 3: o modo card era disparado por `.fichas-list-container`, que `/meu-painel` tambem usa, removendo o scroll de uma tabela que nao virava card. Agora quem decide e o proprio primitivo (`data-responsive`), e `/meu-painel` mantem `overflow-x: auto`.
+- Item 4: busca do quadro passou de `width: 420px; flex-shrink: 0` para `width: min(420px, 100%); flex: 1 1 280px`, e as duas linhas da toolbar quebram. Documento em 1440px agora mede 1440px (era 1455px).
+- Item 5: metadados do quadro subiram para `--font-size-meta` (0.75rem); o chip do card saiu de 0.57rem (~9px) para 12px.
+- Item 7: os handles eram `<span role="button" tabIndex={0}>` sem `onKeyDown`. Viraram `SortableHandle`, com persistencia identica a do arraste.
+- Item 8: removidas 383 linhas da implementacao antiga do quadro, superseded pelo rebuild. A remocao foi feita por script comparando os conjuntos de seletores dos dois blocos e preservando os 3 que so existiam no antigo e ainda sao usados. `globals.css` foi de 10.113 para 9.697 linhas mesmo com as adicoes.
+- Item 9: criado `src/styles/primitives/controls.css` com `control-sm`, `control-md`, `icon-touch` e um extensor `::after` que garante 44x44 em `pointer: coarse` sem inflar o visual no desktop. Alvos abaixo de 44px no quadro mobile cairam de 13 para 3 (skip-link, link de texto inline e um input interno cujo wrapper ja tem 44px).
+- Item 10: os campos intermediarios do card mobile passaram a ocupar duas colunas e o padding foi reduzido.
+- Item 13/19: `h1` unico em `/ferramentas/organizar-nomes-ia`; labels persistentes nas buscas de `/meu-painel` e `/usuarios/perfis`; `metadata` propria nas duas rotas que herdavam o titulo global.
+- Item 14: os tres modulos de grafico expoem tabela alternativa; o container visual ficou `aria-hidden`.
+- Item 15: as opcoes do combobox deixaram de ser `<button>` focavel e o fechamento por timer de 120ms virou verificacao de foco no container.
+- Item 18: `title=""` nativo trocado por `Tooltip` na sidebar, no logout recolhido, nos pontos de confianca da IA, na toolbar de formato e na legenda truncada do donut.
+
+### Suite de testes (item 11)
+
+- Novo `quality-tests/visual/flows.spec.js`: 22 testes funcionais por viewport cobrindo os tres estados de modal (acesso direto, clique e fechamento), tokens definidos, contraste de texto secundario, reordenacao por teclado, tabela alternativa dos graficos, `h1` unico e `title` proprio em 9 rotas, labels de filtro, modo responsivo das tabelas, ausencia de scroll horizontal e ordem de Tab do combobox.
+- `pages.spec.js` passou de 6 rotas para 12 cenarios de rota/estado (incluindo estados vazios, filtrados e a nova rota de design system). As mascaras foram reduzidas a dados textuais instaveis: o quadro inteiro, o calendario e o grafico semanal deixaram de ser mascarados.
+- Adicionado `settleLayout`, que espera fontes e estabilizacao de altura antes do screenshot; sem isso a rota de IA gerava baselines de 972px e 1616px alternadamente.
+- Baselines regeneradas. A suite foi de 27 testes (17 passando, 10 falhando) para 99 testes, todos passando.
+
+### Pagina de design system
+
+- Nova rota `/design-system`, linkada em `/ferramentas` apenas para superadmin.
+- Contem tokens de cor por grupo semantico com valor resolvido em tempo real (reage ao tema), escala tipografica, espacamento, raios, elevacao, tamanhos de controle, breakpoints documentados e 17 componentes com preview ao vivo, snippet e regras de "quando usar" / "quando nao usar" / comportamento responsivo.
+
+- Arquivos alterados: `next.config.mjs`, `src/styles/tokens/colors.css`, `src/styles/globals.css`, `src/styles/primitives/controls.css`, `src/components/ui/{modal,data-table,status-panel,custom-datalist,app-shell,index}`, `src/components/ui/{icon-button,page-header,filter-bar,chart-frame,sortable-handle}.tsx`, `src/features/design-system/*`, `src/app/design-system/page.tsx`, `src/app/ferramentas/page.tsx`, `src/app/meu-painel/page.tsx`, `src/app/usuarios/perfis/page.tsx`, `src/app/meu-painel/{profile,visual}.module.css`, `src/app/usuarios/perfis/ownership.module.css`, `src/components/ai/uniform-list-parser-demo.tsx`, `src/features/catalogos/catalog-items-table.tsx`, `src/features/fichas/{ficha-form,ficha-name-list-badge,fichas-overview}.tsx`, `src/features/dashboard/dashboard-week-chart.tsx`, `src/features/meu-painel/personal-charts.tsx`, `src/features/relatorios/relatorios-charts.tsx`, `quality-tests/visual/{pages.spec.js,flows.spec.js}`, baselines de `pages.spec.js-snapshots`, `TODO.md`, `registro-alteracoes.md`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run test:quality` (25/25), `npm run supabase:check` e `npx playwright test` (99/99) passaram.
+- Caveats:
+  - A conta de teste `lucas` nao e superadmin, entao `/catalogos` e `/usuarios` nao puderam ser exercitados em navegador. A reordenacao por teclado foi validada na lista de produtos da ficha, que usa o mesmo primitivo; `catalog-items-table.tsx` recebeu a mesma ligacao mas so tem cobertura estatica.
+  - O split de CSS por dominio comecou apenas pelos primitivos novos (`styles/primitives/`). O restante de `globals.css` continua monolitico com 9.697 linhas.
+  - O extensor de alvo de toque usa classe dobrada (`.modal-close.modal-close`) para vencer regras posteriores de mesma especificidade em `globals.css`. Ao migrar cada controle para `IconButton`, remover a entrada correspondente da lista.
+
 ## 2026-07-27 - Fichas: feedbacks Motion pendentes
 
 - Modulo: listagem e formulario de fichas.

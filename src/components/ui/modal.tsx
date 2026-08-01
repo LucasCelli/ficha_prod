@@ -2,9 +2,10 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import { IconButton } from "./icon-button";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   dialogContentMotion,
@@ -27,7 +28,20 @@ export function Modal({ children, description, onClose, onCloseHref, size = "md"
   const reduceMotion = useReducedMotion();
   const [visible, setVisible] = useState(true);
 
+  const closedRef = useRef(false);
+  const fallbackRef = useRef<number | null>(null);
+
   const closeModal = useCallback(() => {
+    // A saida pode ser disparada pelo onExitComplete ou pelo fallback abaixo.
+    // Sem esta guarda, fechar duas vezes empilharia navegacoes.
+    if (closedRef.current) return;
+    closedRef.current = true;
+
+    if (fallbackRef.current !== null) {
+      window.clearTimeout(fallbackRef.current);
+      fallbackRef.current = null;
+    }
+
     if (onClose) {
       onClose();
       return;
@@ -40,7 +54,21 @@ export function Modal({ children, description, onClose, onCloseHref, size = "md"
 
   const requestClose = useCallback(() => {
     setVisible(false);
-  }, []);
+
+    // `onExitComplete` nao dispara de forma confiavel quando a saida interrompe
+    // a animacao de entrada, e a URL ficava presa em ?modal=novo. A navegacao
+    // nao pode depender de um callback de animacao.
+    if (fallbackRef.current === null) {
+      fallbackRef.current = window.setTimeout(closeModal, 400);
+    }
+  }, [closeModal]);
+
+  useEffect(
+    () => () => {
+      if (fallbackRef.current !== null) window.clearTimeout(fallbackRef.current);
+    },
+    [],
+  );
 
   return (
     <Dialog.Root
@@ -73,9 +101,9 @@ export function Modal({ children, description, onClose, onCloseHref, size = "md"
                   variants={dialogContentMotion}
                 >
                   <Dialog.Close asChild>
-                    <button className="modal-close" aria-label="Fechar" type="button">
+                    <IconButton appearance="bare" className="modal-close" label="Fechar" tooltip={false}>
                       <X aria-hidden="true" size={20} />
-                    </button>
+                    </IconButton>
                   </Dialog.Close>
                   {title ? <Dialog.Title className="sr-only">{title}</Dialog.Title> : null}
                   {title ? <Dialog.Description className="sr-only">{description ?? title}</Dialog.Description> : null}

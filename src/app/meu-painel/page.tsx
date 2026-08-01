@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarClock, CheckCircle2, Clock3, FilePlus2, FileText, Package } from "lucide-react";
 import { Badge, DataTable, EmptyState } from "@/components/ui";
@@ -11,6 +12,10 @@ import { formatBusinessDateTime, formatShortDateInput, getBusinessTodayInput } f
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import styles from "./profile.module.css";
 import visual from "./visual.module.css";
+
+export const metadata: Metadata = {
+  title: "Meu perfil | Fichas Técnicas",
+};
 
 type Params = Record<string, string | string[] | undefined>;
 export default async function MeuPainelPage({ searchParams }: { searchParams: Promise<Params> }) {
@@ -74,7 +79,7 @@ export default async function MeuPainelPage({ searchParams }: { searchParams: Pr
 
     <section className={styles.panel}>
       <div className={styles.panelTitle}><div><p className="eyebrow">Controle pessoal</p><h2>Minhas fichas</h2></div><Badge>{data.total}</Badge></div>
-      <form className={styles.filters}><input name="busca" defaultValue={busca} placeholder="Buscar cliente…"/><select name="status" defaultValue={status}>
+      <form className={styles.filters}><label className="sr-only" htmlFor="painel-busca">Buscar cliente</label><input id="painel-busca" name="busca" defaultValue={busca} placeholder="Buscar cliente…"/><label className="sr-only" htmlFor="painel-status">Filtrar por status</label><select id="painel-status" name="status" defaultValue={status}>
         <option value="todos">Todos os status</option><option value="pendente">Pendentes</option><option value="entregue">Entregues</option><option value="atrasado">Atrasadas</option>
       </select><input type="hidden" name="period" value={period}/><button className="ui-button ui-button--secondary">Aplicar</button></form>
       {data.recent.length ? <div className="fichas-list-container"><DataTable caption="Minhas fichas" columns={personalColumns}>

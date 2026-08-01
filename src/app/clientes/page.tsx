@@ -48,7 +48,6 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
         <Modal onCloseHref={closeHref} size="md" title="Novo cliente">
           <div className="modal-form">
             <div className="modal-form__header">
-              <span className="eyebrow">Clientes</span>
               <h2>Novo cliente</h2>
             </div>
             <ClienteForm returnTo={closeHref} />
@@ -59,7 +58,6 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
         <Modal onCloseHref={closeHref} size="md" title={`Editar ${editResult.cliente.nome}`}>
           <div className="modal-form">
             <div className="modal-form__header">
-              <span className="eyebrow">Clientes</span>
               <h2>Editar cliente</h2>
             </div>
             <ClienteForm cliente={editResult.cliente} mode="edit" returnTo={closeHref} />

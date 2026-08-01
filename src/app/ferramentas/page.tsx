@@ -28,7 +28,6 @@ export default async function FerramentasPage() {
   return (
     <section className="tools-page" aria-labelledby="tools-title">
       <header className="tools-page__header">
-        <p className="eyebrow">Ferramentas</p>
         <h1 id="tools-title">Ferramentas</h1>
       </header>
 

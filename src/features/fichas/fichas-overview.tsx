@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CalendarDays, CircleHelp, History, ListFilter, Plus, Star } from "lucide-react";
-import { Badge, DataTable, EmptyState, Pagination, Tooltip } from "@/components/ui";
+import { Badge, DataTable, EmptyState, IconButton, Pagination, Tooltip } from "@/components/ui";
 import { formatCompactDateInput, formatDateInput, getBusinessWeekRange } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { getKanbanColumnLabel } from "@/features/quadro-producao/config";
@@ -53,7 +53,6 @@ export function FichasOverview({ filters, result }: FichasOverviewProps) {
       <header className="fichas-view__header">
         <div className="page-heading">
           <div className="page-heading__copy">
-            <p className="eyebrow">Fichas</p>
             <h1 id="fichas-title" className="app-title">
               Fichas
             </h1>
@@ -240,6 +239,7 @@ function renderFichasContent(result: FichaListResult, filters: FichaFilters) {
         caption={`Lista principal de fichas operacionais`}
         className="fichas-table"
         columns={columns}
+        responsiveMode="cards"
       >
         <FichasMotionRows>
           {result.fichas.map((ficha) => (
@@ -345,11 +345,9 @@ function FichaRow({ ficha, currentFilters }: { ficha: FichaListItem; currentFilt
                 {ficha.cliente_nome_snapshot}
               </Link>
               {ficha.cliente_auxiliar ? (
-                <Tooltip label={ficha.cliente_auxiliar}>
-                  <button aria-label={`Alias: ${ficha.cliente_auxiliar}`} className="field-info-button" type="button">
-                    <CircleHelp aria-hidden="true" size={14} />
-                  </button>
-                </Tooltip>
+                <IconButton appearance="bare" className="field-info-button" label={ficha.cliente_auxiliar}>
+                  <CircleHelp aria-hidden="true" size={14} />
+                </IconButton>
               ) : null}
             </span>
             <span className="ficha-row__meta">

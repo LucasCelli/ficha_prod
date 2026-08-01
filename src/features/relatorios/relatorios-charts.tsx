@@ -18,6 +18,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ChartDataTable, Tooltip as UiTooltip } from "@/components/ui";
 import type { RelatorioRankItem, RelatorioStatusFatia, RelatorioTrendPoint, RelatorioVendedor } from "./data";
 import { RelatorioMotionBlock } from "./relatorios-motion";
 
@@ -39,14 +40,14 @@ type DonutSlice = {
 const CHART_VISIBLE_LIMIT = 8;
 
 const CATEGORY_COLORS = [
-  "var(--color-primary)",
-  "var(--color-info)",
-  "var(--color-warning)",
-  "#9254de",
-  "var(--color-success)",
-  "#eb2f96",
-  "#13c2c2",
-  "var(--color-danger)",
+  "var(--color-chart-1)",
+  "var(--color-chart-2)",
+  "var(--color-chart-3)",
+  "var(--color-chart-4)",
+  "var(--color-chart-5)",
+  "var(--color-chart-6)",
+  "var(--color-chart-7)",
+  "var(--color-chart-8)",
 ];
 
 const STATUS_COLORS: Record<RelatorioStatusFatia["status"], string> = {
@@ -80,7 +81,8 @@ export function RelatorioTrendChart({ data }: { data: RelatorioTrendPoint[] }) {
   }
 
   return (
-    <RelatorioMotionBlock className="relatorios-chart relatorios-chart--trend" aria-label="Tendência de produção no período">
+    <>
+    <RelatorioMotionBlock className="relatorios-chart relatorios-chart--trend" aria-hidden="true">
       <ResponsiveContainer height={260} width="100%">
         <ComposedChart data={data} margin={{ bottom: 0, left: -12, right: -8, top: 8 }}>
           <defs>
@@ -118,6 +120,16 @@ export function RelatorioTrendChart({ data }: { data: RelatorioTrendPoint[] }) {
         </ComposedChart>
       </ResponsiveContainer>
     </RelatorioMotionBlock>
+    <ChartDataTable
+      categoryLabel="Período"
+      series={[
+        { label: "Fichas criadas", points: data.map((point) => ({ label: point.label, value: point.criadas })) },
+        { label: "Entregues", points: data.map((point) => ({ label: point.label, value: point.entregues })) },
+        { label: "Itens", points: data.map((point) => ({ label: point.label, value: point.itens })) },
+      ]}
+      title="Tendência de produção no período"
+    />
+    </>
   );
 }
 
@@ -157,7 +169,8 @@ function Donut({ ariaLabel, caption, slices, valueLabel }: { ariaLabel: string; 
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
 
   return (
-    <RelatorioMotionBlock className="relatorios-chart relatorios-chart--donut" aria-label={ariaLabel}>
+    <>
+    <RelatorioMotionBlock className="relatorios-chart relatorios-chart--donut" aria-hidden="true">
       <div className="relatorios-donut">
         <div className="relatorios-donut__chart">
           <ResponsiveContainer height={196} width="100%">
@@ -179,15 +192,21 @@ function Donut({ ariaLabel, caption, slices, valueLabel }: { ariaLabel: string; 
           {slices.map((slice) => (
             <li key={slice.key}>
               <i style={{ background: slice.color }} />
-              <span className="relatorios-donut__legend-label" title={slice.label}>
-                {slice.label}
-              </span>
+              <UiTooltip label={slice.label}>
+                <span className="relatorios-donut__legend-label">{slice.label}</span>
+              </UiTooltip>
               <strong>{formatNumber(slice.value)}</strong>
             </li>
           ))}
         </ul>
       </div>
     </RelatorioMotionBlock>
+    <ChartDataTable
+      categoryLabel="Item"
+      series={[{ label: valueLabel, points: slices.map((slice) => ({ label: slice.label, value: slice.value })) }]}
+      title={ariaLabel}
+    />
+    </>
   );
 }
 
@@ -199,7 +218,8 @@ export function RelatorioVendedoresChart({ items }: { items: RelatorioVendedor[]
   }
 
   return (
-    <RelatorioMotionBlock className="relatorios-chart relatorios-chart--stacked" aria-label="Fichas por vendedor por status">
+    <>
+    <RelatorioMotionBlock className="relatorios-chart relatorios-chart--stacked" aria-hidden="true">
       <ResponsiveContainer height={Math.max(180, data.length * 38)} width="100%">
         <BarChart data={data} layout="vertical" margin={{ bottom: 0, left: 0, right: 16, top: 4 }}>
           <CartesianGrid horizontal={false} stroke="var(--color-border-subtle)" />
@@ -212,6 +232,15 @@ export function RelatorioVendedoresChart({ items }: { items: RelatorioVendedor[]
         </BarChart>
       </ResponsiveContainer>
     </RelatorioMotionBlock>
+    <ChartDataTable
+      categoryLabel="Vendedor"
+      series={[
+        { label: "Entregues", points: data.map((item) => ({ label: item.label, value: item.entregues })) },
+        { label: "Pendentes", points: data.map((item) => ({ label: item.label, value: item.pendentes })) },
+      ]}
+      title="Fichas por vendedor por status"
+    />
+    </>
   );
 }
 

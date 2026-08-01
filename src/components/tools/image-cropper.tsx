@@ -155,7 +155,6 @@ export function ImageCropper() {
   return (
     <section className="image-cropper" aria-labelledby="image-cropper-title">
       <header className="image-cropper__header">
-        <p className="eyebrow">Ferramentas</p>
         <div className="image-cropper__title">
           <span className="image-cropper__title-icon" aria-hidden="true"><Crop size={22} /></span>
           <div><h1 id="image-cropper-title">Cortar imagem</h1><p>Prepare uma imagem no formato retrato 3:4 para o Instagram.</p></div>

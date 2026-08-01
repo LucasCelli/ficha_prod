@@ -34,7 +34,6 @@ export function ClientesOverview({ filters, result, statsResult }: ClientesOverv
       <header className="clientes-view__header">
         <div className="page-heading">
           <div className="page-heading__copy">
-            <p className="eyebrow">Clientes</p>
             <h1 id="clientes-title" className="app-title">
               Clientes
             </h1>

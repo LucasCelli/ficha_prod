@@ -38,6 +38,10 @@ const printRouteSecurityHeaders = securityHeaders.map((header) => {
 
 const nextConfig = {
   serverExternalPackages: ["exceljs"],
+  // Sem isto o `next dev` bloqueia os recursos internos servidos em 127.0.0.1
+  // (HMR e runtime do App Router), e a aplicacao carrega sem hidratar:
+  // nada fica interativo e nenhum modal roteavel abre em desenvolvimento.
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

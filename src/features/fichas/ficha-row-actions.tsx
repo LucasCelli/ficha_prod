@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState, useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { CheckCircle2, ClipboardList, Eye, MoreHorizontal, Pencil, Printer, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { AlertDialog, FloatingMenu, FloatingMenuButton, FloatingMenuLink, Tooltip } from "@/components/ui";
+import { AlertDialog, FloatingMenu, FloatingMenuButton, FloatingMenuLink, IconButton, IconLink, Tooltip } from "@/components/ui";
 import {
   deleteFichaAction,
   markFichaEntregueFormAction,
@@ -148,48 +147,57 @@ export function FichaRowActions({
   return (
     <>
       <div className="ficha-row-actions" aria-label={`Ações da ficha ${fichaLabel}`}>
-        <Tooltip label="Prévia de impressão">
-          <Link aria-label={`Abrir prévia de impressão da ficha ${fichaLabel}`} className="icon-action" href={previewHref} prefetch={false} scroll={false}>
-            <Eye aria-hidden="true" size={17} />
-          </Link>
-        </Tooltip>
+        <IconLink
+          appearance="bare"
+          className="icon-action"
+          href={previewHref}
+          label={`Abrir prévia de impressão da ficha ${fichaLabel}`}
+          prefetch={false}
+          tooltipLabel="Prévia de impressão"
+          scroll={false}
+        >
+          <Eye aria-hidden="true" size={17} />
+        </IconLink>
 
         <Tooltip label="Imprimir ficha">
-          <PrintTriggerButton className="icon-action" href={printHref} label={`Imprimir ficha ${fichaLabel}`}>
+          <PrintTriggerButton className="icon-action icon-touch" href={printHref} label={`Imprimir ficha ${fichaLabel}`}>
             <Printer aria-hidden="true" size={17} />
           </PrintTriggerButton>
         </Tooltip>
 
-        <Tooltip label="Editar ficha">
-          <Link aria-label={`Editar ficha ${fichaLabel}`} className="icon-action" href={editHref}>
-            <Pencil aria-hidden="true" size={17} />
-          </Link>
-        </Tooltip>
+        <IconLink
+          appearance="bare"
+          className="icon-action"
+          href={editHref}
+          label={`Editar ficha ${fichaLabel}`}
+          tooltipLabel="Editar ficha"
+        >
+          <Pencil aria-hidden="true" size={17} />
+        </IconLink>
 
         {status === "entregue" ? (
-          <Tooltip label="Reverter para pendente">
-            <button
-              aria-label={`Reverter ficha ${fichaLabel} para pendente`}
-              className="icon-action icon-action--warning"
-              onClick={openRevertModal}
-              type="button"
-            >
-              <RotateCcw aria-hidden="true" size={17} />
-            </button>
-          </Tooltip>
+          <IconButton
+            appearance="bare"
+            className="icon-action icon-action--warning"
+            label={`Reverter ficha ${fichaLabel} para pendente`}
+            onClick={openRevertModal}
+            tooltipLabel="Reverter para pendente"
+          >
+            <RotateCcw aria-hidden="true" size={17} />
+          </IconButton>
         ) : (
           <form action={markFichaEntregueFormAction}>
             <input name="id" type="hidden" value={fichaId} />
             <input name="returnTo" type="hidden" value={returnTo} />
-            <Tooltip label="Marcar como entregue">
-              <button
-                aria-label={`Marcar ficha ${fichaLabel} como entregue`}
-                className="icon-action icon-action--success"
-                type="submit"
-              >
-                <CheckCircle2 aria-hidden="true" size={17} />
-              </button>
-            </Tooltip>
+            <IconButton
+              appearance="bare"
+              className="icon-action icon-action--success"
+              label={`Marcar ficha ${fichaLabel} como entregue`}
+              tooltipLabel="Marcar como entregue"
+              type="submit"
+            >
+              <CheckCircle2 aria-hidden="true" size={17} />
+            </IconButton>
           </form>
         )}
 

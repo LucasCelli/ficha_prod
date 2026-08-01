@@ -35,7 +35,7 @@ import {
   Star,
   X,
 } from "lucide-react";
-import { Button, Modal, Tooltip } from "@/components/ui";
+import { Button, IconButton, Modal, Tooltip } from "@/components/ui";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import type {
   KanbanBoardColumn,
@@ -839,29 +839,29 @@ const KanbanCard = memo(function KanbanCard({
             <span>{card.clienteNome}</span>
           </div>
           {card.clienteAuxiliar ? (
-            <Tooltip label={card.clienteAuxiliar}>
-              <button
-                aria-label={`Alias: ${card.clienteAuxiliar}`}
-                className="field-info-button"
-                onMouseDownCapture={stopCardDrag}
-                onMouseDown={stopCardDrag}
-                onPointerDownCapture={stopCardDrag}
-                onPointerDown={stopCardDrag}
-                type="button"
-              >
-                <CircleHelp aria-hidden="true" size={14} />
-              </button>
-            </Tooltip>
+            <IconButton
+              appearance="bare"
+              className="field-info-button"
+              label={card.clienteAuxiliar}
+              onMouseDownCapture={stopCardDrag}
+              onMouseDown={stopCardDrag}
+              onPointerDownCapture={stopCardDrag}
+              onPointerDown={stopCardDrag}
+            >
+              <CircleHelp aria-hidden="true" size={14} />
+            </IconButton>
           ) : null}
         </div>
 
         <div className="quadro-producao-card__meta">
           <span className="quadro-producao-card__chip">{normalizePersonalizacaoLabel(card.arte)}</span>
           {!card.isManualCard ? (
-            <span className="quadro-producao-card__chip" title="Quantidade total de itens">
-              <Package aria-hidden="true" size={12} />
-              {formatCount(card.itemQuantity)} {card.itemQuantity === 1 ? "item" : "itens"}
-            </span>
+            <Tooltip label="Quantidade total de itens">
+              <span className="quadro-producao-card__chip">
+                <Package aria-hidden="true" size={12} />
+                {formatCount(card.itemQuantity)} {card.itemQuantity === 1 ? "item" : "itens"}
+              </span>
+            </Tooltip>
           ) : null}
         </div>
 

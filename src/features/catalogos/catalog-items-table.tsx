@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type 
 import { useRouter } from "next/navigation";
 import type { DragEndEventData, DragStartEventData } from "fluid-dnd";
 import { useDragAndDrop } from "fluid-dnd/react";
-import { GripVertical, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { AlertDialog, Badge } from "@/components/ui";
+import { AlertDialog, Badge, SortableHandle, SortableInstructions } from "@/components/ui";
 import { useFluidDndEventTargetGuard } from "@/lib/fluid-dnd-event-target-guard";
 import { deleteCatalogItemsAction, saveCatalogItemOrderAction } from "./actions";
 import { CatalogItemActions } from "./catalog-item-actions";
@@ -127,6 +127,31 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
   }), [persistOrder, startTransition]);
   const [listRef, fluidItems, setFluidItems] = useDragAndDrop<CatalogItem, HTMLDivElement>(items, dragConfig);
   const visibleItems = useMemo(() => getUniqueItemsById(fluidItems), [fluidItems]);
+
+  // Mesma persistencia usada pelo arraste, disparada pelo teclado.
+  //
+  // Diferente do arraste, movimentos consecutivos NAO sao bloqueados enquanto a
+  // ordem anterior salva. Bloquear obrigaria a desabilitar o handle, e um botao
+  // desabilitado perde o foco: o usuario de teclado ficava impedido de mover o
+  // mesmo item duas vezes seguidas. Cada movimento persiste a lista inteira,
+  // entao a ultima escrita e a que vale.
+  const moveItemByKeyboard = useCallback(
+    (itemId: string, destinationIndex: number) => {
+      const rollbackItems = latestItemsRef.current;
+      const nextItems = moveItem(rollbackItems, itemId, destinationIndex);
+      if (haveSameOrder(nextItems, rollbackItems)) return;
+
+      isSavingRef.current = true;
+      setIsSaving(true);
+      setOrderMessage("Salvando ordem.");
+      setFluidItemsRef.current?.(nextItems);
+
+      startTransition(() => {
+        void persistOrder(nextItems, rollbackItems);
+      });
+    },
+    [persistOrder, startTransition],
+  );
   const visibleItemIds = useMemo(() => new Set(visibleItems.map((item) => item.id)), [visibleItems]);
   const effectiveSelectedIds = useMemo(() => [...selectedItemIds].filter((id) => visibleItemIds.has(id)), [selectedItemIds, visibleItemIds]);
   const selectedCount = effectiveSelectedIds.length;
@@ -202,6 +227,7 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
   return (
     <>
       <span className="sr-only" aria-live="polite">{orderMessage}</span>
+      <SortableInstructions />
       <div className="catalog-items-table-wrap" role="region" aria-label="Itens do catalogo">
         <div className="catalog-items-table-toolbar">
           <label className="catalog-items-table-select-all">
@@ -233,7 +259,7 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
             <span role="columnheader">Status</span>
             <span role="columnheader">Ações</span>
           </div>
-          <div className="catalog-items-table__body" ref={listRef} role="rowgroup">
+          <div className="catalog-items-table__body" data-sortable-list="" ref={listRef} role="rowgroup">
             {visibleItems.map((item, index) => (
               <div className="catalog-items-table__row" data-index={index} data-saving={isSaving ? "true" : undefined} key={item.id} role="row">
                 <span className="catalog-items-table__cell catalog-items-table__selection-cell" role="cell">
@@ -245,15 +271,14 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
                   />
                 </span>
                 <span className="catalog-items-table__cell catalog-items-table__order-cell" role="cell">
-                  <span
-                    aria-disabled={isSaving}
-                    aria-label={`Reordenar ${item.name}`}
+                  <SortableHandle
                     className="catalog-items-table__drag"
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <GripVertical aria-hidden="true" size={15} />
-                  </span>
+                    itemLabel={item.name}
+                    onMove={(nextIndex) => moveItemByKeyboard(item.id, nextIndex)}
+                    position={index + 1}
+                    size={15}
+                    total={visibleItems.length}
+                  />
                 </span>
                 <span className="catalog-items-table__cell" role="cell">
                   <span className="ui-table__primary">

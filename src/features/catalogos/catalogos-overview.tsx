@@ -25,7 +25,6 @@ export function CatalogosOverview({ editId, modalMode, result, selectedKind }: C
       <RouteToast messages={catalogoToastMessages} paramName="toast" />
       <header className="catalogos-view__header">
         <div>
-          <span className="eyebrow">Catálogos</span>
           <h1 id="catalogos-title" className="app-title">
             Catálogos
           </h1>
@@ -91,7 +90,6 @@ export function CatalogosOverview({ editId, modalMode, result, selectedKind }: C
             <Modal onCloseHref={closeHref} size="md" title="Novo item">
               <div className="modal-form">
                 <div className="modal-form__header">
-                  <span className="eyebrow">Catálogos</span>
                   <h2>Novo item</h2>
                 </div>
                 <CatalogoForm returnTo={closeHref} selectedKind={selectedKind} />
@@ -103,7 +101,6 @@ export function CatalogosOverview({ editId, modalMode, result, selectedKind }: C
             <Modal onCloseHref={closeHref} size="md" title={`Editar ${selectedItem.name}`}>
               <div className="modal-form">
                 <div className="modal-form__header">
-                  <span className="eyebrow">Catálogos</span>
                   <h2>Editar item</h2>
                 </div>
                 <CatalogoForm item={selectedItem} returnTo={closeHref} selectedKind={selectedKind} />

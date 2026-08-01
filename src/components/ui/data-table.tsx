@@ -15,14 +15,20 @@ type DataTableProps = {
   columns: DataTableColumn[];
   children: ReactNode;
   caption: string;
+  /**
+   * Comportamento abaixo de 860px:
+   * - `scroll` (padrao): a tabela mantem as colunas dentro de um contêiner rolável.
+   * - `cards`: cada linha vira um card. Exige `data-label` em cada `<td>`.
+   */
+  responsiveMode?: "scroll" | "cards";
 };
 
-export function DataTable({ bodyRef, caption, children, className, columns }: DataTableProps) {
+export function DataTable({ bodyRef, caption, children, className, columns, responsiveMode = "scroll" }: DataTableProps) {
   const tableClassName = ["ui-table", className].filter(Boolean).join(" ");
 
   return (
-    <div className="ui-table-wrap">
-      <table className={tableClassName}>
+    <div className="ui-table-wrap" data-responsive={responsiveMode}>
+      <table className={tableClassName} data-responsive={responsiveMode}>
         <caption>{caption}</caption>
         <thead>
           <tr>

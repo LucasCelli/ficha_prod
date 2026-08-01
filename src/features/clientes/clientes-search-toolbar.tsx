@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowUpDown, Filter, Search, X } from "lucide-react";
 import { useQueryState } from "nuqs";
 import type { ClienteFilters } from "./data";
+import { IconButton } from "@/components/ui";
 
 type ClientesSearchToolbarProps = {
   filters: ClienteFilters;
@@ -61,15 +62,16 @@ export function ClientesSearchToolbar({ filters }: ClientesSearchToolbarProps) {
             value={term}
           />
           {term.trim() ? (
-            <button
-              aria-label="Limpar busca"
+            <IconButton
+              appearance="bare"
               className="clientes-search-field__clear"
+              label="Limpar busca"
               onClick={() => setTerm("")}
               onMouseDown={(event) => event.preventDefault()}
-              type="button"
+              tooltip={false}
             >
               <X aria-hidden="true" size={16} />
-            </button>
+            </IconButton>
           ) : null}
         </div>
       </div>

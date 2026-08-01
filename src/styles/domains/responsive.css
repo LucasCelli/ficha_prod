@@ -1,0 +1,563 @@
+/* Ajustes responsivos de todos os dominios, exceto quadro de producao.
+   Importado depois dos arquivos de dominio para que um override de
+   media query sempre vença a regra base que ele pretende sobrescrever.
+   Extraido de globals.css; a ordem interna das regras foi preservada. */
+
+@media (prefers-reduced-motion: reduce) {
+  .relatorios-bars__label.is-marquee .relatorios-bars__label-inner {
+    animation: none;
+  }
+}
+
+@media (max-width: 1024px) {
+  .name-list-view-modal__toolbar {
+    justify-content: flex-start;
+  }
+
+  .name-list-view-modal__comparison {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .catalog-form,
+  .ui-table .catalog-form {
+    min-width: 0;
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-form__grid,
+  .usuario-form__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .catalogos-panel {
+    padding: 14px;
+  }
+
+  .catalogos-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .catalogos-toolbar .floating-menu {
+    margin-inline-start: 0;
+  }
+
+  .catalogos-toolbar .floating-menu,
+  .catalogos-toolbar .floating-menu__trigger,
+  .catalogos-toolbar .ui-button {
+    width: 100%;
+  }
+
+  .modal-form {
+    padding: 20px 18px 0;
+  }
+
+  .modal-form .catalog-form__actions,
+  .modal-form .usuario-form__actions,
+  .modal-form .form-actions {
+    margin-inline: -18px;
+    padding: 14px 18px;
+  }
+
+  .usuarios-view__header {
+    display: grid;
+  }
+
+  .usuarios-summary {
+    justify-content: flex-start;
+  }
+
+  .usuario-form__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Em telas largas o workspace ocupa a altura disponível e o scroll fica interno
+   (textarea e tabela), evitando que a página inteira role. */
+@media (min-width: 1025px) {
+  .ai-demo {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 72px);
+    min-height: 560px;
+  }
+
+  .ai-demo__workspace {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .ai-demo__form,
+  .ai-demo__result {
+    min-height: 0;
+  }
+
+  .ai-demo__form {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .ai-demo__input {
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .ai-demo__input textarea {
+    height: 100%;
+    min-height: 200px;
+    resize: none;
+  }
+
+  .ai-demo__result {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ai-demo__result .ui-table-wrap {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .ai-demo__loading-table {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 1024px) {
+  .ai-demo__workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-demo__input textarea {
+    min-height: 320px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .ficha-preview__split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  .ficha-preview__summary,
+  .ficha-preview__layout,
+  .ficha-preview__technical-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  .app-shell {
+    padding: 24px 20px;
+  }
+
+  .home-dashboard__hero,
+  .home-dashboard__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-dashboard__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tools-page__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-panel--wide {
+    grid-row: auto;
+  }
+
+  .ficha-print-preview__header {
+    align-items: stretch;
+    flex-direction: column;
+    padding: var(--space-18) calc(var(--space-18) + 36px) var(--space-14) var(--space-18);
+  }
+
+  .ficha-print-preview__body {
+    padding: var(--space-16);
+  }
+
+  .app-frame {
+    grid-template-columns: 1fr;
+  }
+
+  .app-sidebar {
+    position: static;
+    height: auto;
+    gap: 14px;
+    border-block-end: 1px solid var(--color-border-subtle);
+    border-inline-end: 0;
+    box-shadow: var(--shadow-sidebar);
+  }
+
+  .app-nav {
+    display: flex;
+    overflow-x: auto;
+    gap: 4px;
+    padding-block-end: 4px;
+    scroll-snap-type: x mandatory;
+  }
+
+  .app-nav__link {
+    min-width: 120px;
+    scroll-snap-align: start;
+  }
+
+  .module-overview__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fichas-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fichas-toolbar__search {
+    grid-column: 1 / -1;
+  }
+
+  .relatorios-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .relatorios-toolbar--periodo {
+    grid-template-columns: 1fr;
+  }
+
+  .clientes-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .cliente-detail__summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .page-heading {
+    display: grid;
+  }
+}
+
+@media (max-width: 768px) {
+  .relatorios-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .fichas-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 14px;
+  }
+
+  .fichas-toolbar__search {
+    grid-column: auto;
+  }
+
+  .fichas-toolbar__export,
+  .fichas-toolbar__export-trigger {
+    width: 100%;
+  }
+
+  .fichas-toolbar__status {
+    min-height: 24px;
+  }
+
+  .quick-filters {
+    flex-wrap: nowrap;
+    margin-inline: -20px;
+    overflow-x: auto;
+    padding: 2px 20px 8px;
+    scroll-padding-inline: 20px;
+    scroll-snap-type: inline proximity;
+    scrollbar-width: none;
+  }
+
+  .quick-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .quick-filter {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+
+  .date-picker__popover {
+    position: fixed;
+    inset: auto 12px max(12px, env(safe-area-inset-bottom));
+    width: auto;
+    max-width: none;
+    max-height: min(76svh, 520px);
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .date-picker__popover .rdp-root {
+    --rdp-day-height: clamp(36px, 11vw, 44px);
+    --rdp-day-width: clamp(36px, 11vw, 44px);
+    --rdp-day_button-height: clamp(36px, 11vw, 44px);
+    --rdp-day_button-width: clamp(36px, 11vw, 44px);
+    margin-inline: auto;
+  }
+
+  .page-heading .ui-button {
+    width: 100%;
+  }
+
+  .app-sidebar {
+    gap: 8px;
+    padding: max(10px, env(safe-area-inset-top)) 12px 10px;
+  }
+
+  .app-sidebar__toggle {
+    width: 44px;
+    height: 44px;
+  }
+
+  .app-sidebar__footer {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .app-sidebar__footer .app-user {
+    grid-column: 1 / -1;
+    padding: 8px 10px;
+  }
+
+  .app-shell {
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    padding-left: max(16px, env(safe-area-inset-left));
+  }
+
+  .app-shell {
+    padding: 20px;
+  }
+
+  .app-loading {
+    padding: 12px;
+  }
+
+  .home-dashboard__metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .tools-page__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-dashboard__actions,
+  .home-panel__header,
+  .home-recent-list a {
+    align-items: stretch;
+  }
+
+  .home-panel__header {
+    display: grid;
+  }
+
+  .home-shortcuts {
+    grid-template-columns: 1fr;
+  }
+
+  .home-recent-list a {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .clientes-results__summary {
+    grid-template-columns: 1fr;
+  }
+
+  .relatorios-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .relatorios-panels {
+    grid-template-columns: 1fr;
+  }
+
+  .cliente-detail__summary {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-section {
+    grid-template-columns: 1fr;
+  }
+
+  .delivery-deadline-alert {
+    grid-column: 1 / -1;
+  }
+
+  .products-editor__head {
+    display: none;
+  }
+
+  .products-editor__toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .products-editor__toolbar-actions {
+    justify-content: space-between;
+  }
+
+  .products-editor__row {
+    grid-template-columns: 1fr;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  .products-editor__cell span {
+    display: inline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (max-width: 1280px) and (min-width: 1025px) {
+  .fichas-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fichas-toolbar__search {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 1024px) {
+  /* Modo cards: dirigido pelo primitivo DataTable (responsiveMode="cards"),
+     nunca pelo conteiner da pagina. Tabelas em modo `scroll` continuam
+     rolaveis, incluindo a de /meu-painel. */
+  .ui-table-wrap[data-responsive="cards"] {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .ui-table[data-responsive="cards"],
+  .ui-table[data-responsive="cards"] tbody,
+  .ui-table[data-responsive="cards"] tr,
+  .ui-table[data-responsive="cards"] td {
+    display: block;
+    width: 100%;
+  }
+
+  .ui-table[data-responsive="cards"] {
+    min-width: 0;
+  }
+
+  .ui-table[data-responsive="cards"] thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .ui-table[data-responsive="cards"] tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  /* Item 10: os campos intermediarios ocupam duas colunas dentro do card.
+     Reduz a altura da lista sem esconder metadados nem acoes. */
+  .ui-table[data-responsive="cards"] tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: hidden;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 12px;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .ui-table[data-responsive="cards"] td:first-child,
+  .ui-table[data-responsive="cards"] td:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .ui-table[data-responsive="cards"] tbody tr:hover {
+    background: var(--color-surface);
+  }
+
+  .ui-table[data-responsive="cards"] td {
+    border-block-end: 1px solid var(--color-border-subtle);
+    padding: 8px 12px;
+  }
+
+  .ui-table[data-responsive="cards"] td:not(:first-child):not(:last-child) {
+    display: grid;
+    align-content: start;
+    gap: 2px;
+  }
+
+  .ui-table[data-responsive="cards"] td:not(:first-child)::before {
+    content: attr(data-label);
+    color: var(--color-muted);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .ui-table[data-responsive="cards"] td:first-child {
+    background: var(--color-surface-2);
+    padding-block: 11px;
+  }
+
+  .ui-table[data-responsive="cards"] td:last-child {
+    border-block-end: 0;
+    padding-block: 9px;
+  }
+
+  .ui-table[data-responsive="cards"] td:last-child::before {
+    display: block;
+    margin-block-end: 6px;
+  }
+
+  .fichas-table .ficha-row-actions {
+    min-width: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .fichas-table .icon-action {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .fichas-table .ficha-row-actions--deliver-only {
+    justify-content: stretch;
+  }
+
+  .fichas-table .ficha-row-actions__deliver-form {
+    width: auto;
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 768px) { .image-cropper__workspace { grid-template-columns: 1fr; } .image-cropper__actions { grid-template-columns: 1fr 1fr; } .image-cropper__actions > div, .image-cropper__actions > .image-cropper__download { grid-column: 1 / -1; } }
+
+@media (max-width: 480px) { .image-cropper__upload { min-height: 300px; padding: 24px 16px; } .image-cropper__editor-card { padding: 12px; } .image-cropper__actions { grid-template-columns: 1fr; } .image-cropper__actions > * { grid-column: 1; } }

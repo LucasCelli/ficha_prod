@@ -1,0 +1,72 @@
+/* Regras de impressao.
+   Extraido de globals.css; a ordem interna das regras foi preservada. */
+
+@media print {
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+
+  body:has(.draft-print-root)> :not(.draft-print-root) {
+    display: none !important;
+  }
+
+  body:has(.draft-print-root) .draft-print-root {
+    display: block !important;
+  }
+
+  .skip-link,
+  .app-sidebar {
+    display: none !important;
+  }
+
+  .app-frame {
+    display: block;
+  }
+
+  .app-shell,
+  .app-main,
+  .ficha-print-page {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    min-height: 0;
+    animation: none;
+  }
+
+  .print-container {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    margin: 0;
+    color: black;
+  }
+
+  .print-raw-name-list-page {
+    display: block;
+  }
+
+  .print-page:not(:last-child) {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-container> :last-child {
+    margin-bottom: 0;
+  }
+
+  .print-card {
+    border-color: black;
+  }
+
+  .print-table,
+  .print-table th,
+  .print-table td {
+    border-color: black;
+  }
+}

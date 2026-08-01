@@ -1,0 +1,324 @@
+/*
+ * Primitivos de controle compartilhados.
+ *
+ * Regra do projeto: o tamanho VISUAL pode ser denso (28-40px), mas a AREA
+ * CLICAVEL nunca fica abaixo de --touch-target-min em ponteiro grosso.
+ * Isso e feito com um ::after que estende o alvo sem mexer no layout.
+ */
+
+.ui-icon-button.ui-icon-button {
+  display: inline-grid;
+  position: relative;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--easing-standard),
+    border-color var(--duration-fast) var(--easing-standard),
+    color var(--duration-fast) var(--easing-standard);
+}
+
+.ui-icon-button--sm {
+  width: var(--control-size-sm);
+  height: var(--control-size-sm);
+}
+
+.ui-icon-button--md {
+  width: var(--control-size-md);
+  height: var(--control-size-md);
+}
+
+.ui-icon-button--lg {
+  width: var(--control-size-lg);
+  height: var(--control-size-lg);
+}
+
+.ui-icon-button.ui-icon-button:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+  color: var(--color-primary-text);
+}
+
+.ui-icon-button.ui-icon-button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.ui-icon-button.ui-icon-button:disabled,
+.ui-icon-button.ui-icon-button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ui-icon-button--primary {
+  color: var(--color-primary-text);
+}
+
+.ui-icon-button--success {
+  color: var(--color-success);
+}
+
+.ui-icon-button--warning {
+  color: var(--color-warning);
+}
+
+.ui-icon-button--danger {
+  color: var(--color-danger);
+}
+
+.ui-icon-button--danger:hover:not(:disabled) {
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.ui-icon-button__spinner {
+  animation: button-spinner-rotate 720ms linear infinite;
+}
+
+/*
+ * Extensor de alvo de toque, aplicado por `<IconButton>` (inclusive em
+ * `appearance="bare"`, que veste um controle herdado sem trocar o visual dele).
+ *
+ * O `position: relative` vai em `:where()` de proposito: precisa perder para
+ * qualquer classe que ja posicione o controle (o botao de limpar da busca de
+ * clientes, por exemplo, e `position: absolute`). Quando o elemento ja e
+ * posicionado, ele proprio serve de contexto para o ::after.
+ */
+:where(.ui-icon-button, .icon-touch, .sortable-handle) {
+  position: relative;
+}
+
+@media (pointer: coarse) {
+  .ui-icon-button.ui-icon-button::after,
+  .icon-touch.icon-touch::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
+    transform: translate(-50%, -50%);
+  }
+}
+
+/*
+ * Controles compactos ainda NAO migrados para <IconButton>/<IconLink>.
+ *
+ * Eles nao ganham o extensor pelo primitivo, entao recebem aqui. Ao migrar um
+ * deles, remova a entrada correspondente: quem passa pelo primitivo ja herda o
+ * alvo de 44px por `.icon-touch`.
+ */
+@media (pointer: coarse) {
+  .format-toolbar__button.format-toolbar__button,
+  .image-upload-card__remove.image-upload-card__remove,
+  .quadro-producao-icon-button.quadro-producao-icon-button,
+  .quadro-producao-icon-button--deliver.quadro-producao-icon-button--deliver,
+  .quadro-producao-search-input.quadro-producao-search-input button {
+    position: relative;
+  }
+
+  .format-toolbar__button.format-toolbar__button::after,
+  .image-upload-card__remove.image-upload-card__remove::after,
+  .quadro-producao-icon-button.quadro-producao-icon-button::after,
+  .quadro-producao-icon-button--deliver.quadro-producao-icon-button--deliver::after,
+  .quadro-producao-search-input.quadro-producao-search-input button::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Tamanhos de controle compartilhados para botoes e campos com texto. */
+.control-sm {
+  min-height: var(--control-size-sm);
+  padding-inline: 10px;
+}
+
+.control-md {
+  min-height: var(--control-size-md);
+  padding-inline: 14px;
+}
+
+@media (pointer: coarse) {
+  .control-sm,
+  .control-md,
+  .quadro-producao-filter-chip.quadro-producao-filter-chip,
+  .quadro-producao-tab.quadro-producao-tab,
+  .quick-filter.quick-filter,
+  .ui-pagination__page.ui-pagination__page,
+  .ui-pagination__link.ui-pagination__link {
+    min-height: var(--touch-target-min);
+  }
+
+  .quadro-producao-search-input.quadro-producao-search-input,
+  .quadro-producao-select.quadro-producao-select,
+  .quadro-producao-filter-selects .quadro-producao-select.quadro-producao-select,
+  .skip-link.skip-link {
+    min-height: var(--touch-target-min);
+  }
+
+  .skip-link.skip-link {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* Handle de reordenacao (SortableHandle) */
+.sortable-handle.sortable-handle {
+  display: inline-grid;
+  position: relative;
+  place-items: center;
+  min-width: var(--control-size-sm);
+  min-height: var(--control-size-sm);
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: grab;
+}
+
+.sortable-handle.sortable-handle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+  border-radius: var(--radius-sm);
+}
+
+.sortable-handle.sortable-handle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (pointer: coarse) {
+  .sortable-handle.sortable-handle::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* PageHeader */
+.ui-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ui-page-header__text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ui-page-header__title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+
+.ui-page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* FilterBar */
+.ui-filter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ui-filter-bar__field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ui-filter-bar__label {
+  color: var(--color-muted);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ui-filter-bar__field :is(input, select) {
+  min-height: var(--control-size-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding-inline: 11px;
+}
+
+.ui-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-size-md);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 650;
+  padding-inline: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ui-filter-chip[data-active="true"] {
+  border-color: color-mix(in srgb, var(--color-primary) 46%, var(--color-border));
+  background: var(--color-primary-bg);
+  color: var(--color-primary-text);
+}
+
+.ui-filter-chip:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .ui-filter-bar__field :is(input, select),
+  .ui-filter-chip {
+    min-height: var(--touch-target-min);
+  }
+}
+
+/* ChartFrame */
+.ui-chart-frame {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  min-width: 0;
+}
+
+.ui-chart-frame__canvas {
+  min-width: 0;
+}
+
+.ui-chart-frame__legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--color-muted);
+  font-size: var(--font-size-meta);
+}

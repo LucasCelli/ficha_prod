@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { AlertDialog } from "@/components/ui";
+import { AlertDialog, IconButton, IconLink } from "@/components/ui";
 import { deleteCatalogItemAction } from "./actions";
 import { getInitialCatalogoDeleteActionState } from "./form-state";
 
@@ -30,12 +29,18 @@ export function CatalogItemActions({ editHref, itemId, itemName, returnTo }: Cat
 
   return (
     <div className="catalog-item-actions">
-      <Link aria-label={`Editar ${itemName}`} className="catalog-item-actions__button" href={editHref}>
+      <IconLink appearance="bare" className="catalog-item-actions__button" href={editHref} label={`Editar ${itemName}`} tooltipLabel="Editar">
         <Pencil aria-hidden="true" size={14} />
-      </Link>
-      <button aria-label={`Excluir ${itemName}`} className="catalog-item-actions__button catalog-item-actions__button--danger" onClick={() => setOpen(true)} type="button">
+      </IconLink>
+      <IconButton
+        appearance="bare"
+        className="catalog-item-actions__button catalog-item-actions__button--danger"
+        label={`Excluir ${itemName}`}
+        onClick={() => setOpen(true)}
+        tooltipLabel="Excluir"
+      >
         <Trash2 aria-hidden="true" size={14} />
-      </button>
+      </IconButton>
 
       {open ? (
         <DeleteCatalogItemDialog

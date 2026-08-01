@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { IconButton } from "@/components/ui";
 
 type DashboardCalendarProps = {
   deliveryCounts: Record<string, number>;
@@ -72,12 +73,12 @@ export function DashboardCalendar({ deliveryCounts, today }: DashboardCalendarPr
           <span>{monthTotal > 0 ? `${monthTotal} ${monthTotal === 1 ? "entrega" : "entregas"}` : "sem entregas"}</span>
         </div>
         <div className="dashboard-calendar__nav">
-          <button aria-label="Mês anterior" onClick={() => shiftMonth(-1)} type="button">
+          <IconButton appearance="bare" label="Mês anterior" onClick={() => shiftMonth(-1)} tooltip={false}>
             <ChevronLeft size={16} />
-          </button>
-          <button aria-label="Próximo mês" onClick={() => shiftMonth(1)} type="button">
+          </IconButton>
+          <IconButton appearance="bare" label="Próximo mês" onClick={() => shiftMonth(1)} tooltip={false}>
             <ChevronRight size={16} />
-          </button>
+          </IconButton>
         </div>
       </div>
 

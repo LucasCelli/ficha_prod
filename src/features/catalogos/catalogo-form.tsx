@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { CircleHelp, Save } from "lucide-react";
 import { toast } from "sonner";
-import { Button, Tooltip } from "@/components/ui";
+import { Button, IconButton } from "@/components/ui";
 import { saveCatalogItemAction } from "./actions";
 import { getInitialCatalogoFormState } from "./form-state";
 import type { CatalogItem, CatalogKind } from "./types";
@@ -27,11 +27,9 @@ function FieldLabel({ htmlFor, info, label }: { htmlFor?: string; info: string; 
   return (
     <div className="field-label-row">
       <label htmlFor={htmlFor}>{label}</label>
-      <Tooltip label={info}>
-        <button aria-label={`Info: ${label}`} className="field-info-button" type="button">
-          <CircleHelp aria-hidden="true" size={14} />
-        </button>
-      </Tooltip>
+      <IconButton appearance="bare" className="field-info-button" label={info}>
+        <CircleHelp aria-hidden="true" size={14} />
+      </IconButton>
     </div>
   );
 }

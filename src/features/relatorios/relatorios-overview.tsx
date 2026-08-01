@@ -89,7 +89,6 @@ function RelatoriosHeader({ filters }: { filters: RelatorioFilters }) {
     <header className="relatorios-view__header">
       <div className="page-heading">
         <div className="page-heading__copy">
-          <p className="eyebrow">Relatórios</p>
           <h1 id="relatorios-title" className="app-title">
             Relatórios
           </h1>

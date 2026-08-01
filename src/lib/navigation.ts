@@ -45,4 +45,9 @@ export const mainNavigation: readonly NavigationItem[] = [
     href: "/meu-painel",
     label: "Meu Perfil",
   },
+  {
+    href: "/design-system",
+    label: "Design system",
+    roles: ["superadmin"],
+  },
 ];

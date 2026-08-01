@@ -40,6 +40,8 @@ import {
   Button,
   CustomDatalist,
   Modal,
+  SortableHandle,
+  SortableInstructions,
   Tooltip,
   type CustomDatalistOption,
 } from "@/components/ui";
@@ -1446,6 +1448,18 @@ function FichaFormInner({
     scheduleDraftSnapshotPersist();
   }
 
+  function moveProductItem(fromIndex: number, toIndex: number) {
+    const current = getValues("itens");
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || toIndex >= current.length) return;
+
+    const nextItems = [...current];
+    const [moved] = nextItems.splice(fromIndex, 1);
+    nextItems.splice(toIndex, 0, moved);
+    replaceProductItems(nextItems);
+    setFluidProductItems(nextItems);
+    scheduleDraftSnapshotPersist();
+  }
+
   function getClearableProductFieldKey(id: string, field: ClearableProductField) {
     return `${id}:${field}`;
   }
@@ -1863,6 +1877,7 @@ function FichaFormInner({
             <span>Produtos</span>
           </legend>
           <div className="products-editor">
+            <SortableInstructions />
             <div className="products-editor__toolbar">
               <Button onClick={addProductItem} type="button" variant="secondary">
                 <Plus aria-hidden="true" size={18} />
@@ -1907,6 +1922,7 @@ function FichaFormInner({
             <motion.div
               animate={sortAnimationKey > 0 ? { backgroundColor: ["var(--color-success-bg)", "var(--color-surface)"] } : undefined}
               className="products-editor__list"
+              data-sortable-list=""
               key={`products-${sortAnimationKey}`}
               ref={productsListRef}
               transition={transitionForReducedMotion(reduceMotion, { duration: 0.7, ease: "easeOut" })}
@@ -1917,14 +1933,13 @@ function FichaFormInner({
                   data-index={index}
                   key={item.id}
                 >
-                <span
-                  aria-label={`Reordenar produto ${index + 1}`}
+                <SortableHandle
                   className="products-editor__drag"
-                  role="button"
-                  tabIndex={0}
-                >
-                  <GripVertical aria-hidden="true" size={16} />
-                </span>
+                  itemLabel={item.produto?.trim() || `produto ${index + 1}`}
+                  onMove={(nextIndex) => moveProductItem(index, nextIndex)}
+                  position={index + 1}
+                  total={fluidProductItems.length}
+                />
                 <div className="products-editor__cell">
                   <span>Tam.</span>
                   <CustomDatalist

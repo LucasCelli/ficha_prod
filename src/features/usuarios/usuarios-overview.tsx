@@ -33,7 +33,6 @@ export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverview
       <RouteToast messages={usuarioToastMessages} paramName="toast" />
       <header className="usuarios-view__header">
         <div>
-          <span className="eyebrow">Usuários</span>
           <h1 id="usuarios-title" className="app-title">
             Operadores
           </h1>
@@ -106,7 +105,6 @@ export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverview
             <Modal onCloseHref="/usuarios" size="md" title="Novo operador">
               <div className="modal-form">
                 <div className="modal-form__header">
-                  <span className="eyebrow">Usuários</span>
                   <h2>Cadastrar operador</h2>
                 </div>
                 <UsuarioForm returnTo="/usuarios" />
@@ -118,7 +116,6 @@ export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverview
             <Modal onCloseHref="/usuarios" size="md" title={`Editar ${selectedOperador.display_name}`}>
               <div className="modal-form">
                 <div className="modal-form__header">
-                  <span className="eyebrow">Usuários</span>
                   <h2>Editar operador</h2>
                 </div>
                 <UsuarioForm operador={selectedOperador} returnTo="/usuarios" />

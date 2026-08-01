@@ -70,7 +70,7 @@ export function ClienteDetail({ result }: ClienteDetailProps) {
           <ClienteDeleteAction
             clienteId={cliente.id}
             clienteNome={cliente.nome}
-            editHref={`/clientes/${cliente.id}/editar`}
+            editHref={`/clientes?edit=${encodeURIComponent(cliente.id)}`}
             returnTo="/clientes"
             variant="header"
             viewFichasHref={`/fichas?cliente=${encodeURIComponent(cliente.nome)}`}

@@ -74,12 +74,16 @@ export function Tooltip({ children, label, side = "top" }: TooltipProps) {
       const maxLeft = window.innerWidth - viewportPadding - tooltipRect.width / 2;
       left = Math.min(Math.max(left, minLeft), maxLeft);
 
+      // A posicao precisa sair da altura medida, nao de um offset fixo: com
+      // tooltip de duas linhas o valor antigo (40px) deixava o balao por cima
+      // do proprio controle.
+      const gap = 10;
       let resolvedSide: "bottom" | "top" = "top";
-      let top = triggerRect.top - 40;
+      let top = triggerRect.top - tooltipRect.height - gap;
 
-      if (triggerRect.top - tooltipRect.height - 10 < viewportPadding) {
+      if (top < viewportPadding) {
         resolvedSide = "bottom";
-        top = triggerRect.bottom + 10;
+        top = triggerRect.bottom + gap;
       }
 
       setPosition({ left, side: resolvedSide, top });

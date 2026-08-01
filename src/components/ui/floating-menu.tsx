@@ -120,7 +120,7 @@ export function FloatingMenu({ children, label, trigger }: FloatingMenuProps) {
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={label}
-        className="icon-action floating-menu__trigger"
+        className="icon-action floating-menu__trigger icon-touch"
         ref={triggerRef}
         onClick={() => setOpen((current) => !current)}
         type="button"
