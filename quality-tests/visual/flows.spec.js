@@ -76,8 +76,12 @@ test.describe("modais roteaveis", () => {
 
     await expect(page.getByRole("dialog")).toBeVisible();
 
+    // Re-clica apenas enquanto o botao existir. Se o dialogo ja fechou e a URL
+    // continua suja, o problema e a navegacao de saida, nao o clique: seguir
+    // clicando um elemento ausente mascararia isso como timeout do locator.
     await expect(async () => {
-      await page.getByRole("button", { name: "Fechar" }).click();
+      const fechar = page.getByRole("button", { name: "Fechar" });
+      if (await fechar.count()) await fechar.click();
       await expect(page).not.toHaveURL(/modal=novo/, { timeout: 1500 });
     }).toPass({ timeout: 15_000 });
 

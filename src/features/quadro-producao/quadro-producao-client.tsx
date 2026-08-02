@@ -373,9 +373,9 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                 value={searchDraft}
               />
               {searchDraft ? (
-                <button aria-label="Limpar busca" onClick={() => setSearchDraft("")} type="button">
+                <IconButton appearance="bare" label="Limpar busca" onClick={() => setSearchDraft("")} tooltip={false}>
                   <X aria-hidden="true" size={13} />
-                </button>
+                </IconButton>
               ) : null}
             </div>
 
@@ -388,11 +388,14 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                 <CalendarDays aria-hidden="true" size={14} />
                 Semana
               </Button>
-              <Tooltip label="Atualizar quadro">
-                <button aria-label="Atualizar quadro" className="quadro-producao-icon-button" onClick={refreshBoard} type="button">
-                  <RefreshCw aria-hidden="true" className={boardQuery.isFetching ? "quadro-producao-spin" : undefined} size={15} />
-                </button>
-              </Tooltip>
+              <IconButton
+                appearance="bare"
+                label="Atualizar quadro"
+                className="quadro-producao-icon-button"
+                onClick={refreshBoard}
+              >
+                <RefreshCw aria-hidden="true" className={boardQuery.isFetching ? "quadro-producao-spin" : undefined} size={15} />
+              </IconButton>
               <Button onClick={clearFilters} variant="ghost">
                 <Filter aria-hidden="true" size={14} />
                 Limpar
@@ -709,58 +712,48 @@ const KanbanColumn = memo(function KanbanColumn({
           <span className="quadro-producao-column__count">{formatCount(column.openCount)}</span>
         </div>
         <div className="quadro-producao-column__actions">
-          <Tooltip label="Mover coluna para a esquerda">
-            <button
-              aria-label="Mover coluna para a esquerda"
-              className="quadro-producao-icon-button"
-              disabled={!canShiftLeft}
-              onClick={() => onShiftColumn(column.id, "left")}
-              type="button"
-            >
-              <ArrowLeft aria-hidden="true" size={14} />
-            </button>
-          </Tooltip>
-          <Tooltip label="Mover coluna para a direita">
-            <button
-              aria-label="Mover coluna para a direita"
-              className="quadro-producao-icon-button"
-              disabled={!canShiftRight}
-              onClick={() => onShiftColumn(column.id, "right")}
-              type="button"
-            >
-              <ArrowRight aria-hidden="true" size={14} />
-            </button>
-          </Tooltip>
-          <Tooltip label="Ordenar por entrega">
-            <button
-              aria-label="Ordenar por entrega"
-              className="quadro-producao-icon-button"
-              onClick={() => onSortByDate(column.id)}
-              type="button"
-            >
-              <CalendarDays aria-hidden="true" size={14} />
-            </button>
-          </Tooltip>
-          <Tooltip label="Novo cartao nesta coluna">
-            <button
-              aria-label="Novo cartao nesta coluna"
-              className="quadro-producao-icon-button"
-              onClick={() => onOpenManualCard(column.id)}
-              type="button"
-            >
-              <Plus aria-hidden="true" size={14} />
-            </button>
-          </Tooltip>
-          <Tooltip label="Renomear coluna">
-            <button
-              aria-label="Renomear coluna"
-              className="quadro-producao-icon-button"
-              onClick={() => onOpenRename(column)}
-              type="button"
-            >
-              <Pencil aria-hidden="true" size={14} />
-            </button>
-          </Tooltip>
+          <IconButton
+            appearance="bare"
+            label="Mover coluna para a esquerda"
+            className="quadro-producao-icon-button"
+            disabled={!canShiftLeft}
+            onClick={() => onShiftColumn(column.id, "left")}
+          >
+            <ArrowLeft aria-hidden="true" size={14} />
+          </IconButton>
+          <IconButton
+            appearance="bare"
+            label="Mover coluna para a direita"
+            className="quadro-producao-icon-button"
+            disabled={!canShiftRight}
+            onClick={() => onShiftColumn(column.id, "right")}
+          >
+            <ArrowRight aria-hidden="true" size={14} />
+          </IconButton>
+          <IconButton
+            appearance="bare"
+            label="Ordenar por entrega"
+            className="quadro-producao-icon-button"
+            onClick={() => onSortByDate(column.id)}
+          >
+            <CalendarDays aria-hidden="true" size={14} />
+          </IconButton>
+          <IconButton
+            appearance="bare"
+            label="Novo cartao nesta coluna"
+            className="quadro-producao-icon-button"
+            onClick={() => onOpenManualCard(column.id)}
+          >
+            <Plus aria-hidden="true" size={14} />
+          </IconButton>
+          <IconButton
+            appearance="bare"
+            label="Renomear coluna"
+            className="quadro-producao-icon-button"
+            onClick={() => onOpenRename(column)}
+          >
+            <Pencil aria-hidden="true" size={14} />
+          </IconButton>
         </div>
       </header>
 
@@ -874,32 +867,28 @@ const KanbanCard = memo(function KanbanCard({
           <div className="quadro-producao-card__actions">
             <CardImagePreviewButton card={card} onOpenView={onOpenView} />
             {isLastColumn ? (
-              <Tooltip label="Marcar como entregue">
-                <button
-                  aria-label={`Marcar pedido de ${card.clienteNome} como entregue`}
-                  className="quadro-producao-icon-button quadro-producao-icon-button--deliver"
-                  disabled={deliverPending}
-                  onClick={() => onDeliverCard(card)}
-                  onMouseDown={stopCardDrag}
-                  onPointerDown={stopCardDrag}
-                  type="button"
-                >
-                  <Check aria-hidden="true" size={15} />
-                </button>
-              </Tooltip>
+              <IconButton
+                appearance="bare"
+                label="Marcar como entregue"
+                className="quadro-producao-icon-button quadro-producao-icon-button--deliver"
+                disabled={deliverPending}
+                onClick={() => onDeliverCard(card)}
+                onMouseDown={stopCardDrag}
+                onPointerDown={stopCardDrag}
+              >
+                <Check aria-hidden="true" size={15} />
+              </IconButton>
             ) : (
-              <Tooltip label="Mover para a próxima coluna">
-                <button
-                  aria-label={`Mover ${card.clienteNome} para a próxima coluna`}
-                  className="quadro-producao-icon-button quadro-producao-icon-button--success"
-                  onClick={() => onMoveNextCard(card)}
-                  onMouseDown={stopCardDrag}
-                  onPointerDown={stopCardDrag}
-                  type="button"
-                >
-                  <ArrowRight aria-hidden="true" size={15} />
-                </button>
-              </Tooltip>
+              <IconButton
+                appearance="bare"
+                label="Mover para a próxima coluna"
+                className="quadro-producao-icon-button quadro-producao-icon-button--success"
+                onClick={() => onMoveNextCard(card)}
+                onMouseDown={stopCardDrag}
+                onPointerDown={stopCardDrag}
+              >
+                <ArrowRight aria-hidden="true" size={15} />
+              </IconButton>
             )}
           </div>
         </div>
@@ -960,9 +949,11 @@ function CardImagePreviewButton({ card, onOpenView }: CardImagePreviewButtonProp
 
   return (
     <>
-      <button
-        aria-label={`Visualizar imagem de ${card.clienteNome}`}
+      <IconButton
+        appearance="bare"
         className="quadro-producao-icon-button"
+        label={`Visualizar imagem de ${card.clienteNome}`}
+        tooltip={false}
         onBlur={closePreview}
         onClick={() => onOpenView(card)}
         onFocus={() => setOpen(true)}
@@ -975,10 +966,9 @@ function CardImagePreviewButton({ card, onOpenView }: CardImagePreviewButtonProp
         onPointerLeave={closePreview}
         onPointerMove={(event) => updatePointerPosition(event.clientX, event.clientY)}
         ref={triggerRef}
-        type="button"
       >
         <Eye aria-hidden="true" size={15} />
-      </button>
+      </IconButton>
       {typeof document !== "undefined" && open
         ? createPortal(
           <div className="quadro-producao-image-preview" ref={previewRef} role="tooltip" style={position ?? undefined}>

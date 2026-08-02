@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ButtonHTMLAttributes, ComponentProps, CSSProperties, MouseEvent, ReactNode } from "react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { IconButton } from "./icon-button";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { motionTransition, popoverMotion, transitionForReducedMotion } from "./motion-presets";
 
@@ -115,18 +116,19 @@ export function FloatingMenu({ children, label, trigger }: FloatingMenuProps) {
 
   return (
     <div className="floating-menu" ref={rootRef}>
-      <button
+      <IconButton
+        appearance="bare"
         aria-controls={menuId}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={label}
-        className="icon-action floating-menu__trigger icon-touch"
-        ref={triggerRef}
+        className="icon-action floating-menu__trigger"
+        label={label}
         onClick={() => setOpen((current) => !current)}
-        type="button"
+        ref={triggerRef}
+        tooltip={false}
       >
         {trigger}
-      </button>
+      </IconButton>
       {typeof document !== "undefined" && (open || menuPosition)
         ? createPortal(
             <AnimatePresence initial={false}>

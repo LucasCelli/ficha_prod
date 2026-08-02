@@ -5,7 +5,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { AlertDialog, Tooltip } from "@/components/ui";
+import { AlertDialog, IconButton } from "@/components/ui";
 import { deleteClienteAction } from "./actions";
 import { getInitialClienteDeleteActionState } from "./form-state";
 
@@ -57,16 +57,15 @@ export function ClienteDeleteAction({
           </button>
         </>
       ) : variant === "icon" ? (
-        <Tooltip label="Excluir cliente">
-          <button
-            aria-label={`Excluir cliente ${clienteNome}`}
-            className="icon-action icon-action--danger"
-            onClick={() => setOpen(true)}
-            type="button"
-          >
-            <Trash2 aria-hidden="true" size={17} />
-          </button>
-        </Tooltip>
+        <IconButton
+          appearance="bare"
+          className="icon-action icon-action--danger"
+          label={`Excluir cliente ${clienteNome}`}
+          onClick={() => setOpen(true)}
+          tooltipLabel="Excluir cliente"
+        >
+          <Trash2 aria-hidden="true" size={17} />
+        </IconButton>
       ) : (
         <span className="cliente-row-actions">
           {viewFichasHref ? (
@@ -79,16 +78,15 @@ export function ClienteDeleteAction({
               Editar
             </Link>
           ) : null}
-          <Tooltip label="Excluir cliente">
-            <button
-              aria-label={`Excluir cliente ${clienteNome}`}
-              className="icon-action icon-action--danger"
-              onClick={() => setOpen(true)}
-              type="button"
-            >
-              <Trash2 aria-hidden="true" size={17} />
-            </button>
-          </Tooltip>
+          <IconButton
+            appearance="bare"
+            className="icon-action icon-action--danger"
+            label={`Excluir cliente ${clienteNome}`}
+            onClick={() => setOpen(true)}
+            tooltipLabel="Excluir cliente"
+          >
+            <Trash2 aria-hidden="true" size={17} />
+          </IconButton>
         </span>
       )}
 

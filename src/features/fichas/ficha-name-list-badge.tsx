@@ -13,7 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { DataTable, Modal, Tooltip } from "@/components/ui";
+import { DataTable, IconButton, Modal, Tooltip } from "@/components/ui";
 import { buildUniformCorelCsv, buildUniformCorelCsvFilename } from "@/lib/ai/uniform-list-csv";
 import { printUniformList } from "@/lib/ai/uniform-list-print";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
@@ -358,19 +358,18 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
                     <>
                       <div className="format-toolbar" role="group" aria-label="Formato dos nomes">
                         {NAME_CASE_OPTIONS.map(({ icon: Icon, label: optionLabel, mode }) => (
-                          <Tooltip key={mode} label={optionLabel}>
-                            <button
-                              aria-label={optionLabel}
-                              className={["format-toolbar__button", nameCaseMode === mode ? "is-active" : null]
-                                .filter(Boolean)
-                                .join(" ")}
-                              data-active={nameCaseMode === mode ? "true" : undefined}
-                              onClick={() => setNameCaseMode(mode)}
-                              type="button"
-                            >
-                              <Icon aria-hidden="true" size={16} />
-                            </button>
-                          </Tooltip>
+                          <IconButton
+                            appearance="bare"
+                            className={["format-toolbar__button", nameCaseMode === mode ? "is-active" : null]
+                              .filter(Boolean)
+                              .join(" ")}
+                            data-active={nameCaseMode === mode ? "true" : undefined}
+                            key={mode}
+                            label={optionLabel}
+                            onClick={() => setNameCaseMode(mode)}
+                          >
+                            <Icon aria-hidden="true" size={16} />
+                          </IconButton>
                         ))}
                       </div>
                       {rawText ? (

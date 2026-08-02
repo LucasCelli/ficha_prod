@@ -1,3 +1,30 @@
+## 2026-08-01 (3) - Migracao completa para IconButton/IconLink e alvos de toque sem lista manual
+
+- Modulo: primitivos de acao icon-only, quadro, fichas, clientes, catalogos, IA e suite de testes.
+
+### Migracao concluida
+
+- Todos os controles icon-only do produto passam agora por `<IconButton>` ou `<IconLink>`: acoes de coluna e de card do quadro, limpar busca do quadro, previa de imagem do card, botoes de formato de nome (demo de IA e badge de lista), remover imagem no formulario de ficha, exclusao de cliente nas duas variantes, gatilho do menu flutuante e fechar do `AlertDialog`.
+- As sete conversoes do quadro foram feitas por script, convertendo `<Tooltip label="X"><button aria-label="X">` em `<IconButton appearance="bare" label="X">`, ja que o primitivo renderiza o tooltip com o mesmo texto.
+- `primitives/controls.css` nao tem mais lista manual de classes: quem passa pelo primitivo herda `.icon-touch` e o alvo de 44px. Ficou apenas uma regra generica para badges acionaveis, que sao largas e baixas e por isso recebem extensao vertical em vez do extensor quadrado (que encolheria a area horizontal).
+
+### Verificacao
+
+- Estilo computado de todos os elementos em 10 rotas x 3 viewports antes e depois: 354 diferencas apenas de `position`/`inset` (efeito esperado do `:where()` que da contexto ao extensor, sem efeito de layout) e 3 diferencas apenas de nome de classe. Nenhuma propriedade visual mudou.
+- Alvos de toque em ponteiro grosso, contando so controles icon-only e desconsiderando links de texto inline (isentos por WCAG 2.5.8): `/quadro-producao`, `/fichas`, `/clientes` e `/meu-painel` ficaram todos em **zero** controles abaixo de 44px sem extensor. Antes desta rodada o quadro tinha 100.
+- Menu flutuante e `AlertDialog` foram exercitados manualmente depois da troca: abertura, ancoragem ao gatilho, fechar por Escape e fechar pelo botao.
+
+### Instabilidade da suite resolvida
+
+- O teste de fechamento do modal falhava esporadicamente so na execucao completa. A causa nao era o clique: o `expect(...).toPass()` continuava clicando um botao que ja tinha sumido, e o timeout do locator aparecia como falha de URL. Agora o bloco so clica enquanto o botao existir, o que separa "clique nao chegou" de "navegacao de saida foi descartada" — se for o segundo caso, o teste falha, que e o comportamento correto.
+- Tres execucoes completas seguidas: 173/173.
+
+- Arquivos alterados: `src/components/ui/{icon-button,icon-link,alert-dialog,floating-menu}.tsx`, `src/styles/primitives/controls.css`, `src/features/quadro-producao/quadro-producao-client.tsx`, `src/features/fichas/{ficha-form,ficha-name-list-badge}.tsx`, `src/features/clientes/cliente-delete-action.tsx`, `src/components/ai/uniform-list-parser-demo.tsx`, `quality-tests/visual/flows.spec.js`, baselines de `pages.spec.js-snapshots`.
+- Validacao: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run test:quality` (25/25), `npm run encoding:check` e `npx playwright test` (173/173, tres execucoes completas seguidas).
+- Caveats:
+  - A reconciliacao das duas geracoes de estilo do quadro continua pendente, com o diagnostico no cabecalho de `domains/quadro-producao.css`.
+  - `PageHeader` e `FilterBar` seguem sem adocao nas telas existentes.
+
 ## 2026-08-01 (2) - IconButton/IconLink, cobertura de superadmin e ajustes de UI reportados
 
 - Modulo: primitivos de acao icon-only, catalogos, quadro, toasts, cabecalhos e suite de testes.

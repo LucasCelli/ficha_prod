@@ -16,7 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Badge, Button, CustomDatalist, DataTable, Tooltip, type CustomDatalistOption } from "@/components/ui";
+import { Badge, Button, CustomDatalist, DataTable, IconButton, Tooltip, type CustomDatalistOption } from "@/components/ui";
 import { findAiModelOption } from "@/lib/ai/model-options";
 import { buildUniformCorelCsv, buildUniformCorelCsvFilename } from "@/lib/ai/uniform-list-csv";
 import { printUniformList } from "@/lib/ai/uniform-list-print";
@@ -656,18 +656,17 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
             <div className="ai-demo__toolbar-start">
               <div className="format-toolbar" role="group" aria-label="Formato dos nomes">
                 {NAME_CASE_OPTIONS.map(({ icon: Icon, label: optionLabel, mode }) => (
-                  <Tooltip key={mode} label={optionLabel}>
-                    <button
-                      aria-label={optionLabel}
-                      className={["format-toolbar__button", nameCaseMode === mode ? "is-active" : null].filter(Boolean).join(" ")}
-                      data-active={nameCaseMode === mode ? "true" : undefined}
-                      disabled={!hasItems || isEditingResult}
-                      onClick={() => transformResultNames(mode)}
-                      type="button"
-                    >
-                      <Icon aria-hidden="true" size={16} />
-                    </button>
-                  </Tooltip>
+                  <IconButton
+                    appearance="bare"
+                    className={["format-toolbar__button", nameCaseMode === mode ? "is-active" : null].filter(Boolean).join(" ")}
+                    data-active={nameCaseMode === mode ? "true" : undefined}
+                    disabled={!hasItems || isEditingResult}
+                    key={mode}
+                    label={optionLabel}
+                    onClick={() => transformResultNames(mode)}
+                  >
+                    <Icon aria-hidden="true" size={16} />
+                  </IconButton>
                 ))}
               </div>
               <Button

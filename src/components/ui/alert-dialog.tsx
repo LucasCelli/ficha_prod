@@ -2,6 +2,7 @@
 
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 import { X } from "lucide-react";
+import { IconButton } from "./icon-button";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState, type ReactNode } from "react";
 import {
@@ -54,9 +55,9 @@ export function AlertDialog({ children, description, onClose, size = "sm", title
                   variants={dialogContentMotion}
                 >
                   <AlertDialogPrimitive.Cancel asChild>
-                    <button className="modal-close" aria-label="Fechar" type="button">
+                    <IconButton appearance="bare" className="modal-close" label="Fechar" tooltip={false}>
                       <X aria-hidden="true" size={20} />
-                    </button>
+                    </IconButton>
                   </AlertDialogPrimitive.Cancel>
                   <AlertDialogPrimitive.Title className="sr-only">{title}</AlertDialogPrimitive.Title>
                   <AlertDialogPrimitive.Description className="sr-only">{description}</AlertDialogPrimitive.Description>

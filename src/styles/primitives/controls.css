@@ -107,34 +107,27 @@
 }
 
 /*
- * Controles compactos ainda NAO migrados para <IconButton>/<IconLink>.
+ * Nao ha mais lista manual de controles icon-only: todos passam por
+ * <IconButton> ou <IconLink>, que aplicam `.icon-touch` e herdam o alvo de
+ * 44px. Controles novos devem usar o primitivo, nao voltar a inscrever a
+ * classe aqui.
  *
- * Eles nao ganham o extensor pelo primitivo, entao recebem aqui. Ao migrar um
- * deles, remova a entrada correspondente: quem passa pelo primitivo ja herda o
- * alvo de 44px por `.icon-touch`.
+ * Badges acionaveis sao o caso restante: sao largas e baixas, entao o extensor
+ * quadrado encolheria a area horizontal. Aqui a extensao e so vertical.
  */
 @media (pointer: coarse) {
-  .format-toolbar__button.format-toolbar__button,
-  .image-upload-card__remove.image-upload-card__remove,
-  .quadro-producao-icon-button.quadro-producao-icon-button,
-  .quadro-producao-icon-button--deliver.quadro-producao-icon-button--deliver,
-  .quadro-producao-search-input.quadro-producao-search-input button {
-    position: relative;
-  }
-
-  .format-toolbar__button.format-toolbar__button::after,
-  .image-upload-card__remove.image-upload-card__remove::after,
-  .quadro-producao-icon-button.quadro-producao-icon-button::after,
-  .quadro-producao-icon-button--deliver.quadro-producao-icon-button--deliver::after,
-  .quadro-producao-search-input.quadro-producao-search-input button::after {
+  button.ui-badge::after {
     content: "";
     position: absolute;
+    inset-inline: 0;
     top: 50%;
-    left: 50%;
-    width: var(--touch-target-min);
     height: var(--touch-target-min);
-    transform: translate(-50%, -50%);
+    transform: translateY(-50%);
   }
+}
+
+:where(button.ui-badge) {
+  position: relative;
 }
 
 /* Tamanhos de controle compartilhados para botoes e campos com texto. */

@@ -33,18 +33,7 @@ import {
   UserRound,
   Wand2,
 } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  Button,
-  CustomDatalist,
-  Modal,
-  SortableHandle,
-  SortableInstructions,
-  Tooltip,
-  type CustomDatalistOption,
-} from "@/components/ui";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, Button, CustomDatalist, IconButton, Modal, SortableHandle, SortableInstructions, Tooltip, type CustomDatalistOption } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
 import { compareUniformSizeAndBabyLookText } from "@/lib/uniform-sizes";
 import { useFluidDndEventTargetGuard } from "@/lib/fluid-dnd-event-target-guard";
@@ -2650,17 +2639,17 @@ function FichaFormInner({
                       ) : (
                         <span aria-hidden="true" />
                       )}
-                      <button
-                        aria-label="Remover imagem"
+                      <IconButton
+                        appearance="bare"
                         className="image-upload-card__remove"
+                        label="Remover imagem"
                         onClick={() => void handleRemoveImage(image)}
                         onMouseDown={(event) => event.stopPropagation()}
                         onPointerDown={(event) => event.stopPropagation()}
                         onTouchStart={(event) => event.stopPropagation()}
-                        type="button"
                       >
                         <Trash2 aria-hidden="true" size={16} />
-                      </button>
+                      </IconButton>
                     </div>
                     <div className="image-upload-card__preview">
                       <div
