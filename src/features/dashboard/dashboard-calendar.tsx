@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { IconButton } from "@/components/ui";
+import { IconButton, Tooltip } from "@/components/ui";
 
 type DashboardCalendarProps = {
   deliveryCounts: Record<string, number>;
@@ -133,9 +133,10 @@ export function DashboardCalendar({ deliveryCounts, today }: DashboardCalendarPr
               href={`/fichas?dataInicio=${cell.dateInput}&dataFim=${cell.dateInput}`}
               key={cell.dateInput}
               style={{ "--cell-intensity": intensity } as CSSProperties}
-              title={`${count} ${count === 1 ? "entrega" : "entregas"} em ${cell.dateInput.split("-").reverse().join("/")}`}
             >
-              {content}
+              <Tooltip label={`${count} ${count === 1 ? "entrega" : "entregas"} em ${cell.dateInput.split("-").reverse().join("/")}`}>
+                {content}
+              </Tooltip>
             </Link>
           );
         })}

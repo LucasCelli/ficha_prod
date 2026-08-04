@@ -293,11 +293,13 @@ function MarqueeLabel({ text }: { text: string }) {
   const style = shift > 0 ? ({ "--marquee-shift": `-${shift}px`, "--marquee-duration": `${Math.max(7, Math.round(shift / 10))}s` } as CSSProperties) : undefined;
 
   return (
-    <span className={`relatorios-bars__label${shift > 0 ? " is-marquee" : ""}`} ref={wrapRef} title={text}>
-      <span className="relatorios-bars__label-inner" ref={innerRef} style={style}>
-        {text}
+    <UiTooltip label={text}>
+      <span className={`relatorios-bars__label${shift > 0 ? " is-marquee" : ""}`} ref={wrapRef}>
+        <span className="relatorios-bars__label-inner" ref={innerRef} style={style}>
+          {text}
+        </span>
       </span>
-    </span>
+    </UiTooltip>
   );
 }
 

@@ -60,6 +60,11 @@ public/                 assets estaticos atuais
 - O runtime Express e os assets HTML/CSS/JS legados foram removidos do checkout ativo.
 - A migracao foi encerrada. Novas features e refinos entram no `TODO.md`.
 
+## Convencoes de interface
+
+- Nao use o atributo HTML nativo `title` para explicar controles, icones ou conteudo truncado.
+- Prefira sempre o componente compartilhado `Tooltip` de `@/components/ui`, mantendo tambem um nome acessivel com `label`, `aria-label` ou `aria-labelledby`.
+- Propriedades `title` que representam titulos reais de pagina, modal, painel, metadados ou dados de dominio continuam validas.
 ## Como continuar
 
 1. Ler `AGENTS.md`.

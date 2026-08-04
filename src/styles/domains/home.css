@@ -523,6 +523,13 @@
   border: none;
 }
 
+.dashboard-calendar__cell > .ui-tooltip {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
 a.dashboard-calendar__cell {
   --cell-intensity: 0.5;
   background: color-mix(in srgb, var(--color-primary) calc(var(--cell-intensity) * 26%), transparent);

@@ -86,6 +86,10 @@
   display: none;
 }
 
+.fichas-toolbar__event {
+  width: max-content;
+}
+
 .fichas-toolbar__search-control {
   position: relative;
   min-width: 0;

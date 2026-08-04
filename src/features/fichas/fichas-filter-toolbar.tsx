@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, FileText, Star, X } from "lucide-react";
+import { Tooltip } from "@/components/ui";
 import type { FichaFilters } from "./data";
 import { DatePickerField } from "./date-picker-field";
 
@@ -176,19 +177,23 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
           <option value="serigrafia_bordado">Serigrafia e Bordado</option>
         </select>
       </div>
-      <label aria-label="Evento" className="checkbox-filter event-filter" htmlFor="evento" title="Evento">
-        <input
-          checked={filters.evento === true}
-          id="evento"
-          name="evento"
-          onChange={(event) =>
-            updateFilter(searchParams, pathname, router, startTransition, "evento", event.target.checked ? "true" : "")
-          }
-          type="checkbox"
-        />
-        <Star aria-hidden="true" className="event-filter__icon" size={20} />
-        <span className="sr-only">Evento</span>
-      </label>
+      <div className="field fichas-toolbar__event">
+        <label id="evento-label" htmlFor="evento">Evento</label>
+        <Tooltip label="Filtrar fichas de evento">
+          <label aria-labelledby="evento-label" className="checkbox-filter event-filter" htmlFor="evento">
+            <input
+              checked={filters.evento === true}
+              id="evento"
+              name="evento"
+              onChange={(event) =>
+                updateFilter(searchParams, pathname, router, startTransition, "evento", event.target.checked ? "true" : "")
+              }
+              type="checkbox"
+            />
+            <Star aria-hidden="true" className="event-filter__icon" size={20} />
+          </label>
+        </Tooltip>
+      </div>
       <div className="field">
         <label htmlFor="dataInicio">Entrega inicial</label>
         <DatePickerField
