@@ -847,7 +847,9 @@ const KanbanCard = memo(function KanbanCard({
         </div>
 
         <div className="quadro-producao-card__meta">
-          <span className="quadro-producao-card__chip">{normalizePersonalizacaoLabel(card.arte)}</span>
+          <Tooltip label={`Tecido: ${card.material?.trim() || "Não informado"}`}>
+            <span className="quadro-producao-card__chip">{normalizePersonalizacaoLabel(card.arte)}</span>
+          </Tooltip>
           {!card.isManualCard ? (
             <Tooltip label="Quantidade total de itens">
               <span className="quadro-producao-card__chip">
