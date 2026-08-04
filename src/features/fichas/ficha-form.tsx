@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
-import { useDragAndDrop } from "fluid-dnd/react";
+import { DragDropProvider } from "@dnd-kit/react";
+import { useSortable } from "@dnd-kit/react/sortable";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import UnderlineExtension from "@tiptap/extension-underline";
@@ -36,7 +37,6 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, Button, CustomDatalist, IconButton, Modal, SortableHandle, SortableInstructions, Tooltip, type CustomDatalistOption } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
 import { compareUniformSizeAndBabyLookText } from "@/lib/uniform-sizes";
-import { useFluidDndEventTargetGuard } from "@/lib/fluid-dnd-event-target-guard";
 import { createFichaAction, updateFichaAction } from "./actions";
 import { DatePickerField } from "./date-picker-field";
 import { DeliveryDeadlineAlert, Field, SubmitButton, sumProductQuantities } from "./ficha-form-controls";
@@ -63,6 +63,44 @@ type FichaFormProps = {
 
 type RichTextCommand = "bold" | "italic" | "underline" | "insertUnorderedList" | "insertOrderedList" | "removeFormat";
 type ClearableProductField = "quantidade" | "tamanho";
+
+type SortableProductRowProps = {
+  children: (handleRef: (element: Element | null) => void) => ReactNode;
+  id: string;
+  index: number;
+};
+
+function SortableProductRow({ children, id, index }: SortableProductRowProps) {
+  const { handleRef, isDragging, isDropping, ref } = useSortable({
+    group: "ficha-products",
+    id,
+    index,
+    transition: { duration: 90, easing: "cubic-bezier(0.2, 0, 0, 1)" },
+    type: "ficha-product",
+  });
+
+  return (
+    <div
+      className={`products-editor__row${isDragging || isDropping ? " products-editor__row--dragging" : ""}`}
+      data-index={index}
+      ref={ref}
+    >
+      {children(handleRef)}
+    </div>
+  );
+}
+
+function SortableImageCard({ children, id, index, style }: { children: (handleRef: (element: Element | null) => void) => ReactNode; id: string; index: number; style?: CSSProperties }) {
+  const { handleRef, isDragging, isDropping, ref } = useSortable({
+    group: "ficha-images",
+    id,
+    index,
+    transition: { duration: 90, easing: "cubic-bezier(0.2, 0, 0, 1)" },
+    type: "ficha-image",
+  });
+
+  return <article className={`image-upload-card${isDragging || isDropping ? " image-upload-card--dragging" : ""}`} data-image-id={id} ref={ref} style={style}>{children(handleRef)}</article>;
+}
 
 type FichaDraftSnapshot = {
   initialData: FichaFormInitialData;
@@ -477,8 +515,6 @@ type ImportedLegacyState = {
 type PendingLegacyImport = ImportedLegacyState;
 
 export function FichaForm(props: FichaFormProps) {
-  useFluidDndEventTargetGuard();
-
   const { ficha, initialData, mode = "create" } = props;
   const [importedLegacyState, setImportedLegacyState] = useState<ImportedLegacyState | null>(null);
   const [restoredDraftData, setRestoredDraftData] = useState<FichaFormInitialData | null>(null);
@@ -752,33 +788,10 @@ function FichaFormInner({
     mode === "edit" && ficha?.id
       ? `/fichas/${ficha.id}/imprimir${includeRawNameListOnPrint && hasListaNomesRaw ? "?listaNomesRaw=1" : ""}`
       : "";
-  const productDragConfig = useMemo(() => ({
-    animationDuration: 90,
-    delayBeforeInsert: 0,
-    delayBeforeRemove: 0,
-    draggingClass: "products-editor__row--dragging",
-    handlerSelector: ".products-editor__drag",
-    // O arraste nativo dos produtos evita a disputa de eventos de mouse do fluid-dnd.
-    isDraggable: () => false,
-  }), []);
-  const imageDragConfig = useMemo(() => ({
-    animationDuration: 90,
-    delayBeforeInsert: 0,
-    delayBeforeRemove: 0,
-    direction: "horizontal" as const,
-    draggingClass: "image-upload-card--dragging",
-    handlerSelector: ".image-upload-card__order",
-    isDraggable: (element: HTMLElement) => element.classList.contains("image-upload-card"),
-  }), []);
-  const [productsListRef, fluidProductItems, setFluidProductItems] = useDragAndDrop<ProductFormItem, HTMLDivElement>(
-    itens,
-    productDragConfig,
-  );
-  const [imageGridRef, fluidImageItems, setFluidImageItems] = useDragAndDrop<ImageFormItem, HTMLDivElement>(
-    imagens,
-    imageDragConfig,
-  );
-  const draggedProductIdRef = useRef<string | null>(null);
+  const productsListRef = useRef<HTMLDivElement>(null);
+  const [productItems, setProductItems] = useState<ProductFormItem[]>(itens);
+  const imageGridRef = useRef<HTMLDivElement>(null);
+  const [imageItems, setImageItems] = useState<ImageFormItem[]>(imagens);
 
   const syncComposicaoByMaterial = useCallback((nextMaterial: string, source: "auto" | "manual", compositionOverride?: string) => {
     const materialOption = MATERIAL_OPTIONS.find((option) => option.nome === nextMaterial);
@@ -894,7 +907,7 @@ function FichaFormInner({
     }, 350);
   }, [getValues, mode]);
 
-  const handleImageFiles = useCallback((files: File[]) => {
+  function handleImageFiles(files: File[]) {
     const selectedFiles = files.filter((file) => file.type.startsWith("image/"));
     const availableSlots = 4 - imagens.length;
     const filesToAdd = selectedFiles.slice(0, availableSlots);
@@ -928,9 +941,9 @@ function FichaFormInner({
 
     const currentImages = getValues("imagens");
     appendImageItem(localImages);
-    setFluidImageItems([...currentImages, ...localImages]);
+    setImageItems([...currentImages, ...localImages]);
     scheduleDraftSnapshotPersist();
-  }, [appendImageItem, getValues, imagens.length, scheduleDraftSnapshotPersist, setFluidImageItems]);
+  }
 
   function handleImageSelection(files: FileList | null) {
     handleImageFiles(Array.from(files ?? []));
@@ -949,7 +962,7 @@ function FichaFormInner({
     const imageIndex = getValues("imagens").findIndex((item) => item.id === image.id);
     if (imageIndex >= 0) {
       removeImageItemAt(imageIndex);
-      setFluidImageItems((current) => current.filter((item) => item.id !== image.id));
+      setImageItems((current) => current.filter((item) => item.id !== image.id));
       scheduleDraftSnapshotPersist();
     }
 
@@ -1171,7 +1184,7 @@ function FichaFormInner({
 
       flushSync(() => {
         replaceImageItems(uploadedImages);
-        setFluidImageItems(uploadedImages);
+        setImageItems(uploadedImages);
       });
       if (imagensJsonInputRef.current) {
         imagensJsonInputRef.current.value = serializeImageItems(uploadedImages);
@@ -1284,26 +1297,26 @@ function FichaFormInner({
   }, [imageGridRef, imagens]);
 
   useEffect(() => {
-    if (!hasUniqueItemIds(fluidProductItems)) {
+    if (!hasUniqueItemIds(productItems)) {
       return;
     }
 
-    const sameOrder = haveSameItemOrder(fluidProductItems, itens);
-    if (!sameOrder && fluidProductItems.length === itens.length) {
-      replaceProductItems(fluidProductItems);
+    const sameOrder = haveSameItemOrder(productItems, itens);
+    if (!sameOrder && productItems.length === itens.length) {
+      replaceProductItems(productItems);
     }
-  }, [fluidProductItems, itens, replaceProductItems]);
+  }, [productItems, itens, replaceProductItems]);
 
   useEffect(() => {
-    if (!hasUniqueItemIds(fluidImageItems)) {
+    if (!hasUniqueItemIds(imageItems)) {
       return;
     }
 
-    const sameOrder = haveSameItemOrder(fluidImageItems, imagens);
-    if (!sameOrder && fluidImageItems.length === imagens.length) {
-      replaceImageItems(fluidImageItems);
+    const sameOrder = haveSameItemOrder(imageItems, imagens);
+    if (!sameOrder && imageItems.length === imagens.length) {
+      replaceImageItems(imageItems);
     }
-  }, [fluidImageItems, imagens, replaceImageItems]);
+  }, [imageItems, imagens, replaceImageItems]);
 
   useEffect(() => {
     function handlePaste(event: ClipboardEvent) {
@@ -1320,7 +1333,7 @@ function FichaFormInner({
 
     document.addEventListener("paste", handlePaste);
     return () => document.removeEventListener("paste", handlePaste);
-  }, [handleImageFiles]);
+  });
 
   useEffect(() => {
     const form = formRef.current;
@@ -1412,7 +1425,7 @@ function FichaFormInner({
     const itemIndex = getValues("itens").findIndex((item) => item.id === id);
     if (itemIndex >= 0) {
       setValue(`itens.${itemIndex}.${field}`, nextValue, { shouldDirty: true });
-      setFluidProductItems((current) => current.map((item) => (item.id === id ? { ...item, [field]: nextValue } : item)));
+      setProductItems((current) => current.map((item) => (item.id === id ? { ...item, [field]: nextValue } : item)));
       scheduleDraftSnapshotPersist();
     }
   }
@@ -1421,7 +1434,7 @@ function FichaFormInner({
     const current = getValues("itens");
     const item = createEmptyProductItem(`item-${Date.now()}-${current.length}`);
     appendProductItem(item);
-    setFluidProductItems([...current, item]);
+    setProductItems([...current, item]);
     scheduleDraftSnapshotPersist();
   }
 
@@ -1435,7 +1448,7 @@ function FichaFormInner({
     const nextItems = [...current];
     nextItems.splice(position === "above" ? itemIndex : itemIndex + 1, 0, duplicated);
     replaceProductItems(nextItems);
-    setFluidProductItems(nextItems);
+    setProductItems(nextItems);
     scheduleDraftSnapshotPersist();
   }
 
@@ -1447,17 +1460,20 @@ function FichaFormInner({
     const [moved] = nextItems.splice(fromIndex, 1);
     nextItems.splice(toIndex, 0, moved);
     replaceProductItems(nextItems);
-    setFluidProductItems(nextItems);
+    setProductItems(nextItems);
     scheduleDraftSnapshotPersist();
   }
 
-  function dropProductItem(targetIndex: number) {
-    const draggedId = draggedProductIdRef.current;
-    if (!draggedId) return;
+  function moveImageItem(fromIndex: number, toIndex: number) {
+    const current = getValues("imagens");
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || toIndex >= current.length) return;
 
-    const fromIndex = getValues("itens").findIndex((item) => item.id === draggedId);
-    moveProductItem(fromIndex, targetIndex);
-    draggedProductIdRef.current = null;
+    const nextItems = [...current];
+    const [moved] = nextItems.splice(fromIndex, 1);
+    nextItems.splice(toIndex, 0, moved);
+    replaceImageItems(nextItems);
+    setImageItems(nextItems);
+    scheduleDraftSnapshotPersist();
   }
 
   function getClearableProductFieldKey(id: string, field: ClearableProductField) {
@@ -1511,7 +1527,7 @@ function FichaFormInner({
     if (event.key !== "Tab") return;
 
     const nextIndex = index + (event.shiftKey ? -1 : 1);
-    if (nextIndex < 0 || nextIndex >= fluidProductItems.length) return;
+    if (nextIndex < 0 || nextIndex >= productItems.length) return;
 
     event.preventDefault();
     focusProductColumnItem(column, nextIndex);
@@ -1523,14 +1539,14 @@ function FichaFormInner({
 
     if (current.length > 1 && itemIndex >= 0) {
       removeProductItemAt(itemIndex);
-      setFluidProductItems(current.filter((item) => item.id !== id));
+      setProductItems(current.filter((item) => item.id !== id));
       scheduleDraftSnapshotPersist();
       return;
     }
 
     const emptyItem = createEmptyProductItem();
     setValue("itens", [emptyItem], { shouldDirty: true });
-    setFluidProductItems([emptyItem]);
+    setProductItems([emptyItem]);
     scheduleDraftSnapshotPersist();
   }
 
@@ -1557,7 +1573,7 @@ function FichaFormInner({
     showProductSortFeedback();
     setSortAnimationKey((current) => current + 1);
     replaceProductItems(sortedItems);
-    setFluidProductItems(sortedItems);
+    setProductItems(sortedItems);
     scheduleDraftSnapshotPersist();
   }
 
@@ -1919,6 +1935,19 @@ function FichaFormInner({
               <span>Detalhes</span>
               <span>Ações</span>
             </div>
+            <DragDropProvider
+              onDragEnd={(event) => {
+                if (event.canceled) return;
+                const sourceId = event.operation.source?.id;
+                const targetId = event.operation.target?.id;
+                if (sourceId == null || targetId == null) return;
+
+                const current = getValues("itens");
+                const fromIndex = current.findIndex((item) => item.id === String(sourceId));
+                const toIndex = current.findIndex((item) => item.id === String(targetId));
+                moveProductItem(fromIndex, toIndex);
+              }}
+            >
             <motion.div
               animate={sortAnimationKey > 0 ? { backgroundColor: ["var(--color-success-bg)", "var(--color-surface)"] } : undefined}
               className="products-editor__list"
@@ -1927,33 +1956,15 @@ function FichaFormInner({
               ref={productsListRef}
               transition={transitionForReducedMotion(reduceMotion, { duration: 0.7, ease: "easeOut" })}
             >
-              {fluidProductItems.map((item, index) => (
-                <div
-                  className="products-editor__row"
-                  data-index={index}
-                  key={item.id}
-                  onDragOver={(event) => {
-                    if (!draggedProductIdRef.current) return;
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = "move";
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    dropProductItem(index);
-                  }}
-                >
+              {productItems.map((item, index) => (
+                <SortableProductRow id={item.id} index={index} key={item.id}>
+                {(handleRef) => <>
                 <SortableHandle
                   className="products-editor__drag"
+                  handleRef={handleRef}
                   itemLabel={item.produto?.trim() || `produto ${index + 1}`}
-                  onDragEnd={() => { draggedProductIdRef.current = null; }}
-                  onDragStart={(event) => {
-                    draggedProductIdRef.current = item.id;
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData("text/plain", item.id);
-                  }}
-                  onMove={(nextIndex) => moveProductItem(index, nextIndex)}
                   position={index + 1}
-                  total={fluidProductItems.length}
+                  total={productItems.length}
                 />
                 <div className="products-editor__cell">
                   <span>Tam.</span>
@@ -2039,9 +2050,11 @@ function FichaFormInner({
                     </button>
                   </Tooltip>
                 </div>
-                </div>
+                </>}
+                </SortableProductRow>
               ))}
             </motion.div>
+            </DragDropProvider>
             <div className="products-editor__total" aria-live="polite">
               <span>Total de produtos</span>
               <strong>{productTotal}</strong>
@@ -2634,12 +2647,24 @@ function FichaFormInner({
             </div>
 
             {imagens.length > 0 ? (
+              <DragDropProvider
+                onDragEnd={(event) => {
+                  if (event.canceled) return;
+                  const sourceId = event.operation.source?.id;
+                  const targetId = event.operation.target?.id;
+                  if (sourceId == null || targetId == null) return;
+
+                  const current = getValues("imagens");
+                  const fromIndex = current.findIndex((item) => item.id === String(sourceId));
+                  const toIndex = current.findIndex((item) => item.id === String(targetId));
+                  moveImageItem(fromIndex, toIndex);
+                }}
+              >
               <div ref={imageGridRef} className="image-upload-grid" data-count={imagens.length}>
-                {fluidImageItems.map((image, index) => (
-                  <article
-                    className="image-upload-card"
-                    data-index={index}
-                    data-image-id={image.id}
+                {imageItems.map((image, index) => (
+                  <SortableImageCard
+                    id={image.id}
+                    index={index}
                     key={image.id}
                     style={{
                       ...(lockedImageCardWidth
@@ -2651,11 +2676,12 @@ function FichaFormInner({
                         : null),
                     }}
                   >
+                  {(handleRef) => <>
                     <div className="image-upload-card__top">
-                      <span className="image-upload-card__order" aria-hidden="true">
+                      <button aria-label={`Reordenar imagem ${index + 1}`} className="image-upload-card__order" ref={handleRef} type="button">
                         <GripVertical aria-hidden="true" size={15} />
                         Imagem {index + 1}
-                      </span>
+                      </button>
                       {image.file ? (
                         <span className="image-upload-card__badge">Pendente</span>
                       ) : image.saveBlocked ? (
@@ -2694,7 +2720,7 @@ function FichaFormInner({
                         onChange={(event) => {
                           const value = event.currentTarget.value;
                           updateImageItem(index, { ...image, altText: value });
-                          setFluidImageItems((current) =>
+                          setImageItems((current) =>
                             current.map((item) => (item.id === image.id ? { ...item, altText: value } : item)),
                           );
                         }}
@@ -2704,9 +2730,11 @@ function FichaFormInner({
                       />
                     </label>
                     {image.importWarning ? <p className="image-upload-card__warning">{image.importWarning}</p> : null}
-                  </article>
+                  </>}
+                  </SortableImageCard>
                 ))}
               </div>
+              </DragDropProvider>
             ) : (
               <p className="image-upload-empty">Nenhuma imagem adicionada.</p>
             )}

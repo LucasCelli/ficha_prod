@@ -169,7 +169,7 @@ export function ComponentGallery() {
 <SortableInstructions />`}
           dont="Não use span com role=button: o handle precisa ser um button real."
           name="SortableHandle"
-          usage="Reordenar listas. Ponteiro via fluid-dnd e teclado via setas, Home e End."
+          usage="Reordenar listas com dnd-kit, incluindo ponteiro e teclado."
         >
           <div className={styles.previewStack}>
             <SortableInstructions />

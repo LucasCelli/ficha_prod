@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import type { DragEndEventData, DragStartEventData } from "fluid-dnd";
-import { useDragAndDrop } from "fluid-dnd/react";
+import { DragDropProvider } from "@dnd-kit/react";
+import { useSortable } from "@dnd-kit/react/sortable";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, Badge, SortableHandle, SortableInstructions } from "@/components/ui";
-import { useFluidDndEventTargetGuard } from "@/lib/fluid-dnd-event-target-guard";
 import { deleteCatalogItemsAction, saveCatalogItemOrderAction } from "./actions";
 import { CatalogItemActions } from "./catalog-item-actions";
 import type { CatalogItem, CatalogKind } from "./types";
@@ -18,6 +17,19 @@ type CatalogItemsTableProps = {
   selectedKind: CatalogKind;
 };
 
+function SortableCatalogRow({ children, disabled, id, index }: { children: (handleRef: (element: Element | null) => void) => ReactNode; disabled: boolean; id: string; index: number }) {
+  const { handleRef, isDragging, isDropping, ref } = useSortable({
+    disabled,
+    group: "catalog-items",
+    id,
+    index,
+    transition: { duration: 90, easing: "cubic-bezier(0.2, 0, 0, 1)" },
+    type: "catalog-item",
+  });
+
+  return <div className={`catalog-items-table__row${isDragging || isDropping ? " catalog-items-table__row--dragging" : ""}`} data-index={index} data-saving={disabled ? "true" : undefined} ref={ref} role="row">{children(handleRef)}</div>;
+}
+
 function getComposition(metadata: unknown) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return "";
   const value = (metadata as Record<string, unknown>).composition;
@@ -26,10 +38,6 @@ function getComposition(metadata: unknown) {
 
 function haveSameOrder(left: CatalogItem[], right: CatalogItem[]) {
   return left.length === right.length && left.every((item, index) => item.id === right[index]?.id);
-}
-
-function hasUniqueItemIds(items: CatalogItem[]) {
-  return new Set(items.map((item) => item.id)).size === items.length;
 }
 
 function getUniqueItemsById(items: CatalogItem[]) {
@@ -65,11 +73,9 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
   const [, startTransition] = useTransition();
   const latestItemsRef = useRef(items);
   const rollbackItemsRef = useRef(items);
-  const activeDragRef = useRef<{ itemId: string } | null>(null);
+  const activeDragRef = useRef<string | null>(null);
   const isSavingRef = useRef(false);
-  const setFluidItemsRef = useRef<Dispatch<SetStateAction<CatalogItem[]>> | null>(null);
-
-  useFluidDndEventTargetGuard();
+  const [localItems, setLocalItems] = useState<CatalogItem[] | null>(null);
 
   const persistOrder = useCallback(async (nextItems: CatalogItem[], rollbackItems: CatalogItem[]) => {
     const result = await saveCatalogItemOrderAction(selectedKind, nextItems.map((item) => item.id));
@@ -78,55 +84,18 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
     setIsSaving(false);
 
     if (result.status === "error") {
-      setFluidItemsRef.current?.(rollbackItems);
+      setLocalItems(rollbackItems);
       setOrderMessage("Ordem nao salva.");
       toast.error("Ordem nao salva", { description: result.message || "Tente novamente." });
       return;
     }
 
     setOrderMessage("Ordem salva.");
+    setLocalItems(null);
     router.refresh();
   }, [router, selectedKind]);
 
-  const dragConfig = useMemo(() => ({
-    animationDuration: 90,
-    delayBeforeInsert: 0,
-    delayBeforeRemove: 0,
-    draggingClass: "catalog-items-table__row--dragging",
-    handlerSelector: ".catalog-items-table__drag",
-    isDraggable: (element: HTMLElement) => !isSavingRef.current && element.classList.contains("catalog-items-table__row"),
-    onDragStart: (data: DragStartEventData<CatalogItem>) => {
-      rollbackItemsRef.current = latestItemsRef.current;
-      activeDragRef.current = {
-        itemId: data.value.id,
-      };
-    },
-    onDragEnd: (data: DragEndEventData<CatalogItem>) => {
-      const dragSource = activeDragRef.current;
-      const rollbackItems = rollbackItemsRef.current;
-      activeDragRef.current = null;
-
-      if (!dragSource) return;
-
-      const nextItems = moveItem(rollbackItems, dragSource.itemId, data.index);
-
-      if (haveSameOrder(nextItems, rollbackItems)) {
-        setFluidItemsRef.current?.(rollbackItems);
-        return;
-      }
-
-      isSavingRef.current = true;
-      setIsSaving(true);
-      setOrderMessage("Salvando ordem.");
-      setFluidItemsRef.current?.(nextItems);
-
-      startTransition(() => {
-        void persistOrder(nextItems, rollbackItems);
-      });
-    },
-  }), [persistOrder, startTransition]);
-  const [listRef, fluidItems, setFluidItems] = useDragAndDrop<CatalogItem, HTMLDivElement>(items, dragConfig);
-  const visibleItems = useMemo(() => getUniqueItemsById(fluidItems), [fluidItems]);
+  const visibleItems = useMemo(() => getUniqueItemsById(localItems ?? items), [items, localItems]);
 
   // Mesma persistencia usada pelo arraste, disparada pelo teclado.
   //
@@ -144,7 +113,7 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
       isSavingRef.current = true;
       setIsSaving(true);
       setOrderMessage("Salvando ordem.");
-      setFluidItemsRef.current?.(nextItems);
+      setLocalItems(nextItems);
 
       startTransition(() => {
         void persistOrder(nextItems, rollbackItems);
@@ -160,21 +129,6 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
   useEffect(() => {
     latestItemsRef.current = visibleItems;
   }, [visibleItems]);
-
-  useEffect(() => {
-    setFluidItemsRef.current = setFluidItems;
-  }, [setFluidItems]);
-
-  useEffect(() => {
-    if (!hasUniqueItemIds(fluidItems)) {
-      setFluidItems(getUniqueItemsById(fluidItems));
-      return;
-    }
-
-    if (!isSavingRef.current && !haveSameOrder(fluidItems, items)) {
-      setFluidItems(items);
-    }
-  }, [fluidItems, items, setFluidItems]);
 
   function toggleItemSelection(itemId: string) {
     setSelectedItemIds((current) => {
@@ -259,9 +213,32 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
             <span role="columnheader">Status</span>
             <span role="columnheader">Ações</span>
           </div>
-          <div className="catalog-items-table__body" data-sortable-list="" ref={listRef} role="rowgroup">
+          <DragDropProvider
+            onDragStart={(event) => {
+              rollbackItemsRef.current = latestItemsRef.current;
+              activeDragRef.current = event.operation.source?.id != null ? String(event.operation.source.id) : null;
+            }}
+            onDragEnd={(event) => {
+              const itemId = activeDragRef.current;
+              activeDragRef.current = null;
+              if (!itemId || event.canceled || event.operation.target?.id == null) return;
+
+              const rollbackItems = rollbackItemsRef.current;
+              const destinationIndex = rollbackItems.findIndex((item) => item.id === String(event.operation.target?.id));
+              const nextItems = moveItem(rollbackItems, itemId, destinationIndex);
+              if (destinationIndex < 0 || haveSameOrder(nextItems, rollbackItems)) return;
+
+              isSavingRef.current = true;
+              setIsSaving(true);
+              setOrderMessage("Salvando ordem.");
+              setLocalItems(nextItems);
+              startTransition(() => { void persistOrder(nextItems, rollbackItems); });
+            }}
+          >
+          <div className="catalog-items-table__body" data-sortable-list="" role="rowgroup">
             {visibleItems.map((item, index) => (
-              <div className="catalog-items-table__row" data-index={index} data-saving={isSaving ? "true" : undefined} key={item.id} role="row">
+              <SortableCatalogRow disabled={isSaving} id={item.id} index={index} key={item.id}>
+              {(handleRef) => <>
                 <span className="catalog-items-table__cell catalog-items-table__selection-cell" role="cell">
                   <input
                     aria-label={`Selecionar ${item.name}`}
@@ -273,6 +250,7 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
                 <span className="catalog-items-table__cell catalog-items-table__order-cell" role="cell">
                   <SortableHandle
                     className="catalog-items-table__drag"
+                    handleRef={handleRef}
                     itemLabel={item.name}
                     onMove={(nextIndex) => moveItemByKeyboard(item.id, nextIndex)}
                     position={index + 1}
@@ -302,9 +280,11 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
                 <span className="catalog-items-table__cell" role="cell">
                   <CatalogItemActions editHref={`/catalogos?tipo=${selectedKind}&edit=${item.id}`} itemId={item.id} itemName={item.name} returnTo={closeHref} />
                 </span>
-              </div>
+              </>}
+              </SortableCatalogRow>
             ))}
           </div>
+          </DragDropProvider>
         </div>
       </div>
       {deleteSelectionOpen ? (

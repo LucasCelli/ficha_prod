@@ -950,6 +950,9 @@
   font-size: 0.75rem;
   font-weight: 900;
   white-space: nowrap;
+  border: 0;
+  background: transparent;
+  cursor: grab;
 }
 
 .image-upload-card__preview {

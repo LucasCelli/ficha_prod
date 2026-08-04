@@ -102,9 +102,11 @@ export function compareUniformSizeAndBabyLookText(
   first: { detalhesProduto?: string | null; produto?: string | null; tamanho?: string | null },
   second: { detalhesProduto?: string | null; produto?: string | null; tamanho?: string | null },
 ) {
+  const sizeComparison = compareUniformSizes(first.tamanho, second.tamanho);
+  if (sizeComparison !== 0) return sizeComparison;
+
   const firstModelBlock = Number(isUniformBabyLookText(`${first.produto ?? ""} ${first.detalhesProduto ?? ""} ${first.tamanho ?? ""}`));
   const secondModelBlock = Number(isUniformBabyLookText(`${second.produto ?? ""} ${second.detalhesProduto ?? ""} ${second.tamanho ?? ""}`));
 
-  if (firstModelBlock !== secondModelBlock) return firstModelBlock - secondModelBlock;
-  return compareUniformSizes(first.tamanho, second.tamanho);
+  return firstModelBlock - secondModelBlock;
 }
