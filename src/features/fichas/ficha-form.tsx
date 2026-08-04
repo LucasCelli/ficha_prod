@@ -758,7 +758,8 @@ function FichaFormInner({
     delayBeforeRemove: 0,
     draggingClass: "products-editor__row--dragging",
     handlerSelector: ".products-editor__drag",
-    isDraggable: (element: HTMLElement) => element.classList.contains("products-editor__row"),
+    // O arraste nativo dos produtos evita a disputa de eventos de mouse do fluid-dnd.
+    isDraggable: () => false,
   }), []);
   const imageDragConfig = useMemo(() => ({
     animationDuration: 90,
@@ -777,6 +778,7 @@ function FichaFormInner({
     imagens,
     imageDragConfig,
   );
+  const draggedProductIdRef = useRef<string | null>(null);
 
   const syncComposicaoByMaterial = useCallback((nextMaterial: string, source: "auto" | "manual", compositionOverride?: string) => {
     const materialOption = MATERIAL_OPTIONS.find((option) => option.nome === nextMaterial);
@@ -1449,6 +1451,15 @@ function FichaFormInner({
     scheduleDraftSnapshotPersist();
   }
 
+  function dropProductItem(targetIndex: number) {
+    const draggedId = draggedProductIdRef.current;
+    if (!draggedId) return;
+
+    const fromIndex = getValues("itens").findIndex((item) => item.id === draggedId);
+    moveProductItem(fromIndex, targetIndex);
+    draggedProductIdRef.current = null;
+  }
+
   function getClearableProductFieldKey(id: string, field: ClearableProductField) {
     return `${id}:${field}`;
   }
@@ -1921,10 +1932,25 @@ function FichaFormInner({
                   className="products-editor__row"
                   data-index={index}
                   key={item.id}
+                  onDragOver={(event) => {
+                    if (!draggedProductIdRef.current) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    dropProductItem(index);
+                  }}
                 >
                 <SortableHandle
                   className="products-editor__drag"
                   itemLabel={item.produto?.trim() || `produto ${index + 1}`}
+                  onDragEnd={() => { draggedProductIdRef.current = null; }}
+                  onDragStart={(event) => {
+                    draggedProductIdRef.current = item.id;
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", item.id);
+                  }}
                   onMove={(nextIndex) => moveProductItem(index, nextIndex)}
                   position={index + 1}
                   total={fluidProductItems.length}

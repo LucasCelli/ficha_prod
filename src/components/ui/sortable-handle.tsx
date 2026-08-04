@@ -1,6 +1,6 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
+import type { DragEvent, KeyboardEvent } from "react";
 import { GripVertical } from "lucide-react";
 
 type SortableHandleProps = {
@@ -11,6 +11,8 @@ type SortableHandleProps = {
   itemLabel: string;
   /** Move o item para o indice destino (0-based). */
   onMove: (nextIndex: number) => void;
+  onDragEnd?: (event: DragEvent<HTMLButtonElement>) => void;
+  onDragStart?: (event: DragEvent<HTMLButtonElement>) => void;
   /** Posicao atual (1-based). */
   position: number;
   size?: number;
@@ -29,7 +31,7 @@ export const SORTABLE_INSTRUCTIONS_ID = "sortable-handle-instructions";
  * A lista precisa ter `data-sortable-list` para o foco reencontrar o handle.
  * Renderize `<SortableInstructions />` uma unica vez por pagina.
  */
-export function SortableHandle({ className, disabled, itemLabel, onMove, position, size = 16, total }: SortableHandleProps) {
+export function SortableHandle({ className, disabled, itemLabel, onDragEnd, onDragStart, onMove, position, size = 16, total }: SortableHandleProps) {
   const index = position - 1;
   const handleClass = className.split(" ")[0];
 
@@ -54,6 +56,9 @@ export function SortableHandle({ className, disabled, itemLabel, onMove, positio
       aria-label={`Reordenar ${itemLabel}. Posição ${position} de ${total}.`}
       className={`${className} sortable-handle`}
       disabled={disabled}
+      draggable={!disabled && Boolean(onDragStart)}
+      onDragEnd={onDragEnd}
+      onDragStart={onDragStart}
       onKeyDown={(event) => {
         if (event.key === "ArrowUp" || event.key === "ArrowLeft") move(event, index - 1);
         else if (event.key === "ArrowDown" || event.key === "ArrowRight") move(event, index + 1);
