@@ -716,6 +716,33 @@ html[data-theme="dark"] .auth-card-brand {
   touch-action: manipulation;
 }
 
+.custom-datalist__option--media {
+  align-items: center;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.custom-datalist__option-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.custom-datalist__option-text > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-datalist__thumb {
+  width: 72px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-2);
+  object-fit: cover;
+}
+
 .custom-datalist__option:hover,
 .custom-datalist__option:focus-visible,
 .custom-datalist__option[aria-selected="true"] {

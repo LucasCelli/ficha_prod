@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   CaseLower,
@@ -16,19 +17,34 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Badge, Button, CustomDatalist, DataTable, IconButton, Tooltip, type CustomDatalistOption } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  CustomDatalist,
+  DataTable,
+  IconButton,
+  Tooltip,
+  type CustomDatalistHandle,
+  type CustomDatalistOption,
+} from "@/components/ui";
 import { findAiModelOption } from "@/lib/ai/model-options";
 import { buildUniformCorelCsv, buildUniformCorelCsvFilename } from "@/lib/ai/uniform-list-csv";
 import { printUniformList } from "@/lib/ai/uniform-list-print";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
+import { formatShortDateInput } from "@/lib/dates";
 import { transformNameCase, type NameCaseMode } from "@/lib/name-case";
 import {
+  FICHA_THUMB_HEIGHT,
+  FICHA_THUMB_WIDTH,
   createEditableList,
   displayValue,
   formatConfidence,
+  formatFichaItemsTotal,
+  formatFichaVenda,
   formatModel,
   getFichaOptionDetails,
   getFichaOptionLabel,
+  getFichaThumbUrl,
   saveBlob,
   sortItems,
   stripEditableList,
@@ -251,6 +267,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
   const [selectedFichaLabel, setSelectedFichaLabel] = useState(initialFicha ? getFichaOptionLabel(initialFicha) : "");
   const [sortConfig, setSortConfig] = useState<{ direction: SortDirection; key: SortKey } | null>(null);
   const loadedFichaListRef = useRef<string | null>(null);
+  const fichaDatalistRef = useRef<CustomDatalistHandle>(null);
   const hasItems = Boolean(result?.items.length);
   const organizingModelLabel = organizingModel ? findAiModelOption(organizingModel)?.label ?? organizingModel : null;
   const selectedFicha = linkedFichas.find((ficha) => ficha.id === selectedFichaId) ?? null;
@@ -259,10 +276,9 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
       linkedFichas.map((ficha) => ({
         aliases: [ficha.cliente, ficha.numeroVenda, ficha.dataEntrega, ficha.id].filter(Boolean) as string[],
         details: getFichaOptionDetails(ficha),
+        id: ficha.id,
+        imageUrl: getFichaThumbUrl(ficha),
         label: getFichaOptionLabel(ficha),
-        metadata: {
-          id: ficha.id,
-        },
         value: getFichaOptionLabel(ficha),
       })),
     [linkedFichas],
@@ -280,6 +296,16 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
     [nameCaseMode, sortedItems],
   );
   const selectedFichaHasLinkedList = Boolean(selectedFicha?.listaIaAnexada || selectedFicha?.listaIa);
+  const selectedFichaThumbUrl = getFichaThumbUrl(selectedFicha);
+  const selectedFichaSummary = selectedFicha
+    ? [
+        formatFichaVenda(selectedFicha.numeroVenda),
+        `Entrega ${formatShortDateInput(selectedFicha.dataEntrega)}`,
+        formatFichaItemsTotal(selectedFicha.itensTotal),
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
   const hasDistinctGroups = useMemo(
     () => new Set((result?.items ?? []).map((item) => item.grupo?.trim() || "")).size > 1,
     [result],
@@ -473,17 +499,20 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
       const fichas = payload.fichas ?? [];
       setLinkedFichas(fichas);
 
+      // A busca nunca escolhe a ficha por conta propria. Selecionar a primeira
+      // do resultado trocaria a ficha vinculada e recarregaria a lista salva
+      // dela por cima do que esta na tela, sem o usuario ter pedido nada.
+      if (!fichas.some((ficha) => ficha.id === selectedFichaId)) setSelectedFichaId("");
+
       if (fichas.length === 0) {
-        setSelectedFichaId("");
-        setSelectedFichaLabel("");
         toast.warning("Nenhum pedido encontrado.");
         return;
       }
 
-      const nextFicha = fichas.find((ficha) => ficha.id === selectedFichaId) ?? fichas[0];
-      setSelectedFichaId(nextFicha.id);
-      setSelectedFichaLabel(getFichaOptionLabel(nextFicha));
-      toast.success("Pedidos carregados.");
+      // O resultado so ajuda se estiver visivel: devolve o foco ao campo e
+      // reabre a lista, em vez de exigir um segundo clique.
+      fichaDatalistRef.current?.focusAndOpen();
+      toast.success(fichas.length === 1 ? "1 pedido encontrado." : `${fichas.length} pedidos encontrados.`);
     } finally {
       setIsLoadingLink(false);
     }
@@ -621,13 +650,14 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
                   id={fichaInputId}
                   onValueChange={(value, option) => {
                     setSelectedFichaLabel(value);
-                    setSelectedFichaId(option?.metadata?.id ?? "");
+                    setSelectedFichaId(option?.id ?? "");
                   }}
                   onEnterKey={() => {
                     void handleLoadFichas();
                   }}
                   options={fichaOptions}
                   placeholder="Cliente ou venda"
+                  ref={fichaDatalistRef}
                   value={selectedFichaLabel}
                 />
                 <Button aria-disabled={isLoadingLink} disabled={isLoadingLink} onClick={handleLoadFichas} type="button" variant="secondary">
@@ -645,9 +675,25 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
                 </Button>
               </div>
               {selectedFicha ? (
-                <Badge tone={selectedFichaHasLinkedList ? "success" : "neutral"}>
-                  {selectedFichaHasLinkedList ? "Lista organizada" : "Sem lista"}
-                </Badge>
+                <div className="ai-demo__link-selected">
+                  {selectedFichaThumbUrl ? (
+                    <Image
+                      alt=""
+                      className="ai-demo__link-thumb"
+                      height={FICHA_THUMB_HEIGHT}
+                      src={selectedFichaThumbUrl}
+                      unoptimized
+                      width={FICHA_THUMB_WIDTH}
+                    />
+                  ) : null}
+                  <span className="ai-demo__link-selected-text">
+                    <strong>{selectedFicha.cliente}</strong>
+                    <small>{selectedFichaSummary}</small>
+                  </span>
+                  <Badge tone={selectedFichaHasLinkedList ? "success" : "neutral"}>
+                    {selectedFichaHasLinkedList ? "Lista organizada" : "Sem lista"}
+                  </Badge>
+                </div>
               ) : null}
             </div>
           </div>

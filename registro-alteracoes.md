@@ -1,3 +1,41 @@
+## 2026-08-04 - Busca de fichas em /ferramentas/organizar-nomes-ia com imagem, itens e entrega
+
+- Modulo: ferramenta de organizar nomes com IA e primitivo `CustomDatalist`.
+
+### Problema
+
+- A sugestao da busca de ficha mostrava so `Venda X - Cliente` e a data de entrega. Quando o mesmo cliente tinha mais de um pedido, as opcoes ficavam praticamente identicas e nao dava para saber qual pedido estava sendo vinculado.
+
+### Mudanca
+
+- `CustomDatalist` ganhou `imageUrl` opcional por opcao: quando presente, a opcao vira grid `miniatura + texto` (`custom-datalist__option--media`) com `next/image` `unoptimized`, do mesmo jeito que `FichaRowThumbnail`. Quem monta as opcoes entrega a URL ja transformada; o primitivo exporta `CUSTOM_DATALIST_IMAGE_WIDTH/HEIGHT` (72x40) para a transformacao bater com o CSS. Opcoes sem imagem continuam com o layout anterior. O separador dos `details` passou de `, ` para ` · `.
+- A rota `GET /api/ai/uniform-list-ficha` passou a trazer `ficha_itens(quantidade)` e `ficha_imagens(url)` nas tres consultas (opcao, ficha unica e retorno do POST), somando as quantidades em `itensTotal` e usando a primeira imagem como `imagemUrl` — mesma leitura que a listagem de `/fichas` faz.
+- Cada sugestao agora mostra a arte do pedido, `Entrega dd/mm/aa`, o total de itens e o estado da lista.
+- A ficha selecionada deixou de ser apenas um badge: virou uma linha com miniatura, cliente, `venda · entrega · itens` e o badge de lista, para confirmar a selecao sem reabrir o menu.
+- `page.tsx` da ferramenta carrega os mesmos campos, entao a ficha vinda por `?fichaId=` ja aparece com imagem e contagem.
+
+### Busca deixou de escolher ficha sozinha
+
+- `handleLoadFichas` selecionava `fichas[0]` quando o resultado nao continha a ficha atual, escrevia o rotulo dela no campo e nao reabria o menu. Alem de confuso, isso trocava a ficha vinculada sem o usuario pedir — e o efeito que carrega a lista salva rodava em seguida, sobrescrevendo o resultado na tela. Agora a busca mantem a selecao so se a ficha continuar no resultado, senao limpa; nenhuma escolha automatica.
+- O texto digitado tambem deixou de ser sobrescrito, entao o filtro do menu continua valendo para o que foi pesquisado.
+- `CustomDatalist` ganhou um handle imperativo (`focusAndOpen`) e a ferramenta o chama quando o resultado chega: o foco volta ao campo e a lista reabre. Sem isso, buscar com Enter deixava o menu fechado mesmo com o foco no input, porque o proprio Enter fecha a lista.
+- O filtro do primitivo passou a casar termo a termo em vez de exigir substring contigua. A busca no servidor usa `busca_normalizada` com `%` entre as palavras, entao `pedro 6571` trazia resultado do servidor que o filtro local escondia depois — o menu dizia "Nenhuma sugestao" logo apos uma busca bem-sucedida. Todo casamento por substring continua casando, entao a mudanca so amplia.
+- Toast passou a informar quantos pedidos vieram, em vez de "Pedidos carregados.".
+- `formatFichaVenda`: ha fichas gravadas com `-` no lugar do numero da venda, que apareciam como `Venda -`. Agora so vira metadado quando tem algum caractere alfanumerico.
+
+### Ajustes na mesma rodada
+
+- O rotulo da opcao virou so o nome do cliente. `Venda X` saiu do prefixo e passou para os metadados, junto de entrega e quantidade; quando a ficha nao tem venda, nada e exibido no lugar (antes aparecia `Sem venda - Cliente`). A busca por numero de venda continua funcionando porque `numeroVenda` ja esta em `aliases`.
+- Bug de chave duplicada no React: a key da opcao era `${label}-${value}`, e dois pedidos do mesmo cliente produziam exatamente a mesma string. `CustomDatalistOption` ganhou `id` opcional, usado como key com fallback para o indice, e a ferramenta passa `ficha.id`. O `metadata.id` que so servia para identificar a ficha selecionada foi substituido por esse `id`; `metadata` continua para payload livre (composicao do tecido em `/fichas`).
+
+- Arquivos alterados: `src/components/ui/{custom-datalist.tsx,index.ts}`, `src/components/ai/uniform-list-parser-utils.ts`, `src/components/ai/uniform-list-parser-demo.tsx`, `src/app/api/ai/uniform-list-ficha/route.ts`, `src/app/ferramentas/organizar-nomes-ia/page.tsx`, `src/styles/domains/primitives.css`, `src/styles/domains/tools.css`.
+- Validacao: `npm run typecheck`, eslint dirigido nos arquivos tocados, `npm run build` e checagem em navegador (Playwright, `desktop-chromium`) com duas fichas do mesmo cliente lado a lado — arte, data e contagem diferentes deixam as opcoes distinguiveis. O console foi capturado no servidor de desenvolvimento, com assercao de que o build e o de dev: o aviso de chave duplicada nao existe em producao, entao um console limpo no build otimizado nao provaria nada. Tambem foram exercitados em navegador: busca por botao e por Enter (menu reabre, campo mantem o texto, nada e selecionado, `Salvar` segue desabilitado) e busca por termos separados (`vania 6571`). `npm run test:quality` (25/25) e `flows.spec.js` (25/26, ver caveat).
+- Caveats:
+  - `ficha_imagens(url)` continua sem `order`, igual a listagem de `/fichas`; se a imagem principal precisar ser deterministica, a correcao vale para as duas superficies.
+  - Baselines visuais nao foram regeradas nesta rodada; a ferramenta nao tem snapshot com o menu aberto.
+  - `formatFichaVenda` foi aplicado so nesta superficie. `/fichas` e `/meu-painel` continuam podendo exibir `Venda -` para as mesmas fichas.
+  - `flows.spec.js` › "o handle de produto e um button e responde as setas" falha nesta branch **antes** destas mudancas (verificado com `git stash`): o handler React nunca aparece em `button.products-editor__drag` dentro dos 15s. Provavelmente resquicio da troca de DnD dos commits anteriores; nao foi investigado aqui. Os outros 25 testes de `flows.spec.js` passam.
+
 ## 2026-08-01 (3) - Migracao completa para IconButton/IconLink e alvos de toque sem lista manual
 
 - Modulo: primitivos de acao icon-only, quadro, fichas, clientes, catalogos, IA e suite de testes.

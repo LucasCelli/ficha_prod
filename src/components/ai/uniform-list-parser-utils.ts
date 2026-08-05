@@ -1,7 +1,14 @@
+import { CUSTOM_DATALIST_IMAGE_HEIGHT, CUSTOM_DATALIST_IMAGE_WIDTH } from "@/components/ui/custom-datalist";
 import { normalizeUniformListGroups } from "@/lib/ai/uniform-list-groups";
 import type { UniformList, UniformListItem } from "@/lib/ai/schemas/uniform-list";
+import { getCloudinaryTransformedImageUrl } from "@/lib/cloudinary-images";
 import { formatShortDateInput } from "@/lib/dates";
 import { compareUniformSizeAndModel } from "@/lib/uniform-sizes";
+
+// A miniatura da ficha aparece na lista de sugestoes e ao lado da ficha
+// selecionada, entao segue a mesma proporcao do primitivo.
+export const FICHA_THUMB_WIDTH = CUSTOM_DATALIST_IMAGE_WIDTH;
+export const FICHA_THUMB_HEIGHT = CUSTOM_DATALIST_IMAGE_HEIGHT;
 
 export type SavedUniformList = UniformList & {
   aiModel?: string | null;
@@ -20,6 +27,8 @@ export type LinkedFicha = {
   cliente: string;
   dataEntrega: string;
   id: string;
+  imagemUrl?: string | null;
+  itensTotal?: number | null;
   listaIaAnexada: boolean;
   listaIa?: SavedUniformList | null;
   numeroVenda: string | null;
@@ -131,9 +140,33 @@ export function stripEditableList(list: EditableUniformList): UniformList {
 }
 
 export function getFichaOptionLabel(ficha: LinkedFicha) {
-  return `${ficha.numeroVenda ? `Venda ${ficha.numeroVenda}` : "Sem venda"} - ${ficha.cliente}`;
+  return ficha.cliente;
 }
 
+export function formatFichaItemsTotal(total: number | null | undefined) {
+  if (!total) return null;
+  return total === 1 ? "1 item" : `${total} itens`;
+}
+
+// Ha fichas gravadas com `-` no lugar do numero da venda; sem esta checagem
+// elas aparecem como "Venda -".
+export function formatFichaVenda(numeroVenda: string | null | undefined) {
+  const venda = numeroVenda?.trim() ?? "";
+  return /[a-z0-9]/i.test(venda) ? `Venda ${venda}` : null;
+}
+
+// O numero da venda entra nos metadados, nao no rotulo: quando nao existe,
+// nada e exibido no lugar. A distincao entre pedidos do mesmo cliente vem da
+// arte, da entrega e da quantidade.
 export function getFichaOptionDetails(ficha: LinkedFicha) {
-  return [`Entrega ${formatShortDateInput(ficha.dataEntrega)}`, ficha.listaIaAnexada ? "Lista organizada" : "Sem lista"];
+  return [
+    formatFichaVenda(ficha.numeroVenda),
+    `Entrega ${formatShortDateInput(ficha.dataEntrega)}`,
+    formatFichaItemsTotal(ficha.itensTotal),
+    ficha.listaIaAnexada ? "Lista organizada" : "Sem lista",
+  ].filter(Boolean) as string[];
+}
+
+export function getFichaThumbUrl(ficha: LinkedFicha | null | undefined) {
+  return ficha?.imagemUrl ? getCloudinaryTransformedImageUrl(ficha.imagemUrl, FICHA_THUMB_WIDTH, FICHA_THUMB_HEIGHT) : null;
 }

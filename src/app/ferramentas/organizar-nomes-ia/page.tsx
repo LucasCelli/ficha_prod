@@ -15,6 +15,8 @@ type OrganizarNomesIaPageProps = {
 type FichaListaRawRow = {
   cliente_nome_snapshot: string;
   data_entrega: string;
+  ficha_imagens?: { url: string }[] | null;
+  ficha_itens?: { quantidade: number | null }[] | null;
   id: string;
   lista_ia_anexada: boolean;
   lista_nomes_raw: string | null;
@@ -35,6 +37,8 @@ export default async function OrganizarNomesIaPage({ searchParams }: OrganizarNo
               cliente: ficha.cliente_nome_snapshot,
               dataEntrega: ficha.data_entrega,
               id: ficha.id,
+              imagemUrl: ficha.ficha_imagens?.[0]?.url ?? null,
+              itensTotal: (ficha.ficha_itens ?? []).reduce((total, item) => total + (item.quantidade ?? 0), 0),
               listaIaAnexada: ficha.lista_ia_anexada,
               numeroVenda: ficha.numero_venda,
             }
@@ -53,7 +57,9 @@ async function getFichaListaRaw(fichaId: string): Promise<FichaListaRawRow | nul
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("fichas")
-    .select("id, numero_venda, cliente_nome_snapshot, data_entrega, lista_ia_anexada, lista_nomes_raw")
+    .select(
+      "id, numero_venda, cliente_nome_snapshot, data_entrega, lista_ia_anexada, lista_nomes_raw, ficha_itens(quantidade), ficha_imagens(url)",
+    )
     .eq("id", fichaId)
     .maybeSingle<FichaListaRawRow>();
 

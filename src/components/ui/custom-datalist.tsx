@@ -1,15 +1,31 @@
 "use client";
 
-import { useId, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
+import Image from "next/image";
+import { useId, useImperativeHandle, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type Ref } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { motionTransition, popoverMotion, transitionForReducedMotion } from "./motion-presets";
+
+// Miniatura opcional das opcoes: quem monta as options ja entrega a URL na
+// mesma proporcao para nao servir imagem maior do que o menu usa.
+export const CUSTOM_DATALIST_IMAGE_WIDTH = 72;
+export const CUSTOM_DATALIST_IMAGE_HEIGHT = 40;
 
 export type CustomDatalistOption = {
   aliases?: string[];
   details?: string[];
+  // Identidade da opcao. Obrigatorio quando duas opcoes podem ter o mesmo
+  // rotulo (ex.: dois pedidos do mesmo cliente); sem ele a chave cai no indice.
+  id?: string;
+  imageUrl?: string | null;
   label: string;
   metadata?: Record<string, string>;
   value?: string;
+};
+
+// Permite que quem carrega as opcoes de forma assincrona devolva o foco ao
+// campo e reabra o menu quando o resultado chega.
+export type CustomDatalistHandle = {
+  focusAndOpen: () => void;
 };
 
 type CustomDatalistProps = {
@@ -27,6 +43,7 @@ type CustomDatalistProps = {
   onValueChange?: (value: string, option?: CustomDatalistOption) => void;
   options: CustomDatalistOption[];
   placeholder?: string;
+  ref?: Ref<CustomDatalistHandle>;
   value?: string;
   "data-product-column"?: string;
   "data-product-index"?: number;
@@ -55,6 +72,7 @@ export function CustomDatalist({
   onValueChange,
   options,
   placeholder,
+  ref,
   value,
   "data-product-column": dataProductColumn,
   "data-product-index": dataProductIndex,
@@ -67,16 +85,26 @@ export function CustomDatalist({
   const [activeIndex, setActiveIndex] = useState(0);
   const currentValue = value ?? internalValue;
   const filteredOptions = useMemo(() => {
-    const search = normalize(currentValue);
-    if (!search) return options.slice(0, 12);
+    // Cada termo digitado e procurado em separado: uma busca por "pedro 6571"
+    // encontra a opcao mesmo que o numero da venda esteja em outro campo.
+    const terms = normalize(currentValue).split(/\s+/).filter(Boolean);
+    if (!terms.length) return options.slice(0, 12);
 
     return options
       .filter((option) => {
-        const optionText = [option.label, option.value, ...(option.aliases ?? [])].filter(Boolean).join(" ");
-        return normalize(optionText).includes(search);
+        const optionText = normalize([option.label, option.value, ...(option.aliases ?? [])].filter(Boolean).join(" "));
+        return terms.every((term) => optionText.includes(term));
       })
       .slice(0, 12);
   }, [currentValue, options]);
+
+  useImperativeHandle(ref, () => ({
+    focusAndOpen() {
+      inputRef.current?.focus();
+      setActiveIndex(0);
+      setIsOpen(true);
+    },
+  }), []);
 
   function setValue(nextValue: string, option?: CustomDatalistOption) {
     setInternalValue(nextValue);
@@ -182,17 +210,31 @@ export function CustomDatalist({
               // fechamento por blur remova o elemento que acabou de receber foco.
               <div
                 aria-selected={index === activeIndex}
-                className="custom-datalist__option"
+                className={["custom-datalist__option", option.imageUrl ? "custom-datalist__option--media" : null]
+                  .filter(Boolean)
+                  .join(" ")}
                 id={`${listboxId}-${index}`}
-                key={`${option.label}-${option.value ?? option.label}`}
+                key={option.id ?? `${index}-${option.value ?? option.label}`}
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => selectOption(option)}
                 role="option"
                 tabIndex={-1}
               >
-                <span>{option.label}</span>
-                {option.details?.length ? <small>{option.details.join(", ")}</small> : null}
+                {option.imageUrl ? (
+                  <Image
+                    alt=""
+                    className="custom-datalist__thumb"
+                    height={CUSTOM_DATALIST_IMAGE_HEIGHT}
+                    src={option.imageUrl}
+                    unoptimized
+                    width={CUSTOM_DATALIST_IMAGE_WIDTH}
+                  />
+                ) : null}
+                <span className="custom-datalist__option-text">
+                  <span>{option.label}</span>
+                  {option.details?.length ? <small>{option.details.join(" · ")}</small> : null}
+                </span>
               </div>
             ))
           ) : (

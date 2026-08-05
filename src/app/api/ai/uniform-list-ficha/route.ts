@@ -32,6 +32,8 @@ const SaveRequestSchema = z.object({
 type FichaListLinkRow = {
   cliente_nome_snapshot: string;
   data_entrega: string;
+  ficha_imagens?: { url: string }[] | null;
+  ficha_itens?: { quantidade: number | null }[] | null;
   id: string;
   lista_ia: unknown;
   lista_ia_anexada: boolean;
@@ -39,6 +41,9 @@ type FichaListLinkRow = {
 };
 
 type FichaListOptionRow = Omit<FichaListLinkRow, "lista_ia">;
+
+const FICHA_OPTION_COLUMNS =
+  "id, numero_venda, cliente_nome_snapshot, data_entrega, lista_ia_anexada, ficha_itens(quantidade), ficha_imagens(url)";
 
 function errorResponse(message: string, status: number) {
   return Response.json({ success: false, error: message }, { status });
@@ -51,12 +56,8 @@ function normalizeSavedList(value: unknown) {
 
 function mapFicha(row: FichaListLinkRow) {
   return {
-    cliente: row.cliente_nome_snapshot,
-    dataEntrega: row.data_entrega,
-    id: row.id,
-    listaIaAnexada: row.lista_ia_anexada,
+    ...mapFichaOption(row),
     listaIa: normalizeSavedList(row.lista_ia),
-    numeroVenda: row.numero_venda,
   };
 }
 
@@ -65,6 +66,8 @@ function mapFichaOption(row: FichaListOptionRow) {
     cliente: row.cliente_nome_snapshot,
     dataEntrega: row.data_entrega,
     id: row.id,
+    imagemUrl: row.ficha_imagens?.[0]?.url ?? null,
+    itensTotal: (row.ficha_itens ?? []).reduce((total, item) => total + (item.quantidade ?? 0), 0),
     listaIaAnexada: row.lista_ia_anexada,
     numeroVenda: row.numero_venda,
   };
@@ -93,7 +96,7 @@ async function handleGET(request: Request) {
   if (fichaId) {
     const { data, error } = await createServerSupabaseClient()
       .from("fichas")
-      .select("id, numero_venda, cliente_nome_snapshot, data_entrega, lista_ia_anexada, lista_ia")
+      .select(`${FICHA_OPTION_COLUMNS}, lista_ia`)
       .eq("id", fichaId)
       .maybeSingle<FichaListLinkRow>();
 
@@ -113,7 +116,7 @@ async function handleGET(request: Request) {
 
   let supabaseQuery = createServerSupabaseClient()
     .from("fichas")
-    .select("id, numero_venda, cliente_nome_snapshot, data_entrega, lista_ia_anexada")
+    .select(FICHA_OPTION_COLUMNS)
     .order("created_at", { ascending: false })
     .limit(30);
 
@@ -174,7 +177,7 @@ async function handlePOST(request: Request) {
     .from("fichas")
     .update({ lista_ia: savedList })
     .eq("id", parsed.data.fichaId)
-    .select("id, numero_venda, cliente_nome_snapshot, data_entrega, lista_ia_anexada, lista_ia")
+    .select(`${FICHA_OPTION_COLUMNS}, lista_ia`)
     .maybeSingle<FichaListLinkRow>();
 
   if (error) {
