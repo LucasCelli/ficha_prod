@@ -1,3 +1,58 @@
+## 2026-08-05 - Impressao vetorial do Plano de Corte
+
+- O Plano de Corte deixou de usar `html2canvas`/JPEG/`jsPDF`. A impressao agora monta uma camada HTML diretamente no `body` e chama o dialogo nativo, preservando texto e tabelas vetoriais ao imprimir ou salvar como PDF.
+- O documento nao sofre o redimensionamento aplicado as fichas rasterizadas. CSS de impressao dedicado define A4, margens fisicas e cores.
+- O controle ganhou duas acoes: imprimir a alternativa atual ou todas as alternativas. Na impressao completa, cada alternativa inicia em uma nova pagina.
+## 2026-08-05 - Excedente minimo para quantidades tubulares impares
+
+- Quantidades impares em tecido tubular deixaram de bloquear o calculo.
+- Como toda frequencia tubular valida e par, o solver usa como alvo interno o proximo numero par de cada tamanho. Isso garante o menor excedente matematicamente possivel: uma peca para cada tamanho impar.
+- O solicitado original e preservado no resultado. A conferencia da tela e do PDF mostra `produzido - solicitado`, portanto o excedente aparece como `+1` no saldo.
+- A validacao final compara a producao ao alvo operacional e continua impedindo faltas, frequencias impares, folhas fracionarias ou producao acima do excedente minimo.
+## 2026-08-05 - Revisao profissional do otimizador de Plano de Corte
+
+- O solver combinatorio foi refeito com enumeracao lazy de conjuntos de folhas, cache das equacoes de frequencia por tamanho e programacao dinamica para combinar atribuicoes respeitando no maximo cinco tamanhos por grade.
+- A funcao objetivo passou a ser lexicografica e explicita: menor quantidade de enfestos, menor frequencia total, menor pico de frequencia, menos entradas de tamanho e menos folhas totais.
+- A busca conserva ate oito solucoes otimas distintas na menor quantidade de enfestos. A UI deduplica, pontua e limita a quatro alternativas relevantes.
+- A prova exata cobre ate quatro enfestos. Acima disso, o fallback deterministico mantem producao exata e invariantes sem expor o navegador a explosao combinatoria.
+- Verificacao independente: todos os pares de quantidades ate 20, planos e tubulares, coincidiram com uma busca exaustiva separada. Casos de seis tamanhos, multiplos tecidos, pedidos grandes e tubular impar tambem passaram. Benchmark de 30 pedidos maiores: aproximadamente 355 ms no ambiente local.
+## 2026-08-05 - Legibilidade do PDF do Plano de Corte
+
+- A tipografia do documento foi ampliada em cabecalho, resumo, tecidos, tabelas, conferencia e rodape.
+- Cada enfesto passou a usar o nome operacional `Tecido - identificacao - 01`.
+- A quantidade de folhas virou o principal destaque visual da linha.
+- Removida a coluna de grade Audaces; o documento mostra somente a grade de producao, pois o Audaces faz a conversao tubular automaticamente.
+## 2026-08-05 - Paridade do editor de quantidades e simplificacao do PDF
+
+- A tabela do Plano de Corte agora usa o mesmo `CustomDatalist` de tamanhos, normaliza tamanho em maiusculas, limpa temporariamente a quantidade ao receber foco e restaura o valor se o operador sair sem editar.
+- O DnD nativo anterior foi removido. As linhas agora usam `DragDropProvider`, `useSortable`, `SortableHandle` e os mesmos contratos de ponteiro/teclado do editor de produtos da ficha.
+- A exclusao de tecido passou a usar `IconButton` solido pequeno com `tone="danger"`, conforme o primitivo compartilhado.
+- O PDF foi simplificado para uma leitura tabular: resumo do plano, uma tabela operacional por tecido com enfesto/folhas/grade/Audaces/producao e uma conferencia final compacta. Foram removidos cards e tabelas aninhadas redundantes.
+## 2026-08-05 - Otimizacao conjunta de enfestos tubulares
+
+- Corrigido o calculador que separava tamanhos quando uma unica grade nao zerava todo o pedido. Ele agora busca combinacoes conjuntas de camadas e frequencias, aumentando a quantidade de enfestos progressivamente e parando na primeira quantidade viavel; complexidade total das frequencias desempata.
+- Caso real `P40 M60 G50 GG30`, tubular, maximo 30: caiu de quatro para dois enfestos, mantendo producao exata e frequencias pares.
+- A busca exata cobre solucoes de ate quatro enfestos; acima disso permanece o fallback deterministico exato para evitar explosao combinatoria no navegador.
+- Em tecidos tubulares, o card e o PDF agora mostram tambem a equivalencia para o Audaces com metade da frequencia de producao.
+## 2026-08-05 - Polimentos do Plano de Corte: editor, alternativas e PDF
+
+- A tabela de tamanhos e quantidades passou a seguir o editor de produtos da ficha: cabecalho/linhas em grid, total, duplicacao acima/abaixo, ordenacao por tamanho, reordenacao por alca (ponteiro e teclado) e composicao responsiva.
+- Largura e tipo viraram propriedades compativeis em todo o plano. A UI sincroniza esses valores entre os tecidos e a validacao pura rejeita larguras diferentes ou mistura de plano com tubular.
+- O calculo agora gera estrategias distintas, elimina resultados duplicados e apresenta alternativas em abas. Como `mapa` equivale a `enfesto` neste dominio, a principal e ordenada pela menor quantidade total de enfestos; complexidade das frequencias desempata.
+- Criado documento de impressao do plano selecionado, com configuracoes, tecidos, enfestos, grades e conferencia. O botao usa o gerador PDF/print ja existente no projeto, permitindo imprimir ou salvar como PDF.
+- O modal de limpeza recebeu espacamento interno explicito e a confirmacao continua usando o `AlertDialog` compartilhado.
+- Polimentos adicionais: tecido customizado, limpeza de erros ao editar, resumo sem metricas duplicadas, alca de arraste isolada dos inputs e mensagens mais claras sobre restricoes compartilhadas.
+## 2026-08-05 - MVP da ferramenta Plano de Corte
+
+- Modulo: `/ferramentas/plano-de-corte`.
+- Criada ferramenta client-side para cadastrar configuracoes do plano, multiplos tecidos e quantidades com tamanhos livres, sem persistencia, migration ou chamada externa.
+- A logica de dominio ficou isolada em `src/features/plano-de-corte`: agrupa itens por tecido, procura grades conjuntas exatas com frequencias de 1 a 6 e no maximo cinco tamanhos, e resolve os saldos com grades individuais. Nenhum enfesto ultrapassa o maximo de folhas.
+- Tecidos tubulares aceitam apenas frequencias pares por tamanho. Quantidades impares sao recusadas com mensagem operacional, sem produzir um plano invalido.
+- O resultado apresenta resumo, enfestos, sugestao de grade, frequencias, folhas, pecas cortadas e conferencia solicitado/produzido/saldo. Folhas e frequencias podem ser ajustadas manualmente, com saldo recalculado imediatamente.
+- A UI reutiliza `Button`, `IconButton`, `EmptyState`, `AlertDialog`, toasts e tokens existentes. A rota foi adicionada ao catalogo de Ferramentas.
+- O modelo reserva origem opcional de ficha e metadados opcionais de risco para evolucao futura, sem expor integracoes incompletas.
+- Validacao: `npm run typecheck`, ESLint dirigido, `npm run encoding:check`, `npm run test:quality` (25/25), sete cenarios dirigidos do calculador e `npm run build` passaram. O build confirmou a rota. A verificacao autenticada no navegador foi tentada, mas o ambiente respondeu `Acesso indisponivel` no login.
+- Limitacao intencional: largura do tecido e comprimento da mesa sao registrados, mas a ferramenta nao afirma encaixe fisico, consumo ou aproveitamento; as grades precisam ser validadas no Audaces.
 ## 2026-08-04 - Busca de fichas em /ferramentas/organizar-nomes-ia com imagem, itens e entrega
 
 - Modulo: ferramenta de organizar nomes com IA e primitivo `CustomDatalist`.

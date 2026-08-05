@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRight, Crop, WandSparkles } from "lucide-react";
+import { ArrowRight, Crop, Scissors, WandSparkles } from "lucide-react";
 import { requireAppSession } from "@/features/auth/session";
 
 export const metadata: Metadata = {
@@ -8,6 +8,12 @@ export const metadata: Metadata = {
 };
 
 const tools = [
+  {
+    description: "Planeje quantidades, tecidos, grades e enfestos antes do encaixe no Audaces.",
+    href: "/ferramentas/plano-de-corte",
+    icon: Scissors,
+    label: "Plano de Corte",
+  },
   {
     description: "Ajuste enquadramento e proporção antes de publicar suas imagens.",
     href: "/ferramentas/cortar-imagem",
