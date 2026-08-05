@@ -598,7 +598,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
     });
 
     if (!opened) {
-      toast.error("Nao foi possivel abrir a impressao", { description: "Tente novamente." });
+      toast.error("Não foi possível abrir a impressão", { description: "Tente novamente." });
     }
   }
 

@@ -38,7 +38,7 @@ export const groqProvider = createGroq({
 
 export const openRouterProvider = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
-  appName: "Fichas Tecnicas",
+  appName: "Fichas Técnicas",
 });
 
 export const geminiProvider = google;

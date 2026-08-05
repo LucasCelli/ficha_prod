@@ -43,11 +43,11 @@ export function buildUniformListPrintHtml(input: UniformListPrintInput) {
           <thead>
             <tr>
               <th>Nome</th>
-              <th>Numero</th>
+              <th>Número</th>
               <th>Tamanho</th>
               <th>Modelo</th>
               ${input.showGroup ? "<th>Grupo</th>" : ""}
-              <th>Observacao</th>
+              <th>Observação</th>
             </tr>
           </thead>
           <tbody>

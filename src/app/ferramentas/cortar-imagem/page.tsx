@@ -3,7 +3,7 @@ import { ImageCropper } from "@/components/tools/image-cropper";
 import { requireAppSession } from "@/features/auth/session";
 
 export const metadata: Metadata = {
-  title: "Cortar imagem | Fichas Tecnicas",
+  title: "Cortar imagem | Fichas Técnicas",
 };
 
 export default async function CortarImagemPage() {

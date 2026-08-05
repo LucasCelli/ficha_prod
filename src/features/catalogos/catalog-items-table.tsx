@@ -182,7 +182,7 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
     <>
       <span className="sr-only" aria-live="polite">{orderMessage}</span>
       <SortableInstructions />
-      <div className="catalog-items-table-wrap" role="region" aria-label="Itens do catalogo">
+      <div className="catalog-items-table-wrap" role="region" aria-label="Itens do catálogo">
         <div className="catalog-items-table-toolbar">
           <label className="catalog-items-table-select-all">
             <input checked={allVisibleSelected} onChange={toggleVisibleSelection} type="checkbox" />

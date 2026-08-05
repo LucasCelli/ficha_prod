@@ -39,7 +39,7 @@ export function AppShell({ children, session, title }: AppShellProps) {
               <PriscilaIcon height={22} />
             </span>
             <span className="app-brand__text" translate="no">
-              Fichas Tecnicas
+              Fichas Técnicas
             </span>
           </Link>
           <IconButton

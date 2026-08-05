@@ -12,7 +12,7 @@ export default function ErrorPage({ reset }: ErrorPageProps) {
       <div className="status-panel__content">
         <p className="status-panel__eyebrow">Erro</p>
         <h1 id="status-panel-title" className="status-panel__title">
-          Nao foi possivel continuar
+          Não foi possível continuar
         </h1>
         <p className="status-panel__description">Tente novamente.</p>
         <div className="status-panel__actions">

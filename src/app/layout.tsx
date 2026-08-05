@@ -23,8 +23,8 @@ const playfairDisplay = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Fichas Tecnicas",
-  description: "Fichas tecnicas de producao.",
+  title: "Fichas Técnicas",
+  description: "Fichas técnicas de produção.",
 };
 
 function normalizeTheme(value: string | undefined) {
@@ -60,9 +60,9 @@ export default async function RootLayout({
       <body className={`${plusJakarta.variable} ${playfairDisplay.variable}`}>
         <AppClientProviders>
           <a className="skip-link" href="#conteudo">
-            Pular para o conteudo
+            Pular para o conteúdo
           </a>
-          {isLoginRoute ? children : <AppShell session={session} title="Aplicacao Fichas Tecnicas">{children}</AppShell>}
+          {isLoginRoute ? children : <AppShell session={session} title="Aplicação Fichas Técnicas">{children}</AppShell>}
           <Toaster
             closeButton
             duration={6500}

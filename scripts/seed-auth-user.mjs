@@ -45,4 +45,4 @@ if (error) {
   process.exit(1);
 }
 
-console.log(`Usuario ${username} salvo como ${role}.`);
+console.log(`Usuário ${username} salvo como ${role}.`);

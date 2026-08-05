@@ -253,7 +253,7 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
         ),
       },
       { key: "nome", label: "Nome" },
-      { key: "numero", label: "Numero", align: "center" as const },
+      { key: "numero", label: "Número", align: "center" as const },
       {
         key: "tamanho",
         label: "Tamanho",
@@ -262,9 +262,9 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
         sortDirection: sizeSortDirection ?? undefined,
       },
       { key: "modelo", label: "Modelo" },
-      { key: "confianca", label: "Confianca", align: "center" as const },
+      { key: "confianca", label: "Confiança", align: "center" as const },
       ...(hasDistinctGroups ? [{ key: "grupo", label: "Grupo" }] : []),
-      { key: "observacao", label: "Observacao" },
+      { key: "observacao", label: "Observação" },
     ];
     return columns;
   }, [allRowsSelected, hasDistinctGroups, organizedItems, sizeSortDirection, someRowsSelected]);
@@ -277,7 +277,7 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
       const payload = (await response.json().catch(() => null)) as NameListApiResponse | null;
 
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.success === false ? payload.error : "Nao foi possivel carregar a lista.");
+        throw new Error(payload?.success === false ? payload.error : "Não foi possível carregar a lista.");
       }
 
       setActiveCopyCell(null);
@@ -287,7 +287,7 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
       setSelectedCsvRows(new Set(isOrganizedList(payload.lista) ? payload.lista.items : []));
       setLoadedList(payload);
     } catch (error) {
-      toast.error("Nao foi possivel carregar lista", {
+      toast.error("Não foi possível carregar a lista", {
         description: error instanceof Error ? error.message : "Tente novamente.",
       });
     } finally {
@@ -424,7 +424,7 @@ export function FichaNameListBadge({ appearance = "badge", fichaId, labelOverrid
                         tipo: loadedList.tipo,
                       });
                       if (!opened) {
-                        toast.error("Nao foi possivel abrir a impressao", { description: "Tente novamente." });
+                        toast.error("Não foi possível abrir a impressão", { description: "Tente novamente." });
                       }
                     }}
                     type="button"
@@ -544,7 +544,7 @@ const OrganizedListRow = memo(function OrganizedListRow({
       >
         <CopyCell
           isActive={activeCopyField === "numero"}
-          label="Numero"
+          label="Número"
           onActivate={() => setActiveCopyCell({ field: "numero", rowKey })}
           value={item.numero}
         />

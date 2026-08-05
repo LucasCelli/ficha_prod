@@ -328,8 +328,8 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
     return (
       <section className="quadro-producao-view">
         <div className="quadro-producao-state">
-          <h1>Quadro de Producao</h1>
-          <p>Supabase nao configurado.</p>
+          <h1>Quadro de Produção</h1>
+          <p>Supabase não configurado.</p>
         </div>
       </section>
     );
@@ -339,7 +339,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
     return (
       <section className="quadro-producao-view">
         <div className="quadro-producao-state">
-          <h1>Quadro de Producao</h1>
+          <h1>Quadro de Produção</h1>
           <p>{currentResult.message}</p>
           <Button onClick={refreshBoard} variant="secondary">
             <RefreshCw aria-hidden="true" size={16} />

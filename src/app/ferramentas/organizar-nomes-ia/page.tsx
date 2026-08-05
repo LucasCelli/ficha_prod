@@ -5,7 +5,7 @@ import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Organizar nomes com IA | Fichas Tecnicas",
+  title: "Organizar nomes com IA | Fichas Técnicas",
 };
 
 type OrganizarNomesIaPageProps = {

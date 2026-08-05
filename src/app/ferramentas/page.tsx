@@ -4,7 +4,7 @@ import { ArrowRight, Crop, WandSparkles } from "lucide-react";
 import { requireAppSession } from "@/features/auth/session";
 
 export const metadata: Metadata = {
-  title: "Ferramentas | Fichas Tecnicas",
+  title: "Ferramentas | Fichas Técnicas",
 };
 
 const tools = [

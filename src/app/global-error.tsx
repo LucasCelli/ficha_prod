@@ -15,7 +15,7 @@ export default function GlobalErrorPage({ reset }: GlobalErrorPageProps) {
           <section className="status-panel status-panel--danger" role="alert">
             <div className="status-panel__content">
               <p className="status-panel__eyebrow">Erro</p>
-              <h1>Nao foi possivel continuar</h1>
+              <h1>Não foi possível continuar</h1>
               <p>Tente novamente.</p>
               <button className="ui-button ui-button--secondary" onClick={reset} type="button">
                 Tentar novamente

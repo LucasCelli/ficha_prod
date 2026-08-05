@@ -179,7 +179,7 @@ export async function deleteCatalogItemsAction(kind: CatalogKind, itemIds: strin
 
   if (!parsedKind || ids.length === 0 || ids.length !== itemIds.length || new Set(ids).size !== ids.length) {
     return {
-      message: "Itens inválidos para exclusao.",
+      message: "Itens inválidos para exclusão.",
       status: "error" as const,
     };
   }
