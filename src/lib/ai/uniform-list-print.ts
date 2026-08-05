@@ -9,22 +9,12 @@ const MODEL_LABELS: Record<string, string> = {
   tradicional: "Camiseta",
 };
 
-const CONFIDENCE_LABELS: Record<string, string> = {
-  alta: "Alta",
-  baixa: "Baixa",
-  media: "Media",
-};
-
 function displayValue(value: string | null | undefined) {
   return value && value.length > 0 ? value : "-";
 }
 
 function formatModel(value: string) {
   return MODEL_LABELS[value] ?? value;
-}
-
-function formatConfidence(value: string) {
-  return CONFIDENCE_LABELS[value] ?? value;
 }
 
 function escapeHtml(value: string | null | undefined) {
@@ -56,7 +46,6 @@ export function buildUniformListPrintHtml(input: UniformListPrintInput) {
               <th>Numero</th>
               <th>Tamanho</th>
               <th>Modelo</th>
-              <th>Confianca</th>
               ${input.showGroup ? "<th>Grupo</th>" : ""}
               <th>Observacao</th>
             </tr>
@@ -70,7 +59,6 @@ export function buildUniformListPrintHtml(input: UniformListPrintInput) {
                     <td>${escapeHtml(item.numero)}</td>
                     <td>${escapeHtml(item.tamanho)}</td>
                     <td>${escapeHtml(formatModel(item.modelo))}</td>
-                    <td>${escapeHtml(formatConfidence(item.confianca))}</td>
                     ${input.showGroup ? `<td>${escapeHtml(item.grupo)}</td>` : ""}
                     <td>${escapeHtml(item.observacao)}</td>
                   </tr>
@@ -97,7 +85,7 @@ export function buildUniformListPrintHtml(input: UniformListPrintInput) {
           table { border-collapse: collapse; width: 100%; }
           th, td { border: 1px solid #d1d5db; padding: 6px 7px; text-align: left; vertical-align: top; }
           th { background: #f3f4f6; font-size: 10px; text-transform: uppercase; }
-          td:nth-child(2), td:nth-child(3), td:nth-child(5) { text-align: center; }
+          td:nth-child(2), td:nth-child(3) { text-align: center; }
           pre { border: 1px solid #d1d5db; font-family: "Courier New", monospace; font-size: 12px; line-height: 1.45; margin: 0; padding: 10px; white-space: pre-wrap; word-break: break-word; }
         </style>
       </head>
