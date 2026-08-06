@@ -109,6 +109,33 @@
   gap: 16px;
 }
 
+.cut-plan__merge-option {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  width: fit-content;
+  gap: 10px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.cut-plan__merge-option input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--color-primary);
+}
+
+.cut-plan__merge-option span {
+  display: grid;
+  gap: 2px;
+}
+
+.cut-plan__merge-option small {
+  color: var(--color-muted);
+  font-weight: var(--font-weight-regular);
+}
+
 /* Sufixo de unidade sobreposto ao input, alinhado ao padding do `.field`. */
 .cut-plan__unit-input {
   display: grid;
@@ -272,6 +299,29 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.cut-plan__merged-grade {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cut-plan__merged-grade li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.cut-plan__merged-grade strong {
+  color: var(--color-text);
+}
+
+.cut-plan__merged-grade span {
+  color: var(--color-primary-text);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Folhas: destaque informativo no azul claro do design system. */
@@ -818,6 +868,61 @@
   font-size: 12px;
 }
 
+.cut-plan-print-simple__sources {
+  margin-top: 16px;
+}
+
+.cut-plan-print-simple__sources h2 {
+  margin: 0 0 7px;
+  color: #40516a;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.cut-plan-print-simple__sources>div {
+  display: grid;
+  gap: 5px;
+}
+
+.cut-plan-print-simple__sources article {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #d8dee8;
+  border-radius: 5px;
+  background: #f5f7fa;
+  padding: 6px;
+  break-inside: avoid;
+}
+
+.cut-plan-print-simple__sources img,
+.cut-plan-print-simple__source-placeholder {
+  display: block;
+  width: 54px;
+  height: 38px;
+  flex: 0 0 54px;
+  border-radius: 3px;
+  background: #e3e8ef;
+  object-fit: cover;
+}
+
+.cut-plan-print-simple__sources p {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.cut-plan-print-simple__sources strong {
+  color: #204f91;
+  font-size: 12px;
+}
+
+.cut-plan-print-simple__sources small {
+  color: #526276;
+  font-size: 10px;
+  font-weight: 600;
+}
+
 .cut-plan-print-simple__summary {
   display: flex;
   margin: 18px 0 26px;
@@ -849,6 +954,18 @@
 .cut-plan-print-simple__fabric {
   margin-top: 26px;
   break-inside: avoid;
+}
+
+.cut-plan-print-simple__conference {
+  margin-top: 16px;
+  break-inside: avoid;
+}
+
+.cut-plan-print-simple__conference h3 {
+  margin: 0 0 8px;
+  color: #40516a;
+  font-size: 11px;
+  text-transform: uppercase;
 }
 
 .cut-plan-print-simple__fabric>header {

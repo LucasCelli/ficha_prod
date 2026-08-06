@@ -1,3 +1,25 @@
+## 2026-08-06 - Mescla opcional de cores nos enfestos
+
+- Módulo: `/ferramentas/plano-de-corte`.
+- Arquivos principais: `model.ts`, `alternatives.ts`, `plano-de-corte-workspace.tsx`, `cut-plan-print-simple.tsx`, `cut-plan-native-print-layer.tsx`, `plano-de-corte.css` e testes de qualidade/Playwright.
+
+### Resultado
+
+- A configuração da mesa ganhou a checkbox `Mesclar tecidos nos enfestos`, desligada por padrão. Sem autorização explícita, o solver preserva integralmente a separação anterior por tecido/cor.
+- Com a opção ativa, as alternativas passam por uma busca combinatória limitada que cruza as soluções válidas de cada cor e prioriza o menor número de enfestos operacionais.
+- A mescla exige o mesmo nome canônico de tecido, largura, tipo, número de folhas e comprimento dimensional conhecido. Cores vazias, repetidas ou materiais incompatíveis não são combinados.
+- Cada enfesto mesclado conserva alocações independentes por cor, com sua própria grade, frequência, peças cortadas e conferência. Tamanhos distintos podem compartilhar o enfesto quando folhas e comprimento da mesa forem compatíveis.
+- O exemplo de 12 camisetas M pretas, 6 brancas e 6 azuis fecha em um enfesto tubular de 3 folhas: frequências 4M, 2M e 2M, sem diferença de produção.
+- Quantidades tubulares pequenas e ímpares também foram cobertas: pedidos 1/3/5 fecham em um enfesto de uma folha, produzem 2/4/6 e exibem sobra +1 em cada cor, totalizando três peças a mais.
+- O resultado da tela e o PDF do Plano de Corte exibem os enfestos mesclados uma única vez, com tecido/cor em cada grade. O total de folhas usa as folhas operacionais do enfesto, sem multiplicá-las pela quantidade de cores.
+- O PDF do Plano de Corte ganhou uma seção de fichas anexadas com miniatura, cliente, tecido, cor, manga e total de peças, usando os dados já importados no plano. O PDF operacional da listagem de fichas não foi alterado.
+
+### Validação
+
+- `npm run test:quality`: 50/50 testes, incluindo opção desligada, exemplo de três cores, tamanhos diferentes, largura incompatível, sobras ímpares e regressão Intercement em dois enfestos.
+- `npm run lint`, `npm run typecheck` e `npm run build` passaram.
+- Playwright autenticado em build de produção confirmou a importação, a faixa de fichas com thumbnail no PDF, a mescla de três cores em um enfesto de três folhas e as três conferências sem diferença.
+
 ## 2026-08-05 - Catalogos como fonte de medidas e configuracao do Plano de Corte
 
 - Modulos: /catalogos?tipo=tamanho, /catalogos?tipo=tecido e /ferramentas/plano-de-corte.

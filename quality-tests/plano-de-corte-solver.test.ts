@@ -5,6 +5,7 @@ import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, calculateShirtAreaC
 import { cutPlanDemandKey, type CutPlanSizeProfile, type FabricType } from "../src/features/plano-de-corte/model.ts";
 import { solveMinimumLays } from "../src/features/plano-de-corte/solver.ts";
 import { calculateCutPlan, formatMarkerLabel } from "../src/features/plano-de-corte/calculator.ts";
+import { calculateCutPlanAlternatives } from "../src/features/plano-de-corte/alternatives.ts";
 import { validateCutPlan } from "../src/features/plano-de-corte/validation.ts";
 import type { CutPlanInput } from "../src/features/plano-de-corte/model.ts";
 
@@ -178,6 +179,99 @@ test("pedido Intercement permanece em dois enfestos com a dobra apenas na estima
   ]);
   assert.ok(result.lays.every((lay) => (lay.markerLengthCm ?? 0) <= input.tableLengthCm));
   assert.ok(result.sizes.every((size) => size.difference === 0));
+});
+
+test("mescla opt-in alinha cores compativeis no mesmo enfesto sem alterar a producao", () => {
+  const profile = measuredProfile("M", [70, 50, 70, 50, 25, 40, 60, 40]);
+  const fabrics = [
+    { id: "black", name: "Malha Fria (PV)", color: "Preto", widthCm: 118, type: "TUBULAR" as const },
+    { id: "white", name: "Malha Fria (PV)", color: "Branco", widthCm: 118, type: "TUBULAR" as const },
+    { id: "blue", name: "Malha Fria (PV)", color: "Azul", widthCm: 118, type: "TUBULAR" as const },
+  ];
+  const input: CutPlanInput = {
+    tableLengthCm: 800,
+    maxLayers: 50,
+    fabrics,
+    items: fabrics.map((fabric) => ({ id: fabric.id, fabricId: fabric.id, size: "M", sleeveType: "CURTA", quantity: fabric.id === "black" ? 12 : 6 })),
+    sizeProfiles: [profile],
+  };
+
+  const separated = calculateCutPlanAlternatives(input)[0];
+  assert.equal(separated.layCount, 3);
+  assert.equal(separated.result.mergedLays, undefined);
+
+  const merged = calculateCutPlanAlternatives({ ...input, mergeFabricsInLays: true })[0];
+  assert.equal(merged.layCount, 1);
+  assert.equal(merged.result.mergedLays?.[0].layers, 3);
+  assert.deepEqual(merged.result.mergedLays?.[0].allocations.map((allocation) => ({
+    fabricId: allocation.fabricId,
+    frequency: allocation.frequencies[0].frequency,
+  })), [
+    { fabricId: "black", frequency: 4 },
+    { fabricId: "white", frequency: 2 },
+    { fabricId: "blue", frequency: 2 },
+  ]);
+  assert.ok(merged.result.fabrics.flatMap((fabric) => fabric.sizes).every((size) => size.difference === 0));
+});
+
+test("mescla tamanhos diferentes, mas nunca tecidos com largura incompativel", () => {
+  const input: CutPlanInput = {
+    tableLengthCm: 800,
+    maxLayers: 50,
+    mergeFabricsInLays: true,
+    fabrics: [
+      { id: "black", name: "Malha", color: "Preto", widthCm: 118, type: "TUBULAR" },
+      { id: "white", name: "Malha", color: "Branco", widthCm: 118, type: "TUBULAR" },
+      { id: "narrow", name: "Malha", color: "Azul", widthCm: 90, type: "TUBULAR" },
+    ],
+    items: [
+      { id: "black-m", fabricId: "black", size: "M", sleeveType: "CURTA", quantity: 6 },
+      { id: "white-g", fabricId: "white", size: "G", sleeveType: "CURTA", quantity: 6 },
+      { id: "narrow-p", fabricId: "narrow", size: "P", sleeveType: "CURTA", quantity: 6 },
+    ],
+    sizeProfiles: [
+      measuredProfile("P", [66, 46, 66, 46, 22, 36, 56, 36]),
+      measuredProfile("M", [70, 50, 70, 50, 25, 40, 60, 40]),
+      measuredProfile("G", [74, 54, 74, 54, 27, 44, 64, 44]),
+    ],
+  };
+  const result = calculateCutPlanAlternatives(input)[0].result;
+  assert.equal(result.mergedLays?.length, 2);
+  assert.deepEqual(new Set(result.mergedLays?.[0].allocations.map((allocation) => allocation.fabricId)), new Set(["black", "white"]));
+  assert.equal(result.mergedLays?.[1].allocations[0].fabricId, "narrow");
+});
+
+test("mescla pequenas quantidades impares tubulares e conserva as sobras por cor", () => {
+  const fabrics = [
+    { id: "black", name: "Malha", color: "Preto", widthCm: 118, type: "TUBULAR" as const },
+    { id: "white", name: "Malha", color: "Branco", widthCm: 118, type: "TUBULAR" as const },
+    { id: "blue", name: "Malha", color: "Azul", widthCm: 118, type: "TUBULAR" as const },
+  ];
+  const quantities = [1, 3, 5];
+  const input: CutPlanInput = {
+    tableLengthCm: 800,
+    maxLayers: 50,
+    mergeFabricsInLays: true,
+    fabrics,
+    items: fabrics.map((fabric, index) => ({ id: fabric.id, fabricId: fabric.id, size: "M", sleeveType: "CURTA", quantity: quantities[index] })),
+    sizeProfiles: [measuredProfile("M", [70, 50, 70, 50, 25, 40, 60, 40])],
+  };
+  const alternative = calculateCutPlanAlternatives(input)[0];
+  const sizes = alternative.result.fabrics.flatMap((fabric) => fabric.sizes);
+
+  assert.equal(alternative.layCount, 1);
+  assert.equal(alternative.result.mergedLays?.[0].layers, 1);
+  assert.deepEqual(Object.fromEntries(alternative.result.mergedLays?.[0].allocations.map((allocation) => [allocation.fabricId, allocation.frequencies[0].frequency]) ?? []), {
+    black: 2,
+    white: 4,
+    blue: 6,
+  });
+  assert.deepEqual(sizes.map(({ requested, produced, difference }) => ({ requested, produced, difference })), [
+    { requested: 1, produced: 2, difference: 1 },
+    { requested: 3, produced: 4, difference: 1 },
+    { requested: 5, produced: 6, difference: 1 },
+  ]);
+  assert.equal(sizes.reduce((total, size) => total + Math.max(0, size.difference), 0), 3);
 });
 
 test("mantem o mesmo tamanho separado por tipo de manga", () => {

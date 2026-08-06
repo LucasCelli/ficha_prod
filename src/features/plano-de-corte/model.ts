@@ -52,6 +52,7 @@ export interface CutPlanInput {
   items: CutPlanItem[];
   sizeProfiles: CutPlanSizeProfile[];
   sourceFichaIds?: string[];
+  mergeFabricsInLays?: boolean;
 }
 
 export interface CutPlanSourceFicha {
@@ -95,6 +96,14 @@ export interface FabricCutPlanResult {
   sizes: SizeProductionResult[];
 }
 
+export interface MergedLayPlan {
+  id: string;
+  layers: number;
+  allocations: LayPlan[];
+  markerLengthCm?: number;
+}
+
 export interface CutPlanResult {
   fabrics: FabricCutPlanResult[];
+  mergedLays?: MergedLayPlan[];
 }

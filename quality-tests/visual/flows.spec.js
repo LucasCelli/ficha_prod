@@ -288,7 +288,7 @@ test.describe("plano de corte: tamanhos e mangas", () => {
       client: "Cliente legado",
       color: "Azul",
       id: "legacy-alias",
-      imageUrl: null,
+      imageUrl: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='60'%3E%3Crect width='80' height='60' fill='%23dbeafe'/%3E%3C/svg%3E",
       items: [{ quantity: 10, size: "M" }],
       material: "Poliviscose",
       number: "LEG-1",
@@ -308,6 +308,55 @@ test.describe("plano de corte: tamanhos e mangas", () => {
     await expect(page.locator('input[id^="cut-plan-fabric-width-"]').first()).toHaveValue("118");
     await expect(page.locator('select[id^="cut-plan-fabric-type-"]').first()).toHaveValue("TUBULAR");
     await expect(page.locator(".cut-plan__fabric-title strong").first()).toHaveText("Malha Fria (PV) — Azul");
+    await expect(page.getByRole("checkbox", { name: /Mesclar tecidos nos enfestos/ })).not.toBeChecked();
+    await page.getByRole("button", { name: "Calcular plano" }).click();
+    await expect(page.getByRole("heading", { name: "Resultado", exact: true })).toBeVisible();
+    await page.evaluate(() => { window.print = () => {}; });
+    await page.getByRole("button", { name: "Imprimir esta" }).click();
+    const printSources = page.locator(".cut-plan-native-print-root .cut-plan-print-simple__sources");
+    await expect(printSources).toContainText("Cliente legado");
+    await expect(printSources).toContainText("Malha Fria (PV) · Azul · Manga curta · 10 peças");
+    await expect(printSources.locator("img")).toHaveCount(1);
+  });
+
+  test("mescla três cores compatíveis no mesmo enfesto quando autorizado", async ({ context, page }) => {
+    await openPage(page, context, "/ferramentas/plano-de-corte");
+    const fichas = [
+      { client: "Pedido preto", color: "Preto", id: "merge-black", quantity: 12 },
+      { client: "Pedido branco", color: "Branco", id: "merge-white", quantity: 6 },
+      { client: "Pedido azul", color: "Azul", id: "merge-blue", quantity: 6 },
+    ].map(({ quantity, ...ficha }) => ({
+      ...ficha,
+      imageUrl: null,
+      items: [{ quantity, size: "M" }],
+      material: "Malha Fria (PV)",
+      number: null,
+      sleeveType: "CURTA",
+      total: quantity,
+    }));
+    await page.route("**/api/ferramentas/plano-de-corte/fichas**", async (route) => {
+      const id = new URL(route.request().url()).searchParams.get("fichaId");
+      await route.fulfill({ contentType: "application/json", json: id ? { success: true, ficha: fichas.find((ficha) => ficha.id === id) } : { success: true, fichas } });
+    });
+
+    for (const ficha of fichas) {
+      await page.getByRole("button", { name: "Buscar", exact: true }).click();
+      await page.getByRole("option").filter({ hasText: ficha.client }).click();
+      await expect(page.locator(".cut-plan-fichas__added > div")).toHaveCount(fichas.indexOf(ficha) + 1);
+    }
+    await page.getByRole("checkbox", { name: /Mesclar tecidos nos enfestos/ }).check();
+    await page.getByRole("button", { name: "Calcular plano" }).click();
+
+    await expect(page.locator(".cut-plan__tabs button").first()).toContainText("1 enfesto");
+    await expect(page.getByRole("heading", { name: "Enfestos mesclados" })).toBeVisible();
+    const mergedLay = page.locator(".cut-plan__lay").first();
+    await expect(mergedLay).toContainText("Malha Fria (PV) — Preto");
+    await expect(mergedLay).toContainText("4M");
+    await expect(mergedLay).toContainText("Malha Fria (PV) — Branco");
+    await expect(mergedLay).toContainText("Malha Fria (PV) — Azul");
+    await expect(mergedLay.locator(".cut-plan__lay-layers > span")).toHaveText("3");
+    await expect(page.locator(".cut-plan__check")).toHaveCount(3);
+    await expect(page.locator(".cut-plan .is-changed")).toHaveCount(0);
   });
 
   test("resultado destaca folhas, omite ausência de estimativa e imprime no rodapé", async ({ context, page }) => {
@@ -340,7 +389,8 @@ test.describe("plano de corte: tamanhos e mangas", () => {
     });
     expect(highlighted).toBeTruthy();
     const actionsFollowCheck = await page.evaluate(() => {
-      const check = document.querySelector(".cut-plan__check:last-of-type");
+      const checks = document.querySelectorAll(".cut-plan__check");
+      const check = checks.item(checks.length - 1);
       const actions = document.querySelector(".cut-plan__print-actions--bottom");
       return Boolean(check && actions && (check.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING));
     });

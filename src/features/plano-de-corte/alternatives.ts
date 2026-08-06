@@ -1,5 +1,5 @@
 import { calculateCutPlan, formatMarkerLabel } from "./calculator.ts";
-import { cutPlanDemandKey, parseCutPlanDemandKey, type CutPlanInput, type CutPlanResult, type FabricCutPlanResult, type LayPlan } from "./model.ts";
+import { cutPlanDemandKey, parseCutPlanDemandKey, type CutPlanInput, type CutPlanResult, type FabricCutPlanResult, type LayPlan, type MergedLayPlan } from "./model.ts";
 import { solveMinimumLays } from "./solver.ts";
 import { compareUniformSizes } from "../../lib/uniform-sizes.ts";
 import { buildSizeProfileIndex, estimateMarkerLengthCm, getMaximumEstimatedFrequency } from "./dimensions.ts";
@@ -67,16 +67,18 @@ function buildFabricResult(fabricId: string, requested: Map<string, number>, lay
 }
 
 function planSignature(result: CutPlanResult) {
+  if (result.mergedLays) return result.mergedLays.map((lay) => `${lay.layers}:${lay.allocations.map((allocation) => `${allocation.fabricId}:${formatMarkerLabel(allocation.frequencies)}`).join("+")}`).join("||");
   return result.fabrics.map((fabric) => fabric.lays.map((lay) => `${lay.fabricId}:${lay.layers}:${formatMarkerLabel(lay.frequencies)}`).join("|")).join("||");
 }
 
 function score(result: CutPlanResult) {
-  const lays = result.fabrics.flatMap((fabric) => fabric.lays);
-  const markerFrequencies = lays.map((lay) => lay.frequencies.reduce((sum, item) => sum + item.frequency, 0));
+  const fabricLays = result.fabrics.flatMap((fabric) => fabric.lays);
+  const operationalLays = result.mergedLays ?? fabricLays;
+  const markerFrequencies = fabricLays.map((lay) => lay.frequencies.reduce((sum, item) => sum + item.frequency, 0));
   const complexity = markerFrequencies.reduce((total, value) => total + value, 0);
   const peakFrequency = Math.max(0, ...markerFrequencies);
-  const sizeEntries = lays.reduce((total, lay) => total + lay.frequencies.length, 0);
-  const totalLayers = lays.reduce((total, lay) => total + lay.layers, 0);
+  const sizeEntries = fabricLays.reduce((total, lay) => total + lay.frequencies.length, 0);
+  const totalLayers = operationalLays.reduce((total, lay) => total + lay.layers, 0);
   const sizeSpreadScore = result.fabrics.reduce((total, fabric) => {
     const orderedSizes = [...new Set(fabric.sizes.map((size) => cutPlanDemandKey(size.size, size.sleeveType)))].sort((left, right) => compareUniformSizes(parseCutPlanDemandKey(left).size, parseCutPlanDemandKey(right).size));
     const ranks = new Map(orderedSizes.map((size, index) => [size, index]));
@@ -85,7 +87,71 @@ function score(result: CutPlanResult) {
       return fabricTotal + (activeRanks.length > 1 ? (activeRanks.at(-1)! - activeRanks[0]) * lay.layers : 0);
     }, 0);
   }, 0);
-  return { mapCount: lays.length, layCount: lays.length, complexity, peakFrequency, sizeEntries, sizeSpreadScore, totalLayers };
+  return { mapCount: operationalLays.length, layCount: operationalLays.length, complexity, peakFrequency, sizeEntries, sizeSpreadScore, totalLayers };
+}
+
+function normalizeCompatibilityValue(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, " ").trim().toLowerCase();
+}
+
+function buildMergedLays(input: CutPlanInput, result: CutPlanResult): MergedLayPlan[] {
+  const groups: Array<MergedLayPlan & { compatibilityKey: string; colors: Set<string> }> = [];
+  const allocations = result.fabrics.flatMap((fabricResult) => fabricResult.lays).sort((left, right) =>
+    right.layers - left.layers || (right.markerLengthCm ?? 0) - (left.markerLengthCm ?? 0));
+
+  for (const allocation of allocations) {
+    const fabric = input.fabrics.find((candidate) => candidate.id === allocation.fabricId)!;
+    const color = normalizeCompatibilityValue(fabric.color);
+    const compatibilityKey = `${normalizeCompatibilityValue(fabric.name)}:${fabric.widthCm}:${fabric.type}`;
+    const allocationLength = allocation.markerLengthCm ?? 0;
+    const target = color && allocation.markerLengthCm !== undefined ? groups.find((group) => group.compatibilityKey === compatibilityKey
+      && group.layers === allocation.layers
+      && !group.allocations.some((existing) => existing.fabricId === allocation.fabricId)
+      && !group.colors.has(color)
+      && group.markerLengthCm !== undefined
+      && group.markerLengthCm + allocationLength <= input.tableLengthCm) : undefined;
+    if (target) {
+      target.allocations.push(allocation);
+      target.colors.add(color);
+      target.markerLengthCm = target.markerLengthCm !== undefined && allocation.markerLengthCm !== undefined
+        ? target.markerLengthCm + allocation.markerLengthCm
+        : undefined;
+      continue;
+    }
+    groups.push({
+      id: `merged-lay-${groups.length + 1}`,
+      layers: allocation.layers,
+      allocations: [allocation],
+      ...(allocation.markerLengthCm !== undefined ? { markerLengthCm: allocation.markerLengthCm } : {}),
+      compatibilityKey,
+      colors: new Set(color ? [color] : []),
+    });
+  }
+  return groups.map((group, index) => ({
+    id: `merged-lay-${index + 1}`,
+    layers: group.layers,
+    allocations: group.allocations,
+    ...(group.markerLengthCm !== undefined ? { markerLengthCm: group.markerLengthCm } : {}),
+  }));
+}
+
+function calculateMergedVariants(input: CutPlanInput, candidates: Array<{ result: CutPlanResult; description: string }>) {
+  const activeFabricIds = input.fabrics.filter((fabric) => input.items.some((item) => item.fabricId === fabric.id)).map((fabric) => fabric.id);
+  const options = new Map(activeFabricIds.map((fabricId) => {
+    const choices = candidates.map(({ result }) => result.fabrics.find((fabric) => fabric.fabricId === fabricId)!).filter(Boolean);
+    return [fabricId, [...new Map(choices.map((choice) => [choice.lays.map((lay) => `${lay.layers}:${formatMarkerLabel(lay.frequencies)}`).join("|"), choice])).values()]];
+  }));
+  let beam: FabricCutPlanResult[][] = [[]];
+  for (const fabricId of activeFabricIds) {
+    beam = beam.flatMap((selected) => options.get(fabricId)!.map((choice) => [...selected, choice]))
+      .sort((left, right) => buildMergedLays(input, { fabrics: left }).length - buildMergedLays(input, { fabrics: right }).length)
+      .slice(0, 64);
+  }
+  return beam.map((fabrics) => {
+    const result: CutPlanResult = { fabrics };
+    result.mergedLays = buildMergedLays(input, result);
+    return { result, description: "Cores compatíveis reunidas no menor número de enfestos, com grade e folhas separadas por tecido." };
+  });
 }
 
 
@@ -135,11 +201,12 @@ function calculateOptimizedVariants(input: CutPlanInput) {
   }));
 }
 export function calculateCutPlanAlternatives(input: CutPlanInput): CutPlanAlternative[] {
-  const candidates = [
+  const baseCandidates = [
     ...calculateOptimizedVariants(input),
     { result: calculateIndividualPlan(input, "compact"), description: "Um enfesto por tamanho, com a frequência mais alta que couber." },
     { result: calculateIndividualPlan(input, "simple"), description: "Um enfesto por tamanho, com a grade mais simples de conferir." },
   ];
+  const candidates = input.mergeFabricsInLays ? calculateMergedVariants(input, baseCandidates) : baseCandidates;
   const unique = [...new Map(candidates.map((candidate) => [planSignature(candidate.result), candidate])).values()]
     .map((candidate) => ({ ...candidate, ...score(candidate.result) }))
     .sort((a, b) => a.layCount - b.layCount || b.sizeSpreadScore - a.sizeSpreadScore || a.complexity - b.complexity || a.peakFrequency - b.peakFrequency || a.sizeEntries - b.sizeEntries || a.totalLayers - b.totalLayers)
