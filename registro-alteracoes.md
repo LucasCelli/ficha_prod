@@ -1,3 +1,92 @@
+## 2026-08-05 - Limites fisicos e estimativa dimensional do Plano de Corte
+
+- Modulo: `/ferramentas/plano-de-corte`.
+- Arquivos: `model.ts`, `dimensions.ts`, `solver.ts`, `calculator.ts`, `alternatives.ts`, `validation.ts`, `plano-de-corte-workspace.tsx`, `cut-plan-size-profiles-modal.tsx`, `cut-plan-print-simple.tsx`, `plano-de-corte.css`, `quality-tests/plano-de-corte-solver.test.ts` e `tsconfig.json`.
+
+### Resultado
+
+- O padrao de folhas passou de 30 para 50. O limite operacional e validado e refletido no input: ate 100 folhas para tecido plano e ate 50 para tubular, cuja duplicacao corresponde a 100 camadas de tecido.
+- Um botao flutuante abre o cadastro de medidas por tamanho. Cada perfil aceita tamanho principal, aliases, altura/largura de uma parte do corpo e altura/largura de uma manga; a conta usa frente + costas e um par de mangas por camiseta.
+- Tamanhos e aliases usam a mesma normalizacao do catalogo de uniformes. Perfis ambiguos ou com medidas invalidas sao recusados antes do calculo.
+- A estimativa usa a area das partes, a largura do tecido e eficiencia conservadora de encaixe de 82%. No tubular, a frequencia de producao e dividida por dois na ocupacao do marcador. O solver rejeita grades estimadas acima do tamanho da mesa.
+- O comprimento estimado aparece em cada enfesto da tela e em coluna propria na impressao. Tamanhos sem perfil continuam calculaveis e sao identificados como sem estimativa dimensional.
+
+### Otimizador
+
+- A geracao por divisores sugerida na analise externa foi rejeitada porque eliminava combinacoes validas. A regressao `10/7` prova a solucao conjunta com layers `3/2`.
+- Entraram podas seguras por capacidade, MDC, frequencia minima, quantidade de tamanhos e representabilidade. A DP processa primeiro os tamanhos com menos atribuicoes possiveis sem alterar o rank fisico usado pelo criterio de dispersao.
+- A metrica foi renomeada internamente de `sizeMixScore` para `sizeSpreadScore`, deixando explicito que a preferencia atual junta tamanhos distantes. A funcao objetivo permanece lexicografica; nao foram introduzidos pesos arbitrarios.
+- O calculo duplicado da solucao principal foi removido. A prova combinatoria tem orcamento de 1,5 s; ao esgotar, o fallback deterministico preserva producao exata, paridade, frequencias, limite de tamanhos e folhas sem travar indefinidamente a interface.
+- A interface mostra spinner e bloqueia novo disparo enquanto o calculo esta em andamento.
+
+### Validacao
+
+- `npm run typecheck`, `npm run lint`, `npm run encoding:check`, `npm run test:quality` (34/34), `npm run supabase:check`, `npm run build` e `git diff --check` passaram.
+- A nova suite compara o solver com busca exaustiva independente em entradas pequenas, cobre plano/tubular, aliases, estimativa, limites, regressao por divisores, caso `P40 M60 G50 GG30` e fallback com 16 tamanhos.
+- Benchmark dirigido: caso operacional tubular em aproximadamente 2 ms; estresse combinatorio encerrado em aproximadamente 1,5 s com fallback exato.
+- Navegador autenticado em build de producao: limites 50/100, troca de tipo, modal desktop/mobile, alias `MEDIO` para perfil `M` e pedido de 60 pecas limitado por mesa de 250 cm. Resultado: tres enfestos, cada um com 196 cm estimados, sem overflow em viewport de 393 px.
+
+### Caveats
+
+- A medida e uma aproximacao por area com margem de encaixe, nao substitui o nesting do Audaces. Apenas tamanhos que encontram um perfil por nome ou alias entram na restricao de comprimento.
+- Os perfis pertencem a sessao atual da ferramenta, assim como os demais dados do plano; nenhuma persistencia nova foi criada.
+
+## 2026-08-05 - Card de enfesto: hierarquia, badges de grade e tabela compacta
+
+- Modulo: `/ferramentas/plano-de-corte`, bloco de resultado.
+- Arquivos: `src/features/plano-de-corte/plano-de-corte-workspace.tsx`, `plano-de-corte.css`.
+- `Enfesto 01` virou o titulo do card, com o destaque azul que antes era da grade. A grade passou a ser uma badge por combinacao (`4P`, `6M`), usando o primitivo `Badge`.
+- A quantidade de folhas saiu do input e virou circulo no canto superior direito, com peso visual abaixo do titulo. Cada card ganhou borda superior, no mesmo idioma das etapas do plano.
+- Removidos os inputs de folhas e de frequencia: ajustar esses valores na mao nao substitui o solver e abria espaco para um plano incoerente com o calculo. Com isso sairam a funcao `updateLay` da tela e a coluna `Folhas` da tabela, que repetia o valor do circulo.
+- A tabela do enfesto ficou compacta (fonte `sm`, linhas de 6px) e sem largura minima, porque cresce junto com a quantidade de tamanhos do mapa.
+- Removida a linha `No Audaces:`. Ela existia para explicar a divisao tubular, mas o proprio Audaces ja faz a conversao.
+- Caveat: `recalculateFabricResult` em `calculator.ts` ficou sem chamador. Foi mantida exportada de proposito, porque e a porta de entrada caso a edicao manual de enfesto volte; se nao voltar, remover.
+
+## 2026-08-05 - Revisao de UI do Plano de Corte contra os padroes do projeto
+
+- Modulo: `/ferramentas/plano-de-corte`.
+- Arquivos: `src/features/plano-de-corte/plano-de-corte.css`, `plano-de-corte-workspace.tsx`, `cut-plan-items-editor.tsx`, `cut-plan-ficha-picker.tsx`, `cut-plan-print-simple.tsx`, `calculator.ts`.
+
+### Correcoes de comportamento
+
+- `Adicionar linha` inseria a nova linha no topo: `onClick={addItem}` entregava o evento de clique no parametro `afterId`, que caia no ramo de insercao posicional com indice `-1`. O tipo da prop (`() => void`) escondia o erro. Agora o handler chama `addItem()` e a prop declara `(afterId?: string)`.
+- Campos numericos quebravam ao serem esvaziados: `valueAsNumber` devolvia `NaN` para o estado controlado. `NumberField` passou a manter rascunho local e so propagar numero valido, no mesmo padrao ja usado na quantidade do editor.
+- Sem unidade, o input de folhas herdava o `padding-right: 58px` do sufixo sobreposto e escondia o valor. O involucro de unidade so e renderizado quando existe unidade.
+
+### Padronizacao
+
+- Formularios passaram a usar o primitivo compartilhado `.field` (`div.field > label[for] + controle`) em vez de estilo local duplicado. Isso corrige o modo escuro: a seta e o fundo do `select` e o fundo dos inputs vinham do tema claro, porque a copia local nao trazia os overrides `html[data-theme="dark"]` do primitivo. Rotulos passam a ter a mesma tipografia (caixa alta) do resto do app.
+- Os dois dialogos de confirmacao passaram a usar a estrutura `.confirm-dialog` de `/fichas`, `/clientes` e `/catalogos`, no lugar das classes locais `cut-plan__dialog`/`modal-header`/`modal-actions`. Removido o `AlertDialogDescription` aninhado, que duplicava o id da descricao ja renderizada pelo `AlertDialog`.
+- Abas de alternativas deixaram de usar `role="tablist"`/`role="tab"` sem `tabpanel`, `aria-controls` nem navegacao por setas. Agora sao botoes com `aria-pressed`, com contraste corrigido no rotulo secundario da aba ativa.
+- Plurais escritos (`countLabel`) no lugar de `enfesto(s)`, `peca(s)` e `alternativa(s)`, alinhado ao restante do produto.
+- Alinhamento das acoes: a tela misturava botoes a esquerda e a direita. Agora toda barra de acao fica a direita com a acao principal por ultimo, como `.form-actions` de `/clientes` e `/fichas`. `cut-plan__actions` foi trocada pelo proprio `.form-actions`; a barra do editor de quantidades deixou de usar `space-between`. A esquerda sobra apenas o seletor de alternativas, que e navegacao e nao acao.
+- Microcopy: removidas as descricoes explicativas das quatro etapas e o paragrafo de aviso da tela. O aviso operacional permanece no rodape do documento impresso, que e onde o setor de corte le.
+
+### Copy
+
+- Revisao de linguagem em toda a tela: mais direta e proxima de quem opera o corte, sem perder a seriedade. Trocas principais:
+  - `Ficha existente` para `Pesquisar ficha`, com placeholder `Nome do cliente ou numero da venda`.
+  - `Configuracoes do plano` para `Mesa e enfesto`; `Comprimento da mesa` para `Tamanho da mesa`.
+  - No card de tecido, rotulos deixaram de repetir a palavra tecido: `Cor / identificacao` para `Cor`, `Largura do tecido` para `Largura`, `Tipo do tecido` para `Plano ou tubular`.
+  - `Adicionar linha` para `Adicionar tamanho`; `Plano calculado` para `Resultado`; `Imprimir atual` para `Imprimir esta`.
+  - Conferencia: `Solicitado / Produzido / Saldo` para `Pedido / Vai cortar / Diferenca`, na tela e no impresso. Resumo: `Folhas totais` para `Total de folhas` e `Pecas excedentes` para `Pecas a mais`.
+  - Abas passaram de `Alternativa N` para `Opcao N`, alinhadas ao toast e ao rotulo do grupo.
+  - Erros e avisos reescritos em voz ativa e com saida acionavel. Ex.: `Nao foi possivel gerar um plano exato dentro dos limites informados.` virou `Nao deu para fechar a conta com esses limites. Aumente o maximo de folhas por enfesto ou revise as quantidades.`
+  - `Sobrescrever esta ficha?` virou `Esta ficha ja esta no plano. Atualizar?`, com acao `Atualizar`.
+
+### CSS
+
+- Folha reescrita em formato expandido e comentado, como os demais dominios. As tres camadas de patch que sobrescreviam regras do proprio arquivo foram fundidas nas regras de origem.
+- Removido CSS morto: `.cut-plan-print-host`, `.cut-plan-print__*`, `.cut-plan-print` (implementacao de impressao anterior), `.cut-plan__errors` e `.cut-plan__inline-empty`. O modificador `.cut-plan__table--result` foi fundido em `.cut-plan__table`, unica variante em uso.
+- Breakpoints locais 640/760/900 substituidos pelos oficiais do projeto: 768 e 1024.
+- Decisao mantida: a folha continua em `src/features/plano-de-corte/` e nao em `src/styles/domains/`, porque o bloco `@media print` sobrescreve o `@page` global (6mm em `base.css`). Importada pelo layout da rota, ela nao contamina a impressao de fichas e relatorios. O motivo agora esta comentado no arquivo.
+
+### Validacao
+
+- `npm run typecheck`, `npm run lint`, `npm run encoding:check`, `npm run test:quality` (25/25) e `npm run build` passaram.
+- Verificacao no navegador autenticado (Playwright, build de producao): claro e escuro em 1440px, 393px mobile, dialogo de confirmacao, plano calculado com duas e quatro alternativas, e a camada de impressao em media `print`.
+- Caveat: `/ferramentas/plano-de-corte` continua sem baseline em `quality-tests/visual/pages.spec.js` (assim como `/ferramentas/cortar-imagem`).
+
 ## 2026-08-05 - Impressao vetorial do Plano de Corte
 
 - O Plano de Corte deixou de usar `html2canvas`/JPEG/`jsPDF`. A impressao agora monta uma camada HTML diretamente no `body` e chama o dialogo nativo, preservando texto e tabelas vetoriais ao imprimir ou salvar como PDF.

@@ -12,7 +12,8 @@ const SIZE_OPTIONS: CustomDatalistOption[] = UNIFORM_SIZE_GROUPS.flat().map((siz
 const fabricLabel = (fabric: CutPlanFabric) => `${fabric.name}${fabric.color.trim() ? ` — ${fabric.color.trim()}` : ""}`;
 
 type Props = {
-  addItem: () => void;
+  /** Sem `afterId` a linha entra no fim; o evento de clique nunca pode chegar aqui. */
+  addItem: (afterId?: string) => void;
   duplicateItem: (id: string, direction: "above" | "below") => void;
   fabrics: CutPlanFabric[];
   items: CutPlanItem[];
@@ -49,16 +50,16 @@ export function CutPlanItemsEditor({ addItem, duplicateItem, fabrics, items, mov
 
   return <div className="cut-plan-items">
     <SortableInstructions />
-    <div className="cut-plan-items__toolbar"><Button variant="secondary" onClick={addItem}><Plus size={18} /> Adicionar linha</Button><Button variant="secondary" onClick={sortItems} disabled={items.length < 2}><RotateCcw size={18} /> Ordenar por tamanho</Button></div>
+    <div className="cut-plan-items__toolbar"><Button variant="secondary" onClick={sortItems} disabled={items.length < 2}><RotateCcw size={18} /> Ordenar por tamanho</Button><Button variant="secondary" onClick={() => addItem()}><Plus size={18} /> Adicionar tamanho</Button></div>
     <div className="cut-plan-items__head" aria-hidden="true"><span></span><span>Tamanho</span><span>Quantidade</span><span>Tecido</span><span>Ações</span></div>
     <DragDropProvider onDragEnd={(event) => { if (event.canceled) return; const source = event.operation.source?.id; const target = event.operation.target?.id; if (source == null || target == null) return; moveItem(items.findIndex((item) => item.id === String(source)), items.findIndex((item) => item.id === String(target))); }}>
       <div className="cut-plan-items__list" data-sortable-list="">{items.length ? items.map((item, index) => <SortableRow id={item.id} index={index} key={item.id}>{(handleRef) => <>
         <SortableHandle className="cut-plan-items__drag" handleRef={handleRef} itemLabel={item.size || `linha ${index + 1}`} onMove={(target) => moveItem(index, target)} position={index + 1} total={items.length} />
-        <div className="cut-plan-items__cell"><span>Tamanho</span><CustomDatalist aria-label={`Tamanho da linha ${index + 1}`} id={`cut-plan-size-${item.id}`} onValueChange={(value) => updateItem(item.id, { size: value.toUpperCase() })} options={SIZE_OPTIONS} placeholder="Ex.: P ou 38" value={item.size} /></div>
-        <label className="cut-plan-items__cell"><span>Quantidade</span><input aria-label={`Quantidade da linha ${index + 1}`} inputMode="numeric" min="0" step="1" type="number" value={quantityDrafts[item.id] ?? (Number.isFinite(item.quantity) && item.quantity !== 0 ? String(item.quantity) : "")} onBlur={() => handleQuantityBlur(item)} onChange={(event) => handleQuantityChange(item, event.currentTarget.value)} onFocus={() => handleQuantityFocus(item)} placeholder="Qtd." /></label>
-        <label className="cut-plan-items__cell"><span>Tecido</span><select aria-label={`Tecido da linha ${index + 1}`} value={item.fabricId} onChange={(event) => updateItem(item.id, { fabricId: event.currentTarget.value })}>{fabrics.map((fabric) => <option value={fabric.id} key={fabric.id}>{fabricLabel(fabric)}</option>)}</select></label>
-        <div className="cut-plan-items__actions"><div><Tooltip label="Duplicar acima"><button aria-label={`Duplicar linha ${index + 1} acima`} onClick={() => duplicateItem(item.id, "above")} type="button"><ArrowUp size={14} /></button></Tooltip><Tooltip label="Duplicar abaixo"><button aria-label={`Duplicar linha ${index + 1} abaixo`} onClick={() => duplicateItem(item.id, "below")} type="button"><ArrowDown size={14} /></button></Tooltip></div><Tooltip label="Remover linha"><button aria-label={`Remover linha ${index + 1}`} className="is-danger" onClick={() => removeItem(item.id)} type="button"><Trash2 size={16} /></button></Tooltip></div>
-      </>}</SortableRow>) : <div className="cut-plan-items__empty">Nenhuma quantidade adicionada.</div>}</div>
+        <div className="cut-plan-items__cell field"><span>Tamanho</span><CustomDatalist aria-label={`Tamanho da linha ${index + 1}`} id={`cut-plan-size-${item.id}`} onValueChange={(value) => updateItem(item.id, { size: value.toUpperCase() })} options={SIZE_OPTIONS} placeholder="Ex.: P ou 38" value={item.size} /></div>
+        <label className="cut-plan-items__cell field"><span>Quantidade</span><input aria-label={`Quantidade da linha ${index + 1}`} inputMode="numeric" min="0" step="1" type="number" value={quantityDrafts[item.id] ?? (Number.isFinite(item.quantity) && item.quantity !== 0 ? String(item.quantity) : "")} onBlur={() => handleQuantityBlur(item)} onChange={(event) => handleQuantityChange(item, event.currentTarget.value)} onFocus={() => handleQuantityFocus(item)} placeholder="Qtd." /></label>
+        <label className="cut-plan-items__cell field"><span>Tecido</span><select aria-label={`Tecido da linha ${index + 1}`} value={item.fabricId} onChange={(event) => updateItem(item.id, { fabricId: event.currentTarget.value })}>{fabrics.map((fabric) => <option value={fabric.id} key={fabric.id}>{fabricLabel(fabric)}</option>)}</select></label>
+        <div className="cut-plan-items__actions"><div><Tooltip label="Duplicar acima"><button aria-label={`Duplicar linha ${index + 1} acima`} onClick={() => duplicateItem(item.id, "above")} type="button"><ArrowUp size={14} /></button></Tooltip><Tooltip label="Duplicar abaixo"><button aria-label={`Duplicar linha ${index + 1} abaixo`} onClick={() => duplicateItem(item.id, "below")} type="button"><ArrowDown size={14} /></button></Tooltip></div><Tooltip label="Remover"><button aria-label={`Remover linha ${index + 1}`} className="is-danger" onClick={() => removeItem(item.id)} type="button"><Trash2 size={16} /></button></Tooltip></div>
+      </>}</SortableRow>) : <div className="cut-plan-items__empty">Nenhum tamanho adicionado ainda.</div>}</div>
     </DragDropProvider>
     <div className="cut-plan-items__total" aria-live="polite"><span>Total de peças</span><strong>{items.reduce((total, item) => total + (Number.isFinite(item.quantity) ? item.quantity : 0), 0)}</strong></div>
   </div>;

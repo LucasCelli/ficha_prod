@@ -1,7 +1,8 @@
-import { calculateCutPlan, formatMarkerLabel } from "./calculator";
-import type { CutPlanInput, CutPlanResult, FabricCutPlanResult, LayPlan } from "./model";
-import { solveMinimumLays } from "./solver";
-import { compareUniformSizes } from "@/lib/uniform-sizes";
+import { calculateCutPlan, formatMarkerLabel } from "./calculator.ts";
+import type { CutPlanInput, CutPlanResult, FabricCutPlanResult, LayPlan } from "./model.ts";
+import { solveMinimumLays } from "./solver.ts";
+import { compareUniformSizes } from "../../lib/uniform-sizes.ts";
+import { buildSizeProfileIndex, estimateMarkerLengthCm, getMaximumEstimatedFrequency } from "./dimensions.ts";
 
 export interface CutPlanAlternative {
   id: string;
@@ -23,12 +24,13 @@ function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"
       const lays: LayPlan[] = [];
       for (const [size, requestedQuantity] of requested) {
         let remaining = fabric.type === "TUBULAR" && requestedQuantity % 2 !== 0 ? requestedQuantity + 1 : requestedQuantity;
+        const maximumFrequency = getMaximumEstimatedFrequency(size, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles);
         while (remaining > 0) {
           let frequency = fabric.type === "TUBULAR" ? 2 : 1;
           let layers = Math.min(input.maxLayers, remaining / frequency);
           if (mode === "compact") {
             const step = fabric.type === "TUBULAR" ? 2 : 1;
-            for (let candidate = step; candidate <= 6; candidate += step) {
+            for (let candidate = step; candidate <= maximumFrequency; candidate += step) {
               const candidateLayers = remaining / candidate;
               if (Number.isInteger(candidateLayers) && candidateLayers >= 1 && candidateLayers <= input.maxLayers) {
                 frequency = candidate;
@@ -42,6 +44,11 @@ function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"
           lays.push({ id: `${fabric.id}-${mode}-${lays.length + 1}`, fabricId: fabric.id, layers, frequencies: [{ size, frequency }] });
           remaining -= produced;
         }
+      }
+      const profileIndex = buildSizeProfileIndex(input.sizeProfiles);
+      for (const lay of lays) {
+        const markerLength = estimateMarkerLengthCm(lay.frequencies, fabric.type, fabric.widthCm, profileIndex);
+        lay.markerLengthCm = markerLength === null ? undefined : Math.ceil(markerLength);
       }
       return buildFabricResult(fabric.id, requested, lays);
     }),
@@ -67,7 +74,7 @@ function score(result: CutPlanResult) {
   const peakFrequency = Math.max(0, ...markerFrequencies);
   const sizeEntries = lays.reduce((total, lay) => total + lay.frequencies.length, 0);
   const totalLayers = lays.reduce((total, lay) => total + lay.layers, 0);
-  const sizeMixScore = result.fabrics.reduce((total, fabric) => {
+  const sizeSpreadScore = result.fabrics.reduce((total, fabric) => {
     const orderedSizes = [...new Set(fabric.sizes.map((size) => size.size))].sort(compareUniformSizes);
     const ranks = new Map(orderedSizes.map((size, index) => [size, index]));
     return total + fabric.lays.reduce((fabricTotal, lay) => {
@@ -75,7 +82,7 @@ function score(result: CutPlanResult) {
       return fabricTotal + (activeRanks.length > 1 ? (activeRanks.at(-1)! - activeRanks[0]) * lay.layers : 0);
     }, 0);
   }, 0);
-  return { mapCount: lays.length, layCount: lays.length, complexity, peakFrequency, sizeEntries, sizeMixScore, totalLayers };
+  return { mapCount: lays.length, layCount: lays.length, complexity, peakFrequency, sizeEntries, sizeSpreadScore, totalLayers };
 }
 
 
@@ -89,12 +96,23 @@ function aggregateFabricItems(input: CutPlanInput, fabricId: string) {
 }
 
 function calculateOptimizedVariants(input: CutPlanInput) {
-  const primary = calculateCutPlan(input);
+  const primary = calculateCutPlan(input, false);
   const fabrics = primary.fabrics.map((fabricResult) => {
     const fabric = input.fabrics.find((candidate) => candidate.id === fabricResult.fabricId)!;
     const requested = aggregateFabricItems(input, fabric.id);
     const target = new Map([...requested].map(([size, quantity]) => [size, fabric.type === "TUBULAR" && quantity % 2 !== 0 ? quantity + 1 : quantity]));
-    const solutions = solveMinimumLays(target, input.maxLayers, fabric.type, fabricResult.lays.length);
+    const constraints = {
+      tableLengthCm: input.tableLengthCm,
+      fabricWidthCm: fabric.widthCm,
+      sizeProfiles: input.sizeProfiles,
+    };
+    const solutions = solveMinimumLays(target, input.maxLayers, fabric.type, fabricResult.lays.length, constraints);
+    if (solutions.length && requested.size > 3 && !solutions.some((solution) => solution.lays.every((lay) => lay.frequencies.length <= 3))) {
+      const simpler = solveMinimumLays(target, input.maxLayers, fabric.type, fabricResult.lays.length, { ...constraints, maxSizesPerMarker: 3 });
+      for (const solution of simpler) {
+        if (!solutions.some((existing) => existing.signature === solution.signature)) solutions.push(solution);
+      }
+    }
     return { fabric, requested, solutions };
   });
   const variantCount = Math.max(1, ...fabrics.map((entry) => entry.solutions.length));
@@ -108,23 +126,23 @@ function calculateOptimizedVariants(input: CutPlanInput) {
       }),
     },
     description: rank === 0
-      ? "Menor quantidade de enfestos, priorizando tamanhos menores com maiores na mesma grade."
-      : "Mesma quantidade mínima de enfestos, com outra distribuição exata de folhas e frequências.",
+      ? "O menor número de enfestos, juntando tamanhos pequenos e grandes na mesma grade."
+      : "Mesmo número de enfestos, com outra divisão de folhas e frequências.",
   }));
 }
 export function calculateCutPlanAlternatives(input: CutPlanInput): CutPlanAlternative[] {
   const candidates = [
     ...calculateOptimizedVariants(input),
-    { result: calculateIndividualPlan(input, "compact"), description: "Separa os tamanhos e busca frequências compactas." },
-    { result: calculateIndividualPlan(input, "simple"), description: "Usa grades individuais mais simples para conferência." },
+    { result: calculateIndividualPlan(input, "compact"), description: "Um enfesto por tamanho, com a frequência mais alta que couber." },
+    { result: calculateIndividualPlan(input, "simple"), description: "Um enfesto por tamanho, com a grade mais simples de conferir." },
   ];
   const unique = [...new Map(candidates.map((candidate) => [planSignature(candidate.result), candidate])).values()]
     .map((candidate) => ({ ...candidate, ...score(candidate.result) }))
-    .sort((a, b) => a.layCount - b.layCount || b.sizeMixScore - a.sizeMixScore || a.complexity - b.complexity || a.peakFrequency - b.peakFrequency || a.sizeEntries - b.sizeEntries || a.totalLayers - b.totalLayers)
+    .sort((a, b) => a.layCount - b.layCount || b.sizeSpreadScore - a.sizeSpreadScore || a.complexity - b.complexity || a.peakFrequency - b.peakFrequency || a.sizeEntries - b.sizeEntries || a.totalLayers - b.totalLayers)
     .slice(0, 4);
   return unique.map((candidate, index) => ({
     id: `alternative-${index + 1}`,
-    label: index === 0 ? "Principal" : `Alternativa ${index + 1}`,
+    label: index === 0 ? "Principal" : `Opção ${index + 1}`,
     description: candidate.description,
     result: candidate.result,
     mapCount: candidate.mapCount,

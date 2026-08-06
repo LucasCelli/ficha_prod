@@ -16,11 +16,22 @@ export interface CutPlanItem {
   sourceFichaId?: string;
 }
 
+export interface CutPlanSizeProfile {
+  id: string;
+  size: string;
+  aliases: string[];
+  bodyHeightCm: number;
+  bodyWidthCm: number;
+  sleeveHeightCm: number;
+  sleeveWidthCm: number;
+}
+
 export interface CutPlanInput {
   tableLengthCm: number;
   maxLayers: number;
   fabrics: CutPlanFabric[];
   items: CutPlanItem[];
+  sizeProfiles: CutPlanSizeProfile[];
   sourceFichaIds?: string[];
 }
 

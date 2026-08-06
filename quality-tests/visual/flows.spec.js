@@ -216,6 +216,7 @@ test.describe("estrutura de pagina", () => {
     { path: "/meu-painel", title: /Meu perfil/ },
     { path: "/quadro-producao", title: /Quadro|Fichas/ },
     { path: "/ferramentas/organizar-nomes-ia", title: /Organizar nomes/ },
+    { path: "/ferramentas/plano-de-corte", title: /Plano de Corte/ },
     { path: "/design-system", title: /Design system/ },
   ];
 
@@ -266,8 +267,11 @@ test.describe("tabelas responsivas", () => {
 });
 
 test.describe("breakpoints consolidados", () => {
-  test("o CSS usa apenas os quatro cortes oficiais", async ({ context, page }) => {
-    await openPage(page, context, "/");
+  // `/ferramentas/plano-de-corte` carrega folha propria pelo layout da rota:
+  // sem visitar a rota, os cortes dela nao entram em `document.styleSheets`.
+  for (const rota of ["/", "/ferramentas/plano-de-corte"]) {
+  test(`o CSS usa apenas os quatro cortes oficiais em ${rota}`, async ({ context, page }) => {
+    await openPage(page, context, rota);
 
     const cortes = await page.evaluate(() => {
       const larguras = new Set();
@@ -298,6 +302,7 @@ test.describe("breakpoints consolidados", () => {
     const permitidos = new Set([480, 768, 1024, 1025, 1280]);
     expect(cortes.filter((c) => !permitidos.has(c))).toEqual([]);
   });
+  }
 });
 
 test.describe("combobox", () => {
