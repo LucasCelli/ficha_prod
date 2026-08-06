@@ -102,6 +102,63 @@ test.describe("catalogos: reordenacao por teclado", () => {
   });
 });
 
+test.describe("catalogos: medidas dos tamanhos", () => {
+  test("o formulario de tamanho expoe largura e altura das quatro partes nessa ordem", async ({ context, page }) => {
+    await openPage(page, context, "/catalogos?tipo=tamanho&modal=novo");
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    const parts = dialog.locator(".catalog-form__measurement-pair");
+    await expect(parts).toHaveCount(4);
+    await expect(parts.locator("h3")).toHaveText(["Frente", "Costas", "Manga curta", "Manga longa"]);
+    await expect(dialog.locator('.catalog-form__measurements input[type="number"]')).toHaveCount(8);
+    for (const part of await parts.all()) {
+      await expect(part.locator("label")).toHaveText(["Largura", "Altura"]);
+    }
+  });
+
+  test("autopreenche larguras vazias em pares sem sobrescrever edicoes", async ({ context, page }) => {
+    await openPage(page, context, "/catalogos?tipo=tamanho&modal=novo");
+
+    const front = page.locator("#catalog-measureFrontWidthCm");
+    const back = page.locator("#catalog-measureBackWidthCm");
+    const shortSleeve = page.locator("#catalog-measureShortSleeveWidthCm");
+    const longSleeve = page.locator("#catalog-measureLongSleeveWidthCm");
+    await waitForHandler(page, "#catalog-measureFrontWidthCm", "onChange");
+
+    await front.pressSequentially("50.2");
+    await expect(back).toHaveValue("50.2");
+    await back.fill("51");
+    await front.fill("52");
+    await expect(back).toHaveValue("51");
+
+    await longSleeve.pressSequentially("42.2");
+    await expect(shortSleeve).toHaveValue("42.2");
+    await shortSleeve.fill("43");
+    await longSleeve.fill("44");
+    await expect(shortSleeve).toHaveValue("43");
+  });
+});
+
+test.describe("catalogos: configuração dos tecidos", () => {
+  test("o formulario de tecido exige largura e tipo de corte", async ({ context, page }) => {
+    await openPage(page, context, "/catalogos?tipo=tecido&modal=novo");
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel("Largura")).toBeVisible();
+    await expect(dialog.getByLabel("Tipo")).toBeVisible();
+    await expect(dialog.getByLabel("Tipo").locator("option")).toHaveText(["Selecione", "Plano", "Tubular"]);
+  });
+
+  test("Malha Fria exibe 118 cm e Tubular na coluna Corte", async ({ context, page }) => {
+    await openPage(page, context, "/catalogos?tipo=tecido");
+
+    const row = page.locator(".catalog-items-table__row").filter({ hasText: "Malha Fria (PV)" });
+    await expect(row).toContainText("118 cm · Tubular");
+  });
+});
+
 test.describe("estrutura das telas administrativas", () => {
   for (const rota of ["/catalogos", "/usuarios", "/usuarios/perfis"]) {
     test(`${rota} tem um h1 e title proprio`, async ({ context, page }) => {

@@ -230,6 +230,135 @@ test.describe("estrutura de pagina", () => {
   }
 });
 
+test.describe("plano de corte: tamanhos e mangas", () => {
+  test("cada linha escolhe manga curta ou longa", async ({ context, page }) => {
+    await openPage(page, context, "/ferramentas/plano-de-corte");
+    const fabric = page.locator('input[id^="cut-plan-fabric-name-"]').first();
+    await expect(fabric).toHaveAttribute("role", "combobox");
+    await expect(fabric).toHaveValue("Malha Fria (PV)");
+    await fabric.fill("Poliviscose");
+    const fabricOption = page.getByRole("option").filter({ hasText: "Malha Fria (PV)" }).first();
+    await expect(fabricOption).toContainText("118 cm");
+    await expect(fabricOption).toContainText("Tubular");
+    await fabricOption.click();
+    await expect(fabric).toHaveValue("Malha Fria (PV)");
+    await expect(page.locator('input[id^="cut-plan-fabric-width-"]').first()).toHaveValue("118");
+    await expect(page.locator('select[id^="cut-plan-fabric-type-"]').first()).toHaveValue("TUBULAR");
+    await page.locator('input[id^="cut-plan-fabric-color-"]').first().fill("Azul");
+    await expect(page.locator(".cut-plan__fabric-title strong").first()).toHaveText("Malha Fria (PV) — Azul");
+
+    await page.getByRole("button", { name: /adicionar tamanho/i }).click();
+
+    const sleeve = page.getByLabel("Manga da linha 1");
+    await expect(sleeve).toBeVisible();
+    await expect(sleeve.locator("option")).toHaveText(["Curta", "Longa"]);
+    await sleeve.selectOption("LONGA");
+    await expect(sleeve).toHaveValue("LONGA");
+    const overflow = await page.evaluate(() => ({
+      client: document.documentElement.clientWidth,
+      scroll: document.documentElement.scrollWidth,
+    }));
+    expect(overflow.scroll).toBeLessThanOrEqual(overflow.client + 1);
+  });
+
+  test("a busca de ficha preenche o tipo de manga nas linhas importadas", async ({ context, page }) => {
+    await openPage(page, context, "/ferramentas/plano-de-corte");
+    const response = await page.request.get("/api/ferramentas/plano-de-corte/fichas");
+    expect(response.ok()).toBeTruthy();
+    const payload = await response.json();
+    const ficha = payload.fichas?.find((candidate) => candidate.material?.trim() && candidate.items?.length);
+    test.skip(!ficha, "sem ficha com tecido e tamanhos no ambiente");
+
+    const search = page.getByLabel("Pesquisar ficha");
+    await search.fill(ficha.number || ficha.client);
+    await page.getByRole("button", { name: "Buscar", exact: true }).click();
+    await page.getByRole("option").filter({ hasText: ficha.client }).first().click();
+
+    await expect(page.locator(".cut-plan-fichas__added")).toContainText(ficha.sleeveType === "LONGA" ? "Manga longa" : "Manga curta");
+    await expect(page.locator('input[id^="cut-plan-fabric-name-"]').first()).toHaveValue(ficha.material);
+    await expect(page.locator(".cut-plan__fabric-title strong").first()).toHaveText(ficha.color ? `${ficha.material} — ${ficha.color}` : ficha.material);
+    const sleeves = page.locator('select[aria-label^="Manga da linha"]');
+    await expect(sleeves).toHaveCount(ficha.items.length);
+    for (const select of await sleeves.all()) await expect(select).toHaveValue(ficha.sleeveType);
+  });
+
+  test("a importação resolve alias para o tecido canônico e seus dados de corte", async ({ context, page }) => {
+    await openPage(page, context, "/ferramentas/plano-de-corte");
+    const ficha = {
+      client: "Cliente legado",
+      color: "Azul",
+      id: "legacy-alias",
+      imageUrl: null,
+      items: [{ quantity: 10, size: "M" }],
+      material: "Poliviscose",
+      number: "LEG-1",
+      sleeveType: "CURTA",
+      total: 10,
+    };
+    await page.route("**/api/ferramentas/plano-de-corte/fichas**", async (route) => {
+      const isSingle = new URL(route.request().url()).searchParams.has("fichaId");
+      await route.fulfill({ contentType: "application/json", json: isSingle ? { success: true, ficha } : { success: true, fichas: [ficha] } });
+    });
+
+    await page.getByLabel("Pesquisar ficha").fill("Cliente legado");
+    await page.getByRole("button", { name: "Buscar", exact: true }).click();
+    await page.getByRole("option").filter({ hasText: "Cliente legado" }).click();
+
+    await expect(page.locator('input[id^="cut-plan-fabric-name-"]').first()).toHaveValue("Malha Fria (PV)");
+    await expect(page.locator('input[id^="cut-plan-fabric-width-"]').first()).toHaveValue("118");
+    await expect(page.locator('select[id^="cut-plan-fabric-type-"]').first()).toHaveValue("TUBULAR");
+    await expect(page.locator(".cut-plan__fabric-title strong").first()).toHaveText("Malha Fria (PV) — Azul");
+  });
+
+  test("resultado destaca folhas, omite ausência de estimativa e imprime no rodapé", async ({ context, page }) => {
+    await openPage(page, context, "/ferramentas/plano-de-corte");
+    await expect(page.getByRole("heading", { name: "Resultado", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: /adicionar tamanho/i }).click();
+    await page.getByLabel("Tamanho da linha 1").fill("P");
+    await page.getByRole("button", { name: "Calcular plano" }).click();
+
+    await expect(page.getByRole("heading", { name: "Resultado", exact: true })).toBeVisible();
+    await expect(page.locator(".cut-plan__check").first()).toBeVisible();
+    await expect(page.getByText("Sem estimativa dimensional")).toHaveCount(0);
+    await expect(page.locator(".cut-plan__marker-length").first()).toHaveText(/^Comprimento estimado: \d+,\d metros$/);
+    await expect(page.locator(".cut-plan__grade").first()).not.toContainText(/\bM[CL]\b/);
+    const layCard = page.locator(".cut-plan__lay").first();
+    await layCard.hover();
+    await expect.poll(() => layCard.evaluate((element) => ({ shadow: getComputedStyle(element).boxShadow, transform: getComputedStyle(element).transform }))).not.toEqual({ shadow: "none", transform: "none" });
+    const layers = page.locator(".cut-plan__lay-layers > span").first();
+    await expect(layers).toBeVisible();
+    const highlighted = await layers.evaluate((element) => {
+      const probe = document.createElement("span");
+      probe.style.background = "var(--color-primary-bg)";
+      probe.style.color = "var(--color-primary-text)";
+      document.body.append(probe);
+      const expected = getComputedStyle(probe);
+      const actual = getComputedStyle(element);
+      const matches = actual.backgroundColor === expected.backgroundColor && actual.color === expected.color;
+      probe.remove();
+      return matches;
+    });
+    expect(highlighted).toBeTruthy();
+    const actionsFollowCheck = await page.evaluate(() => {
+      const check = document.querySelector(".cut-plan__check:last-of-type");
+      const actions = document.querySelector(".cut-plan__print-actions--bottom");
+      return Boolean(check && actions && (check.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING));
+    });
+    expect(actionsFollowCheck).toBeTruthy();
+    const printButton = page.getByRole("button", { name: "Imprimir esta" });
+    await expect(printButton).toBeVisible();
+    await page.evaluate(() => { window.print = () => {}; });
+    await printButton.click();
+    const printRoot = page.locator(".cut-plan-native-print-root");
+    await expect(printRoot).toHaveCount(1);
+    await expect(printRoot).not.toContainText("FICHA PROD · SETOR DE CORTE");
+    await expect(printRoot).not.toContainText("PRINCIPAL");
+    await expect(printRoot).not.toContainText("Máx. por enfesto");
+    await expect(printRoot).not.toContainText("Confira cada grade no Audaces antes de liberar o corte.");
+    await expect(printRoot.locator(".cut-plan-print-simple__summary dt")).toHaveText(["Enfestos", "Total de folhas"]);
+  });
+});
+
 test.describe("filtros com rotulo persistente", () => {
   test("/meu-painel: busca e status tem label associado", async ({ context, page }) => {
     await openPage(page, context, "/meu-painel");

@@ -36,6 +36,22 @@ function getComposition(metadata: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+function getSizeMeasurements(item: CatalogItem) {
+  const values = [
+    ["F", item.measure_front_height_cm, item.measure_front_width_cm],
+    ["C", item.measure_back_height_cm, item.measure_back_width_cm],
+    ["MC", item.measure_short_sleeve_height_cm, item.measure_short_sleeve_width_cm],
+    ["ML", item.measure_long_sleeve_height_cm, item.measure_long_sleeve_width_cm],
+  ] as const;
+  if (values.some(([, height, width]) => height === null || width === null)) return "";
+  return values.map(([label, height, width]) => `${label} ${height}×${width} cm`).join(" · ");
+}
+
+function getFabricSettings(item: CatalogItem) {
+  if (item.fabric_width_cm === null || !item.fabric_type) return "";
+  return `${item.fabric_width_cm} cm · ${item.fabric_type === "TUBULAR" ? "Tubular" : "Plano"}`;
+}
+
 function haveSameOrder(left: CatalogItem[], right: CatalogItem[]) {
   return left.length === right.length && left.every((item, index) => item.id === right[index]?.id);
 }
@@ -209,7 +225,7 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
             <span role="columnheader" />
             <span role="columnheader">Nome</span>
             <span role="columnheader">Aliases</span>
-            <span role="columnheader">Metadados</span>
+            <span role="columnheader">{selectedKind === "tamanho" ? "Medidas" : selectedKind === "tecido" ? "Corte" : "Metadados"}</span>
             <span role="columnheader">Status</span>
             <span role="columnheader">Ações</span>
           </div>
@@ -271,7 +287,7 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
                 </span>
                 <span className="catalog-items-table__cell" role="cell">
                   <span className="catalog-items-table__clip">
-                    {getComposition(item.metadata) || item.description || <span className="ui-table__muted">-</span>}
+                    {(selectedKind === "tamanho" ? getSizeMeasurements(item) : selectedKind === "tecido" ? getFabricSettings(item) : getComposition(item.metadata) || item.description) || <span className="ui-table__muted">-</span>}
                   </span>
                 </span>
                 <span className="catalog-items-table__cell" role="cell">

@@ -1,3 +1,46 @@
+## 2026-08-05 - Catalogos como fonte de medidas e configuracao do Plano de Corte
+
+- Modulos: /catalogos?tipo=tamanho, /catalogos?tipo=tecido e /ferramentas/plano-de-corte.
+- Banco: migrations 20260806013614_catalog_size_measurements.sql, 20260806015715_complete_catalog_size_dimensions.sql e 20260806023754_catalog_fabric_cut_settings.sql.
+- Arquivos principais: src/features/catalogos/*, src/features/plano-de-corte/*, API de busca de fichas, tipos Supabase e testes de qualidade/Playwright.
+
+### Resultado
+
+- Cada tamanho do catalogo agora persiste oito dimensoes: altura e largura de frente, costas, manga curta e manga longa. O banco aceita o conjunto completo ou todos os campos vazios, restringe as medidas a tamanhos e valida valores positivos de ate 1000 cm.
+- O formulario de Catalogos exibe as quatro partes em grupos de largura/altura; a tabela resume as medidas cadastradas. Nomes e aliases ativos do mesmo catalogo alimentam o datalist da ficha e o Plano de Corte.
+- Nos grupos de medidas, Largura agora aparece antes de Altura. Frente/Costas e Manga curta/Manga longa sincronizam a largura parceira que estava inicialmente vazia durante toda a digitacao; a sincronizacao para somente quando o usuario edita o campo parceiro, preservando qualquer valor preexistente e permitindo edicao posterior independente.
+- O cadastro local de perfis de medida do Plano de Corte foi removido. O algoritmo monta o indice diretamente a partir dos tamanhos persistidos e calcula frente + costas + duas mangas do tipo escolhido.
+- Manga passou a ser um select em cada linha de tamanho/quantidade. Demandas com o mesmo tamanho e mangas diferentes permanecem separadas no solver, nos enfestos, na conferencia e na impressao.
+- A busca de fichas passou a carregar o campo manga; ao importar uma ficha existente, todas as linhas recebem automaticamente Curta ou Longa. Fichas de tipos diferentes podem coexistir no mesmo plano.
+- No mobile, o menu da busca passou a participar do fluxo do layout para nao cobrir o botao Buscar; Enter tambem dispara a pesquisa.
+- O select fixo de tecidos foi substituido pelo mesmo datalist de Catalogos usado nas fichas. Cada tecido passa a persistir largura util e tipo Plano/Tubular; selecionar ou importar um tecido configurado preenche esses valores no plano.
+- Materiais legados salvos por alias sao resolvidos para o nome canonico do catalogo antes de entrar no plano; largura, tipo, limite de folhas, titulo e ficha adicionada passam a usar essa identidade unica.
+- O titulo de cada card de tecido agora e o nome selecionado junto da cor, sem o rotulo generico Tecido 01.
+- No resultado, a quantidade de folhas recebeu o destaque azul claro do design system, o texto Sem estimativa dimensional foi removido e os botoes de impressao foram movidos para depois da conferencia.
+- O comprimento estimado deixou de exibir a capacidade total da mesa em centimetros e passou a mostrar somente o valor calculado em metros com uma casa decimal, tanto na tela quanto na impressao.
+- As grades omitem MC/ML quando o tecido inteiro usa um unico tipo de manga; em pedidos mistos, as siglas permanecem na tela e na impressao para diferenciar as linhas.
+- Cards operacionais do Plano de Corte receberam hover discreto com elevacao de um pixel, sombra e borda primaria: tecidos, indicadores, enfestos e conferencia. O efeito fica restrito a dispositivos com ponteiro e respeita reducao de movimento.
+- A impressao foi enxugada: sairam a assinatura Ficha Prod/Setor de Corte, o selo da alternativa, Mesa, Maximo por enfesto e a instrucao do rodape. O resumo impresso mantem somente Enfestos e Total de folhas.
+- O bloco 4 Resultado fica totalmente desmontado enquanto nao existe calculo valido e reaparece somente depois de gerar alternativas; qualquer alteracao que invalide o plano volta a oculta-lo ate o proximo calculo.
+- A estimativa tubular explicita a composicao usada pelo Audaces sem criar uma restricao artificial de enfestos: por par produzido, usa uma frente inteira, duas meias-costas dobradas na largura, uma manga inteira e duas meias-mangas dobradas na largura. A altura nunca e dividida, e a area continua equivalente a frente + costas + um par de mangas.
+- Foi removida a interpretacao regressiva que somava as alturas da borda como limite rigido da mesa. Esse limite havia transformado o pedido Intercement de dois para tres enfestos mesmo sem mudanca de frequencias; a otimizacao voltou a decidir pelo encaixe de area estimada.
+
+### Banco remoto
+
+- As tres migrations foram aplicadas e registradas no projeto Supabase qgqoxzbncbcmuaqmytou, preservando o historico legado.
+- Verificacao remota confirmou oito colunas finais, nenhuma coluna transitoria e os dois constraints validados. Um smoke transacional gravou as oito dimensoes e executou rollback.
+- Para tecidos, a verificacao remota confirmou duas colunas, dois constraints validados e a migration registrada. Malha Fria (PV) foi migrada para 118 cm/Tubular; um smoke gravou 120 cm/Plano em Piquet e executou rollback.
+- A persistencia tambem foi exercitada pelo formulario real de edicao: Malha Fria (PV) foi salva novamente e lida pela Data API com aliases, composicao, largura 118 e tipo TUBULAR preservados.
+- Estado final: 31 tamanhos existentes, nenhum conjunto parcial e nenhuma medida sintetica deixada no banco. Os tamanhos atuais permanecem sem estimativa ate que suas oito dimensoes sejam cadastradas.
+
+### Validacao
+
+- npm run typecheck, npm run lint, npm run test:quality (42/42), npm run supabase:check, npm run encoding:check, npm run build e git diff --check passaram.
+- Playwright autenticado: formularios administrativos de tamanhos e tecidos, ordem Largura/Altura, autopreenchimento nao destrutivo das larguras em pares, coluna Corte, datalist do tecido, valores 118 cm/Tubular, titulo nome + cor, importacao de ficha real, destaque das folhas, ausencia da mensagem sem estimativa e impressoes no rodape. Desktop, tablet e mobile passaram.
+- Uma ficha simulada com o alias legado Poliviscose foi importada nos tres viewports e resultou no tecido canonico Malha Fria (PV), 118 cm, Tubular e titulo com a cor.
+- O teste do algoritmo prova que M Curta e M Longa nao sao agregados e que a manga longa usa sua propria area.
+- A chave dimensional do Plano de Corte passou a preservar o modelo Baby Look: P e Baby P usam perfis distintos, enquanto Baby P e BL P continuam aliases do mesmo perfil. A validacao deixou de acusar aliases equivalentes dentro do proprio cadastro, mas ainda bloqueia colisao real entre dois registros diferentes.
+
 ## 2026-08-05 - Limites fisicos e estimativa dimensional do Plano de Corte
 
 - Modulo: `/ferramentas/plano-de-corte`.

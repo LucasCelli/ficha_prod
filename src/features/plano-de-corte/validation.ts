@@ -1,6 +1,5 @@
 import type { CutPlanInput } from "./model.ts";
-import { getLayerLimit } from "./dimensions.ts";
-import { normalizeUniformSizeKey } from "../../lib/uniform-sizes.ts";
+import { getLayerLimit, normalizeCutPlanSizeKey } from "./dimensions.ts";
 
 export function validateCutPlan(input: CutPlanInput) {
   const errors: string[] = [];
@@ -21,19 +20,25 @@ export function validateCutPlan(input: CutPlanInput) {
   if (input.items.length === 0) errors.push("Adicione pelo menos um tamanho.");
   for (const item of input.items) {
     if (!item.size.trim()) errors.push("Preencha o tamanho em todas as linhas.");
+    if (item.sleeveType !== "CURTA" && item.sleeveType !== "LONGA") errors.push(`Informe o tipo de manga de ${item.size || "cada linha"}.`);
     if (!Number.isInteger(item.quantity) || item.quantity < 1) errors.push(`Informe a quantidade de ${item.size || "cada linha"}.`);
     if (!input.fabrics.some((fabric) => fabric.id === item.fabricId)) errors.push(`Escolha o tecido de ${item.size || "cada linha"}.`);
   }
-  const profileKeys = new Set<string>();
+  const profileKeys = new Map<string, string>();
   for (const profile of input.sizeProfiles) {
     if (!profile.size.trim()) errors.push("Informe o tamanho em todos os perfis de medidas.");
-    const dimensions = [profile.bodyHeightCm, profile.bodyWidthCm, profile.sleeveHeightCm, profile.sleeveWidthCm];
+    const dimensions = [
+      profile.frontHeightCm, profile.frontWidthCm, profile.backHeightCm, profile.backWidthCm,
+      profile.shortSleeveHeightCm, profile.shortSleeveWidthCm,
+      profile.longSleeveHeightCm, profile.longSleeveWidthCm,
+    ];
     if (dimensions.some((value) => !Number.isFinite(value) || value <= 0)) errors.push(`Revise as medidas de ${profile.size || "cada perfil"}.`);
     for (const value of [profile.size, ...profile.aliases]) {
-      const key = normalizeUniformSizeKey(value);
+      const key = normalizeCutPlanSizeKey(value);
       if (!key) continue;
-      if (profileKeys.has(key)) errors.push(`O tamanho ou alias ${value} está repetido nos perfis.`);
-      profileKeys.add(key);
+      const ownerId = profileKeys.get(key);
+      if (ownerId && ownerId !== profile.id) errors.push(`O tamanho ou alias ${value} está repetido nos perfis.`);
+      else profileKeys.set(key, profile.id);
     }
   }
   return [...new Set(errors)];

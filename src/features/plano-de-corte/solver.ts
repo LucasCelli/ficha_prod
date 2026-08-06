@@ -1,6 +1,6 @@
-import { compareUniformSizes, normalizeUniformSizeKey } from "../../lib/uniform-sizes.ts";
-import { buildSizeProfileIndex, calculateShirtAreaCm2, ESTIMATED_NESTING_EFFICIENCY } from "./dimensions.ts";
-import type { CutPlanSizeProfile, FabricType, MarkerFrequency } from "./model";
+import { compareUniformSizes } from "../../lib/uniform-sizes.ts";
+import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, normalizeCutPlanSizeKey } from "./dimensions.ts";
+import { parseCutPlanDemandKey, type CutPlanSizeProfile, type FabricType, type MarkerFrequency, type SleeveType } from "./model.ts";
 
 export type SolvedLay = { layers: number; frequencies: MarkerFrequency[]; markerLengthCm?: number };
 export type SolverMetrics = {
@@ -27,7 +27,7 @@ const MAX_RETURNED_SOLUTIONS = 8;
 const MAX_LAYER_SETS_PER_LAY_COUNT = 350_000;
 const MAX_SOLVER_DURATION_MS = 1_500;
 
-type RankedEntry = { size: string; quantity: number; rank: number };
+type RankedEntry = { size: string; sleeveType: SleeveType; quantity: number; rank: number };
 type SizeAssignment = { frequencies: number[]; markerLengths: number[]; totalFrequency: number };
 type PartialPlan = {
   assignments: number[][];
@@ -147,11 +147,10 @@ function solveLayerSet(
   budget: SearchBudget,
 ) {
   const profileIndex = buildSizeProfileIndex(constraints.sizeProfiles);
-  const frequencyDivisor = type === "TUBULAR" ? 2 : 1;
   const prepared = entries.map((entry) => {
-    const profile = profileIndex.get(normalizeUniformSizeKey(entry.size));
+    const profile = profileIndex.get(normalizeCutPlanSizeKey(entry.size));
     const lengthPerFrequency = profile
-      ? calculateShirtAreaCm2(profile) / frequencyDivisor / (constraints.fabricWidthCm * ESTIMATED_NESTING_EFFICIENCY)
+      ? calculateMarkerAreaLengthCm(profile, entry.sleeveType, type, constraints.fabricWidthCm, 1)
       : 0;
     return {
       entry,
@@ -163,17 +162,15 @@ function solveLayerSet(
   // Tamanhos mais restritos primeiro reduzem a DP sem alterar o rank fisico.
   prepared.sort((a, b) => a.options.length - b.options.length || b.entry.quantity - a.entry.quantity || a.entry.rank - b.entry.rank);
   const emptyAssignments = entries.map(() => [] as number[]);
-  let states = new Map<string, PartialPlan[]>([[
-    `0:${layers.map(() => 0).join(",")}:${layers.map(() => 0).join(",")}`,
-    [{
-      assignments: emptyAssignments,
-      counts: layers.map(() => 0),
-      markerLengths: layers.map(() => 0),
-      sizeSpreadScore: 0,
-      totalFrequency: 0,
-      usedMask: 0,
-    }],
-  ]]);
+  const initialPlan: PartialPlan = {
+    assignments: emptyAssignments,
+    counts: layers.map(() => 0),
+    markerLengths: layers.map(() => 0),
+    sizeSpreadScore: 0,
+    totalFrequency: 0,
+    usedMask: 0,
+  };
+  let states = new Map<string, PartialPlan[]>([[partialKey(initialPlan), [initialPlan]]]);
   const maxSizesPerMarker = constraints.maxSizesPerMarker ?? DEFAULT_MAX_SIZES_PER_MARKER;
 
   for (const { entry, options } of prepared) {
@@ -220,9 +217,9 @@ function comparePartialPlans(a: PartialPlan, b: PartialPlan) {
 function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPlan, searchComplete: boolean): SolvedPlan {
   const lays = layers.map((layerCount, layIndex) => ({
     layers: layerCount,
-    frequencies: entries.flatMap(({ size, rank }) => {
+    frequencies: entries.flatMap(({ size, sleeveType, rank }) => {
       const frequency = plan.assignments[rank][layIndex];
-      return frequency ? [{ size, frequency }] : [];
+      return frequency ? [{ size, sleeveType, frequency }] : [];
     }),
     ...(plan.markerLengths[layIndex] > 0 ? { markerLengthCm: Math.ceil(plan.markerLengths[layIndex]) } : {}),
   }));
@@ -234,7 +231,7 @@ function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPl
     totalLayers: layers.reduce((sum, value) => sum + value, 0),
     sizeEntries: lays.reduce((sum, lay) => sum + lay.frequencies.length, 0),
   };
-  const signature = lays.map((lay) => `${lay.layers}:${lay.frequencies.map((item) => `${item.size}=${item.frequency}`).join(",")}`).join("|");
+  const signature = lays.map((lay) => `${lay.layers}:${lay.frequencies.map((item) => `${item.size}:${item.sleeveType}=${item.frequency}`).join(",")}`).join("|");
   return { lays, metrics, signature, searchComplete };
 }
 
@@ -255,9 +252,13 @@ export function solveMinimumLays(
   fallbackLayCount: number,
   constraints: SolverConstraints,
 ): SolvedPlan[] {
-  const ordered = [...quantities.entries()].sort(([left], [right]) => compareUniformSizes(left, right));
+  const ordered = [...quantities.entries()].sort(([left], [right]) => {
+    const leftDemand = parseCutPlanDemandKey(left);
+    const rightDemand = parseCutPlanDemandKey(right);
+    return compareUniformSizes(leftDemand.size, rightDemand.size) || leftDemand.sleeveType.localeCompare(rightDemand.sleeveType);
+  });
   if (!ordered.length) return [];
-  const entries = ordered.map(([size, quantity], rank) => ({ size, quantity, rank }));
+  const entries = ordered.map(([key, quantity], rank) => ({ ...parseCutPlanDemandKey(key), quantity, rank }));
   const maxSizesPerMarker = constraints.maxSizesPerMarker ?? DEFAULT_MAX_SIZES_PER_MARKER;
   const lowerBound = Math.max(
     1,

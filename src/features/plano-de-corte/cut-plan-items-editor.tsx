@@ -5,10 +5,9 @@ import { DragDropProvider } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { ArrowDown, ArrowUp, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button, CustomDatalist, SortableHandle, SortableInstructions, Tooltip, type CustomDatalistOption } from "@/components/ui";
-import { compareUniformSizes, UNIFORM_SIZE_GROUPS } from "@/lib/uniform-sizes";
-import type { CutPlanFabric, CutPlanItem } from "./model";
+import { compareUniformSizes } from "@/lib/uniform-sizes";
+import type { CutPlanFabric, CutPlanItem, SleeveType } from "./model";
 
-const SIZE_OPTIONS: CustomDatalistOption[] = UNIFORM_SIZE_GROUPS.flat().map((size) => ({ label: size, value: size }));
 const fabricLabel = (fabric: CutPlanFabric) => `${fabric.name}${fabric.color.trim() ? ` — ${fabric.color.trim()}` : ""}`;
 
 type Props = {
@@ -19,6 +18,7 @@ type Props = {
   items: CutPlanItem[];
   moveItem: (fromIndex: number, toIndex: number) => void;
   removeItem: (id: string) => void;
+  sizeOptions: CustomDatalistOption[];
   sortItems: () => void;
   updateItem: (id: string, patch: Partial<CutPlanItem>) => void;
 };
@@ -28,7 +28,7 @@ function SortableRow({ children, id, index }: { children: (handleRef: (element: 
   return <div className={`cut-plan-items__row${isDragging || isDropping ? " is-dragging" : ""}`} data-index={index} ref={ref}>{children(handleRef)}</div>;
 }
 
-export function CutPlanItemsEditor({ addItem, duplicateItem, fabrics, items, moveItem, removeItem, sortItems, updateItem }: Props) {
+export function CutPlanItemsEditor({ addItem, duplicateItem, fabrics, items, moveItem, removeItem, sizeOptions, sortItems, updateItem }: Props) {
   const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
 
   function handleQuantityFocus(item: CutPlanItem) {
@@ -51,11 +51,12 @@ export function CutPlanItemsEditor({ addItem, duplicateItem, fabrics, items, mov
   return <div className="cut-plan-items">
     <SortableInstructions />
     <div className="cut-plan-items__toolbar"><Button variant="secondary" onClick={sortItems} disabled={items.length < 2}><RotateCcw size={18} /> Ordenar por tamanho</Button><Button variant="secondary" onClick={() => addItem()}><Plus size={18} /> Adicionar tamanho</Button></div>
-    <div className="cut-plan-items__head" aria-hidden="true"><span></span><span>Tamanho</span><span>Quantidade</span><span>Tecido</span><span>Ações</span></div>
+    <div className="cut-plan-items__head" aria-hidden="true"><span></span><span>Tamanho</span><span>Manga</span><span>Quantidade</span><span>Tecido</span><span>Ações</span></div>
     <DragDropProvider onDragEnd={(event) => { if (event.canceled) return; const source = event.operation.source?.id; const target = event.operation.target?.id; if (source == null || target == null) return; moveItem(items.findIndex((item) => item.id === String(source)), items.findIndex((item) => item.id === String(target))); }}>
       <div className="cut-plan-items__list" data-sortable-list="">{items.length ? items.map((item, index) => <SortableRow id={item.id} index={index} key={item.id}>{(handleRef) => <>
         <SortableHandle className="cut-plan-items__drag" handleRef={handleRef} itemLabel={item.size || `linha ${index + 1}`} onMove={(target) => moveItem(index, target)} position={index + 1} total={items.length} />
-        <div className="cut-plan-items__cell field"><span>Tamanho</span><CustomDatalist aria-label={`Tamanho da linha ${index + 1}`} id={`cut-plan-size-${item.id}`} onValueChange={(value) => updateItem(item.id, { size: value.toUpperCase() })} options={SIZE_OPTIONS} placeholder="Ex.: P ou 38" value={item.size} /></div>
+        <div className="cut-plan-items__cell field"><span>Tamanho</span><CustomDatalist aria-label={`Tamanho da linha ${index + 1}`} id={`cut-plan-size-${item.id}`} onValueChange={(value) => updateItem(item.id, { size: value.toUpperCase() })} options={sizeOptions} placeholder="Escolha um tamanho" value={item.size} /></div>
+        <label className="cut-plan-items__cell field"><span>Manga</span><select aria-label={`Manga da linha ${index + 1}`} value={item.sleeveType} onChange={(event) => updateItem(item.id, { sleeveType: event.currentTarget.value as SleeveType })}><option value="CURTA">Curta</option><option value="LONGA">Longa</option></select></label>
         <label className="cut-plan-items__cell field"><span>Quantidade</span><input aria-label={`Quantidade da linha ${index + 1}`} inputMode="numeric" min="0" step="1" type="number" value={quantityDrafts[item.id] ?? (Number.isFinite(item.quantity) && item.quantity !== 0 ? String(item.quantity) : "")} onBlur={() => handleQuantityBlur(item)} onChange={(event) => handleQuantityChange(item, event.currentTarget.value)} onFocus={() => handleQuantityFocus(item)} placeholder="Qtd." /></label>
         <label className="cut-plan-items__cell field"><span>Tecido</span><select aria-label={`Tecido da linha ${index + 1}`} value={item.fabricId} onChange={(event) => updateItem(item.id, { fabricId: event.currentTarget.value })}>{fabrics.map((fabric) => <option value={fabric.id} key={fabric.id}>{fabricLabel(fabric)}</option>)}</select></label>
         <div className="cut-plan-items__actions"><div><Tooltip label="Duplicar acima"><button aria-label={`Duplicar linha ${index + 1} acima`} onClick={() => duplicateItem(item.id, "above")} type="button"><ArrowUp size={14} /></button></Tooltip><Tooltip label="Duplicar abaixo"><button aria-label={`Duplicar linha ${index + 1} abaixo`} onClick={() => duplicateItem(item.id, "below")} type="button"><ArrowDown size={14} /></button></Tooltip></div><Tooltip label="Remover"><button aria-label={`Remover linha ${index + 1}`} className="is-danger" onClick={() => removeItem(item.id)} type="button"><Trash2 size={16} /></button></Tooltip></div>
@@ -66,5 +67,5 @@ export function CutPlanItemsEditor({ addItem, duplicateItem, fabrics, items, mov
 }
 
 export function sortCutPlanItems(items: CutPlanItem[]) {
-  return [...items].sort((a, b) => compareUniformSizes(a.size, b.size));
+  return [...items].sort((a, b) => compareUniformSizes(a.size, b.size) || a.sleeveType.localeCompare(b.sleeveType));
 }

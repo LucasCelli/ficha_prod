@@ -22,7 +22,7 @@ export function CutPlanFichaPicker({ added, onAdd, onRemove }: { added: CutPlanS
   const inputRef = useRef<CustomDatalistHandle>(null);
   const datalistOptions = useMemo<CustomDatalistOption[]>(() => options.map((ficha) => ({
     aliases: [ficha.client, ficha.number, ficha.material, ficha.color, ficha.id].filter(Boolean) as string[],
-    details: [ficha.material, ficha.color, countLabel(ficha.total, "peça")].filter(Boolean),
+    details: [ficha.material, ficha.color, ficha.sleeveType === "LONGA" ? "Manga longa" : "Manga curta", countLabel(ficha.total, "peça")].filter(Boolean),
     id: ficha.id,
     imageUrl: ficha.imageUrl ?? undefined,
     label: fichaLabel(ficha),
@@ -63,11 +63,11 @@ export function CutPlanFichaPicker({ added, onAdd, onRemove }: { added: CutPlanS
 
   return <><div className="cut-plan-fichas">
     <div className="cut-plan-fichas__search">
-      <div className="field"><label htmlFor="cut-plan-ficha">Pesquisar ficha</label><CustomDatalist id="cut-plan-ficha" onValueChange={(next, option) => { setValue(next); setSelectedId(option?.id ?? ""); if (option?.id) void add(option.id); }} options={datalistOptions} placeholder="Nome do cliente ou número da venda" ref={inputRef} value={value} /></div>
+      <div className="field"><label htmlFor="cut-plan-ficha">Pesquisar ficha</label><CustomDatalist id="cut-plan-ficha" onEnterKey={() => void search()} onValueChange={(next, option) => { setValue(next); setSelectedId(option?.id ?? ""); if (option?.id) void add(option.id); }} options={datalistOptions} placeholder="Nome do cliente ou número da venda" ref={inputRef} value={value} /></div>
       <Button disabled={loading} onClick={() => void search()} type="button" variant="secondary">{loading ? <span className="button-spinner" aria-hidden="true" /> : <Search size={16} />} Buscar</Button>
       <Button disabled={loading || !selectedId} onClick={() => void add(selectedId)} type="button"><Plus size={17} /> Adicionar ficha</Button>
     </div>
-    {added.length ? <div className="cut-plan-fichas__added">{added.map((ficha) => <div key={ficha.id}><span><strong>{fichaLabel(ficha)}</strong><small>{[ficha.material, ficha.color, countLabel(ficha.total, "peça")].filter(Boolean).join(" · ")}</small></span><IconButton label={`Remover ficha de ${ficha.client}`} onClick={() => onRemove(ficha.id)} size="sm" tone="danger"><X size={16} /></IconButton></div>)}</div> : null}
+    {added.length ? <div className="cut-plan-fichas__added">{added.map((ficha) => <div key={ficha.id}><span><strong>{fichaLabel(ficha)}</strong><small>{[ficha.material, ficha.color, ficha.sleeveType === "LONGA" ? "Manga longa" : "Manga curta", countLabel(ficha.total, "peça")].filter(Boolean).join(" · ")}</small></span><IconButton label={`Remover ficha de ${ficha.client}`} onClick={() => onRemove(ficha.id)} size="sm" tone="danger"><X size={16} /></IconButton></div>)}</div> : null}
   </div>
     {pendingOverwrite ? <AlertDialog title="Atualizar ficha" description="Os tamanhos e as quantidades desta ficha serão trocados pelos que estão na ficha agora." onClose={() => setPendingOverwrite(null)}>
       <section className="confirm-dialog" aria-describedby="cut-plan-overwrite-description">

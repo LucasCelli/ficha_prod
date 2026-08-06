@@ -1,4 +1,6 @@
 import {
+  cutPlanDemandKey,
+  parseCutPlanDemandKey,
   type CutPlanInput,
   type CutPlanResult,
   type FabricCutPlanResult,
@@ -26,7 +28,8 @@ function aggregateItems(input: CutPlanInput, fabricId: string) {
   const quantities = new Map<string, number>();
   for (const item of input.items.filter((candidate) => candidate.fabricId === fabricId)) {
     const size = normalizeSize(item.size);
-    quantities.set(size, (quantities.get(size) ?? 0) + item.quantity);
+    const key = cutPlanDemandKey(size, item.sleeveType);
+    quantities.set(key, (quantities.get(key) ?? 0) + item.quantity);
   }
   return quantities;
 }
@@ -44,7 +47,7 @@ function findJointCandidate(
   if (entries.length < 2) return null;
 
   for (let layers = Math.min(maxLayers, ...entries.map(([, quantity]) => quantity)); layers >= 1; layers -= 1) {
-    const frequencies = entries.map(([size, quantity]) => ({ size, frequency: quantity / layers }));
+    const frequencies = entries.map(([key, quantity]) => ({ ...parseCutPlanDemandKey(key), frequency: quantity / layers }));
     if (frequencies.every(({ frequency }) => Number.isInteger(frequency)
       && frequency >= 1
       && frequency <= MAX_FREQUENCY
@@ -58,17 +61,19 @@ function findJointCandidate(
 
 function subtractProduction(remaining: Map<string, number>, lay: Pick<LayPlan, "layers" | "frequencies">) {
   for (const marker of lay.frequencies) {
-    remaining.set(marker.size, (remaining.get(marker.size) ?? 0) - marker.frequency * lay.layers);
+    const key = cutPlanDemandKey(marker.size, marker.sleeveType);
+    remaining.set(key, (remaining.get(key) ?? 0) - marker.frequency * lay.layers);
   }
 }
 
 function calculateSizes(requested: Map<string, number>, lays: LayPlan[]) {
-  return [...requested.entries()].map(([size, quantity]) => {
+  return [...requested.entries()].map(([key, quantity]) => {
+    const { size, sleeveType } = parseCutPlanDemandKey(key);
     const produced = lays.reduce((total, lay) => {
-      const marker = lay.frequencies.find((frequency) => frequency.size === size);
+      const marker = lay.frequencies.find((frequency) => frequency.size === size && frequency.sleeveType === sleeveType);
       return total + (marker ? marker.frequency * lay.layers : 0);
     }, 0);
-    return { size, requested: quantity, produced, difference: produced - quantity };
+    return { size, sleeveType, requested: quantity, produced, difference: produced - quantity };
   });
 }
 
@@ -97,16 +102,17 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
       continue;
     }
 
-    const [size, quantity] = [...remaining.entries()].find(([, value]) => value > 0)!;
+    const [demandKey, quantity] = [...remaining.entries()].find(([, value]) => value > 0)!;
+    const { size, sleeveType } = parseCutPlanDemandKey(demandKey);
     if (fabric.type === "TUBULAR") {
       const layers = Math.min(input.maxLayers, quantity / 2);
-      const markerLength = estimateMarkerLengthCm([{ size, frequency: 2 }], fabric.type, fabric.widthCm, buildSizeProfileIndex(input.sizeProfiles)) ?? 0;
+      const markerLength = estimateMarkerLengthCm([{ size, sleeveType, frequency: 2 }], fabric.type, fabric.widthCm, buildSizeProfileIndex(input.sizeProfiles)) ?? 0;
       if (markerLength > input.tableLengthCm) throw new CutPlanCalculationError(`O tamanho ${size} ultrapassa a mesa mesmo na menor grade tubular.`);
-      addLay(layers, [{ size, frequency: 2 }]);
+      addLay(layers, [{ size, sleeveType, frequency: 2 }]);
     } else {
       let frequency = 1;
       let layers = Math.min(input.maxLayers, quantity);
-      const maximumFrequency = getMaximumEstimatedFrequency(size, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles);
+      const maximumFrequency = getMaximumEstimatedFrequency(size, sleeveType, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles);
       if (!maximumFrequency) throw new CutPlanCalculationError(`O tamanho ${size} ultrapassa a mesa mesmo na grade de frequência 1.`);
       for (let candidate = 1; candidate <= maximumFrequency; candidate += 1) {
         const candidateLayers = quantity / candidate;
@@ -116,7 +122,7 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
           break;
         }
       }
-      addLay(layers, [{ size, frequency }]);
+      addLay(layers, [{ size, sleeveType, frequency }]);
     }
   }
 
@@ -168,8 +174,8 @@ export function recalculateFabricResult(
   return { fabricId, lays: measuredLays, sizes: calculateSizes(aggregateItems(input, fabricId), measuredLays) };
 }
 
-export function formatMarkerLabel(frequencies: MarkerFrequency[]) {
-  return frequencies.map(({ size, frequency }) => `${frequency}${size}`).join(" + ");
+export function formatMarkerLabel(frequencies: MarkerFrequency[], showSleeveType = true) {
+  return frequencies.map(({ size, sleeveType, frequency }) => `${frequency}${size}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`).join(" + ");
 }
 
 /** Rotulo contado no padrao do projeto: plural escrito, nunca "(s)". */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { CircleHelp, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +15,9 @@ type CatalogoFormProps = {
   returnTo?: string;
   selectedKind: CatalogKind;
 };
+
+type SizeWidthKey = "front" | "back" | "shortSleeve" | "longSleeve";
+type SizeWidths = Record<SizeWidthKey, string>;
 
 function getMetadataText(item: CatalogItem | undefined, key: string) {
   const metadata = item?.metadata;
@@ -36,7 +39,31 @@ function FieldLabel({ htmlFor, info, label }: { htmlFor?: string; info: string; 
 
 export function CatalogoForm({ item, returnTo, selectedKind }: CatalogoFormProps) {
   const [state, formAction] = useActionState(saveCatalogItemAction, getInitialCatalogoFormState());
+  const [kind, setKind] = useState<CatalogKind>(item?.kind ?? selectedKind);
+  const [sizeWidths, setSizeWidths] = useState<SizeWidths>(() => ({
+    back: item?.measure_back_width_cm?.toString() ?? "",
+    front: item?.measure_front_width_cm?.toString() ?? "",
+    longSleeve: item?.measure_long_sleeve_width_cm?.toString() ?? "",
+    shortSleeve: item?.measure_short_sleeve_width_cm?.toString() ?? "",
+  }));
+  const independentWidthsRef = useRef(new Set<SizeWidthKey>([
+    ...(item?.measure_front_width_cm != null ? ["front" as const] : []),
+    ...(item?.measure_back_width_cm != null ? ["back" as const] : []),
+    ...(item?.measure_short_sleeve_width_cm != null ? ["shortSleeve" as const] : []),
+    ...(item?.measure_long_sleeve_width_cm != null ? ["longSleeve" as const] : []),
+  ]));
   const lastToastRef = useRef<string | null>(null);
+  const isSize = kind === "tamanho";
+  const isFabric = kind === "tecido";
+
+  function updateSizeWidth(source: SizeWidthKey, paired: SizeWidthKey, value: string) {
+    independentWidthsRef.current.add(source);
+    setSizeWidths((current) => ({
+      ...current,
+      [source]: value,
+      ...(!independentWidthsRef.current.has(paired) ? { [paired]: value } : {}),
+    }));
+  }
 
   useEffect(() => {
     if (!state.message || lastToastRef.current === state.message) return;
@@ -63,7 +90,7 @@ export function CatalogoForm({ item, returnTo, selectedKind }: CatalogoFormProps
               <div className="readonly-field">{catalogKindLabels[item.kind]}</div>
             </>
           ) : (
-            <select id="catalog-kind" name="kind" defaultValue={selectedKind}>
+            <select id="catalog-kind" name="kind" value={kind} onChange={(event) => setKind(event.currentTarget.value as CatalogKind)}>
               {catalogKinds.map((kind) => (
                 <option key={kind} value={kind}>
                   {catalogKindLabels[kind]}
@@ -103,6 +130,60 @@ export function CatalogoForm({ item, returnTo, selectedKind }: CatalogoFormProps
           <input id="catalog-composition" defaultValue={getMetadataText(item, "composition")} name="composition" placeholder="100% poliéster…" />
         </div>
 
+        {isSize ? (
+          <fieldset className="catalog-form__measurements">
+            <legend>Medidas do molde</legend>
+            <p>Largura e altura em centímetros usadas pelo Plano de Corte. Preencha as quatro partes ou deixe tudo vazio.</p>
+            <div>
+              <MeasurementPair
+                height={{ defaultValue: item?.measure_front_height_cm, error: state.fieldErrors?.measureFrontHeightCm, name: "measureFrontHeightCm" }}
+                label="Frente"
+                width={{ error: state.fieldErrors?.measureFrontWidthCm, name: "measureFrontWidthCm", onChange: (value) => updateSizeWidth("front", "back", value), value: sizeWidths.front }}
+              />
+              <MeasurementPair
+                height={{ defaultValue: item?.measure_back_height_cm, error: state.fieldErrors?.measureBackHeightCm, name: "measureBackHeightCm" }}
+                label="Costas"
+                width={{ error: state.fieldErrors?.measureBackWidthCm, name: "measureBackWidthCm", onChange: (value) => updateSizeWidth("back", "front", value), value: sizeWidths.back }}
+              />
+              <MeasurementPair
+                height={{ defaultValue: item?.measure_short_sleeve_height_cm, error: state.fieldErrors?.measureShortSleeveHeightCm, name: "measureShortSleeveHeightCm" }}
+                label="Manga curta"
+                width={{ error: state.fieldErrors?.measureShortSleeveWidthCm, name: "measureShortSleeveWidthCm", onChange: (value) => updateSizeWidth("shortSleeve", "longSleeve", value), value: sizeWidths.shortSleeve }}
+              />
+              <MeasurementPair
+                height={{ defaultValue: item?.measure_long_sleeve_height_cm, error: state.fieldErrors?.measureLongSleeveHeightCm, name: "measureLongSleeveHeightCm" }}
+                label="Manga longa"
+                width={{ error: state.fieldErrors?.measureLongSleeveWidthCm, name: "measureLongSleeveWidthCm", onChange: (value) => updateSizeWidth("longSleeve", "shortSleeve", value), value: sizeWidths.longSleeve }}
+              />
+            </div>
+          </fieldset>
+        ) : null}
+
+        {isFabric ? (
+          <fieldset className="catalog-form__fabric-settings">
+            <legend>Configuração de corte</legend>
+            <div>
+              <div className="field">
+                <label htmlFor="catalog-fabric-width">Largura</label>
+                <div className="catalog-form__unit-input">
+                  <input aria-invalid={Boolean(state.fieldErrors?.fabricWidthCm)} defaultValue={item?.fabric_width_cm ?? ""} id="catalog-fabric-width" inputMode="decimal" min="0.1" name="fabricWidthCm" step="0.1" type="number" />
+                  <span>cm</span>
+                </div>
+                {state.fieldErrors?.fabricWidthCm ? <small className="field-error">{state.fieldErrors.fabricWidthCm}</small> : null}
+              </div>
+              <div className="field">
+                <label htmlFor="catalog-fabric-type">Tipo</label>
+                <select aria-invalid={Boolean(state.fieldErrors?.fabricType)} defaultValue={item?.fabric_type ?? ""} id="catalog-fabric-type" name="fabricType">
+                  <option disabled value="">Selecione</option>
+                  <option value="PLANO">Plano</option>
+                  <option value="TUBULAR">Tubular</option>
+                </select>
+                {state.fieldErrors?.fabricType ? <small className="field-error">{state.fieldErrors.fabricType}</small> : null}
+              </div>
+            </div>
+          </fieldset>
+        ) : null}
+
         <label className="checkbox-field catalog-form__active">
           <input defaultChecked={item?.active ?? true} name="active" type="checkbox" />
           <span>Ativo</span>
@@ -123,6 +204,46 @@ export function CatalogoForm({ item, returnTo, selectedKind }: CatalogoFormProps
       </div>
     </form>
   );
+}
+
+type MeasurementFieldProps = {
+  defaultValue?: number | null;
+  error?: string;
+  name: string;
+  onChange?: (value: string) => void;
+  value?: string;
+};
+
+function MeasurementPair({ height, label, width }: { height: MeasurementFieldProps; label: string; width: MeasurementFieldProps }) {
+  return <section className="catalog-form__measurement-pair">
+    <h3>{label}</h3>
+    <div>
+      <MeasurementField {...width} label="Largura" />
+      <MeasurementField {...height} label="Altura" />
+    </div>
+  </section>;
+}
+
+function MeasurementField({ defaultValue, error, label, name, onChange, value }: MeasurementFieldProps & { label: string }) {
+  return <div className="field">
+    <label htmlFor={`catalog-${name}`}>{label}</label>
+    <div className="catalog-form__unit-input">
+      <input
+        aria-invalid={Boolean(error)}
+        defaultValue={value === undefined ? defaultValue ?? "" : undefined}
+        id={`catalog-${name}`}
+        inputMode="decimal"
+        min="0.1"
+        name={name}
+        onChange={onChange ? (event) => onChange(event.currentTarget.value) : undefined}
+        step="0.1"
+        type="number"
+        value={value}
+      />
+      <span>cm</span>
+    </div>
+    {error ? <small className="field-error">{error}</small> : null}
+  </div>;
 }
 
 function SubmitButton({ isEdit }: { isEdit: boolean }) {

@@ -25,7 +25,17 @@ function getCatalogItemInput(formData: FormData) {
     aliases: formData.get("aliases"),
     composition: formData.get("composition"),
     description: formData.get("description"),
+    fabricType: formData.get("fabricType"),
+    fabricWidthCm: formData.get("fabricWidthCm"),
     kind: formData.get("kind"),
+    measureBackHeightCm: formData.get("measureBackHeightCm"),
+    measureBackWidthCm: formData.get("measureBackWidthCm"),
+    measureFrontHeightCm: formData.get("measureFrontHeightCm"),
+    measureFrontWidthCm: formData.get("measureFrontWidthCm"),
+    measureLongSleeveHeightCm: formData.get("measureLongSleeveHeightCm"),
+    measureLongSleeveWidthCm: formData.get("measureLongSleeveWidthCm"),
+    measureShortSleeveHeightCm: formData.get("measureShortSleeveHeightCm"),
+    measureShortSleeveWidthCm: formData.get("measureShortSleeveWidthCm"),
     name: formData.get("name"),
     sortOrder: formData.get("sortOrder"),
   };
@@ -36,8 +46,18 @@ function getCatalogItemPayload(values: CatalogItemValues) {
     active: values.active,
     aliases: values.aliases,
     description: values.description ?? null,
+    fabric_type: values.kind === "tecido" ? values.fabricType ?? null : null,
+    fabric_width_cm: values.kind === "tecido" ? values.fabricWidthCm ?? null : null,
     kind: values.kind,
     metadata: values.composition ? { composition: values.composition } : {},
+    measure_back_height_cm: values.kind === "tamanho" ? values.measureBackHeightCm ?? null : null,
+    measure_back_width_cm: values.kind === "tamanho" ? values.measureBackWidthCm ?? null : null,
+    measure_front_height_cm: values.kind === "tamanho" ? values.measureFrontHeightCm ?? null : null,
+    measure_front_width_cm: values.kind === "tamanho" ? values.measureFrontWidthCm ?? null : null,
+    measure_long_sleeve_height_cm: values.kind === "tamanho" ? values.measureLongSleeveHeightCm ?? null : null,
+    measure_long_sleeve_width_cm: values.kind === "tamanho" ? values.measureLongSleeveWidthCm ?? null : null,
+    measure_short_sleeve_height_cm: values.kind === "tamanho" ? values.measureShortSleeveHeightCm ?? null : null,
+    measure_short_sleeve_width_cm: values.kind === "tamanho" ? values.measureShortSleeveWidthCm ?? null : null,
     name: values.name,
     slug: slugify(values.name),
     sort_order: values.sortOrder,
@@ -123,6 +143,8 @@ export async function saveCatalogItemAction(_previousState: CatalogoFormState, f
   }
 
   revalidatePath("/catalogos");
+  revalidatePath("/ferramentas/plano-de-corte");
+  revalidatePath("/fichas");
 
   const returnTo = getReturnTo(formData);
   if (returnTo) {
@@ -167,6 +189,7 @@ export async function deleteCatalogItemAction(
   }
 
   revalidatePath("/catalogos");
+  revalidatePath("/ferramentas/plano-de-corte");
   revalidatePath("/fichas");
   redirect(withToastParam(getReturnTo(formData) ?? "/catalogos", "catalog-item-deleted"));
 }
@@ -222,6 +245,7 @@ export async function deleteCatalogItemsAction(kind: CatalogKind, itemIds: strin
   }
 
   revalidatePath("/catalogos");
+  revalidatePath("/ferramentas/plano-de-corte");
   revalidatePath("/fichas");
 
   return {
@@ -289,6 +313,7 @@ export async function saveCatalogItemOrderAction(kind: CatalogKind, itemIds: str
   }
 
   revalidatePath("/catalogos");
+  revalidatePath("/ferramentas/plano-de-corte");
   revalidatePath("/fichas");
 
   return {

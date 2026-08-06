@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { performance } from "node:perf_hooks";
-import { buildSizeProfileIndex, estimateMarkerLengthCm, getLayerLimit } from "../src/features/plano-de-corte/dimensions.ts";
-import type { CutPlanSizeProfile, FabricType } from "../src/features/plano-de-corte/model.ts";
+import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, calculateShirtAreaCm2, estimateMarkerLengthCm, formatEstimatedLengthMeters, getLayerLimit, getMaximumEstimatedFrequency, normalizeCutPlanSizeKey } from "../src/features/plano-de-corte/dimensions.ts";
+import { cutPlanDemandKey, type CutPlanSizeProfile, type FabricType } from "../src/features/plano-de-corte/model.ts";
 import { solveMinimumLays } from "../src/features/plano-de-corte/solver.ts";
-import { calculateCutPlan } from "../src/features/plano-de-corte/calculator.ts";
+import { calculateCutPlan, formatMarkerLabel } from "../src/features/plano-de-corte/calculator.ts";
 import { validateCutPlan } from "../src/features/plano-de-corte/validation.ts";
 import type { CutPlanInput } from "../src/features/plano-de-corte/model.ts";
 
@@ -15,6 +15,20 @@ test("aplica os limites fisicos de folhas por tipo", () => {
   assert.equal(getLayerLimit("TUBULAR"), 50);
 });
 
+test("formata o comprimento estimado em metros com uma casa decimal", () => {
+  assert.equal(formatEstimatedLengthMeters(589), "5,9 metros");
+  assert.equal(formatEstimatedLengthMeters(500), "5,0 metros");
+});
+
+test("omite a manga na grade unica e preserva na grade mista", () => {
+  const frequencies = [
+    { size: "P", sleeveType: "CURTA" as const, frequency: 2 },
+    { size: "M", sleeveType: "LONGA" as const, frequency: 4 },
+  ];
+  assert.equal(formatMarkerLabel(frequencies, false), "2P + 4M");
+  assert.equal(formatMarkerLabel(frequencies, true), "2P MC + 4M ML");
+});
+
 test("validacao rejeita folhas acima do limite do tecido", () => {
   const tubular = createInput("TUBULAR", 51);
   const flat = createInput("PLANO", 101);
@@ -22,21 +36,86 @@ test("validacao rejeita folhas acima do limite do tecido", () => {
   assert.ok(validateCutPlan(flat).some((message) => message.includes("100 folhas")));
 });
 
-test("estima corpo duplo, par de mangas, aliases e duplicacao tubular", () => {
+test("estima frente, costas, tipo de manga, aliases e duplicacao tubular", () => {
   const profile: CutPlanSizeProfile = {
     id: "m",
     size: "M",
     aliases: ["MEDIO"],
-    bodyHeightCm: 70,
-    bodyWidthCm: 50,
-    sleeveHeightCm: 25,
-    sleeveWidthCm: 20,
+    backHeightCm: 70,
+    backWidthCm: 50,
+    frontHeightCm: 70,
+    frontWidthCm: 50,
+    longSleeveHeightCm: 60,
+    longSleeveWidthCm: 20,
+    shortSleeveHeightCm: 25,
+    shortSleeveWidthCm: 20,
   };
   const index = buildSizeProfileIndex([profile]);
-  const flat = estimateMarkerLengthCm([{ size: "medio", frequency: 2 }], "PLANO", 100, index)!;
-  const tubular = estimateMarkerLengthCm([{ size: "M", frequency: 2 }], "TUBULAR", 100, index)!;
-  assert.ok(flat > 0);
-  assert.equal(tubular, flat / 2);
+  const flatShort = estimateMarkerLengthCm([{ size: "medio", sleeveType: "CURTA", frequency: 2 }], "PLANO", 100, index)!;
+  const flatLong = estimateMarkerLengthCm([{ size: "M", sleeveType: "LONGA", frequency: 2 }], "PLANO", 100, index)!;
+  const tubularShort = estimateMarkerLengthCm([{ size: "M", sleeveType: "CURTA", frequency: 2 }], "TUBULAR", 100, index)!;
+  const tubularLong = estimateMarkerLengthCm([{ size: "M", sleeveType: "LONGA", frequency: 2 }], "TUBULAR", 100, index)!;
+  const tubularShortDouble = estimateMarkerLengthCm([{ size: "M", sleeveType: "CURTA", frequency: 4 }], "TUBULAR", 100, index)!;
+  assert.ok(flatShort > 0);
+  assert.ok(flatLong > flatShort);
+  assert.equal(calculateShirtAreaCm2(profile, "CURTA"), 8_000);
+  assert.equal(calculateMarkerAreaLengthCm(profile, "CURTA", "TUBULAR", 100, 2), flatShort / 2);
+  assert.equal(tubularShort, flatShort / 2);
+  assert.equal(tubularLong, flatLong / 2);
+  assert.equal(tubularShortDouble, flatShort);
+  assert.equal(getMaximumEstimatedFrequency("M", "CURTA", "TUBULAR", 100, 300, [profile]), 6);
+  assert.equal(getMaximumEstimatedFrequency("M", "CURTA", "PLANO", 100, 300, [profile]), 3);
+});
+
+test("separa perfis tradicionais e Baby Look e aceita aliases equivalentes do mesmo perfil", () => {
+  const regular: CutPlanSizeProfile = {
+    id: "regular-p",
+    size: "P",
+    aliases: [],
+    backHeightCm: 70,
+    backWidthCm: 50,
+    frontHeightCm: 70,
+    frontWidthCm: 50,
+    longSleeveHeightCm: 60,
+    longSleeveWidthCm: 20,
+    shortSleeveHeightCm: 25,
+    shortSleeveWidthCm: 20,
+  };
+  const baby: CutPlanSizeProfile = {
+    ...regular,
+    id: "baby-p",
+    size: "Baby P",
+    aliases: ["BL P"],
+    backWidthCm: 42,
+    frontWidthCm: 42,
+  };
+  const index = buildSizeProfileIndex([regular, baby]);
+  assert.equal(index.get(normalizeCutPlanSizeKey("P"))?.id, "regular-p");
+  assert.equal(index.get(normalizeCutPlanSizeKey("Baby P"))?.id, "baby-p");
+  assert.equal(index.get(normalizeCutPlanSizeKey("BL P"))?.id, "baby-p");
+
+  const input = createInput("PLANO", 20);
+  input.sizeProfiles = [regular, baby];
+  assert.equal(validateCutPlan(input).some((message) => message.includes("repetido nos perfis")), false);
+});
+
+test("continua rejeitando a mesma chave de tamanho em perfis realmente distintos", () => {
+  const input = createInput("PLANO", 20);
+  const profile: CutPlanSizeProfile = {
+    id: "first-p",
+    size: "P",
+    aliases: [],
+    backHeightCm: 70,
+    backWidthCm: 50,
+    frontHeightCm: 70,
+    frontWidthCm: 50,
+    longSleeveHeightCm: 60,
+    longSleeveWidthCm: 20,
+    shortSleeveHeightCm: 25,
+    shortSleeveWidthCm: 20,
+  };
+  input.sizeProfiles = [profile, { ...profile, id: "second-p" }];
+  assert.ok(validateCutPlan(input).some((message) => message.includes("repetido nos perfis")));
 });
 
 test("mantem combinacoes validas que a poda incorreta por divisores eliminaria", () => {
@@ -50,10 +129,14 @@ test("usa o comprimento da mesa para reduzir frequencias", () => {
     id: "p",
     size: "P",
     aliases: [],
-    bodyHeightCm: 70,
-    bodyWidthCm: 50,
-    sleeveHeightCm: 25,
-    sleeveWidthCm: 20,
+    backHeightCm: 70,
+    backWidthCm: 50,
+    frontHeightCm: 70,
+    frontWidthCm: 50,
+    longSleeveHeightCm: 60,
+    longSleeveWidthCm: 20,
+    shortSleeveHeightCm: 25,
+    shortSleeveWidthCm: 20,
   };
   const tableLengthCm = 250;
   const solutions = solveMinimumLays(new Map([["P", 60]]), 10, "PLANO", 6, {
@@ -70,6 +153,50 @@ test("caso tubular real fecha em dois enfestos com frequencias pares", () => {
   const solution = solveMinimumLays(quantities, 30, "TUBULAR", 4, unconstrained)[0];
   assert.equal(solution?.lays.length, 2);
   assert.ok(solution.lays.every((lay) => lay.frequencies.every(({ frequency }) => frequency % 2 === 0)));
+});
+
+test("pedido Intercement permanece em dois enfestos com a dobra apenas na estimativa de area", () => {
+  const input = createInput("TUBULAR", 50);
+  input.items = [
+    { id: "p", fabricId: "fabric", size: "P", sleeveType: "CURTA", quantity: 40 },
+    { id: "m", fabricId: "fabric", size: "M", sleeveType: "CURTA", quantity: 60 },
+    { id: "g", fabricId: "fabric", size: "G", sleeveType: "CURTA", quantity: 50 },
+    { id: "gg", fabricId: "fabric", size: "GG", sleeveType: "CURTA", quantity: 30 },
+  ];
+  input.sizeProfiles = [
+    measuredProfile("P", [73.8, 52.2, 76.4, 52.2, 25.6, 44.4, 63.7, 44.4]),
+    measuredProfile("M", [75.8, 55.2, 78.4, 55.2, 26.7, 46.4, 67.8, 46.4]),
+    measuredProfile("G", [77.8, 58.2, 80.4, 58.2, 27.7, 48.4, 68.8, 48.4]),
+    measuredProfile("GG", [79.8, 62.2, 82.4, 62.2, 28.7, 50.4, 69.9, 50.4]),
+  ];
+
+  const result = calculateCutPlan(input).fabrics[0];
+  assert.deepEqual(result.lays.map(({ layers }) => layers), [15, 5]);
+  assert.deepEqual(result.lays.map((lay) => formatMarkerLabel(lay.frequencies, false)), [
+    "2P + 4M + 2G + 2GG",
+    "2P + 4G",
+  ]);
+  assert.ok(result.lays.every((lay) => (lay.markerLengthCm ?? 0) <= input.tableLengthCm));
+  assert.ok(result.sizes.every((size) => size.difference === 0));
+});
+
+test("mantem o mesmo tamanho separado por tipo de manga", () => {
+  const input = createInput("PLANO", 20);
+  input.items = [
+    { id: "short", fabricId: "fabric", size: "M", sleeveType: "CURTA", quantity: 10 },
+    { id: "long", fabricId: "fabric", size: "M", sleeveType: "LONGA", quantity: 12 },
+  ];
+  const result = calculateCutPlan(input).fabrics[0];
+  assert.deepEqual(result.sizes.map(({ size, sleeveType, requested }) => ({ size, sleeveType, requested })), [
+    { size: "M", sleeveType: "CURTA", requested: 10 },
+    { size: "M", sleeveType: "LONGA", requested: 12 },
+  ]);
+  assert.ok(result.lays.flatMap((lay) => lay.frequencies).some((marker) => marker.size === "M" && marker.sleeveType === "CURTA"));
+  assert.ok(result.lays.flatMap((lay) => lay.frequencies).some((marker) => marker.size === "M" && marker.sleeveType === "LONGA"));
+  assert.ok(solveMinimumLays(new Map([
+    [cutPlanDemandKey("M", "CURTA"), 10],
+    [cutPlanDemandKey("M", "LONGA"), 12],
+  ]), 20, "PLANO", 4, unconstrained)[0]);
 });
 
 test("coincide com busca exaustiva independente em entradas pequenas", () => {
@@ -99,6 +226,7 @@ test("orcamento combinatorio cai no fallback sem perder producao exata", () => {
     id: `item-${index}`,
     fabricId: "fabric",
     size: `T${index}`,
+    sleeveType: index % 2 ? "LONGA" : "CURTA",
     quantity: 20 + index * 2,
   }));
   const startedAt = performance.now();
@@ -137,7 +265,26 @@ function createInput(type: FabricType, maxLayers: number): CutPlanInput {
     tableLengthCm: 800,
     maxLayers,
     fabrics: [{ id: "fabric", name: "Malha", color: "", widthCm: 118, type }],
-    items: [{ id: "item", fabricId: "fabric", size: "M", quantity: type === "TUBULAR" ? 20 : 10 }],
+    items: [{ id: "item", fabricId: "fabric", size: "M", sleeveType: "CURTA", quantity: type === "TUBULAR" ? 20 : 10 }],
     sizeProfiles: [],
+  };
+}
+
+function measuredProfile(
+  size: string,
+  [frontHeightCm, frontWidthCm, backHeightCm, backWidthCm, shortSleeveHeightCm, shortSleeveWidthCm, longSleeveHeightCm, longSleeveWidthCm]: number[],
+): CutPlanSizeProfile {
+  return {
+    id: size.toLowerCase(),
+    size,
+    aliases: [],
+    frontHeightCm,
+    frontWidthCm,
+    backHeightCm,
+    backWidthCm,
+    shortSleeveHeightCm,
+    shortSleeveWidthCm,
+    longSleeveHeightCm,
+    longSleeveWidthCm,
   };
 }

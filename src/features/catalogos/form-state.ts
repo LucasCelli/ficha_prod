@@ -1,4 +1,10 @@
-export type CatalogoFieldErrors = Partial<Record<"aliases" | "composition" | "description" | "kind" | "name" | "sortOrder", string>>;
+export type CatalogoFieldErrors = Partial<Record<
+  "aliases" | "composition" | "description" | "fabricType" | "fabricWidthCm" | "kind" |
+  "measureBackHeightCm" | "measureBackWidthCm" | "measureFrontHeightCm" | "measureFrontWidthCm" |
+  "measureLongSleeveHeightCm" | "measureLongSleeveWidthCm" |
+  "measureShortSleeveHeightCm" | "measureShortSleeveWidthCm" | "name" | "sortOrder",
+  string
+>>;
 
 export type CatalogoFormState = {
   fieldErrors?: CatalogoFieldErrors;

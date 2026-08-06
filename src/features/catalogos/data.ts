@@ -25,6 +25,12 @@ export type CatalogosResult =
     };
 
 export type CatalogOptionsByKind = Record<CatalogKind, CustomDatalistOption[]>;
+export type CatalogSizeForCutPlan = Pick<CatalogItem,
+  "aliases" | "id" | "measure_back_height_cm" | "measure_back_width_cm" |
+  "measure_front_height_cm" | "measure_front_width_cm" |
+  "measure_long_sleeve_height_cm" | "measure_long_sleeve_width_cm" |
+  "measure_short_sleeve_height_cm" | "measure_short_sleeve_width_cm" | "name"
+>;
 
 function getEmptyCatalogMap(): Record<CatalogKind, CatalogItem[]> {
   return catalogKinds.reduce(
@@ -132,7 +138,7 @@ export async function listCatalogOptionsForFichaForm(): Promise<CatalogOptionsBy
   try {
     const { data, error } = await createServerSupabaseClient()
       .from("catalog_items")
-      .select("kind,name,aliases,metadata")
+      .select("kind,name,aliases,metadata,fabric_width_cm,fabric_type")
       .eq("active", true)
       .order("kind", { ascending: true })
       .order("sort_order", { ascending: true })
@@ -141,11 +147,20 @@ export async function listCatalogOptionsForFichaForm(): Promise<CatalogOptionsBy
     if (error) return itemsByKind;
 
     (data ?? []).forEach((item) => {
-      const metadata = getMetadataRecord(item.metadata);
+      const baseMetadata = getMetadataRecord(item.metadata);
+      const fabricMetadata = item.kind === "tecido" && item.fabric_width_cm !== null && item.fabric_type
+        ? { fabricType: item.fabric_type, fabricWidthCm: String(item.fabric_width_cm) }
+        : undefined;
+      const metadata = baseMetadata || fabricMetadata ? { ...baseMetadata, ...fabricMetadata } : undefined;
+      const fabricDetails = item.kind !== "tecido"
+        ? []
+        : fabricMetadata
+          ? [`${item.fabric_width_cm} cm`, item.fabric_type === "TUBULAR" ? "Tubular" : "Plano"]
+          : ["Sem largura e tipo"];
 
       itemsByKind[item.kind].push({
         aliases: item.aliases,
-        details: getCatalogOptionDetails(item.aliases, metadata),
+        details: [...(getCatalogOptionDetails(item.aliases, metadata) ?? []), ...fabricDetails],
         label: item.name,
         metadata,
         value: item.name,
@@ -155,5 +170,23 @@ export async function listCatalogOptionsForFichaForm(): Promise<CatalogOptionsBy
     return itemsByKind;
   } catch {
     return itemsByKind;
+  }
+}
+
+export async function listCatalogSizesForCutPlan(): Promise<CatalogSizeForCutPlan[]> {
+  if (!getSupabaseConfigStatus().hasServerConfig) return [];
+
+  try {
+    const { data, error } = await createServerSupabaseClient()
+      .from("catalog_items")
+      .select("id,name,aliases,measure_front_height_cm,measure_front_width_cm,measure_back_height_cm,measure_back_width_cm,measure_short_sleeve_height_cm,measure_short_sleeve_width_cm,measure_long_sleeve_height_cm,measure_long_sleeve_width_cm")
+      .eq("kind", "tamanho")
+      .eq("active", true)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true });
+
+    return error ? [] : data ?? [];
+  } catch {
+    return [];
   }
 }

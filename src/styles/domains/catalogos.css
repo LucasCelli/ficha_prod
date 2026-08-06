@@ -159,6 +159,81 @@
   grid-column: 1 / -1;
 }
 
+.catalog-form__measurements,
+.catalog-form__fabric-settings {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.catalog-form__measurements legend,
+.catalog-form__fabric-settings legend {
+  padding-inline: 4px;
+  color: var(--color-text);
+  font-weight: 800;
+}
+
+.catalog-form__measurements > p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+}
+
+.catalog-form__measurements > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.catalog-form__fabric-settings > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.catalog-form__measurement-pair {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  background: var(--color-surface-2);
+  padding: 12px;
+}
+
+.catalog-form__measurement-pair h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.8125rem;
+}
+
+.catalog-form__measurement-pair > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.catalog-form__unit-input {
+  position: relative;
+}
+
+.catalog-form__unit-input input {
+  width: 100%;
+  padding-inline-end: 42px;
+}
+
+.catalog-form__unit-input span {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 12px;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
 .catalog-form__actions {
   display: flex;
   gap: 12px;

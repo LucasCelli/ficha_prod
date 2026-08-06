@@ -10,10 +10,11 @@ type FichaRow = {
   ficha_itens?: Array<{ quantidade: number; tamanho: string | null }> | null;
   id: string;
   material: string | null;
+  manga: string | null;
   numero_venda: string | null;
 };
 
-const COLUMNS = "id, numero_venda, cliente_nome_snapshot, material, cor_material, ficha_itens(tamanho, quantidade), ficha_imagens(url)";
+const COLUMNS = "id, numero_venda, cliente_nome_snapshot, material, cor_material, manga, ficha_itens(tamanho, quantidade), ficha_imagens(url)";
 
 function normalizeSearchText(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, " ").toLowerCase().trim();
@@ -26,7 +27,8 @@ function mapFicha(row: FichaRow) {
     if (size && item.quantidade > 0) quantitiesBySize.set(size, (quantitiesBySize.get(size) ?? 0) + item.quantidade);
   }
   const items = [...quantitiesBySize].map(([size, quantity]) => ({ quantity, size }));
-  return { client: row.cliente_nome_snapshot, color: row.cor_material?.trim() ?? "", id: row.id, imageUrl: row.ficha_imagens?.[0]?.url ?? null, items, material: row.material?.trim() ?? "", number: row.numero_venda, total: items.reduce((sum, item) => sum + item.quantity, 0) };
+  const sleeveType = normalizeSearchText(row.manga ?? "").includes("long") ? "LONGA" as const : "CURTA" as const;
+  return { client: row.cliente_nome_snapshot, color: row.cor_material?.trim() ?? "", id: row.id, imageUrl: row.ficha_imagens?.[0]?.url ?? null, items, material: row.material?.trim() ?? "", number: row.numero_venda, sleeveType, total: items.reduce((sum, item) => sum + item.quantity, 0) };
 }
 
 async function handleGET(request: Request) {
