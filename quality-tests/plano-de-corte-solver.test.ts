@@ -4,7 +4,7 @@ import { performance } from "node:perf_hooks";
 import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, calculateShirtAreaCm2, estimateMarkerLengthCm, formatEstimatedLengthMeters, getLayerLimit, getMaximumEstimatedFrequency, normalizeCutPlanSizeKey } from "../src/features/plano-de-corte/dimensions.ts";
 import { cutPlanDemandKey, type CutPlanSizeProfile, type FabricType } from "../src/features/plano-de-corte/model.ts";
 import { solveMinimumLays } from "../src/features/plano-de-corte/solver.ts";
-import { calculateCutPlan, formatMarkerLabel } from "../src/features/plano-de-corte/calculator.ts";
+import { calculateCutPlan, formatCutPlanSizeLabel, formatMarkerLabel } from "../src/features/plano-de-corte/calculator.ts";
 import { calculateCutPlanAlternatives } from "../src/features/plano-de-corte/alternatives.ts";
 import { validateCutPlan } from "../src/features/plano-de-corte/validation.ts";
 import type { CutPlanInput } from "../src/features/plano-de-corte/model.ts";
@@ -28,6 +28,11 @@ test("omite a manga na grade unica e preserva na grade mista", () => {
   ];
   assert.equal(formatMarkerLabel(frequencies, false), "2P + 4M");
   assert.equal(formatMarkerLabel(frequencies, true), "2P MC + 4M ML");
+});
+
+test("abrevia Baby Look como BL na apresentação", () => {
+  assert.equal(formatCutPlanSizeLabel("BABY PP"), "BL PP");
+  assert.equal(formatMarkerLabel([{ size: "BABY PP", sleeveType: "CURTA", frequency: 2 }], false), "2BL PP");
 });
 
 test("validacao rejeita folhas acima do limite do tecido", () => {

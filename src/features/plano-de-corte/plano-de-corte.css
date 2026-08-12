@@ -285,6 +285,25 @@
   gap: 8px;
 }
 
+.cut-plan__lay-copy {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: copy;
+  font: inherit;
+  font-weight: inherit;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--duration-fast) var(--easing-standard);
+}
+
+.cut-plan__lay-copy:hover,
+.cut-plan__lay-copy:focus-visible {
+  text-decoration-color: currentColor;
+}
 .cut-plan__lay-header h4 {
   color: var(--color-primary-text);
   font-size: 1.15rem;
@@ -845,7 +864,7 @@
 .cut-plan-print-simple__page {
   width: 794px;
   min-height: 1123px;
-  padding: 42px 44px;
+  padding: 32px 38px;
 }
 
 .cut-plan-print-simple__header {
@@ -853,7 +872,7 @@
   align-items: flex-start;
   justify-content: space-between;
   border-bottom: 2px solid #204f91;
-  padding-bottom: 14px;
+  padding-bottom: 8px;
 }
 
 .cut-plan-print-simple__header h1 {
@@ -923,36 +942,8 @@
   font-weight: 600;
 }
 
-.cut-plan-print-simple__summary {
-  display: flex;
-  margin: 18px 0 26px;
-  border-block: 1px solid #d8dee8;
-}
-
-.cut-plan-print-simple__summary div {
-  flex: 1;
-  padding: 11px 13px;
-}
-
-.cut-plan-print-simple__summary div+div {
-  border-left: 1px solid #d8dee8;
-}
-
-.cut-plan-print-simple__summary dt {
-  color: #66758a;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.cut-plan-print-simple__summary dd {
-  margin: 3px 0 0;
-  font-size: 15px;
-  font-weight: 700;
-}
-
 .cut-plan-print-simple__fabric {
-  margin-top: 26px;
+  margin-top: 16px;
   break-inside: avoid;
 }
 
@@ -1021,11 +1012,15 @@
 .cut-plan-print-simple th,
 .cut-plan-print-simple td {
   border-bottom: 1px solid #dce2ea;
-  padding: 10px 9px;
+  padding: 6px 8px;
   text-align: left;
   vertical-align: middle;
 }
 
+.cut-plan-print-simple__check th,
+.cut-plan-print-simple__check td {
+  padding-block: 4px;
+}
 .cut-plan-print-simple tbody tr:last-child td {
   border-bottom: 0;
 }

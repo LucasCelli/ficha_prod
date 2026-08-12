@@ -174,8 +174,12 @@ export function recalculateFabricResult(
   return { fabricId, lays: measuredLays, sizes: calculateSizes(aggregateItems(input, fabricId), measuredLays) };
 }
 
+export function formatCutPlanSizeLabel(size: string) {
+  return size.replace(/^BABY(?:\s+LOOK)?\s+/i, "BL ");
+}
+
 export function formatMarkerLabel(frequencies: MarkerFrequency[], showSleeveType = true) {
-  return frequencies.map(({ size, sleeveType, frequency }) => `${frequency}${size}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`).join(" + ");
+  return frequencies.map(({ size, sleeveType, frequency }) => `${frequency}${formatCutPlanSizeLabel(size)}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`).join(" + ");
 }
 
 /** Rotulo contado no padrao do projeto: plural escrito, nunca "(s)". */
