@@ -33,6 +33,13 @@ test("omite a manga na grade unica e preserva na grade mista", () => {
 test("abrevia Baby Look como BL na apresentação", () => {
   assert.equal(formatCutPlanSizeLabel("BABY PP"), "BL PP");
   assert.equal(formatMarkerLabel([{ size: "BABY PP", sleeveType: "CURTA", frequency: 2 }], false), "2BL PP");
+  assert.equal(formatMarkerLabel([
+    { size: "P", sleeveType: "CURTA", frequency: 2 },
+    { size: "M", sleeveType: "CURTA", frequency: 2 },
+    { size: "BABY M", sleeveType: "CURTA", frequency: 2 },
+    { size: "G", sleeveType: "CURTA", frequency: 4 },
+    { size: "GG", sleeveType: "CURTA", frequency: 2 },
+  ], false), "2P + 2M + 4G + 2GG + 2BL M");
 });
 
 test("validacao rejeita folhas acima do limite do tecido", () => {

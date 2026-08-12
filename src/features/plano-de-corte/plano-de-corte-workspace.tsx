@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, Badge, Button, CustomDatalist, IconButton, type CustomDatalistOption } from "@/components/ui";
 import type { CatalogSizeForCutPlan } from "@/features/catalogos/data";
 import { calculateCutPlanAlternatives, type CutPlanAlternative } from "./alternatives";
-import { countLabel, CutPlanCalculationError, formatCutPlanSizeLabel, formatMarkerLabel } from "./calculator";
+import { countLabel, CutPlanCalculationError, formatCutPlanSizeLabel, formatMarkerLabel, sortMarkerFrequenciesForDisplay } from "./calculator";
 import { CutPlanFichaPicker } from "./cut-plan-ficha-picker";
 import { CutPlanNativePrintLayer } from "./cut-plan-native-print-layer";
 import { CutPlanItemsEditor, sortCutPlanItems } from "./cut-plan-items-editor";
@@ -269,7 +269,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
 }
 
 function layClipboardText(frequencies: MarkerFrequency[], layers: number, showSleeveType: boolean) {
-  const grade = frequencies.map((marker) => `${marker.frequency}${formatCutPlanSizeLabel(marker.size)}${showSleeveType ? ` ${marker.sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`).join(" ");
+  const grade = sortMarkerFrequenciesForDisplay(frequencies).map((marker) => `${marker.frequency}${formatCutPlanSizeLabel(marker.size)}${showSleeveType ? ` ${marker.sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`).join(" ");
   return `${grade} x ${layers} ${layers === 1 ? "FOLHA" : "FOLHAS"}`;
 }
 
@@ -289,7 +289,7 @@ function PlanResult({ alternative, fabrics }: { alternative: CutPlanAlternative;
       <div className="cut-plan__lay-header">
         <div className="cut-plan__lay-heading">
           <h4><button className="cut-plan__lay-copy" onClick={() => void copyLaySummary(layClipboardText(lay.frequencies, lay.layers, showSleeveType))} title="Copiar resumo do enfesto" type="button">Enfesto {String(index + 1).padStart(2, "0")}</button></h4>
-          <ul className="cut-plan__grade">{lay.frequencies.map((marker) => <li key={`${marker.size}-${marker.sleeveType}`}><Badge tone="info">{marker.frequency}{formatCutPlanSizeLabel(marker.size)}{showSleeveType ? ` · ${marker.sleeveType === "LONGA" ? "ML" : "MC"}` : ""}</Badge></li>)}</ul>
+          <ul className="cut-plan__grade">{sortMarkerFrequenciesForDisplay(lay.frequencies).map((marker) => <li key={`${marker.size}-${marker.sleeveType}`}><Badge tone="info">{marker.frequency}{formatCutPlanSizeLabel(marker.size)}{showSleeveType ? ` · ${marker.sleeveType === "LONGA" ? "ML" : "MC"}` : ""}</Badge></li>)}</ul>
           {lay.markerLengthCm ? <p className="cut-plan__marker-length">Comprimento estimado: {formatEstimatedLengthMeters(lay.markerLengthCm)}</p> : null}
         </div>
         <p className="cut-plan__lay-layers"><span>{lay.layers}</span><small>{lay.layers === 1 ? "folha" : "folhas"}</small></p>

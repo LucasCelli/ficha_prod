@@ -9,6 +9,7 @@ import {
 } from "./model.ts";
 import { buildSizeProfileIndex, estimateMarkerLengthCm, getMaximumEstimatedFrequency } from "./dimensions.ts";
 import { solveMinimumLays } from "./solver.ts";
+import { compareUniformSizes, isUniformBabyLookText } from "../../lib/uniform-sizes.ts";
 
 export class CutPlanCalculationError extends Error {
   constructor(message: string) {
@@ -178,8 +179,16 @@ export function formatCutPlanSizeLabel(size: string) {
   return size.replace(/^BABY(?:\s+LOOK)?\s+/i, "BL ");
 }
 
+export function sortMarkerFrequenciesForDisplay(frequencies: MarkerFrequency[]) {
+  return [...frequencies].sort((first, second) => {
+    const modelOrder = Number(isUniformBabyLookText(first.size)) - Number(isUniformBabyLookText(second.size));
+    if (modelOrder !== 0) return modelOrder;
+    return compareUniformSizes(first.size, second.size);
+  });
+}
+
 export function formatMarkerLabel(frequencies: MarkerFrequency[], showSleeveType = true) {
-  return frequencies.map(({ size, sleeveType, frequency }) => `${frequency}${formatCutPlanSizeLabel(size)}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`).join(" + ");
+  return sortMarkerFrequenciesForDisplay(frequencies).map(({ size, sleeveType, frequency }) => `${frequency}${formatCutPlanSizeLabel(size)}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`).join(" + ");
 }
 
 /** Rotulo contado no padrao do projeto: plural escrito, nunca "(s)". */
