@@ -55,6 +55,81 @@
   line-height: 1.5;
 }
 
+/* Histórico local de planos calculados */
+.cut-plan__history {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  padding: 16px 18px;
+}
+
+.cut-plan__history>header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.cut-plan__history h2 {
+  font-size: 1rem;
+}
+
+.cut-plan__history header p,
+.cut-plan__history-empty {
+  margin: 3px 0 0;
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+}
+
+.cut-plan__history-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
+  gap: 8px;
+}
+
+.cut-plan__history-list article {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  padding: 5px;
+}
+
+.cut-plan__history-restore {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 3px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.cut-plan__history-restore strong,
+.cut-plan__history-restore span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cut-plan__history-restore span {
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+}
+
+.cut-plan__history-restore:hover strong,
+.cut-plan__history-restore:focus-visible strong {
+  color: var(--color-primary-text);
+}
 /* Etapas do plano */
 
 .cut-plan__section {
