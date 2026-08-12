@@ -57,13 +57,26 @@
 
 /* Histórico local de planos calculados */
 .cut-plan__history {
+  position: fixed;
+  z-index: 40;
+  top: 84px;
+  right: 20px;
   display: grid;
+  width: min(430px, calc(100vw - 40px));
+  max-height: calc(100vh - 104px);
   gap: 12px;
+  overflow: hidden;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-lg);
   padding: 16px 18px;
+}
+
+.cut-plan__history.is-collapsed {
+  width: auto;
+  max-width: calc(100vw - 40px);
+  padding: 10px 12px;
 }
 
 .cut-plan__history>header {
@@ -77,6 +90,24 @@
   font-size: 1rem;
 }
 
+.cut-plan__history h2 span {
+  display: inline-grid;
+  min-width: 22px;
+  height: 22px;
+  margin-left: 5px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-primary-bg);
+  color: var(--color-primary-text);
+  font-size: var(--font-size-xs);
+}
+
+.cut-plan__history-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .cut-plan__history header p,
 .cut-plan__history-empty {
   margin: 3px 0 0;
@@ -86,8 +117,9 @@
 
 .cut-plan__history-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
   gap: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .cut-plan__history-list article {
@@ -839,6 +871,17 @@
 }
 
 @media (max-width: 768px) {
+  .cut-plan__history {
+    top: 72px;
+    right: 12px;
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 84px);
+  }
+
+  .cut-plan__history.is-collapsed {
+    max-width: calc(100vw - 24px);
+  }
+
   .cut-plan__section {
     padding: 14px 15px 15px;
   }
