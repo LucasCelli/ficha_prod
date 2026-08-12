@@ -210,6 +210,12 @@
   padding: 10px 12px;
 }
 
+.cut-plan__table tfoot th,
+.cut-plan__table tfoot td {
+  border-top: 2px solid var(--color-border-strong);
+  background: var(--color-surface-2);
+  font-weight: 800;
+}
 .cut-plan__table tr:last-child td {
   border-bottom: 0;
 }
@@ -1020,6 +1026,12 @@
 .cut-plan-print-simple__check th,
 .cut-plan-print-simple__check td {
   padding-block: 4px;
+}
+.cut-plan-print-simple tfoot th,
+.cut-plan-print-simple tfoot td {
+  border-top: 2px solid #9eabbc;
+  background: #eef2f7;
+  font-weight: 700;
 }
 .cut-plan-print-simple tbody tr:last-child td {
   border-bottom: 0;

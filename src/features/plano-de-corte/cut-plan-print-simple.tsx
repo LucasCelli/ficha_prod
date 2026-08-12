@@ -12,7 +12,12 @@ const fichaDetail = (ficha: CutPlanSourceFicha) => [
 ].filter(Boolean).join(" · ");
 
 function Conference({ fabricResult, fabric }: { fabricResult: FabricCutPlanResult; fabric: CutPlanFabric }) {
-  return <section className="cut-plan-print-simple__conference"><h3>Conferência final — {fabricLabel(fabric)}</h3><table className="cut-plan-print-simple__check"><thead><tr><th>Tamanho</th><th>Manga</th><th>Pedido</th><th>Vai cortar</th><th>Diferença</th></tr></thead><tbody>{fabricResult.sizes.map((size) => <tr key={`${size.size}-${size.sleeveType}`}><td><strong>{formatCutPlanSizeLabel(size.size)}</strong></td><td>{size.sleeveType === "LONGA" ? "Longa" : "Curta"}</td><td>{size.requested}</td><td>{size.produced}</td><td>{size.difference > 0 ? "+" : ""}{size.difference}</td></tr>)}</tbody></table></section>;
+  const totals = fabricResult.sizes.reduce((sum, size) => ({
+    difference: sum.difference + Math.max(0, size.difference),
+    produced: sum.produced + size.produced,
+    requested: sum.requested + size.requested,
+  }), { difference: 0, produced: 0, requested: 0 });
+  return <section className="cut-plan-print-simple__conference"><h3>Conferência final — {fabricLabel(fabric)}</h3><table className="cut-plan-print-simple__check"><thead><tr><th>Tamanho</th><th>Manga</th><th>Pedido</th><th>Vai cortar</th><th>Diferença</th></tr></thead><tbody>{fabricResult.sizes.map((size) => <tr key={`${size.size}-${size.sleeveType}`}><td><strong>{formatCutPlanSizeLabel(size.size)}</strong></td><td>{size.sleeveType === "LONGA" ? "Longa" : "Curta"}</td><td>{size.requested}</td><td>{size.produced}</td><td>{size.difference > 0 ? "+" : ""}{size.difference}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>Totais</th><td><strong>{totals.requested}</strong></td><td><strong>{totals.produced}</strong></td><td><strong>{totals.difference}</strong></td></tr></tfoot></table></section>;
 }
 
 export function CutPlanPrintSimple({ alternative, input, sourceFichas = [] }: { alternative: CutPlanAlternative; input: CutPlanInput; sourceFichas?: CutPlanSourceFicha[] }) {
