@@ -588,6 +588,10 @@ export type Database = {
         };
         Returns: string;
       };
+      delete_manual_kanban_card: {
+        Args: { p_card_id: string };
+        Returns: undefined;
+      };
       record_login_failure: {
         Args: { p_attempt_keys: string[] };
         Returns: undefined;

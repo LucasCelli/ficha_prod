@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, Trash2 } from "lucide-react";
 import { Button, Modal } from "@/components/ui";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import type { KanbanBoardColumn, KanbanCardSummary } from "./data";
@@ -13,6 +13,7 @@ type CardDetailsModalProps = {
   deliverPending: boolean;
   onClose: () => void;
   onDeliverCard: (card: KanbanCardSummary) => void;
+  onDeleteCard: (card: KanbanCardSummary) => void;
   onMoveNextCard: (card: KanbanCardSummary) => void;
 };
 
@@ -22,6 +23,7 @@ export function CardDetailsModal({
   deliverPending,
   onClose,
   onDeliverCard,
+  onDeleteCard,
   onMoveNextCard,
 }: CardDetailsModalProps) {
   const currentColumnIndex = columns.findIndex((column) => column.id === card.kanbanColumnId);
@@ -67,7 +69,9 @@ export function CardDetailsModal({
           </dl>
 
           <div className="quadro-producao-view-modal__actions">
+            {card.isManualCard ? <Button onClick={() => onDeleteCard(card)} variant="danger"><Trash2 aria-hidden="true" size={16} />Excluir</Button> : null}
             {isLastColumn ? (
+              card.isManualCard ? null : (
               <Button
                 className="quadro-producao-view-modal__move quadro-producao-view-modal__move--deliver"
                 disabled={deliverPending}
@@ -77,6 +81,7 @@ export function CardDetailsModal({
                 <Check aria-hidden="true" size={16} />
                 Entregar
               </Button>
+              )
             ) : (
               <Button className="quadro-producao-view-modal__move" onClick={() => onMoveNextCard(card)} variant="secondary">
                 <ArrowRight aria-hidden="true" size={16} />

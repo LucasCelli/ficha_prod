@@ -333,3 +333,8 @@ export async function createManualKanbanCard(input: CreateManualKanbanCardInput,
 
   return { id: data };
 }
+
+export async function deleteManualKanbanCard(cardId: string) {
+  const { error } = await createServerSupabaseClient().rpc("delete_manual_kanban_card", { p_card_id: cardId });
+  if (error) throw new Error(error.message);
+}

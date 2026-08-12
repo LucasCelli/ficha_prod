@@ -33,9 +33,10 @@ import {
   RefreshCw,
   Search,
   Star,
+  Trash2,
   X,
 } from "lucide-react";
-import { Button, IconButton, Modal, Tooltip } from "@/components/ui";
+import { Button, CustomDatalist, IconButton, Modal, Tooltip, type CustomDatalistOption } from "@/components/ui";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import type {
   KanbanBoardColumn,
@@ -45,6 +46,7 @@ import type {
 } from "./data";
 import {
   fetchQuadroProducao,
+  deleteManualKanbanCard,
   patchKanbanCardMove,
   patchKanbanColumn,
   postKanbanCardEntregar,
@@ -57,6 +59,7 @@ import { quadroProducaoSearchParamParsers } from "./search-params";
 import { CardDetailsModal } from "./card-details-modal";
 
 type QuadroProducaoClientProps = {
+  catalogFabricOptions: CustomDatalistOption[];
   initialFilters: QuadroProducaoFilters;
   initialResult: QuadroProducaoResult;
 };
@@ -68,7 +71,7 @@ import {
   getResultColumns, moveCard, normalizeColumnCounts, sameDestination, stopCardDrag, updateQueryResult,
   type DragDestination, type DragStart, type ManualCardDraft,
 } from "./quadro-producao-state";
-export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroProducaoClientProps) {
+export function QuadroProducaoClient({ catalogFabricOptions, initialFilters, initialResult }: QuadroProducaoClientProps) {
   const [filters, setFilters] = useQueryStates(quadroProducaoSearchParamParsers);
   const [searchDraft, setSearchDraft] = useState(filters.busca);
   const [localColumns, setLocalColumns] = useState<KanbanBoardColumn[] | null>(null);
@@ -174,6 +177,16 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
     onSuccess: () => toast.success("Pedido entregue."),
     onSettled: () => {
       setLocalColumns(null);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (cardId: string) => deleteManualKanbanCard(cardId),
+    onError: (error: Error) => toast.error(error.message),
+    onSuccess: () => {
+      toast.success("Cartão excluído.");
+      setViewCard(null);
+      refreshBoard();
     },
   });
 
@@ -288,6 +301,10 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
   const deliverCard = useCallback((card: KanbanCardSummary) => {
     mutateDeliverCard(card.id);
   }, [mutateDeliverCard]);
+
+  const deleteCard = useCallback((card: KanbanCardSummary) => {
+    if (window.confirm(`Excluir o cartão manual “${card.clienteNome}”?`)) deleteMutation.mutate(card.id);
+  }, [deleteMutation]);
 
   const openRenameColumn = useCallback((column: KanbanBoardColumn) => {
     setRenameTarget(column);
@@ -516,6 +533,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
                 isLastColumn={index === columns.length - 1}
                 key={column.id}
                 onDeliverCard={deliverCard}
+                onDeleteCard={deleteCard}
                 onMoveNextCard={moveToNextColumn}
                 onOpenManualCard={openManualCardModal}
                 onOpenRename={openRenameColumn}
@@ -613,17 +631,25 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
             </label>
             <label className="quadro-producao-field">
               <span>Arte</span>
-              <input
+              <select
                 className="quadro-producao-input"
                 onChange={(event) => setManualCardDraft((draft) => ({ ...draft, arte: event.target.value }))}
                 value={manualCardDraft.arte}
-              />
+              >
+                <option value="">-</option><option value="sem_personalizacao">Sem Personalização</option>
+                <option value="sublimacao">Sublimação</option><option value="serigrafia">Serigrafia</option>
+                <option value="bordado">Bordado</option><option value="patch">PATCH Termocolante</option>
+                <option value="dtf">DTF Têxtil</option><option value="transfer">Transfer</option>
+                <option value="sublimacao_serigrafia">Sublimação e Serigrafia</option>
+                <option value="serigrafia_dtf">Serigrafia e DTF</option><option value="serigrafia_bordado">Serigrafia e Bordado</option>
+              </select>
             </label>
             <label className="quadro-producao-field">
               <span>Tecido</span>
-              <input
-                className="quadro-producao-input"
-                onChange={(event) => setManualCardDraft((draft) => ({ ...draft, material: event.target.value }))}
+              <CustomDatalist
+                id="manual-card-material"
+                onValueChange={(value) => setManualCardDraft((draft) => ({ ...draft, material: value }))}
+                options={catalogFabricOptions}
                 value={manualCardDraft.material}
               />
             </label>
@@ -654,6 +680,7 @@ export function QuadroProducaoClient({ initialFilters, initialResult }: QuadroPr
           deliverPending={deliverMutation.isPending}
           onClose={() => setViewCard(null)}
           onDeliverCard={(card) => deliverMutation.mutate(card.id)}
+          onDeleteCard={deleteCard}
           onMoveNextCard={moveToNextColumn}
         />
       ) : null}
@@ -669,6 +696,7 @@ type KanbanColumnProps = {
   isDropColumn: boolean;
   isLastColumn: boolean;
   onDeliverCard: (card: KanbanCardSummary) => void;
+  onDeleteCard: (card: KanbanCardSummary) => void;
   onMoveNextCard: (card: KanbanCardSummary) => void;
   onOpenManualCard: (columnId: string) => void;
   onOpenRename: (column: KanbanBoardColumn) => void;
@@ -685,6 +713,7 @@ const KanbanColumn = memo(function KanbanColumn({
   isDropColumn,
   isLastColumn,
   onDeliverCard,
+  onDeleteCard,
   onMoveNextCard,
   onOpenManualCard,
   onOpenRename,
@@ -767,6 +796,7 @@ const KanbanColumn = memo(function KanbanColumn({
             isLastColumn={isLastColumn}
             key={card.id}
             onDeliverCard={onDeliverCard}
+            onDeleteCard={onDeleteCard}
             onMoveNextCard={onMoveNextCard}
             onOpenView={onOpenView}
           />
@@ -790,6 +820,7 @@ type KanbanCardProps = {
   deliverPending: boolean;
   isLastColumn: boolean;
   onDeliverCard: (card: KanbanCardSummary) => void;
+  onDeleteCard: (card: KanbanCardSummary) => void;
   onMoveNextCard: (card: KanbanCardSummary) => void;
   onOpenView: (card: KanbanCardSummary) => void;
 };
@@ -801,6 +832,7 @@ const KanbanCard = memo(function KanbanCard({
   deliverPending,
   isLastColumn,
   onDeliverCard,
+  onDeleteCard,
   onMoveNextCard,
   onOpenView,
 }: KanbanCardProps) {
@@ -868,7 +900,13 @@ const KanbanCard = memo(function KanbanCard({
           </div>
           <div className="quadro-producao-card__actions">
             <CardImagePreviewButton card={card} onOpenView={onOpenView} />
+            {card.isManualCard ? (
+              <IconButton appearance="bare" label="Excluir cartão manual" className="quadro-producao-icon-button" onClick={() => onDeleteCard(card)} onMouseDown={stopCardDrag} onPointerDown={stopCardDrag}>
+                <Trash2 aria-hidden="true" size={15} />
+              </IconButton>
+            ) : null}
             {isLastColumn ? (
+              card.isManualCard ? null : (
               <IconButton
                 appearance="bare"
                 label="Marcar como entregue"
@@ -880,6 +918,7 @@ const KanbanCard = memo(function KanbanCard({
               >
                 <Check aria-hidden="true" size={15} />
               </IconButton>
+              )
             ) : (
               <IconButton
                 appearance="bare"

@@ -3,6 +3,7 @@ import { loadQuadroProducaoSearchParams } from "@/features/quadro-producao/searc
 import { getQuadroProducaoSnapshot } from "@/features/quadro-producao/data";
 import { QuadroProducaoClient } from "@/features/quadro-producao/quadro-producao-client";
 import { requireAppSession } from "@/features/auth/session";
+import { listCatalogOptionsForFichaForm } from "@/features/catalogos/data";
 
 export const metadata: Metadata = {
   title: "Quadro de Produção | Fichas Técnicas",
@@ -15,7 +16,10 @@ type QuadroProducaoPageProps = {
 export default async function QuadroProducaoPage({ searchParams }: QuadroProducaoPageProps) {
   await requireAppSession();
   const filters = await loadQuadroProducaoSearchParams((await searchParams) ?? {});
-  const result = await getQuadroProducaoSnapshot(filters);
+  const [result, catalogOptions] = await Promise.all([
+    getQuadroProducaoSnapshot(filters),
+    listCatalogOptionsForFichaForm(),
+  ]);
 
-  return <QuadroProducaoClient initialFilters={filters} initialResult={result} />;
+  return <QuadroProducaoClient catalogFabricOptions={catalogOptions.tecido} initialFilters={filters} initialResult={result} />;
 }

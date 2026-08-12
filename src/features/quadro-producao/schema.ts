@@ -27,7 +27,7 @@ export const moveKanbanCardSchema = z.object({
 });
 
 export const createManualKanbanCardSchema = z.object({
-  arte: z.preprocess(optionalTrimmedString, z.string().max(500, "Arte muito longa.").optional()),
+  arte: z.preprocess(optionalTrimmedString, z.enum(["sem_personalizacao", "sublimacao", "serigrafia", "bordado", "patch", "dtf", "transfer", "sublimacao_serigrafia", "serigrafia_dtf", "serigrafia_bordado"]).optional()),
   columnId: z.string().uuid("Coluna inválida."),
   dataEntrega: z.preprocess(
     trimmedString,

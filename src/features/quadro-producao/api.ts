@@ -120,3 +120,11 @@ export async function postKanbanCardEntregar(id: string) {
 
   return parseJsonResponse<{ ok: true }>(response);
 }
+
+export async function deleteManualKanbanCard(id: string) {
+  const response = await fetch(`/api/quadro-producao/cards/${encodeURIComponent(id)}/manual`, {
+    credentials: "same-origin",
+    method: "DELETE",
+  });
+  return parseJsonResponse<{ ok: true }>(response);
+}

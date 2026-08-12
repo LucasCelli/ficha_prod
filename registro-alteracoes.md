@@ -2614,3 +2614,10 @@
 - Cobertura: adicionado teste Playwright para a prévia modal e para o botão direto da tabela, além de contratos para CSP, exceção same-origin, fallback do visualizador e fronteira do sanitizador.
 - Arquivos alterados: `next.config.mjs`, `src/app/fichas/page.tsx`, `src/app/fichas/[id]/imprimir/page.tsx`, `src/features/fichas/print-ficha.tsx`, `src/features/fichas/ficha-print-preview-modal.tsx`, `src/features/fichas/ficha-draft-print.tsx`, `src/features/fichas/print-pdf.ts`, `src/lib/sanitize-observations.client.ts`, `quality-tests/code-review-hardening.test.ts`, `quality-tests/visual/pdf-regression.spec.js`, `playwright.config.js` e `registro-alteracoes.md`.
 - Validação: `npm run typecheck`, `npm run lint`, `npm run test:quality` (25 testes), `npm run build` e Playwright desktop (prévia e impressão direta) passaram. Os headers efetivos da rota foram confirmados como `SAMEORIGIN`, `frame-ancestors 'self'` e `frame-src 'self' blob:`.
+## 2026-08-12 - Cards manuais exclusivos do quadro de produção
+
+- Cards criados manualmente deixaram de ser fichas vazias: agora são persistidos em `kanban_manual_cards`, tabela própria do quadro.
+- A migração transfere os cards manuais legados para a nova tabela e remove as antigas linhas marcadas com `is_manual_card` de `fichas`.
+- Personalização virou uma seleção das opções oficiais da ficha e tecido passou a usar o catálogo ativo, evitando categorias paralelas como `Sublimação` escrita livremente.
+- Cards manuais ganharam exclusão no card e no modal; fichas continuam com o fluxo de entrega. Movimento, ordenação, busca e filtros do quadro combinam os dois tipos de card.
+- Validação: typecheck, ESLint dirigido, 51 testes de qualidade e build de produção.

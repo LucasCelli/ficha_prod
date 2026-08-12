@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { performance } from "node:perf_hooks";
-import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, calculateShirtAreaCm2, estimateMarkerLengthCm, formatEstimatedLengthMeters, getLayerLimit, getMaximumEstimatedFrequency, normalizeCutPlanSizeKey } from "../src/features/plano-de-corte/dimensions.ts";
+import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, calculateShirtAreaCm2, ESTIMATED_NESTING_EFFICIENCY, estimateMarkerLengthCm, formatEstimatedLengthMeters, getLayerLimit, getMaximumEstimatedFrequency, normalizeCutPlanSizeKey } from "../src/features/plano-de-corte/dimensions.ts";
 import { cutPlanDemandKey, type CutPlanSizeProfile, type FabricType } from "../src/features/plano-de-corte/model.ts";
 import { solveMinimumLays } from "../src/features/plano-de-corte/solver.ts";
 import { calculateCutPlan, formatCutPlanSizeLabel, formatMarkerLabel } from "../src/features/plano-de-corte/calculator.ts";
@@ -40,6 +40,13 @@ test("abrevia Baby Look como BL na apresentação", () => {
     { size: "G", sleeveType: "CURTA", frequency: 4 },
     { size: "GG", sleeveType: "CURTA", frequency: 2 },
   ], false), "2P + 2M + 4G + 2GG + 2BL M");
+});
+
+test("eficiencia estimada acompanha o mapa tubular real de 118 por 836,32 cm", () => {
+  // A area informada pelo Audaces soma as duas faces do tubular; o marcador
+  // ocupa uma largura geometrica de 118 cm, portanto comparamos metade dela.
+  const realUtilization = (16.15 * 10_000 / 2) / (118 * 836.32);
+  assert.ok(Math.abs(realUtilization - ESTIMATED_NESTING_EFFICIENCY) < 0.002);
 });
 
 test("validacao rejeita folhas acima do limite do tecido", () => {
@@ -168,7 +175,7 @@ test("caso tubular real fecha em dois enfestos com frequencias pares", () => {
   assert.ok(solution.lays.every((lay) => lay.frequencies.every(({ frequency }) => frequency % 2 === 0)));
 });
 
-test("pedido Intercement permanece em dois enfestos com a dobra apenas na estimativa de area", () => {
+test("pedido Intercement permanece em dois enfestos com a dobra conservada pela area", () => {
   const input = createInput("TUBULAR", 50);
   input.items = [
     { id: "p", fabricId: "fabric", size: "P", sleeveType: "CURTA", quantity: 40 },
