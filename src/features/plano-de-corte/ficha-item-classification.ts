@@ -21,6 +21,7 @@ export function normalizeCutPlanDescription(value: string) {
 
 export function resolveItemSleeveType(itemDescription: string, technicalSleeve: string | null): SleeveType {
   const item = normalizeCutPlanDescription(itemDescription);
+  if (/\b(?:calca|calcas|bermuda|bermudas|short|shorts|saia|saias|macacao|macacoes)\b/.test(item)) return "CURTA";
   const mentionsLong = /\b(?:manga\s+)?longa\b/.test(item);
   const mentionsShort = /\b(?:manga\s+)?curta\b/.test(item);
   if (mentionsLong !== mentionsShort) return mentionsLong ? "LONGA" : "CURTA";
@@ -34,6 +35,19 @@ export function resolveItemModelSize(size: string, itemDescription: string) {
   if (mentionsFemale && !mentionsMale && !/^\s*(?:fem|feminina|bl|baby(?:\s+look)?)\b/i.test(size)) return `FEM ${size.trim()}`;
   if (mentionsMale && !mentionsFemale && !/^\s*(?:masc|masculina|masculino)\b/i.test(size)) return `MASC ${size.trim()}`;
   return size.trim();
+}
+
+export function resolveItemGarmentSize(size: string, itemDescription: string) {
+  const description = normalizeCutPlanDescription(itemDescription);
+  const garment = [
+    { label: "CALÇA", pattern: /\bcalca(?:s)?\b/ },
+    { label: "BERMUDA", pattern: /\bbermuda(?:s)?\b/ },
+    { label: "SHORT", pattern: /\bshort(?:s)?\b/ },
+    { label: "SAIA", pattern: /\bsaia(?:s)?\b/ },
+    { label: "MACACÃO", pattern: /\bmacacao(?:s)?\b/ },
+  ].find(({ pattern }) => pattern.test(description));
+  if (!garment || normalizeCutPlanDescription(size).startsWith(normalizeCutPlanDescription(garment.label))) return size.trim();
+  return `${garment.label} ${size.trim()}`;
 }
 
 export function resolveItemColor(itemDescription: string, technicalColor: string | null) {

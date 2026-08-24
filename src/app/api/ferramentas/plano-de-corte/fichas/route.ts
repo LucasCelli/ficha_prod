@@ -1,6 +1,6 @@
 import { getServerErrorMessage, withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { resolveItemColor, resolveItemModelSize, resolveItemSleeveType } from "@/features/plano-de-corte/ficha-item-classification";
+import { resolveItemColor, resolveItemGarmentSize, resolveItemModelSize, resolveItemSleeveType } from "@/features/plano-de-corte/ficha-item-classification";
 
 export const runtime = "nodejs";
 
@@ -27,7 +27,7 @@ function mapFicha(row: FichaRow) {
     const rawSize = item.tamanho?.trim().toUpperCase() ?? "";
     if (!rawSize || item.quantidade <= 0) continue;
     const description = [item.produto, item.descricao, item.detalhes_produto, item.detalhes].filter(Boolean).join(" ");
-    const size = resolveItemModelSize(rawSize, description);
+    const size = resolveItemGarmentSize(resolveItemModelSize(rawSize, description), description);
     const color = resolveItemColor(description, row.cor_material);
     const material = row.material?.trim() ?? "";
     const sleeveType = resolveItemSleeveType(description, row.manga);

@@ -178,8 +178,8 @@ export function recalculateFabricResult(
 export function formatCutPlanSizeLabel(size: string) {
   return size
     .replace(/^BABY(?:\s+LOOK)?\s+/i, "BL ")
-    .replace(/^FEM(?:ININA)?\s+/i, "FEM. ")
-    .replace(/^MASC(?:ULINA|ULINO)?\s+/i, "MASC. ");
+    .replace(/\bFEM(?:ININA)?\s+/i, "FEM. ")
+    .replace(/\bMASC(?:ULINA|ULINO)?\s+/i, "MASC. ");
 }
 
 export function sortMarkerFrequenciesForDisplay(frequencies: MarkerFrequency[]) {
