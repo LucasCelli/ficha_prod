@@ -4,7 +4,7 @@ import { performance } from "node:perf_hooks";
 import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, calculateShirtAreaCm2, ESTIMATED_NESTING_EFFICIENCY, estimateMarkerLengthCm, formatEstimatedLengthMeters, getLayerLimit, getMaximumEstimatedFrequency, normalizeCutPlanSizeKey } from "../src/features/plano-de-corte/dimensions.ts";
 import { cutPlanDemandKey, type CutPlanSizeProfile, type FabricType } from "../src/features/plano-de-corte/model.ts";
 import { solveMinimumLays } from "../src/features/plano-de-corte/solver.ts";
-import { calculateCutPlan, formatCutPlanSizeLabel, formatMarkerLabel } from "../src/features/plano-de-corte/calculator.ts";
+import { calculateCutPlan, formatCutPlanSizeLabel, formatMarkerLabel, formatOperationalMarkerLabel } from "../src/features/plano-de-corte/calculator.ts";
 import { calculateCutPlanAlternatives } from "../src/features/plano-de-corte/alternatives.ts";
 import { validateCutPlan } from "../src/features/plano-de-corte/validation.ts";
 import type { CutPlanInput } from "../src/features/plano-de-corte/model.ts";
@@ -28,6 +28,15 @@ test("omite a manga na grade unica e preserva na grade mista", () => {
   ];
   assert.equal(formatMarkerLabel(frequencies, false), "2P + 4M");
   assert.equal(formatMarkerLabel(frequencies, true), "2P MC + 4M ML");
+  assert.equal(formatOperationalMarkerLabel(frequencies, false), "(2-P) (4-M)");
+  assert.equal(formatOperationalMarkerLabel(frequencies, true), "(2-P MC) (4-M ML)");
+});
+
+test("formato operacional separa frequência de tamanhos numéricos", () => {
+  assert.equal(formatOperationalMarkerLabel([
+    { size: "14", sleeveType: "CURTA", frequency: 2 },
+    { size: "EEGG (58)", sleeveType: "CURTA", frequency: 2 },
+  ], false), "(2-14) (2-EEGG (58))");
 });
 
 test("abrevia Baby Look como BL na apresentação", () => {

@@ -60,7 +60,7 @@ export interface CutPlanSourceFicha {
   color: string;
   id: string;
   imageUrl: string | null;
-  items: Array<{ quantity: number; size: string }>;
+  items: Array<{ color?: string; material?: string; quantity: number; size: string; sleeveType?: SleeveType }>;
   material: string;
   number: string | null;
   sleeveType: SleeveType;

@@ -191,6 +191,12 @@ export function formatMarkerLabel(frequencies: MarkerFrequency[], showSleeveType
   return sortMarkerFrequenciesForDisplay(frequencies).map(({ size, sleeveType, frequency }) => `${frequency}${formatCutPlanSizeLabel(size)}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`).join(" + ");
 }
 
+export function formatOperationalMarkerLabel(frequencies: MarkerFrequency[], showSleeveType = true) {
+  return sortMarkerFrequenciesForDisplay(frequencies)
+    .map(({ size, sleeveType, frequency }) => `(${frequency}-${formatCutPlanSizeLabel(size)}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""})`)
+    .join(" ");
+}
+
 /** Rotulo contado no padrao do projeto: plural escrito, nunca "(s)". */
 export function countLabel(count: number, singular: string, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;

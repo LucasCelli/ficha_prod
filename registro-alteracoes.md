@@ -2621,3 +2621,9 @@
 - Personalização virou uma seleção das opções oficiais da ficha e tecido passou a usar o catálogo ativo, evitando categorias paralelas como `Sublimação` escrita livremente.
 - Cards manuais ganharam exclusão no card e no modal; fichas continuam com o fluxo de entrega. Movimento, ordenação, busca e filtros do quadro combinam os dois tipos de card.
 - Validação: typecheck, ESLint dirigido, 51 testes de qualidade e build de produção.
+# 2026-08-24 - Produto e detalhes na importação do Plano de Corte
+
+- A importação de fichas no Plano de Corte passou a classificar cada linha usando produto, descrição e detalhes antes de recorrer às especificações técnicas gerais.
+- Manga curta e longa e cores explícitas agora permanecem separadas por item; linhas sem indicação própria continuam herdando manga e cor da ficha.
+- Quantidades são agregadas somente quando tamanho, manga, tecido e cor coincidem.
+- A grade operacional copiada e impressa passou a separar frequência e tamanho com hífen e parênteses, evitando ambiguidades como `214`: `(2-14) (2-P) (2-M)`.

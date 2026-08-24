@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, Badge, Button, CustomDatalist, IconButton, type CustomDatalistOption } from "@/components/ui";
 import type { CatalogSizeForCutPlan } from "@/features/catalogos/data";
 import { calculateCutPlanAlternatives, type CutPlanAlternative } from "./alternatives";
-import { countLabel, CutPlanCalculationError, formatCutPlanSizeLabel, formatMarkerLabel, sortMarkerFrequenciesForDisplay } from "./calculator";
+import { countLabel, CutPlanCalculationError, formatCutPlanSizeLabel, formatMarkerLabel, formatOperationalMarkerLabel, sortMarkerFrequenciesForDisplay } from "./calculator";
 import { CutPlanFichaPicker } from "./cut-plan-ficha-picker";
 import { CutPlanNativePrintLayer } from "./cut-plan-native-print-layer";
 import { CutPlanItemsEditor, sortCutPlanItems } from "./cut-plan-items-editor";
@@ -164,8 +164,9 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
     let nextFabrics = overwrite
       ? fabrics.filter((fabric) => !replacedFabricIds.has(fabric.id) || nextReferencedFabricIds.has(fabric.id))
       : fabrics;
-    const catalogFabric = findCatalogFabric(ficha.material);
-    const canonicalMaterial = catalogFabric?.value ?? catalogFabric?.label ?? ficha.material.trim();
+    const itemMaterials = ficha.items.map((item) => item.material?.trim() || ficha.material.trim()).filter(Boolean);
+    const catalogFabric = findCatalogFabric(itemMaterials[0] ?? ficha.material);
+    const canonicalMaterial = catalogFabric?.value ?? catalogFabric?.label ?? itemMaterials[0] ?? ficha.material.trim();
     const importedSource = { ...ficha, material: canonicalMaterial };
     const requiredMaterial = baseSources[0]?.material;
     const requiredCatalogFabric = requiredMaterial ? findCatalogFabric(requiredMaterial) : undefined;
@@ -174,20 +175,31 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
       toast.error("Esta ficha é de outro tecido.", { description: "O plano está usando " + requiredMaterial + "." });
       return false;
     }
-    const importedFabricSettings = getFabricCutSettings(catalogFabric);
-    let targetFabric = nextFabrics.find((fabric) => normalizeMaterial(fabric.name) === normalizeMaterial(canonicalMaterial) && normalizeMaterial(fabric.color) === normalizeMaterial(ficha.color));
-    if (!targetFabric) {
-      if (!existingSource && !baseItems.length && !baseSources.length && nextFabrics.length === 1) {
-        targetFabric = { ...nextFabrics[0], name: canonicalMaterial, color: ficha.color, ...importedFabricSettings };
-        nextFabrics = [targetFabric];
-      } else {
-        targetFabric = { ...createFabric(canonicalMaterial, nextFabrics[0] ?? fabrics[0], importedFabricSettings), color: ficha.color };
-        nextFabrics = [...nextFabrics, targetFabric];
+    const importedItems: CutPlanItem[] = [];
+    for (const item of ficha.items) {
+      const rawMaterial = item.material?.trim() || ficha.material.trim();
+      const itemCatalogFabric = findCatalogFabric(rawMaterial);
+      const itemMaterial = itemCatalogFabric?.value ?? itemCatalogFabric?.label ?? rawMaterial;
+      if (normalizeMaterial(itemMaterial) !== normalizeMaterial(canonicalMaterial)) {
+        toast.error("Esta ficha usa mais de um tecido.", { description: "Crie planos separados para tecidos diferentes." });
+        return false;
       }
+      const itemColor = item.color?.trim() || ficha.color;
+      let targetFabric = nextFabrics.find((fabric) => normalizeMaterial(fabric.name) === normalizeMaterial(itemMaterial) && normalizeMaterial(fabric.color) === normalizeMaterial(itemColor));
+      if (!targetFabric) {
+        const settings = getFabricCutSettings(itemCatalogFabric);
+        if (!existingSource && !baseItems.length && !baseSources.length && nextFabrics.length === 1 && importedItems.length === 0) {
+          targetFabric = { ...nextFabrics[0], name: itemMaterial, color: itemColor, ...settings };
+          nextFabrics = [targetFabric];
+        } else {
+          targetFabric = { ...createFabric(itemMaterial, nextFabrics[0] ?? fabrics[0], settings), color: itemColor };
+          nextFabrics = [...nextFabrics, targetFabric];
+        }
+      }
+      importedItems.push({ id: createId(), fabricId: targetFabric.id, size: item.size, sleeveType: item.sleeveType ?? ficha.sleeveType, quantity: item.quantity, sourceFichaId: ficha.id });
     }
-    const importedItems: CutPlanItem[] = ficha.items.map((item) => ({ id: createId(), fabricId: targetFabric.id, size: item.size, sleeveType: ficha.sleeveType, quantity: item.quantity, sourceFichaId: ficha.id }));
     setFabrics(nextFabrics);
-    setMaxLayers((current) => Math.min(current, getLayerLimit(targetFabric.type)));
+    setMaxLayers((current) => Math.min(current, ...nextFabrics.map((fabric) => getLayerLimit(fabric.type))));
     setItems([...baseItems, ...importedItems]);
     setSourceFichas(existingSource ? sourceFichas.map((current) => current.id === ficha.id ? importedSource : current) : [...sourceFichas, importedSource]);
     invalidate();
@@ -269,7 +281,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
 }
 
 function layClipboardText(frequencies: MarkerFrequency[], layers: number, showSleeveType: boolean) {
-  const grade = sortMarkerFrequenciesForDisplay(frequencies).map((marker) => `${marker.frequency}${formatCutPlanSizeLabel(marker.size)}${showSleeveType ? ` ${marker.sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`).join(" ");
+  const grade = formatOperationalMarkerLabel(frequencies, showSleeveType);
   return `${grade} x ${layers} ${layers === 1 ? "FOLHA" : "FOLHAS"}`;
 }
 

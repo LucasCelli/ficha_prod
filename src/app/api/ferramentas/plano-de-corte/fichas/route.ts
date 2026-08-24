@@ -1,5 +1,6 @@
 import { getServerErrorMessage, withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { resolveItemColor, resolveItemSleeveType } from "@/features/plano-de-corte/ficha-item-classification";
 
 export const runtime = "nodejs";
 
@@ -7,26 +8,33 @@ type FichaRow = {
   cliente_nome_snapshot: string;
   cor_material: string | null;
   ficha_imagens?: Array<{ url: string }> | null;
-  ficha_itens?: Array<{ quantidade: number; tamanho: string | null }> | null;
+  ficha_itens?: Array<{ descricao: string | null; detalhes: string | null; detalhes_produto: string | null; produto: string | null; quantidade: number; tamanho: string | null }> | null;
   id: string;
   material: string | null;
   manga: string | null;
   numero_venda: string | null;
 };
 
-const COLUMNS = "id, numero_venda, cliente_nome_snapshot, material, cor_material, manga, ficha_itens(tamanho, quantidade), ficha_imagens(url)";
+const COLUMNS = "id, numero_venda, cliente_nome_snapshot, material, cor_material, manga, ficha_itens(produto, descricao, detalhes, detalhes_produto, tamanho, quantidade), ficha_imagens(url)";
 
 function normalizeSearchText(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, " ").toLowerCase().trim();
 }
 
 function mapFicha(row: FichaRow) {
-  const quantitiesBySize = new Map<string, number>();
+  const quantitiesByVariant = new Map<string, { color: string; material: string; quantity: number; size: string; sleeveType: "CURTA" | "LONGA" }>();
   for (const item of row.ficha_itens ?? []) {
     const size = item.tamanho?.trim().toUpperCase() ?? "";
-    if (size && item.quantidade > 0) quantitiesBySize.set(size, (quantitiesBySize.get(size) ?? 0) + item.quantidade);
+    if (!size || item.quantidade <= 0) continue;
+    const description = [item.produto, item.descricao, item.detalhes_produto, item.detalhes].filter(Boolean).join(" ");
+    const color = resolveItemColor(description, row.cor_material);
+    const material = row.material?.trim() ?? "";
+    const sleeveType = resolveItemSleeveType(description, row.manga);
+    const key = [size, sleeveType, material, color].join("\u001f");
+    const current = quantitiesByVariant.get(key);
+    quantitiesByVariant.set(key, { color, material, quantity: (current?.quantity ?? 0) + item.quantidade, size, sleeveType });
   }
-  const items = [...quantitiesBySize].map(([size, quantity]) => ({ quantity, size }));
+  const items = [...quantitiesByVariant.values()];
   const sleeveType = normalizeSearchText(row.manga ?? "").includes("long") ? "LONGA" as const : "CURTA" as const;
   return { client: row.cliente_nome_snapshot, color: row.cor_material?.trim() ?? "", id: row.id, imageUrl: row.ficha_imagens?.[0]?.url ?? null, items, material: row.material?.trim() ?? "", number: row.numero_venda, sleeveType, total: items.reduce((sum, item) => sum + item.quantity, 0) };
 }
