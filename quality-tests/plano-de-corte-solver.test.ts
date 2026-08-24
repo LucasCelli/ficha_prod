@@ -41,6 +41,8 @@ test("formato operacional separa frequência de tamanhos numéricos", () => {
 
 test("abrevia Baby Look como BL na apresentação", () => {
   assert.equal(formatCutPlanSizeLabel("BABY PP"), "BL PP");
+  assert.equal(formatCutPlanSizeLabel("FEM P"), "FEM. P");
+  assert.equal(formatCutPlanSizeLabel("MASC P"), "MASC. P");
   assert.equal(formatMarkerLabel([{ size: "BABY PP", sleeveType: "CURTA", frequency: 2 }], false), "2BL PP");
   assert.equal(formatMarkerLabel([
     { size: "P", sleeveType: "CURTA", frequency: 2 },
@@ -122,6 +124,7 @@ test("separa perfis tradicionais e Baby Look e aceita aliases equivalentes do me
   assert.equal(index.get(normalizeCutPlanSizeKey("P"))?.id, "regular-p");
   assert.equal(index.get(normalizeCutPlanSizeKey("Baby P"))?.id, "baby-p");
   assert.equal(index.get(normalizeCutPlanSizeKey("BL P"))?.id, "baby-p");
+  assert.equal(index.get(normalizeCutPlanSizeKey("Feminina P"))?.id, "baby-p");
 
   const input = createInput("PLANO", 20);
   input.sizeProfiles = [regular, baby];

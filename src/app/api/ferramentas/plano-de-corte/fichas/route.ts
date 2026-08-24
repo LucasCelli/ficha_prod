@@ -1,6 +1,6 @@
 import { getServerErrorMessage, withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { resolveItemColor, resolveItemSleeveType } from "@/features/plano-de-corte/ficha-item-classification";
+import { resolveItemColor, resolveItemModelSize, resolveItemSleeveType } from "@/features/plano-de-corte/ficha-item-classification";
 
 export const runtime = "nodejs";
 
@@ -24,9 +24,10 @@ function normalizeSearchText(value: string) {
 function mapFicha(row: FichaRow) {
   const quantitiesByVariant = new Map<string, { color: string; material: string; quantity: number; size: string; sleeveType: "CURTA" | "LONGA" }>();
   for (const item of row.ficha_itens ?? []) {
-    const size = item.tamanho?.trim().toUpperCase() ?? "";
-    if (!size || item.quantidade <= 0) continue;
+    const rawSize = item.tamanho?.trim().toUpperCase() ?? "";
+    if (!rawSize || item.quantidade <= 0) continue;
     const description = [item.produto, item.descricao, item.detalhes_produto, item.detalhes].filter(Boolean).join(" ");
+    const size = resolveItemModelSize(rawSize, description);
     const color = resolveItemColor(description, row.cor_material);
     const material = row.material?.trim() ?? "";
     const sleeveType = resolveItemSleeveType(description, row.manga);

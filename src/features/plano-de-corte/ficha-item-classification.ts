@@ -27,6 +27,15 @@ export function resolveItemSleeveType(itemDescription: string, technicalSleeve: 
   return normalizeCutPlanDescription(technicalSleeve ?? "").includes("long") ? "LONGA" : "CURTA";
 }
 
+export function resolveItemModelSize(size: string, itemDescription: string) {
+  const description = normalizeCutPlanDescription(itemDescription);
+  const mentionsFemale = /\b(?:feminina|feminino|fem)\b/.test(description);
+  const mentionsMale = /\b(?:masculina|masculino|masc)\b/.test(description);
+  if (mentionsFemale && !mentionsMale && !/^\s*(?:fem|feminina|bl|baby(?:\s+look)?)\b/i.test(size)) return `FEM ${size.trim()}`;
+  if (mentionsMale && !mentionsFemale && !/^\s*(?:masc|masculina|masculino)\b/i.test(size)) return `MASC ${size.trim()}`;
+  return size.trim();
+}
+
 export function resolveItemColor(itemDescription: string, technicalColor: string | null) {
   const item = ` ${normalizeCutPlanDescription(itemDescription)} `;
   const match = COLOR_TERMS.find(([term]) => item.includes(` ${term} `));

@@ -2627,3 +2627,4 @@
 - Manga curta e longa e cores explícitas agora permanecem separadas por item; linhas sem indicação própria continuam herdando manga e cor da ficha.
 - Quantidades são agregadas somente quando tamanho, manga, tecido e cor coincidem.
 - A grade operacional copiada e impressa passou a separar frequência e tamanho com hífen e parênteses, evitando ambiguidades como `214`: `(2-14) (2-P) (2-M)`.
+- Produtos descritos como masculinos e femininos agora usam chaves de molde distintas, exibidas de forma compacta como `MASC.` e `FEM.`; o molde feminino de camisa social reutiliza o perfil dimensional equivalente de Baby Look sem ser somado ao masculino.

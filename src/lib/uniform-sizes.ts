@@ -37,13 +37,13 @@ function normalizeUniformText(value: string | null | undefined) {
 export function normalizeUniformSizeKey(value: string | null | undefined) {
   const normalized = normalizeUniformText(value);
   return normalized
-    .replace(/^(?:BL|BABY|BABYLOOK|BABY\s+LOOK|BABY-LOOK)\s*/i, "")
+    .replace(/^(?:BABY\s+LOOK|BABY-LOOK|BABYLOOK|BABY|FEMININA|MASCULINA|MASCULINO|MASC|FEM|BL)(?=\s|$)\s*/i, "")
     .replace(/\s+/g, "");
 }
 
 export function isUniformBabyLookText(value: string | null | undefined) {
   const normalized = normalizeUniformText(value).replace(/[_-]+/g, " ");
-  return /(^|\s)(?:BL|BABY|BABYLOOK|BABY\s+LOOK)(?=\s|$)/.test(normalized);
+  return /(^|\s)(?:BL|BABY|BABYLOOK|BABY\s+LOOK|FEM|FEMININA)(?=\s|$)/.test(normalized);
 }
 
 export function getUniformSizeSortParts(value: string | null | undefined) {
