@@ -28,6 +28,8 @@ export interface CutPlanItem {
   size: string;
   sleeveType: SleeveType;
   quantity: number;
+  /** Quantidade original da ficha; `quantity` permanece como alvo operacional editável. */
+  importedQuantity?: number;
   sourceFichaId?: string;
 }
 

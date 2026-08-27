@@ -2637,3 +2637,4 @@
 - Adicionado teste de regressao para o plano de um unico enfesto com essa grade.
 - O passo Mesa e enfesto ganhou uma frequencia maxima customizavel, com padrao 14 para tecido tubular e 8 para tecido plano; o valor acompanha o historico e limita todos os caminhos do calculo.
 - A reordenacao dos produtos passou a resolver origem e destino pelos IDs estaveis sobre o estado mais recente; atualizacoes concorrentes da lista e destinos removidos nao aplicam mais indices antigos a outras linhas.
+- Linhas importadas agora preservam a quantidade original da ficha separada da quantidade operacional editavel; aumentos manuais entram no corte, mas a conferencia continua calculando a sobra contra o pedido importado.

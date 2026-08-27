@@ -24,12 +24,13 @@ function normalizeSize(size: string) {
   return size.trim().replace(/\s+/g, " ");
 }
 
-function aggregateItems(input: CutPlanInput, fabricId: string) {
+function aggregateItems(input: CutPlanInput, fabricId: string, useImportedQuantity = false) {
   const quantities = new Map<string, number>();
   for (const item of input.items.filter((candidate) => candidate.fabricId === fabricId)) {
     const size = normalizeSize(item.size);
     const key = cutPlanDemandKey(size, item.sleeveType);
-    quantities.set(key, (quantities.get(key) ?? 0) + item.quantity);
+    const quantity = useImportedQuantity ? (item.importedQuantity ?? item.quantity) : item.quantity;
+    quantities.set(key, (quantities.get(key) ?? 0) + quantity);
   }
   return quantities;
 }
@@ -68,7 +69,9 @@ function subtractProduction(remaining: Map<string, number>, lay: Pick<LayPlan, "
 }
 
 function calculateSizes(requested: Map<string, number>, lays: LayPlan[]) {
-  return [...requested.entries()].map(([key, quantity]) => {
+  const keys = new Set([...requested.keys(), ...lays.flatMap((lay) => lay.frequencies.map((marker) => cutPlanDemandKey(marker.size, marker.sleeveType)))]);
+  return [...keys].map((key) => {
+    const quantity = requested.get(key) ?? 0;
     const { size, sleeveType } = parseCutPlanDemandKey(key);
     const produced = lays.reduce((total, lay) => {
       const marker = lay.frequencies.find((frequency) => frequency.size === size && frequency.sleeveType === sleeveType);
@@ -82,8 +85,9 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
   const fabric = input.fabrics.find((candidate) => candidate.id === fabricId);
   if (!fabric) throw new CutPlanCalculationError("Uma das linhas está apontando para um tecido que não existe mais.");
 
-  const requested = aggregateItems(input, fabricId);
-  const optimizationTarget = new Map([...requested].map(([size, quantity]) => [
+  const requested = aggregateItems(input, fabricId, true);
+  const operational = aggregateItems(input, fabricId);
+  const optimizationTarget = new Map([...operational].map(([size, quantity]) => [
     size,
     fabric.type === "TUBULAR" && quantity % 2 !== 0 ? quantity + 1 : quantity,
   ]));
@@ -151,8 +155,7 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
       || !Number.isInteger(frequency)
       || frequency > (input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type))
       || (fabric.type === "TUBULAR" && frequency % 2 !== 0)))
-    || targetSizes.some(({ difference }) => difference !== 0)
-    || sizes.some(({ difference }) => difference < 0)) {
+    || targetSizes.some(({ difference }) => difference !== 0)) {
     throw new CutPlanCalculationError("Não deu para fechar a conta com esses limites. Aumente o máximo de folhas por enfesto ou revise as quantidades.");
   }
   return { fabricId, lays, sizes };

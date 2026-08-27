@@ -24,6 +24,7 @@ export function validateCutPlan(input: CutPlanInput) {
     if (!item.size.trim()) errors.push("Preencha o tamanho em todas as linhas.");
     if (item.sleeveType !== "CURTA" && item.sleeveType !== "LONGA") errors.push(`Informe o tipo de manga de ${item.size || "cada linha"}.`);
     if (!Number.isInteger(item.quantity) || item.quantity < 1) errors.push(`Informe a quantidade de ${item.size || "cada linha"}.`);
+    if (item.importedQuantity !== undefined && (!Number.isInteger(item.importedQuantity) || item.importedQuantity < 0)) errors.push(`Revise a quantidade original de ${item.size || "cada linha"}.`);
     if (!input.fabrics.some((fabric) => fabric.id === item.fabricId)) errors.push(`Escolha o tecido de ${item.size || "cada linha"}.`);
   }
   const profileKeys = new Map<string, string>();

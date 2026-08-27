@@ -150,7 +150,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
     setItems((current) => { if (!afterId) return [...current, item]; const index = current.findIndex((row) => row.id === afterId); return [...current.slice(0, index + 1), item, ...current.slice(index + 1)]; }); invalidate();
   }
   function duplicateItem(itemId: string, direction: "above" | "below") {
-    setItems((current) => { const index = current.findIndex((item) => item.id === itemId); const copy = { ...current[index], id: createId() }; const target = direction === "above" ? index : index + 1; return [...current.slice(0, target), copy, ...current.slice(target)]; }); invalidate();
+    setItems((current) => { const index = current.findIndex((item) => item.id === itemId); const source = current[index]; const copy = { ...source, id: createId(), ...(source.importedQuantity !== undefined ? { importedQuantity: 0 } : {}) }; const target = direction === "above" ? index : index + 1; return [...current.slice(0, target), copy, ...current.slice(target)]; }); invalidate();
   }
   function moveItem(itemId: string, target: string | number) {
     setItems((current) => moveCutPlanItem(current, itemId, target));
@@ -201,7 +201,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
           nextFabrics = [...nextFabrics, targetFabric];
         }
       }
-      importedItems.push({ id: createId(), fabricId: targetFabric.id, size: item.size, sleeveType: item.sleeveType ?? ficha.sleeveType, quantity: item.quantity, sourceFichaId: ficha.id });
+      importedItems.push({ id: createId(), fabricId: targetFabric.id, size: item.size, sleeveType: item.sleeveType ?? ficha.sleeveType, quantity: item.quantity, importedQuantity: item.quantity, sourceFichaId: ficha.id });
     }
     setFabrics(nextFabrics);
     setMaxLayers((current) => Math.min(current, ...nextFabrics.map((fabric) => getLayerLimit(fabric.type))));

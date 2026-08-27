@@ -17,13 +17,15 @@ function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"
   return {
     fabrics: input.fabrics.filter((fabric) => input.items.some((item) => item.fabricId === fabric.id)).map((fabric) => {
       const requested = new Map<string, number>();
+      const operational = new Map<string, number>();
       for (const item of input.items.filter((candidate) => candidate.fabricId === fabric.id)) {
         const size = item.size.trim().replace(/\s+/g, " ");
         const key = cutPlanDemandKey(size, item.sleeveType);
-        requested.set(key, (requested.get(key) ?? 0) + item.quantity);
+        requested.set(key, (requested.get(key) ?? 0) + (item.importedQuantity ?? item.quantity));
+        operational.set(key, (operational.get(key) ?? 0) + item.quantity);
       }
       const lays: LayPlan[] = [];
-      for (const [key, requestedQuantity] of requested) {
+      for (const [key, requestedQuantity] of operational) {
         const { size, sleeveType } = parseCutPlanDemandKey(key);
         let remaining = fabric.type === "TUBULAR" && requestedQuantity % 2 !== 0 ? requestedQuantity + 1 : requestedQuantity;
         const configuredMaximumFrequency = input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type);
@@ -59,7 +61,9 @@ function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"
 }
 
 function buildFabricResult(fabricId: string, requested: Map<string, number>, lays: LayPlan[]): FabricCutPlanResult {
-  const sizes = [...requested].map(([key, quantity]) => {
+  const keys = new Set([...requested.keys(), ...lays.flatMap((lay) => lay.frequencies.map((marker) => cutPlanDemandKey(marker.size, marker.sleeveType)))]);
+  const sizes = [...keys].map((key) => {
+    const quantity = requested.get(key) ?? 0;
     const { size, sleeveType } = parseCutPlanDemandKey(key);
     const produced = lays.reduce((total, lay) => total + (lay.frequencies.find((item) => item.size === size && item.sleeveType === sleeveType)?.frequency ?? 0) * lay.layers, 0);
     return { size, sleeveType, requested: quantity, produced, difference: produced - quantity };
@@ -157,12 +161,13 @@ function calculateMergedVariants(input: CutPlanInput, candidates: Array<{ result
 }
 
 
-function aggregateFabricItems(input: CutPlanInput, fabricId: string) {
+function aggregateFabricItems(input: CutPlanInput, fabricId: string, useImportedQuantity = false) {
   const requested = new Map<string, number>();
   for (const item of input.items.filter((candidate) => candidate.fabricId === fabricId)) {
     const size = item.size.trim().replace(/\s+/g, " ");
     const key = cutPlanDemandKey(size, item.sleeveType);
-    requested.set(key, (requested.get(key) ?? 0) + item.quantity);
+    const quantity = useImportedQuantity ? (item.importedQuantity ?? item.quantity) : item.quantity;
+    requested.set(key, (requested.get(key) ?? 0) + quantity);
   }
   return requested;
 }
@@ -171,8 +176,9 @@ function calculateOptimizedVariants(input: CutPlanInput) {
   const primary = calculateCutPlan(input, false);
   const fabrics = primary.fabrics.map((fabricResult) => {
     const fabric = input.fabrics.find((candidate) => candidate.id === fabricResult.fabricId)!;
-    const requested = aggregateFabricItems(input, fabric.id);
-    const target = new Map([...requested].map(([size, quantity]) => [size, fabric.type === "TUBULAR" && quantity % 2 !== 0 ? quantity + 1 : quantity]));
+    const requested = aggregateFabricItems(input, fabric.id, true);
+    const operational = aggregateFabricItems(input, fabric.id);
+    const target = new Map([...operational].map(([size, quantity]) => [size, fabric.type === "TUBULAR" && quantity % 2 !== 0 ? quantity + 1 : quantity]));
     const constraints = {
       tableLengthCm: input.tableLengthCm,
       fabricWidthCm: fabric.widthCm,

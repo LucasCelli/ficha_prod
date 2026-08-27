@@ -227,6 +227,28 @@ test("respeita a frequencia maxima personalizada no solver", () => {
   assert.ok(restricted.lays.every((lay) => lay.frequencies.every(({ frequency }) => frequency <= 8)));
 });
 
+test("mantem a quantidade importada como pedido ao aumentar o corte manualmente", () => {
+  const input = createInput("TUBULAR", 50);
+  input.items = [{
+    id: "imported-m",
+    fabricId: "fabric",
+    size: "M",
+    sleeveType: "CURTA",
+    importedQuantity: 6,
+    quantity: 12,
+    sourceFichaId: "ficha-1",
+  }];
+
+  const result = calculateCutPlanAlternatives(input)[0].result.fabrics[0].sizes[0];
+  assert.deepEqual(result, {
+    size: "M",
+    sleeveType: "CURTA",
+    requested: 6,
+    produced: 12,
+    difference: 6,
+  });
+});
+
 test("pedido Intercement permanece em dois enfestos com a dobra conservada pela area", () => {
   const input = createInput("TUBULAR", 50);
   input.items = [
