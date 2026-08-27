@@ -216,6 +216,23 @@ test("prefere um unico enfesto tubular com frequencia 8 quando fecha em mais fol
   assert.equal(formatMarkerLabel(solution.lays[0].frequencies, false), "8G + 2GG + 2BL GG");
 });
 
+test("oferece alternativa intermediaria de dois enfestos com tamanhos pequenos juntos", () => {
+  const input = createInput("TUBULAR", 50);
+  input.maxFrequency = 14;
+  input.items = [
+    { id: "g", fabricId: "fabric", size: "G", sleeveType: "CURTA", quantity: 24 },
+    { id: "gg", fabricId: "fabric", size: "GG", sleeveType: "CURTA", quantity: 6 },
+    { id: "baby-gg", fabricId: "fabric", size: "BABY GG", sleeveType: "CURTA", quantity: 6 },
+  ];
+
+  const alternatives = calculateCutPlanAlternatives(input);
+  assert.deepEqual(alternatives.slice(0, 2).map(({ layCount }) => layCount), [1, 2]);
+  assert.ok(alternatives[1].result.fabrics[0].lays.some((lay) => {
+    const sizes = new Set(lay.frequencies.map(({ size }) => size));
+    return sizes.has("GG") && sizes.has("BABY GG");
+  }));
+});
+
 test("respeita a frequencia maxima personalizada no solver", () => {
   const quantities = new Map([["G", 42]]);
   const expanded = solveMinimumLays(quantities, 3, "TUBULAR", 3, { ...unconstrained, maxFrequency: 14 })[0];

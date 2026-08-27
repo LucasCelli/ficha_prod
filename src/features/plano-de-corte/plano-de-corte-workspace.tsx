@@ -240,15 +240,18 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
     }, 0);
   }
   function restoreHistoryEntry(entry: CutPlanHistoryEntry) {
+    const restoredMaxFrequency = entry.input.maxFrequency ?? getDefaultMaximumFrequency(entry.input.fabrics[0]?.type ?? "TUBULAR");
+    const recalculatedAlternatives = calculateCutPlanAlternatives({ ...entry.input, maxFrequency: restoredMaxFrequency, sizeProfiles });
     setTableLengthCm(entry.input.tableLengthCm);
     setMaxLayers(entry.input.maxLayers);
-    setMaxFrequency(entry.input.maxFrequency ?? getDefaultMaximumFrequency(entry.input.fabrics[0]?.type ?? "TUBULAR"));
+    setMaxFrequency(restoredMaxFrequency);
     setMergeFabricsInLays(Boolean(entry.input.mergeFabricsInLays));
     setFabrics(entry.input.fabrics);
     setItems(entry.input.items);
     setSourceFichas(entry.sourceFichas);
-    setAlternatives(entry.alternatives);
-    setSelectedId(entry.alternatives[0]?.id ?? "");
+    setAlternatives(recalculatedAlternatives);
+    setSelectedId(recalculatedAlternatives[0]?.id ?? "");
+    setHistory((current) => current.map((currentEntry) => currentEntry.id === entry.id ? { ...currentEntry, input: { ...currentEntry.input, maxFrequency: restoredMaxFrequency }, alternatives: recalculatedAlternatives } : currentEntry));
     toast.success("Plano restaurado do histórico.");
   }
   function removeHistoryEntry(entryId: string) {

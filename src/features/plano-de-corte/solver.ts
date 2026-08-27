@@ -19,12 +19,15 @@ export type SolverConstraints = {
   sizeProfiles: CutPlanSizeProfile[];
   maxSizesPerMarker?: number;
   maxFrequency?: number;
+  /** Quantidades de enfestos acima do mínimo que também devem ser exploradas. */
+  additionalLayCounts?: number;
 };
 
 const DEFAULT_MAX_SIZES_PER_MARKER = 5;
 const MAX_EXACT_LAYS = 4;
 const SOLUTIONS_PER_STATE = 6;
 const MAX_RETURNED_SOLUTIONS = 8;
+const MAX_SOLUTIONS_PER_LAY_COUNT = 4;
 const MAX_LAYER_SETS_PER_LAY_COUNT = 350_000;
 const MAX_SOLVER_DURATION_MS = 1_500;
 
@@ -272,11 +275,14 @@ export function solveMinimumLays(
     Math.ceil(entries.length / maxSizesPerMarker),
     Math.ceil(Math.max(...entries.map(({ quantity }) => quantity)) / (maxFrequency * maxLayers)),
   );
-  const upperBound = Math.min(MAX_EXACT_LAYS, fallbackLayCount);
+  const upperBound = Math.min(MAX_EXACT_LAYS, fallbackLayCount + (constraints.additionalLayCounts ?? 0));
   const cache = new Map<string, SizeAssignment[]>();
   const budget: SearchBudget = { startedAt: Date.now(), operations: 0 };
   const minimumFrequency = type === "TUBULAR" ? 2 : 1;
   const searchMaxLayers = Math.min(maxLayers, Math.floor(Math.max(...entries.map(({ quantity }) => quantity)) / minimumFrequency));
+  const collected = new Map<string, SolvedPlan>();
+  let lastCountToSearch = upperBound;
+  let foundMinimum = false;
 
   for (let count = lowerBound; count <= upperBound; count += 1) {
     const found = new Map<string, SolvedPlan>();
@@ -291,7 +297,8 @@ export function solveMinimumLays(
       if (!canRepresentAllQuantities(entries, layers, type, maxFrequency)) continue;
       const layerSolutions = solveLayerSet(entries, layers, type, constraints, cache, budget);
       if (layerSolutions === null) {
-        return [...found.values()]
+        for (const solution of found.values()) collected.set(solution.signature, { ...solution, searchComplete: false });
+        return [...collected.values()]
           .map((solution) => ({ ...solution, searchComplete: false }))
           .sort(compareSolutions)
           .slice(0, MAX_RETURNED_SOLUTIONS);
@@ -303,12 +310,16 @@ export function solveMinimumLays(
       }
     }
     if (found.size) {
-      return [...found.values()]
-        .map((solution) => ({ ...solution, searchComplete }))
-        .sort(compareSolutions)
-        .slice(0, MAX_RETURNED_SOLUTIONS);
+      if (!foundMinimum) {
+        foundMinimum = true;
+        lastCountToSearch = Math.min(upperBound, count + (constraints.additionalLayCounts ?? 0));
+      }
+      for (const solution of [...found.values()].sort(compareSolutions).slice(0, MAX_SOLUTIONS_PER_LAY_COUNT)) {
+        collected.set(solution.signature, { ...solution, searchComplete });
+      }
+      if (count >= lastCountToSearch) return [...collected.values()].sort(compareSolutions).slice(0, MAX_RETURNED_SOLUTIONS);
     }
-    if (!searchComplete) return [];
+    if (!searchComplete) return [...collected.values()].sort(compareSolutions).slice(0, MAX_RETURNED_SOLUTIONS);
   }
-  return [];
+  return [...collected.values()].sort(compareSolutions).slice(0, MAX_RETURNED_SOLUTIONS);
 }

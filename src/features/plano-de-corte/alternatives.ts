@@ -184,8 +184,10 @@ function calculateOptimizedVariants(input: CutPlanInput) {
       fabricWidthCm: fabric.widthCm,
       sizeProfiles: input.sizeProfiles,
       maxFrequency: input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type),
+      additionalLayCounts: 1,
     };
-    const solutions = solveMinimumLays(target, input.maxLayers, fabric.type, fabricResult.lays.length, constraints);
+    const allSolutions = solveMinimumLays(target, input.maxLayers, fabric.type, fabricResult.lays.length, constraints);
+    const solutions = allSolutions.filter((solution, index) => allSolutions.slice(0, index).filter((previous) => previous.lays.length === solution.lays.length).length < 2);
     if (solutions.length && requested.size > 3 && !solutions.some((solution) => solution.lays.every((lay) => lay.frequencies.length <= 3))) {
       const simpler = solveMinimumLays(target, input.maxLayers, fabric.type, fabricResult.lays.length, { ...constraints, maxSizesPerMarker: 3 });
       for (const solution of simpler) {

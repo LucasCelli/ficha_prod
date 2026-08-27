@@ -16,6 +16,7 @@
     "supabase:check": "node scripts/check-supabase-config.mjs",
     "typecheck": "tsc --noEmit",
     "test:visual": "playwright test",
+    "test:cut-plan:real": "node scripts/audit-cut-plan-real-orders.mjs",
     "test:visual:update": "playwright test --update-snapshots"
   },
   "dependencies": {

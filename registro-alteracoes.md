@@ -2638,3 +2638,8 @@
 - O passo Mesa e enfesto ganhou uma frequencia maxima customizavel, com padrao 14 para tecido tubular e 8 para tecido plano; o valor acompanha o historico e limita todos os caminhos do calculo.
 - A reordenacao dos produtos passou a resolver origem e destino pelos IDs estaveis sobre o estado mais recente; atualizacoes concorrentes da lista e destinos removidos nao aplicam mais indices antigos a outras linhas.
 - Linhas importadas agora preservam a quantidade original da ficha separada da quantidade operacional editavel; aumentos manuais entram no corte, mas a conferencia continua calculando a sobra contra o pedido importado.
+- O solver deixou de encerrar a geracao de alternativas no primeiro numero viavel: para a tela, ele tambem explora o nivel imediatamente seguinte e conserva solucoes por quantidade de enfestos, evitando completar as abas apenas com a estrategia simplista de um tamanho por enfesto.
+- O caso `24G + 6GG + 6BL GG` agora oferece, entre a grade unica e os tres enfestos individuais, uma alternativa real de dois enfestos que mantem `GG + BL GG` juntos.
+- Foi criado o comando `npm run test:cut-plan:real`, uma auditoria somente leitura e anonimizada de pedidos do Supabase. A execucao validou 20 pedidos reais (10 tubulares e 10 planos), incluindo 18 multitemanho e 6 com pelo menos 50 pecas; todos conservaram a producao e 18 exibiram alternativas com contagens distintas de enfestos.
+- Os tres limites do passo Mesa e enfesto e a opcao de mescla passaram a ocupar uma unica linha no desktop, preservando a quebra em coluna no mobile.
+- Planos restaurados do historico nao reutilizam mais alternativas serializadas por versoes antigas: as entradas sao recalculadas com o solver e os perfis dimensionais atuais antes de voltar ao resultado.
