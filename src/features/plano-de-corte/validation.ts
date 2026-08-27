@@ -1,5 +1,5 @@
 import type { CutPlanInput } from "./model.ts";
-import { getLayerLimit, normalizeCutPlanSizeKey } from "./dimensions.ts";
+import { getDefaultMaximumFrequency, getLayerLimit, normalizeCutPlanSizeKey } from "./dimensions.ts";
 
 export function validateCutPlan(input: CutPlanInput) {
   const errors: string[] = [];
@@ -7,6 +7,8 @@ export function validateCutPlan(input: CutPlanInput) {
   if (!Number.isInteger(input.maxLayers) || input.maxLayers < 1) errors.push("O enfesto precisa ter pelo menos 1 folha.");
   if (input.fabrics.length === 0) errors.push("Adicione pelo menos um tecido.");
   const referenceFabric = input.fabrics[0];
+  const maxFrequency = input.maxFrequency ?? (referenceFabric ? getDefaultMaximumFrequency(referenceFabric.type) : undefined);
+  if (!Number.isInteger(maxFrequency) || maxFrequency! < 1) errors.push("A frequência máxima precisa ser um número inteiro maior que zero.");
   if (referenceFabric && input.maxLayers > getLayerLimit(referenceFabric.type)) {
     errors.push(`O limite para tecido ${referenceFabric.type === "TUBULAR" ? "tubular" : "plano"} é de ${getLayerLimit(referenceFabric.type)} folhas.`);
   }

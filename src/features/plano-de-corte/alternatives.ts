@@ -2,7 +2,7 @@ import { calculateCutPlan, formatMarkerLabel } from "./calculator.ts";
 import { cutPlanDemandKey, parseCutPlanDemandKey, type CutPlanInput, type CutPlanResult, type FabricCutPlanResult, type LayPlan, type MergedLayPlan } from "./model.ts";
 import { solveMinimumLays } from "./solver.ts";
 import { compareUniformSizes } from "../../lib/uniform-sizes.ts";
-import { buildSizeProfileIndex, estimateMarkerLengthCm, getMaximumEstimatedFrequency } from "./dimensions.ts";
+import { buildSizeProfileIndex, estimateMarkerLengthCm, getDefaultMaximumFrequency, getMaximumEstimatedFrequency } from "./dimensions.ts";
 
 export interface CutPlanAlternative {
   id: string;
@@ -26,7 +26,8 @@ function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"
       for (const [key, requestedQuantity] of requested) {
         const { size, sleeveType } = parseCutPlanDemandKey(key);
         let remaining = fabric.type === "TUBULAR" && requestedQuantity % 2 !== 0 ? requestedQuantity + 1 : requestedQuantity;
-        const maximumFrequency = getMaximumEstimatedFrequency(size, sleeveType, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles);
+        const configuredMaximumFrequency = input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type);
+        const maximumFrequency = getMaximumEstimatedFrequency(size, sleeveType, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles, configuredMaximumFrequency);
         while (remaining > 0) {
           let frequency = fabric.type === "TUBULAR" ? 2 : 1;
           let layers = Math.min(input.maxLayers, remaining / frequency);
@@ -79,6 +80,7 @@ function score(result: CutPlanResult) {
   const peakFrequency = Math.max(0, ...markerFrequencies);
   const sizeEntries = fabricLays.reduce((total, lay) => total + lay.frequencies.length, 0);
   const totalLayers = operationalLays.reduce((total, lay) => total + lay.layers, 0);
+  const totalMarkerLengthCm = operationalLays.reduce((total, lay) => total + (lay.markerLengthCm ?? 0), 0);
   const sizeSpreadScore = result.fabrics.reduce((total, fabric) => {
     const orderedSizes = [...new Set(fabric.sizes.map((size) => cutPlanDemandKey(size.size, size.sleeveType)))].sort((left, right) => compareUniformSizes(parseCutPlanDemandKey(left).size, parseCutPlanDemandKey(right).size));
     const ranks = new Map(orderedSizes.map((size, index) => [size, index]));
@@ -87,7 +89,7 @@ function score(result: CutPlanResult) {
       return fabricTotal + (activeRanks.length > 1 ? (activeRanks.at(-1)! - activeRanks[0]) * lay.layers : 0);
     }, 0);
   }, 0);
-  return { mapCount: operationalLays.length, layCount: operationalLays.length, complexity, peakFrequency, sizeEntries, sizeSpreadScore, totalLayers };
+  return { mapCount: operationalLays.length, layCount: operationalLays.length, complexity, peakFrequency, sizeEntries, sizeSpreadScore, totalLayers, totalMarkerLengthCm };
 }
 
 function normalizeCompatibilityValue(value: string) {
@@ -175,6 +177,7 @@ function calculateOptimizedVariants(input: CutPlanInput) {
       tableLengthCm: input.tableLengthCm,
       fabricWidthCm: fabric.widthCm,
       sizeProfiles: input.sizeProfiles,
+      maxFrequency: input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type),
     };
     const solutions = solveMinimumLays(target, input.maxLayers, fabric.type, fabricResult.lays.length, constraints);
     if (solutions.length && requested.size > 3 && !solutions.some((solution) => solution.lays.every((lay) => lay.frequencies.length <= 3))) {
@@ -209,7 +212,7 @@ export function calculateCutPlanAlternatives(input: CutPlanInput): CutPlanAltern
   const candidates = input.mergeFabricsInLays ? calculateMergedVariants(input, baseCandidates) : baseCandidates;
   const unique = [...new Map(candidates.map((candidate) => [planSignature(candidate.result), candidate])).values()]
     .map((candidate) => ({ ...candidate, ...score(candidate.result) }))
-    .sort((a, b) => a.layCount - b.layCount || b.sizeSpreadScore - a.sizeSpreadScore || a.complexity - b.complexity || a.peakFrequency - b.peakFrequency || a.sizeEntries - b.sizeEntries || a.totalLayers - b.totalLayers)
+    .sort((a, b) => a.layCount - b.layCount || b.totalLayers - a.totalLayers || a.totalMarkerLengthCm - b.totalMarkerLengthCm || b.sizeSpreadScore - a.sizeSpreadScore || a.complexity - b.complexity || a.peakFrequency - b.peakFrequency || a.sizeEntries - b.sizeEntries)
     .slice(0, 4);
   return unique.map((candidate, index) => ({
     id: `alternative-${index + 1}`,

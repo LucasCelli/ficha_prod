@@ -48,6 +48,7 @@ export interface CutPlanSizeProfile {
 export interface CutPlanInput {
   tableLengthCm: number;
   maxLayers: number;
+  maxFrequency?: number;
   fabrics: CutPlanFabric[];
   items: CutPlanItem[];
   sizeProfiles: CutPlanSizeProfile[];

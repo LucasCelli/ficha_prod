@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { performance } from "node:perf_hooks";
-import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, calculateShirtAreaCm2, ESTIMATED_NESTING_EFFICIENCY, estimateMarkerLengthCm, formatEstimatedLengthMeters, getLayerLimit, getMaximumEstimatedFrequency, normalizeCutPlanSizeKey } from "../src/features/plano-de-corte/dimensions.ts";
+import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, calculateShirtAreaCm2, ESTIMATED_NESTING_EFFICIENCY, estimateMarkerLengthCm, formatEstimatedLengthMeters, getDefaultMaximumFrequency, getLayerLimit, getMaximumEstimatedFrequency, normalizeCutPlanSizeKey } from "../src/features/plano-de-corte/dimensions.ts";
 import { cutPlanDemandKey, type CutPlanSizeProfile, type FabricType } from "../src/features/plano-de-corte/model.ts";
 import { solveMinimumLays } from "../src/features/plano-de-corte/solver.ts";
 import { calculateCutPlan, formatCutPlanSizeLabel, formatMarkerLabel, formatOperationalMarkerLabel } from "../src/features/plano-de-corte/calculator.ts";
 import { calculateCutPlanAlternatives } from "../src/features/plano-de-corte/alternatives.ts";
 import { validateCutPlan } from "../src/features/plano-de-corte/validation.ts";
+import { moveCutPlanItem } from "../src/features/plano-de-corte/item-order.ts";
 import type { CutPlanInput } from "../src/features/plano-de-corte/model.ts";
 
 const unconstrained = { tableLengthCm: 100_000, fabricWidthCm: 118, sizeProfiles: [] };
@@ -14,6 +15,21 @@ const unconstrained = { tableLengthCm: 100_000, fabricWidthCm: 118, sizeProfiles
 test("aplica os limites fisicos de folhas por tipo", () => {
   assert.equal(getLayerLimit("PLANO"), 100);
   assert.equal(getLayerLimit("TUBULAR"), 50);
+  assert.equal(getDefaultMaximumFrequency("TUBULAR"), 14);
+  assert.equal(getDefaultMaximumFrequency("PLANO"), 8);
+});
+
+test("reordena produtos por id estavel e ignora destinos que desapareceram", () => {
+  const input = createInput("TUBULAR", 50);
+  const items = [
+    { ...input.items[0], id: "a", size: "P" },
+    { ...input.items[0], id: "b", size: "M" },
+    { ...input.items[0], id: "c", size: "G" },
+  ];
+
+  assert.deepEqual(moveCutPlanItem(items, "a", "c").map(({ id }) => id), ["b", "c", "a"]);
+  assert.equal(moveCutPlanItem(items, "a", "removed"), items);
+  assert.equal(moveCutPlanItem(items, "removed", "b"), items);
 });
 
 test("formata o comprimento estimado em metros com uma casa decimal", () => {
@@ -187,6 +203,30 @@ test("caso tubular real fecha em dois enfestos com frequencias pares", () => {
   assert.ok(solution.lays.every((lay) => lay.frequencies.every(({ frequency }) => frequency % 2 === 0)));
 });
 
+test("prefere um unico enfesto tubular com frequencia 8 quando fecha em mais folhas", () => {
+  const quantities = new Map([
+    ["G", 24],
+    ["GG", 6],
+    ["BABY GG", 6],
+  ]);
+  const solution = solveMinimumLays(quantities, 50, "TUBULAR", 3, unconstrained)[0];
+
+  assert.equal(solution?.lays.length, 1);
+  assert.equal(solution.lays[0].layers, 3);
+  assert.equal(formatMarkerLabel(solution.lays[0].frequencies, false), "8G + 2GG + 2BL GG");
+});
+
+test("respeita a frequencia maxima personalizada no solver", () => {
+  const quantities = new Map([["G", 42]]);
+  const expanded = solveMinimumLays(quantities, 3, "TUBULAR", 3, { ...unconstrained, maxFrequency: 14 })[0];
+  const restricted = solveMinimumLays(quantities, 3, "TUBULAR", 3, { ...unconstrained, maxFrequency: 8 })[0];
+
+  assert.equal(expanded?.lays.length, 1);
+  assert.equal(expanded.lays[0].layers, 3);
+  assert.equal(expanded.lays[0].frequencies[0].frequency, 14);
+  assert.ok(restricted.lays.every((lay) => lay.frequencies.every(({ frequency }) => frequency <= 8)));
+});
+
 test("pedido Intercement permanece em dois enfestos com a dobra conservada pela area", () => {
   const input = createInput("TUBULAR", 50);
   input.items = [
@@ -203,10 +243,10 @@ test("pedido Intercement permanece em dois enfestos com a dobra conservada pela 
   ];
 
   const result = calculateCutPlan(input).fabrics[0];
-  assert.deepEqual(result.lays.map(({ layers }) => layers), [15, 5]);
+  assert.deepEqual(result.lays.map(({ layers }) => layers), [15, 10]);
   assert.deepEqual(result.lays.map((lay) => formatMarkerLabel(lay.frequencies, false)), [
-    "2P + 4M + 2G + 2GG",
-    "2P + 4G",
+    "4M + 2G + 2GG",
+    "4P + 2G",
   ]);
   assert.ok(result.lays.every((lay) => (lay.markerLengthCm ?? 0) <= input.tableLengthCm));
   assert.ok(result.sizes.every((size) => size.difference === 0));
@@ -363,7 +403,7 @@ test("orcamento combinatorio cai no fallback sem perder producao exata", () => {
 });
 
 function bruteMinimumLayCount(quantities: number[], maxLayers: number, type: FabricType, maxCount: number) {
-  const options = type === "TUBULAR" ? [0, 2, 4, 6] : [0, 1, 2, 3, 4, 5, 6];
+  const options = type === "TUBULAR" ? [0, 2, 4, 6, 8] : [0, 1, 2, 3, 4, 5, 6, 7, 8];
   for (let count = 1; count <= maxCount; count += 1) {
     for (const layers of bruteLayerSets(maxLayers, count)) {
       if (quantities.every((quantity) => canAssign(quantity, layers, options))) return count;

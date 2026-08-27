@@ -8,6 +8,7 @@ export type SolverMetrics = {
   peakFrequency: number;
   sizeSpreadScore: number;
   totalLayers: number;
+  totalMarkerLengthCm: number;
   sizeEntries: number;
 };
 export type SolvedPlan = { lays: SolvedLay[]; metrics: SolverMetrics; signature: string; searchComplete: boolean };
@@ -17,9 +18,9 @@ export type SolverConstraints = {
   fabricWidthCm: number;
   sizeProfiles: CutPlanSizeProfile[];
   maxSizesPerMarker?: number;
+  maxFrequency?: number;
 };
 
-const MAX_FREQUENCY = 6;
 const DEFAULT_MAX_SIZES_PER_MARKER = 5;
 const MAX_EXACT_LAYS = 4;
 const SOLUTIONS_PER_STATE = 6;
@@ -44,8 +45,9 @@ function budgetExhausted(budget: SearchBudget) {
   return budget.operations % 2_048 === 0 && Date.now() - budget.startedAt >= MAX_SOLVER_DURATION_MS;
 }
 
-function frequencyOptions(type: FabricType) {
-  return type === "TUBULAR" ? [0, 2, 4, 6] : [0, 1, 2, 3, 4, 5, 6];
+function frequencyOptions(type: FabricType, maxFrequency: number) {
+  const step = type === "TUBULAR" ? 2 : 1;
+  return [0, ...Array.from({ length: Math.floor(maxFrequency / step) }, (_, index) => (index + 1) * step)];
 }
 
 function *generateLayerSets(maxLayers: number, count: number, ceiling = maxLayers, prefix: number[] = []): Generator<number[]> {
@@ -62,8 +64,8 @@ function greatestCommonDivisor(left: number, right: number): number {
   return right === 0 ? Math.abs(left) : greatestCommonDivisor(right, left % right);
 }
 
-function canRepresentAllQuantities(entries: RankedEntry[], layers: number[], type: FabricType) {
-  const totalCapacity = layers.reduce((sum, layer) => sum + layer * MAX_FREQUENCY, 0);
+function canRepresentAllQuantities(entries: RankedEntry[], layers: number[], type: FabricType, maxFrequency: number) {
+  const totalCapacity = layers.reduce((sum, layer) => sum + layer * maxFrequency, 0);
   const divisor = layers.reduce(greatestCommonDivisor) * (type === "TUBULAR" ? 2 : 1);
   const minimumFrequency = type === "TUBULAR" ? 2 : 1;
   const maximumQuantity = Math.max(...entries.map(({ quantity }) => quantity));
@@ -73,8 +75,8 @@ function canRepresentAllQuantities(entries: RankedEntry[], layers: number[], typ
   return entries.every(({ quantity }) => quantity <= totalCapacity && quantity % divisor === 0);
 }
 
-function assignmentKey(quantity: number, layers: number[], type: FabricType, lengthPerFrequency: number) {
-  return `${type}:${quantity}:${layers.join(",")}:${lengthPerFrequency.toFixed(6)}`;
+function assignmentKey(quantity: number, layers: number[], type: FabricType, lengthPerFrequency: number, maxFrequency: number) {
+  return `${type}:${quantity}:${layers.join(",")}:${lengthPerFrequency.toFixed(6)}:${maxFrequency}`;
 }
 
 function getSizeAssignments(
@@ -83,15 +85,16 @@ function getSizeAssignments(
   type: FabricType,
   lengthPerFrequency: number,
   tableLengthCm: number,
+  maxFrequency: number,
   cache: Map<string, SizeAssignment[]>,
 ) {
-  const key = assignmentKey(entry.quantity, layers, type, lengthPerFrequency);
+  const key = assignmentKey(entry.quantity, layers, type, lengthPerFrequency, maxFrequency);
   const cached = cache.get(key);
   if (cached) return cached;
 
   const result: SizeAssignment[] = [];
-  const options = frequencyOptions(type);
-  const remainingCapacities = layers.map((_, index) => layers.slice(index + 1).reduce((sum, layer) => sum + layer * MAX_FREQUENCY, 0));
+  const options = frequencyOptions(type, maxFrequency);
+  const remainingCapacities = layers.map((_, index) => layers.slice(index + 1).reduce((sum, layer) => sum + layer * maxFrequency, 0));
 
   function visit(index: number, remaining: number, values: number[]) {
     if (index === layers.length) {
@@ -154,7 +157,7 @@ function solveLayerSet(
       : 0;
     return {
       entry,
-      options: getSizeAssignments(entry, layers, type, lengthPerFrequency, constraints.tableLengthCm, cache),
+      options: getSizeAssignments(entry, layers, type, lengthPerFrequency, constraints.tableLengthCm, constraints.maxFrequency ?? 8, cache),
     };
   });
   if (prepared.some(({ options }) => options.length === 0)) return [];
@@ -229,6 +232,7 @@ function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPl
     peakFrequency: Math.max(...markerTotals),
     sizeSpreadScore: calculateSizeSpreadScore(plan.assignments, layers),
     totalLayers: layers.reduce((sum, value) => sum + value, 0),
+    totalMarkerLengthCm: plan.markerLengths.reduce((sum, value) => sum + value, 0),
     sizeEntries: lays.reduce((sum, lay) => sum + lay.frequencies.length, 0),
   };
   const signature = lays.map((lay) => `${lay.layers}:${lay.frequencies.map((item) => `${item.size}:${item.sleeveType}=${item.frequency}`).join(",")}`).join("|");
@@ -237,6 +241,8 @@ function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPl
 
 function compareSolutions(a: SolvedPlan, b: SolvedPlan) {
   return a.lays.length - b.lays.length
+    || b.metrics.totalLayers - a.metrics.totalLayers
+    || a.metrics.totalMarkerLengthCm - b.metrics.totalMarkerLengthCm
     || b.metrics.sizeSpreadScore - a.metrics.sizeSpreadScore
     || a.metrics.totalFrequency - b.metrics.totalFrequency
     || a.metrics.peakFrequency - b.metrics.peakFrequency
@@ -260,10 +266,11 @@ export function solveMinimumLays(
   if (!ordered.length) return [];
   const entries = ordered.map(([key, quantity], rank) => ({ ...parseCutPlanDemandKey(key), quantity, rank }));
   const maxSizesPerMarker = constraints.maxSizesPerMarker ?? DEFAULT_MAX_SIZES_PER_MARKER;
+  const maxFrequency = constraints.maxFrequency ?? 8;
   const lowerBound = Math.max(
     1,
     Math.ceil(entries.length / maxSizesPerMarker),
-    Math.ceil(Math.max(...entries.map(({ quantity }) => quantity)) / (MAX_FREQUENCY * maxLayers)),
+    Math.ceil(Math.max(...entries.map(({ quantity }) => quantity)) / (maxFrequency * maxLayers)),
   );
   const upperBound = Math.min(MAX_EXACT_LAYS, fallbackLayCount);
   const cache = new Map<string, SizeAssignment[]>();
@@ -281,7 +288,7 @@ export function solveMinimumLays(
         searchComplete = false;
         break;
       }
-      if (!canRepresentAllQuantities(entries, layers, type)) continue;
+      if (!canRepresentAllQuantities(entries, layers, type, maxFrequency)) continue;
       const layerSolutions = solveLayerSet(entries, layers, type, constraints, cache, budget);
       if (layerSolutions === null) {
         return [...found.values()]

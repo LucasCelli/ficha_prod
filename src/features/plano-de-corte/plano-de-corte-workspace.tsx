@@ -10,9 +10,10 @@ import { countLabel, CutPlanCalculationError, formatCutPlanSizeLabel, formatMark
 import { CutPlanFichaPicker } from "./cut-plan-ficha-picker";
 import { CutPlanNativePrintLayer } from "./cut-plan-native-print-layer";
 import { CutPlanItemsEditor, sortCutPlanItems } from "./cut-plan-items-editor";
+import { moveCutPlanItem } from "./item-order";
 import type { CutPlanFabric, CutPlanInput, CutPlanItem, CutPlanSourceFicha, FabricType, MarkerFrequency } from "./model";
 import { validateCutPlan } from "./validation";
-import { formatEstimatedLengthMeters, getLayerLimit } from "./dimensions";
+import { formatEstimatedLengthMeters, getDefaultMaximumFrequency, getLayerLimit } from "./dimensions";
 
 const CUT_PLAN_HISTORY_KEY = "ficha-prod:cut-plan-history:v1";
 const CUT_PLAN_HISTORY_LIMIT = 15;
@@ -75,6 +76,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
   const defaultFabricSettings = getFabricCutSettings(defaultFabricOption);
   const [tableLengthCm, setTableLengthCm] = useState(800);
   const [maxLayers, setMaxLayers] = useState(50);
+  const [maxFrequency, setMaxFrequency] = useState(() => getDefaultMaximumFrequency(defaultFabricSettings.type ?? "TUBULAR"));
   const [mergeFabricsInLays, setMergeFabricsInLays] = useState(false);
   const [fabrics, setFabrics] = useState<CutPlanFabric[]>(() => [createFabric(defaultFabricName, undefined, defaultFabricSettings)]);
   const [items, setItems] = useState<CutPlanItem[]>([]);
@@ -107,7 +109,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
     label: size.name,
     value: size.name,
   })), [catalogSizes]);
-  const input = useMemo<CutPlanInput>(() => ({ tableLengthCm, maxLayers, mergeFabricsInLays, fabrics, items, sizeProfiles, sourceFichaIds: sourceFichas.map((ficha) => ficha.id) }), [tableLengthCm, maxLayers, mergeFabricsInLays, fabrics, items, sizeProfiles, sourceFichas]);
+  const input = useMemo<CutPlanInput>(() => ({ tableLengthCm, maxLayers, maxFrequency, mergeFabricsInLays, fabrics, items, sizeProfiles, sourceFichaIds: sourceFichas.map((ficha) => ficha.id) }), [tableLengthCm, maxLayers, maxFrequency, mergeFabricsInLays, fabrics, items, sizeProfiles, sourceFichas]);
   const selected = alternatives.find((alternative) => alternative.id === selectedId) ?? alternatives[0];
   useEffect(() => {
     setHistory(readCutPlanHistory());
@@ -130,7 +132,10 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
   function updateFabric(fabricId: string, patch: Partial<CutPlanFabric>) {
     const sharedPatch = { ...(patch.widthCm !== undefined ? { widthCm: patch.widthCm } : {}), ...(patch.type ? { type: patch.type } : {}) };
     setFabrics((current) => current.map((fabric) => fabric.id === fabricId ? { ...fabric, ...patch } : { ...fabric, ...sharedPatch }));
-    if (patch.type) setMaxLayers((current) => Math.min(current, getLayerLimit(patch.type!)));
+    if (patch.type) {
+      setMaxLayers((current) => Math.min(current, getLayerLimit(patch.type!)));
+      setMaxFrequency(getDefaultMaximumFrequency(patch.type));
+    }
     invalidate();
   }
   function addFabric() { setFabrics((current) => [...current, createFabric(defaultFabricName, current[0], defaultFabricSettings)]); invalidate(); }
@@ -147,9 +152,9 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
   function duplicateItem(itemId: string, direction: "above" | "below") {
     setItems((current) => { const index = current.findIndex((item) => item.id === itemId); const copy = { ...current[index], id: createId() }; const target = direction === "above" ? index : index + 1; return [...current.slice(0, target), copy, ...current.slice(target)]; }); invalidate();
   }
-  function moveItem(fromIndex: number, toIndex: number) {
-    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || toIndex >= items.length) return;
-    setItems((current) => { const next = [...current]; const [moved] = next.splice(fromIndex, 1); next.splice(toIndex, 0, moved); return next; }); invalidate();
+  function moveItem(itemId: string, target: string | number) {
+    setItems((current) => moveCutPlanItem(current, itemId, target));
+    invalidate();
   }
   function sortItems() { setItems((current) => sortCutPlanItems(current)); invalidate(); toast.success("Tamanhos ordenados."); }
   function addSourceFicha(ficha: CutPlanSourceFicha, overwrite = false) {
@@ -200,6 +205,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
     }
     setFabrics(nextFabrics);
     setMaxLayers((current) => Math.min(current, ...nextFabrics.map((fabric) => getLayerLimit(fabric.type))));
+    setMaxFrequency(getDefaultMaximumFrequency(nextFabrics[0]?.type ?? "TUBULAR"));
     setItems([...baseItems, ...importedItems]);
     setSourceFichas(existingSource ? sourceFichas.map((current) => current.id === ficha.id ? importedSource : current) : [...sourceFichas, importedSource]);
     invalidate();
@@ -224,7 +230,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
     }
     setCalculating(true);
     window.setTimeout(() => {
-      try { const generated = calculateCutPlanAlternatives(input); setAlternatives(generated); setSelectedId(generated[0]?.id ?? ""); const entry: CutPlanHistoryEntry = { id: createId(), createdAt: new Date().toISOString(), input: { tableLengthCm, maxLayers, mergeFabricsInLays, fabrics, items, sourceFichaIds: sourceFichas.map((ficha) => ficha.id) }, sourceFichas, alternatives: generated }; setHistory((current) => [entry, ...current].slice(0, CUT_PLAN_HISTORY_LIMIT)); toast.success(generated.length === 1 ? "1 opção de plano encontrada." : `${generated.length} opções de plano encontradas.`); }
+      try { const generated = calculateCutPlanAlternatives(input); setAlternatives(generated); setSelectedId(generated[0]?.id ?? ""); const entry: CutPlanHistoryEntry = { id: createId(), createdAt: new Date().toISOString(), input: { tableLengthCm, maxLayers, maxFrequency, mergeFabricsInLays, fabrics, items, sourceFichaIds: sourceFichas.map((ficha) => ficha.id) }, sourceFichas, alternatives: generated }; setHistory((current) => [entry, ...current].slice(0, CUT_PLAN_HISTORY_LIMIT)); toast.success(generated.length === 1 ? "1 opção de plano encontrada." : `${generated.length} opções de plano encontradas.`); }
       catch (error) {
         setAlternatives([]);
         toast.error("Não deu para calcular o plano", { description: error instanceof CutPlanCalculationError ? error.message : "Tente de novo." });
@@ -236,6 +242,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
   function restoreHistoryEntry(entry: CutPlanHistoryEntry) {
     setTableLengthCm(entry.input.tableLengthCm);
     setMaxLayers(entry.input.maxLayers);
+    setMaxFrequency(entry.input.maxFrequency ?? getDefaultMaximumFrequency(entry.input.fabrics[0]?.type ?? "TUBULAR"));
     setMergeFabricsInLays(Boolean(entry.input.mergeFabricsInLays));
     setFabrics(entry.input.fabrics);
     setItems(entry.input.items);
@@ -250,7 +257,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
   function clearHistory() {
     setHistory([]);
     toast.success("Histórico apagado.");
-  }  function clear() { setTableLengthCm(800); setMaxLayers(50); setMergeFabricsInLays(false); setFabrics([createFabric(defaultFabricName, undefined, defaultFabricSettings)]); setItems([]); setSourceFichas([]); setAlternatives([]); setConfirmClear(false); }
+  }  function clear() { setTableLengthCm(800); setMaxLayers(50); setMaxFrequency(getDefaultMaximumFrequency(defaultFabricSettings.type ?? "TUBULAR")); setMergeFabricsInLays(false); setFabrics([createFabric(defaultFabricName, undefined, defaultFabricSettings)]); setItems([]); setSourceFichas([]); setAlternatives([]); setConfirmClear(false); }
   const finishPrinting = useCallback(() => setPrintSelection(null), []);
   function printPlan(scope: "current" | "all") {
     if (!selected) return;
@@ -262,7 +269,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
     <section className={`cut-plan__history${historyCollapsed ? " is-collapsed" : ""}`} aria-labelledby="cut-plan-history-title">
       <header><div><h2 id="cut-plan-history-title">Últimos planos <span>{history.length}</span></h2>{historyCollapsed ? null : <p>Restaure qualquer uma das 15 gerações mais recentes.</p>}</div><div className="cut-plan__history-actions">{!historyCollapsed && history.length ? <Button onClick={clearHistory} variant="ghost"><Trash2 size={16} /> Apagar todos</Button> : null}<IconButton label={historyCollapsed ? "Expandir histórico" : "Recolher histórico"} onClick={() => setHistoryCollapsed((current) => !current)} size="sm"><>{historyCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}</></IconButton></div></header>
       {historyCollapsed ? null : history.length ? <div className="cut-plan__history-list">{history.map((entry) => { const total = entry.input.items.reduce((sum, item) => sum + item.quantity, 0); const fabricsLabel = entry.input.fabrics.map(fabricLabel).join(" · "); return <article key={entry.id}><button className="cut-plan__history-restore" onClick={() => restoreHistoryEntry(entry)} type="button"><strong>{fabricsLabel || "Plano de corte"}</strong><span>{total} peças · {countLabel(entry.alternatives[0]?.layCount ?? 0, "enfesto")} · {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.createdAt))}</span></button><IconButton label={`Excluir plano de ${fabricsLabel || "corte"}`} onClick={() => removeHistoryEntry(entry.id)} size="sm" tone="danger"><Trash2 size={16} /></IconButton></article>; })}</div> : <p className="cut-plan__history-empty">Os planos calculados aparecerão aqui.</p>}
-    </section>    <Panel number="1" title="Mesa e enfesto"><div className="cut-plan__settings"><NumberField id="cut-plan-table-length" label="Tamanho da mesa" unit="cm" value={tableLengthCm} onChange={(value) => { setTableLengthCm(value); invalidate(); }} /><NumberField key={fabrics[0]?.type ?? "TUBULAR"} id="cut-plan-max-layers" label="Máximo de folhas por enfesto" max={getLayerLimit(fabrics[0]?.type ?? "TUBULAR")} unit="folhas" integer value={maxLayers} onChange={(value) => { setMaxLayers(Math.min(value, getLayerLimit(fabrics[0]?.type ?? "TUBULAR"))); invalidate(); }} /><label className="cut-plan__merge-option"><input checked={mergeFabricsInLays} onChange={(event) => { setMergeFabricsInLays(event.currentTarget.checked); invalidate(); }} type="checkbox" /><span><strong>Mesclar tecidos nos enfestos</strong><small>Combina cores compatíveis do mesmo tecido, largura e tipo.</small></span></label></div></Panel>
+    </section>    <Panel number="1" title="Mesa e enfesto"><div className="cut-plan__settings"><NumberField id="cut-plan-table-length" label="Tamanho da mesa" unit="cm" value={tableLengthCm} onChange={(value) => { setTableLengthCm(value); invalidate(); }} /><NumberField key={fabrics[0]?.type ?? "TUBULAR"} id="cut-plan-max-layers" label="Máximo de folhas por enfesto" max={getLayerLimit(fabrics[0]?.type ?? "TUBULAR")} unit="folhas" integer value={maxLayers} onChange={(value) => { setMaxLayers(Math.min(value, getLayerLimit(fabrics[0]?.type ?? "TUBULAR"))); invalidate(); }} /><NumberField id="cut-plan-max-frequency" label="Frequência máxima" unit="peças" integer value={maxFrequency} onChange={(value) => { setMaxFrequency(value); invalidate(); }} /><label className="cut-plan__merge-option"><input checked={mergeFabricsInLays} onChange={(event) => { setMergeFabricsInLays(event.currentTarget.checked); invalidate(); }} type="checkbox" /><span><strong>Mesclar tecidos nos enfestos</strong><small>Combina cores compatíveis do mesmo tecido, largura e tipo.</small></span></label></div></Panel>
     <Panel number="2" title="Tecidos" action={<Button variant="secondary" onClick={addFabric}><Plus size={17} /> Adicionar tecido</Button>}><div className="cut-plan__fabric-list">{fabrics.map((fabric, index) => <article className="cut-plan__fabric" key={fabric.id}><div className="cut-plan__fabric-title"><strong>{fabricLabel(fabric)}</strong><IconButton label={`Remover ${fabricLabel(fabric)}`} onClick={() => removeFabric(fabric.id)} size="sm" tone="danger"><Trash2 size={17} /></IconButton></div><div className="cut-plan__fabric-fields"><div className="field"><label htmlFor={`cut-plan-fabric-name-${fabric.id}`}>Tecido</label><CustomDatalist id={`cut-plan-fabric-name-${fabric.id}`} onValueChange={(value, option) => updateFabric(fabric.id, { name: value, ...getFabricCutSettings(option) })} options={catalogFabricOptions} placeholder="Escolha um tecido" value={fabric.name} /></div><Field id={`cut-plan-fabric-color-${fabric.id}`} label="Cor"><input id={`cut-plan-fabric-color-${fabric.id}`} value={fabric.color} placeholder="Ex.: Azul Marinho" onChange={(event) => updateFabric(fabric.id, { color: event.currentTarget.value })} /></Field><NumberField id={`cut-plan-fabric-width-${fabric.id}`} label="Largura" unit="cm" value={fabric.widthCm} onChange={(value) => updateFabric(fabric.id, { widthCm: value })} /><Field id={`cut-plan-fabric-type-${fabric.id}`} label="Plano ou tubular"><select id={`cut-plan-fabric-type-${fabric.id}`} value={fabric.type} onChange={(event) => updateFabric(fabric.id, { type: event.currentTarget.value as FabricType })}><option value="PLANO">Plano</option><option value="TUBULAR">Tubular</option></select></Field></div><small>{index ? "A largura e o tipo seguem o primeiro tecido." : fabric.type === "TUBULAR" ? "No tubular, a frequência de cada tamanho sai sempre em número par." : "A frequência de cada tamanho vai de 1 a 6."}</small></article>)}</div></Panel>
     <Panel number="3" title="Tamanhos e quantidades"><CutPlanFichaPicker added={sourceFichas} onAdd={addSourceFicha} onRemove={removeSourceFicha} /><CutPlanItemsEditor fabrics={fabrics} items={items} addItem={addItem} duplicateItem={duplicateItem} moveItem={moveItem} sizeOptions={sizeOptions} sortItems={sortItems} updateItem={updateItem} removeItem={(itemId) => { setItems((current) => current.filter((item) => item.id !== itemId)); invalidate(); }} /></Panel>
     <div className="form-actions"><Button variant="ghost" onClick={() => setConfirmClear(true)}><RotateCcw size={17} /> Limpar plano</Button><Button aria-busy={calculating} disabled={calculating} onClick={calculate}>{calculating ? <span className="button-spinner" aria-hidden="true" /> : <Calculator aria-hidden="true" size={18} />} {calculating ? "Calculando" : "Calcular plano"}</Button></div>

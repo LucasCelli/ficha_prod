@@ -13,6 +13,10 @@ export function getLayerLimit(type: FabricType) {
   return type === "TUBULAR" ? 50 : 100;
 }
 
+export function getDefaultMaximumFrequency(type: FabricType) {
+  return type === "TUBULAR" ? 14 : 8;
+}
+
 export function normalizeCutPlanSizeKey(value: string | null | undefined) {
   const sizeKey = normalizeUniformSizeKey(value);
   if (!sizeKey) return "";
@@ -96,11 +100,12 @@ export function getMaximumEstimatedFrequency(
   fabricWidthCm: number,
   tableLengthCm: number,
   profiles: CutPlanSizeProfile[],
+  maxFrequency = getDefaultMaximumFrequency(type),
 ) {
   const profileIndex = buildSizeProfileIndex(profiles);
   const step = type === "TUBULAR" ? 2 : 1;
   let maximum = 0;
-  for (let frequency = step; frequency <= 6; frequency += step) {
+  for (let frequency = step; frequency <= maxFrequency; frequency += step) {
     const length = estimateMarkerLengthCm([{ size, sleeveType, frequency }], type, fabricWidthCm, profileIndex);
     if (length === null || length <= tableLengthCm) maximum = frequency;
   }

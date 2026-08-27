@@ -2629,3 +2629,11 @@
 - A grade operacional copiada e impressa passou a separar frequência e tamanho com hífen e parênteses, evitando ambiguidades como `214`: `(2-14) (2-P) (2-M)`.
 - Produtos descritos como masculinos e femininos agora usam chaves de molde distintas, exibidas de forma compacta como `MASC.` e `FEM.`; o molde feminino de camisa social reutiliza o perfil dimensional equivalente de Baby Look sem ser somado ao masculino.
 - Calça, bermuda, short, saia e macacão também passam a compor a identidade da linha importada, impedindo que peças inferiores do mesmo tamanho, tecido e cor sejam somadas entre si.
+
+## 2026-08-27 - Prioridade operacional do Planejador de Corte
+
+- O solver passou a aceitar frequencias de ate oito pecas por tamanho, permitindo grades tubulares como `8G + 2GG + 2BL GG` em tres folhas.
+- A ordenacao agora prioriza explicitamente menos enfestos, mais folhas/camadas e menor comprimento estimado, antes dos desempates de complexidade da grade.
+- Adicionado teste de regressao para o plano de um unico enfesto com essa grade.
+- O passo Mesa e enfesto ganhou uma frequencia maxima customizavel, com padrao 14 para tecido tubular e 8 para tecido plano; o valor acompanha o historico e limita todos os caminhos do calculo.
+- A reordenacao dos produtos passou a resolver origem e destino pelos IDs estaveis sobre o estado mais recente; atualizacoes concorrentes da lista e destinos removidos nao aplicam mais indices antigos a outras linhas.

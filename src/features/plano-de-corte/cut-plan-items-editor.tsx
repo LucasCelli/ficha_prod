@@ -28,7 +28,7 @@ type Props = {
   duplicateItem: (id: string, direction: "above" | "below") => void;
   fabrics: CutPlanFabric[];
   items: CutPlanItem[];
-  moveItem: (fromIndex: number, toIndex: number) => void;
+  moveItem: (itemId: string, target: string | number) => void;
   removeItem: (id: string) => void;
   sizeOptions: CustomDatalistOption[];
   sortItems: () => void;
@@ -64,9 +64,9 @@ export function CutPlanItemsEditor({ addItem, duplicateItem, fabrics, items, mov
     <SortableInstructions />
     <div className="cut-plan-items__toolbar"><Button variant="secondary" onClick={sortItems} disabled={items.length < 2}><RotateCcw size={18} /> Ordenar por tamanho</Button><Button variant="secondary" onClick={() => addItem()}><Plus size={18} /> Adicionar tamanho</Button></div>
     <div className="cut-plan-items__head" aria-hidden="true"><span></span><span>Tamanho</span><span>Tipo</span><span>Quantidade</span><span>Tecido</span><span>Ações</span></div>
-    <DragDropProvider onDragEnd={(event) => { if (event.canceled) return; const source = event.operation.source?.id; const target = event.operation.target?.id; if (source == null || target == null) return; moveItem(items.findIndex((item) => item.id === String(source)), items.findIndex((item) => item.id === String(target))); }}>
+    <DragDropProvider onDragEnd={(event) => { if (event.canceled) return; const source = event.operation.source?.id; const target = event.operation.target?.id; if (source == null || target == null || source === target) return; moveItem(String(source), String(target)); }}>
       <div className="cut-plan-items__list" data-sortable-list="">{items.length ? items.map((item, index) => <SortableRow id={item.id} index={index} key={item.id}>{(handleRef) => <>
-        <SortableHandle className="cut-plan-items__drag" handleRef={handleRef} itemLabel={item.size || `linha ${index + 1}`} onMove={(target) => moveItem(index, target)} position={index + 1} total={items.length} />
+        <SortableHandle className="cut-plan-items__drag" handleRef={handleRef} itemLabel={item.size || `linha ${index + 1}`} onMove={(target) => moveItem(item.id, target)} position={index + 1} total={items.length} />
         <div className="cut-plan-items__cell field"><span>Tamanho</span><CustomDatalist aria-label={`Tamanho da linha ${index + 1}`} id={`cut-plan-size-${item.id}`} onValueChange={(value) => updateItem(item.id, { size: value.toUpperCase() })} options={sizeOptions} placeholder="Escolha um tamanho" value={item.size} /></div>
         <label className="cut-plan-items__cell field"><span>Tipo</span><select aria-label={`Manga da linha ${index + 1}`} value={getItemType(item)} onChange={(event) => updateItem(item.id, changeItemType(item, event.currentTarget.value))}><option value="CURTA">Manga curta</option><option value="LONGA">Manga longa</option><option value="SHORT">Short</option><option value="BERMUDA">Bermuda</option><option value="CALÇA">Calça</option><option value="SAIA">Saia</option><option value="MACACÃO">Macacão</option></select></label>
         <label className="cut-plan-items__cell field"><span>Quantidade</span><input aria-label={`Quantidade da linha ${index + 1}`} inputMode="numeric" min="0" step="1" type="number" value={quantityDrafts[item.id] ?? (Number.isFinite(item.quantity) && item.quantity !== 0 ? String(item.quantity) : "")} onBlur={() => handleQuantityBlur(item)} onChange={(event) => handleQuantityChange(item, event.currentTarget.value)} onFocus={() => handleQuantityFocus(item)} placeholder="Qtd." /></label>

@@ -7,7 +7,7 @@ import {
   type LayPlan,
   type MarkerFrequency,
 } from "./model.ts";
-import { buildSizeProfileIndex, estimateMarkerLengthCm, getMaximumEstimatedFrequency } from "./dimensions.ts";
+import { buildSizeProfileIndex, estimateMarkerLengthCm, getDefaultMaximumFrequency, getMaximumEstimatedFrequency } from "./dimensions.ts";
 import { solveMinimumLays } from "./solver.ts";
 import { compareUniformSizes, isUniformBabyLookText } from "../../lib/uniform-sizes.ts";
 
@@ -18,7 +18,6 @@ export class CutPlanCalculationError extends Error {
   }
 }
 
-const MAX_FREQUENCY = 6;
 const MAX_SIZES_PER_MARKER = 5;
 
 function normalizeSize(size: string) {
@@ -43,6 +42,7 @@ function findJointCandidate(
 ): { layers: number; frequencies: MarkerFrequency[] } | null {
   const fabric = input.fabrics.find((candidate) => candidate.id === fabricId)!;
   const tubular = fabric.type === "TUBULAR";
+  const maxFrequency = input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type);
   const profileIndex = buildSizeProfileIndex(input.sizeProfiles);
   const entries = [...remaining.entries()].filter(([, quantity]) => quantity > 0).slice(0, MAX_SIZES_PER_MARKER);
   if (entries.length < 2) return null;
@@ -51,7 +51,7 @@ function findJointCandidate(
     const frequencies = entries.map(([key, quantity]) => ({ ...parseCutPlanDemandKey(key), frequency: quantity / layers }));
     if (frequencies.every(({ frequency }) => Number.isInteger(frequency)
       && frequency >= 1
-      && frequency <= MAX_FREQUENCY
+      && frequency <= maxFrequency
       && (!tubular || frequency % 2 === 0))
       && (estimateMarkerLengthCm(frequencies, fabric.type, fabric.widthCm, profileIndex) ?? 0) <= input.tableLengthCm) {
       return { layers, frequencies };
@@ -113,7 +113,8 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
     } else {
       let frequency = 1;
       let layers = Math.min(input.maxLayers, quantity);
-      const maximumFrequency = getMaximumEstimatedFrequency(size, sleeveType, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles);
+      const configuredMaximumFrequency = input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type);
+      const maximumFrequency = getMaximumEstimatedFrequency(size, sleeveType, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles, configuredMaximumFrequency);
       if (!maximumFrequency) throw new CutPlanCalculationError(`O tamanho ${size} ultrapassa a mesa mesmo na grade de frequência 1.`);
       for (let candidate = 1; candidate <= maximumFrequency; candidate += 1) {
         const candidateLayers = quantity / candidate;
@@ -131,6 +132,7 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
     tableLengthCm: input.tableLengthCm,
     fabricWidthCm: fabric.widthCm,
     sizeProfiles: input.sizeProfiles,
+    maxFrequency: input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type),
   })[0] : undefined;
   if (optimized) {
     lays.splice(0, lays.length, ...optimized.lays.map((lay, index) => ({ ...lay, id: `${fabricId}-lay-${index + 1}`, fabricId })));
@@ -147,6 +149,7 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
   if (lays.some((lay) => !Number.isInteger(lay.layers) || lay.layers < 1 || lay.layers > input.maxLayers)
     || lays.some((lay) => lay.frequencies.some(({ frequency }) => frequency < 1
       || !Number.isInteger(frequency)
+      || frequency > (input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type))
       || (fabric.type === "TUBULAR" && frequency % 2 !== 0)))
     || targetSizes.some(({ difference }) => difference !== 0)
     || sizes.some(({ difference }) => difference < 0)) {
