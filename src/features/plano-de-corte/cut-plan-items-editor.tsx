@@ -5,7 +5,7 @@ import { DragDropProvider } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { ArrowDown, ArrowUp, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button, CustomDatalist, SortableHandle, SortableInstructions, Tooltip, type CustomDatalistOption } from "@/components/ui";
-import { compareUniformSizes } from "@/lib/uniform-sizes";
+import { compareUniformSizeAndBabyLookText } from "@/lib/uniform-sizes";
 import type { CutPlanFabric, CutPlanItem, SleeveType } from "./model";
 
 const fabricLabel = (fabric: CutPlanFabric) => `${fabric.name}${fabric.color.trim() ? ` — ${fabric.color.trim()}` : ""}`;
@@ -79,5 +79,8 @@ export function CutPlanItemsEditor({ addItem, duplicateItem, fabrics, items, mov
 }
 
 export function sortCutPlanItems(items: CutPlanItem[]) {
-  return [...items].sort((a, b) => compareUniformSizes(a.size, b.size) || a.sleeveType.localeCompare(b.sleeveType));
+  return [...items].sort((a, b) =>
+    compareUniformSizeAndBabyLookText({ tamanho: a.size }, { tamanho: b.size }) ||
+    a.sleeveType.localeCompare(b.sleeveType),
+  );
 }

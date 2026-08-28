@@ -12,6 +12,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FichaDeleteActionState, FichaFormState, FichaStatusActionState, FieldErrors } from "./form-state";
 import { fichaFormSchema, type FichaFormValues } from "./schema";
 import { getFichaDeleteConfirmationCode } from "./delete-confirmation";
+import { sortFichaProductItemsForSave } from "./product-item-sorting";
 
 function getFichaFormInput(formData: FormData) {
   return {
@@ -112,7 +113,7 @@ function getFichaPayload(values: FichaFormValues): Json {
 }
 
 function getFichaItensPayload(values: FichaFormValues): Json {
-  return values.itens.map((item) => ({
+  return sortFichaProductItemsForSave(values.itens).map((item) => ({
     detalhes_produto: nullableText(item.detalhesProduto),
     produto: item.produto,
     quantidade: item.quantidade,
