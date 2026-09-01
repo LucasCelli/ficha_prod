@@ -7,6 +7,7 @@ export { Card } from "./card";
 export { AppClientProviders } from "./app-client-providers";
 export { ChartDataTable, ChartFrame, type ChartSeries } from "./chart-frame";
 export { CustomDatalist, type CustomDatalistHandle, type CustomDatalistOption } from "./custom-datalist";
+export { CustomSelect } from "./custom-select";
 export { DataTable } from "./data-table";
 export { EmptyState } from "./empty-state";
 export { FilterBar, FilterChip, FilterField } from "./filter-bar";

@@ -739,7 +739,7 @@ export type Database = {
       };
     };
     Enums: {
-      app_user_role: "superadmin" | "operador";
+      app_user_role: "superadmin" | "vendedor" | "designer";
       catalog_item_kind:
         | "produto"
         | "tamanho"

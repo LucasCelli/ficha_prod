@@ -1,56 +1,55 @@
 import { getServerErrorMessage } from "@/lib/server/boundaries";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { Operador } from "./types";
+import type { Usuario } from "./types";
 
 export type UsuariosResult =
   | {
       kind: "ok";
-      operadores: Operador[];
+      usuarios: Usuario[];
     }
   | {
       kind: "not-configured";
-      operadores: [];
+      usuarios: [];
     }
   | {
       kind: "error";
       message: string;
-      operadores: [];
+      usuarios: [];
     };
 
-export async function listOperadores(): Promise<UsuariosResult> {
+export async function listUsuarios(): Promise<UsuariosResult> {
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
       kind: "not-configured",
-      operadores: [],
+      usuarios: [],
     };
   }
 
   try {
     const { data, error } = await createServerSupabaseClient()
       .from("app_users")
-      .select("id,username,display_name,active,last_login_at,created_at,updated_at")
-      .eq("role", "operador")
+      .select("id,username,display_name,role,active,last_login_at,created_at,updated_at")
       .order("active", { ascending: false })
       .order("display_name", { ascending: true });
 
     if (error) {
       return {
         kind: "error",
-        message: getServerErrorMessage("usuarios.list", error, "Não foi possível consultar os operadores."),
-        operadores: [],
+        message: getServerErrorMessage("usuarios.list", error, "Não foi possível consultar os usuários."),
+        usuarios: [],
       };
     }
 
     return {
       kind: "ok",
-      operadores: data ?? [],
+      usuarios: data ?? [],
     };
   } catch (error) {
     return {
       kind: "error",
-      message: getServerErrorMessage("usuarios.list", error, "Não foi possível consultar os operadores."),
-      operadores: [],
+      message: getServerErrorMessage("usuarios.list", error, "Não foi possível consultar os usuários."),
+      usuarios: [],
     };
   }
 }

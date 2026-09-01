@@ -1,3 +1,23 @@
+## 2026-08-31 - Funções de usuário e seleção fechada de vendedor
+
+- Módulos: `/usuarios`, `/fichas/nova`, edição de fichas e autenticação da aplicação.
+- Arquivos principais: `src/features/usuarios/*`, `src/features/auth/*`, `src/features/fichas/form-options.ts`, `src/features/fichas/ficha-form.tsx`, `src/features/fichas/actions.ts`, tipos Supabase e migration `20260901031811_user_roles_and_seller_selection.sql`.
+
+### Resultado
+
+- Os rótulos de função passam a ser Admin, Vendedor e Designer. Admin conserva as permissões atuais de `superadmin`; Vendedor e Designer conservam as permissões atuais de operador.
+- A migration renomeia o valor legado `operador` para `vendedor`, preservando todos os usuários existentes e mantendo `superadmin` como representação interna de Admin. O novo valor `designer` é adicionado ao enum.
+- A gestão de usuários lista todas as funções, permite defini-las no cadastro e na edição e mantém a checkbox de usuário ativo. O próprio Admin não pode desativar nem remover sua própria função administrativa.
+- O campo Vendedor da ficha deixou de aceitar texto livre e passou a ser uma seleção fechada. Suas opções vêm exclusivamente de usuários ativos com função Vendedor; nomes históricos digitados em fichas não alimentam mais a lista.
+- O popup nativo do `<select>` foi substituído por `CustomSelect`: o controle preserva a seta e o comportamento de lista fechada, mas reutiliza o mesmo menu, opções, hover, scroll, tokens e animação do `CustomDatalist` em light e dark mode.
+- A criação e a edição de ficha repetem essa validação no servidor, impedindo valores adulterados, usuários inativos ou funções diferentes de Vendedor.
+
+### Validação
+
+- `npm run typecheck`, `npm run build`, `npm run encoding:check`, `npm run supabase:check`, `git diff --check` e `npm run test:quality` passaram; a suíte de qualidade fechou em 69/69.
+- `npm run lint` permanece bloqueado por uma ocorrência preexistente de `react-hooks/set-state-in-effect` em `src/features/plano-de-corte/plano-de-corte-workspace.tsx:115`, arquivo não alterado nesta frente.
+- A migration foi confirmada no banco remoto: 1 Admin ativo, 5 Vendedores ativos, 2 Designers ativos e 1 Designer inativo. `/fichas/nova` foi validada em navegador autenticado e dark mode com os dois menus abertos, incluindo seleção por clique e comparação dos estilos computados entre Cliente (`CustomDatalist`) e Vendedor (`CustomSelect`).
+
 ## 2026-08-06 - Mescla opcional de cores nos enfestos
 
 - Módulo: `/ferramentas/plano-de-corte`.

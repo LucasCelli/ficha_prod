@@ -2,6 +2,7 @@ export type UsuarioFieldErrors = {
   active?: string;
   displayName?: string;
   pin?: string;
+  role?: string;
   username?: string;
 };
 

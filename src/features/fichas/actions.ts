@@ -141,6 +141,28 @@ async function saveFichaAtomic(fichaId: string | null, actorId: string, values: 
     p_itens: getFichaItensPayload(values),
   });
 }
+
+async function isActiveSeller(displayName: string) {
+  const { data, error } = await createServerSupabaseClient()
+    .from("app_users")
+    .select("id")
+    .eq("role", "vendedor")
+    .eq("active", true)
+    .eq("display_name", displayName)
+    .limit(1)
+    .maybeSingle();
+
+  return { error, valid: Boolean(data) };
+}
+
+function getInvalidSellerState(): FichaFormState {
+  return {
+    fieldErrors: { vendedor: "Selecione um vendedor ativo cadastrado." },
+    message: "O vendedor selecionado não está disponível.",
+    status: "error",
+  };
+}
+
 export async function createFichaAction(_previousState: FichaFormState, formData: FormData): Promise<FichaFormState> {
   const session = await requireAuthenticatedAction();
 
@@ -167,6 +189,12 @@ export async function createFichaAction(_previousState: FichaFormState, formData
       status: "error",
     };
   }
+
+  const seller = await isActiveSeller(parsed.data.vendedor);
+  if (seller.error) {
+    return getActionError("fichas.validate-seller", seller.error, "Não foi possível validar o vendedor.");
+  }
+  if (!seller.valid) return getInvalidSellerState();
 
   const { error } = await saveFichaAtomic(null, session.user.id, parsed.data);
 
@@ -212,6 +240,12 @@ export async function updateFichaAction(_previousState: FichaFormState, formData
       status: "error",
     };
   }
+
+  const seller = await isActiveSeller(parsed.data.vendedor);
+  if (seller.error) {
+    return getActionError("fichas.validate-seller", seller.error, "Não foi possível validar o vendedor.");
+  }
+  if (!seller.valid) return getInvalidSellerState();
 
   const { error } = await saveFichaAtomic(id, session.user.id, parsed.data);
 

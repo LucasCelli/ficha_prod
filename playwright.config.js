@@ -56,7 +56,7 @@ export default defineConfig({
     },
     {
       // Superficies restritas a superadmin. Sessao propria porque a conta usada
-      // nos demais projetos e operador e seria redirecionada para a home.
+      // nos demais projetos e Vendedor e seria redirecionada para a home.
       name: "superadmin-chromium",
       dependencies: ["setup"],
       testMatch: /admin\.spec\.js/,

@@ -34,7 +34,7 @@ import {
   UserRound,
   Wand2,
 } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, Button, CustomDatalist, IconButton, Modal, SortableHandle, SortableInstructions, Tooltip, type CustomDatalistOption } from "@/components/ui";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, Button, CustomDatalist, CustomSelect, IconButton, Modal, SortableHandle, SortableInstructions, Tooltip, type CustomDatalistOption } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
 import { compareUniformSizeAndBabyLookText } from "@/lib/uniform-sizes";
 import { createFichaAction, updateFichaAction } from "./actions";
@@ -1834,14 +1834,15 @@ function FichaFormInner({
           </Field>
 
           <Field label="Vendedor" name="vendedor" error={state.fieldErrors?.vendedor} required>
-            <CustomDatalist
+            <CustomSelect
               id="vendedor"
+              key={`vendedor-${initialData.vendedor}`}
               name="vendedor"
               aria-describedby={state.fieldErrors?.vendedor ? "vendedor-error" : undefined}
               aria-invalid={Boolean(state.fieldErrors?.vendedor)}
-              defaultValue={initialData.vendedor || undefined}
+              defaultValue={vendedorOptions.some((option) => option.value === initialData.vendedor) ? initialData.vendedor : ""}
               options={vendedorOptions}
-              placeholder="Digite o vendedor…"
+              placeholder="Selecione o vendedor"
             />
           </Field>
 

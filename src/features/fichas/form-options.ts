@@ -10,31 +10,33 @@ export type FichaFormOptions = {
 };
 
 const CLIENTE_OPTIONS_LIMIT = 500;
-const VENDEDOR_OPTIONS_LIMIT = 1000;
+const VENDEDOR_OPTIONS_LIMIT = 500;
 
 export async function listFichaFormOptions(): Promise<FichaFormOptions> {
-  const catalogOptions = await listCatalogOptionsForFichaForm();
+  const catalogOptionsPromise = listCatalogOptionsForFichaForm();
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      catalogOptions,
+      catalogOptions: await catalogOptionsPromise,
       clienteOptions: [],
       vendedorOptions: [],
     };
   }
 
   const supabase = createServerSupabaseClient();
-  const [clientesResult, vendedoresResult] = await Promise.all([
+  const [catalogOptions, clientesResult, vendedoresResult] = await Promise.all([
+    catalogOptionsPromise,
     supabase
       .from("clientes")
       .select("nome,email,telefone")
       .order("nome", { ascending: true })
       .limit(CLIENTE_OPTIONS_LIMIT),
     supabase
-      .from("fichas")
-      .select("vendedor")
-      .not("vendedor", "is", null)
-      .order("vendedor", { ascending: true })
+      .from("app_users")
+      .select("id,display_name")
+      .eq("role", "vendedor")
+      .eq("active", true)
+      .order("display_name", { ascending: true })
       .limit(VENDEDOR_OPTIONS_LIMIT),
   ]);
 
@@ -47,31 +49,10 @@ export async function listFichaFormOptions(): Promise<FichaFormOptions> {
         label: cliente.nome,
         value: cliente.nome,
       })),
-    vendedorOptions: buildUniqueVendedorOptions(vendedoresResult.data ?? []),
+    vendedorOptions: (vendedoresResult.data ?? []).map((vendedor) => ({
+      id: vendedor.id,
+      label: vendedor.display_name,
+      value: vendedor.display_name,
+    })),
   };
-}
-
-function buildUniqueVendedorOptions(rows: Array<{ vendedor: string | null }>): CustomDatalistOption[] {
-  const options = new Map<string, string>();
-
-  rows.forEach((row) => {
-    const vendedor = row.vendedor?.trim();
-    if (!vendedor) return;
-
-    const key = vendedor
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase();
-
-    if (!options.has(key)) {
-      options.set(key, vendedor);
-    }
-  });
-
-  return Array.from(options.values())
-    .sort((a, b) => a.localeCompare(b, "pt-BR", { sensitivity: "base" }))
-    .map((vendedor) => ({
-      label: vendedor,
-      value: vendedor,
-    }));
 }

@@ -16,7 +16,7 @@ setup("authenticate", async ({ page }) => {
   await login(page, process.env.E2E_USERNAME ?? "lucas", process.env.E2E_PIN ?? "4700", authFile);
 });
 
-// Conta separada porque `lucas` e operador: /catalogos e /usuarios sao superadmin.
+// Conta separada porque `lucas` e Vendedor: /catalogos e /usuarios sao exclusivos de Admin.
 setup("authenticate superadmin", async ({ page }) => {
   await login(page, process.env.E2E_SUPERADMIN_USERNAME ?? "nhx", process.env.E2E_SUPERADMIN_PIN ?? "756361", superadminFile);
 });

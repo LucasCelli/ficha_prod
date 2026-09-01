@@ -501,3 +501,44 @@ test.describe("combobox", () => {
     await expect(input).toHaveAttribute("aria-expanded", "true");
   });
 });
+
+test.describe("select de vendedor", () => {
+  test("mantem a lista fechada com o visual do datalist", async ({ context, page }) => {
+    await openPage(page, context, "/fichas/nova", "dark");
+
+    const select = page.locator("#vendedor");
+    await expect(select).toHaveAttribute("role", "combobox");
+    await expect(select).toHaveAttribute("aria-haspopup", "listbox");
+    await expect(page.locator('input[type="hidden"][name="vendedor"]')).toHaveValue("");
+
+    await page.locator("#cliente").click();
+    const datalistStyles = await menuStyles(page, ".custom-datalist__menu");
+    await select.click();
+    const selectMenu = page.locator(".custom-select__menu");
+    await expect(selectMenu).toBeVisible();
+    expect(await selectMenu.locator('[role="option"]').count()).toBeGreaterThan(1);
+    await expect(selectMenu.locator('[role="option"]').first()).toHaveAttribute("aria-selected", "true");
+    const selectStyles = await menuStyles(page, ".custom-select__menu");
+
+    expect(selectStyles).toEqual(datalistStyles);
+
+    const firstSeller = selectMenu.locator('[role="option"]').first();
+    const sellerName = await firstSeller.textContent();
+    await firstSeller.click();
+    await expect(page.locator('input[type="hidden"][name="vendedor"]')).toHaveValue(sellerName ?? "");
+    await expect(select).toContainText(sellerName ?? "");
+  });
+});
+
+async function menuStyles(page, selector) {
+  return page.locator(selector).evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      border: style.border,
+      borderRadius: style.borderRadius,
+      maxHeight: style.maxHeight,
+      padding: style.padding,
+    };
+  });
+}

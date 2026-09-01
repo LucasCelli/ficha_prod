@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { AppUserRole } from "@/features/auth/types";
+
 import { getServerErrorMessage } from "@/lib/server/boundaries";
 
 import { addDaysToInput, addMonthsToInput, getBusinessTodayInput } from "@/lib/dates";
@@ -40,7 +42,7 @@ export type PersonalDashboardData = {
   series: { date: string; total: number }[];
   total: number;
   upcoming: PersonalFichaLink[];
-  user: { displayName: string; role: string; username: string };
+  user: { displayName: string; role: AppUserRole; username: string };
 };
 
 export type PersonalDashboardResult =
@@ -83,7 +85,7 @@ export async function getPersonalDashboardData(input: {
   displayName: string;
   page?: number;
   period?: string;
-  role: string;
+  role: AppUserRole;
   status?: string;
   userId: string;
   username: string;

@@ -3,6 +3,7 @@ import { KeyRound, ShieldCheck, UserPlus } from "lucide-react";
 import { Badge, DataTable, EmptyState, Modal } from "@/components/ui";
 import { RouteToast, type RouteToastMessage } from "@/components/ui/route-toast";
 import { formatBusinessDateTime } from "@/lib/dates";
+import { appUserRoleLabels } from "@/features/auth/types";
 import type { UsuariosResult } from "./data";
 import { UsuarioForm } from "./usuario-form";
 
@@ -13,8 +14,9 @@ type UsuariosOverviewProps = {
 };
 
 const columns = [
-  { key: "operator", label: "Operador" },
+  { key: "user", label: "Usuário" },
   { key: "status", label: "Status" },
+  { key: "role", label: "Função" },
   { key: "access", label: "Acesso" },
   { key: "actions", label: "Ações" },
 ];
@@ -25,8 +27,8 @@ function formatDate(value: string | null) {
 }
 
 export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverviewProps) {
-  const selectedOperador = result.operadores.find((operador) => operador.id === editId);
-  const activeCount = result.operadores.filter((operador) => operador.active).length;
+  const selectedUsuario = result.usuarios.find((usuario) => usuario.id === editId);
+  const activeCount = result.usuarios.filter((usuario) => usuario.active).length;
 
   return (
     <section className="usuarios-view" aria-labelledby="usuarios-title">
@@ -34,24 +36,24 @@ export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverview
       <header className="usuarios-view__header">
         <div>
           <h1 id="usuarios-title" className="app-title">
-            Operadores
+            Usuários
           </h1>
         </div>
-        <div className="usuarios-summary" aria-label="Resumo de operadores">
+        <div className="usuarios-summary" aria-label="Resumo de usuários">
           <span>
             <ShieldCheck aria-hidden="true" size={18} />
             {activeCount} ativos
           </span>
           <span>
             <KeyRound aria-hidden="true" size={18} />
-            {result.operadores.length} cadastrados
+            {result.usuarios.length} cadastrados
           </span>
           <Link className="ui-button ui-button--secondary" href="/usuarios/perfis">
             Gestão de autoria
           </Link>
           <Link className="ui-button ui-button--primary" href="/usuarios?modal=novo">
             <UserPlus aria-hidden="true" size={18} />
-            Novo operador
+            Novo usuário
           </Link>
         </div>
       </header>
@@ -60,37 +62,38 @@ export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverview
         <EmptyState
           actions={<Link className="ui-button ui-button--secondary" href="/">Voltar ao início</Link>}
           description="Tente novamente."
-          title="Operadores indisponíveis"
+          title="Usuários indisponíveis"
         />
       ) : null}
 
-      {result.kind === "error" ? <EmptyState description={result.message} title="Não foi possível carregar operadores" /> : null}
+      {result.kind === "error" ? <EmptyState description={result.message} title="Não foi possível carregar usuários" /> : null}
 
       {result.kind === "ok" ? (
         <section className="usuarios-panel" aria-labelledby="usuarios-list-title">
           <div className="usuarios-panel__title usuarios-panel__title--spread">
             <div>
               <ShieldCheck aria-hidden="true" size={18} />
-              <h2 id="usuarios-list-title">Operadores cadastrados</h2>
+              <h2 id="usuarios-list-title">Usuários cadastrados</h2>
             </div>
-            <Badge>{result.operadores.length}</Badge>
+            <Badge>{result.usuarios.length}</Badge>
           </div>
-          {result.operadores.length ? (
-            <DataTable caption="Operadores cadastrados" columns={columns}>
-              {result.operadores.map((operador) => (
-                <tr key={operador.id}>
+          {result.usuarios.length ? (
+            <DataTable caption="Usuários cadastrados" columns={columns}>
+              {result.usuarios.map((usuario) => (
+                <tr key={usuario.id}>
                   <td>
                     <span className="ui-table__primary">
-                      <strong>{operador.display_name}</strong>
-                      <span className="ui-table__muted">{operador.username}</span>
+                      <strong>{usuario.display_name}</strong>
+                      <span className="ui-table__muted">{usuario.username}</span>
                     </span>
                   </td>
                   <td>
-                    <Badge tone={operador.active ? "success" : "neutral"}>{operador.active ? "Ativo" : "Inativo"}</Badge>
+                    <Badge tone={usuario.active ? "success" : "neutral"}>{usuario.active ? "Ativo" : "Inativo"}</Badge>
                   </td>
-                  <td>{formatDate(operador.last_login_at)}</td>
+                  <td><Badge tone={usuario.role === "superadmin" ? "info" : "neutral"}>{appUserRoleLabels[usuario.role]}</Badge></td>
+                  <td>{formatDate(usuario.last_login_at)}</td>
                   <td>
-                    <Link className="ui-button ui-button--secondary" href={`/usuarios?edit=${operador.id}`}>
+                    <Link className="ui-button ui-button--secondary" href={`/usuarios?edit=${usuario.id}`}>
                       Editar
                     </Link>
                   </td>
@@ -98,27 +101,27 @@ export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverview
               ))}
             </DataTable>
           ) : (
-            <EmptyState description="Sem registros." title="Nenhum operador" />
+            <EmptyState description="Sem registros." title="Nenhum usuário" />
           )}
 
           {modalMode === "novo" ? (
-            <Modal onCloseHref="/usuarios" size="md" title="Novo operador">
+            <Modal onCloseHref="/usuarios" size="md" title="Novo usuário">
               <div className="modal-form">
                 <div className="modal-form__header">
-                  <h2>Cadastrar operador</h2>
+                  <h2>Cadastrar usuário</h2>
                 </div>
                 <UsuarioForm returnTo="/usuarios" />
               </div>
             </Modal>
           ) : null}
 
-          {selectedOperador ? (
-            <Modal onCloseHref="/usuarios" size="md" title={`Editar ${selectedOperador.display_name}`}>
+          {selectedUsuario ? (
+            <Modal onCloseHref="/usuarios" size="md" title={`Editar ${selectedUsuario.display_name}`}>
               <div className="modal-form">
                 <div className="modal-form__header">
-                  <h2>Editar operador</h2>
+                  <h2>Editar usuário</h2>
                 </div>
-                <UsuarioForm operador={selectedOperador} returnTo="/usuarios" />
+                <UsuarioForm usuario={selectedUsuario} returnTo="/usuarios" />
               </div>
             </Modal>
           ) : null}
@@ -129,14 +132,14 @@ export function UsuariosOverview({ editId, modalMode, result }: UsuariosOverview
 }
 
 const usuarioToastMessages: Record<string, RouteToastMessage> = {
-  "operador-created": {
-    description: "O operador foi cadastrado.",
-    title: "Operador salvo",
+  "usuario-created": {
+    description: "O usuário foi cadastrado.",
+    title: "Usuário salvo",
     tone: "success",
   },
-  "operador-updated": {
+  "usuario-updated": {
     description: "As alterações foram salvas.",
-    title: "Operador atualizado",
+    title: "Usuário atualizado",
     tone: "success",
   },
 };

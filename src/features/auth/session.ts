@@ -7,6 +7,7 @@ import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { hashSessionToken } from "./crypto";
 import type { AppSession } from "./types";
+import type { AppUserRole } from "./types";
 
 export const APP_SESSION_COOKIE = "ficha_app_session";
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
@@ -16,7 +17,7 @@ type SessionRpcRow = {
   display_name: string;
   expires_at: string;
   last_seen_at: string;
-  role: "operador" | "superadmin";
+  role: AppUserRole;
   user_id: string;
   username: string;
 };

@@ -13,8 +13,8 @@ if (!supabaseUrl || !serviceRoleKey || !username || !pin) {
   process.exit(1);
 }
 
-if (!["superadmin", "operador"].includes(role)) {
-  console.error("AUTH_SEED_ROLE deve ser superadmin ou operador.");
+if (!["superadmin", "vendedor", "designer"].includes(role)) {
+  console.error("AUTH_SEED_ROLE deve ser superadmin, vendedor ou designer.");
   process.exit(1);
 }
 

@@ -6,24 +6,25 @@ import { useFormStatus } from "react-dom";
 import { Eye, EyeOff, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui";
-import { saveOperadorAction } from "./actions";
+import { appUserRoleLabels, appUserRoles } from "@/features/auth/types";
+import { saveUsuarioAction } from "./actions";
 import { getInitialUsuarioFormState } from "./form-state";
-import type { Operador } from "./types";
+import type { Usuario } from "./types";
 
 type UsuarioFormProps = {
-  operador?: Operador;
+  usuario?: Usuario;
   returnTo?: string;
 };
 
-export function UsuarioForm({ operador, returnTo }: UsuarioFormProps) {
-  const [state, formAction] = useActionState(saveOperadorAction, getInitialUsuarioFormState());
+export function UsuarioForm({ usuario, returnTo }: UsuarioFormProps) {
+  const [state, formAction] = useActionState(saveUsuarioAction, getInitialUsuarioFormState());
   const [showPin, setShowPin] = useState(false);
   const lastToastRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!state.message || lastToastRef.current === state.message) return;
 
-    const title = state.status === "success" ? "Operador salvo" : "Pendência no operador";
+    const title = state.status === "success" ? "Usuário salvo" : "Pendência no usuário";
     const description = state.message === title ? undefined : state.message;
     const toastFn = state.status === "success" ? toast.success : toast.error;
     toastFn(title, { description });
@@ -40,7 +41,7 @@ export function UsuarioForm({ operador, returnTo }: UsuarioFormProps) {
 
   return (
     <form action={formAction} className="usuario-form">
-      {operador ? <input name="id" type="hidden" value={operador.id} /> : null}
+      {usuario ? <input name="id" type="hidden" value={usuario.id} /> : null}
       {returnTo ? <input name="returnTo" type="hidden" value={returnTo} /> : null}
 
       <div className="usuario-form__grid">
@@ -49,7 +50,7 @@ export function UsuarioForm({ operador, returnTo }: UsuarioFormProps) {
           <input
             aria-invalid={Boolean(state.fieldErrors?.displayName)}
             autoComplete="name"
-            defaultValue={operador?.display_name}
+            defaultValue={usuario?.display_name}
             id="operator-display-name"
             name="displayName"
             placeholder="Nome da pessoa"
@@ -62,7 +63,7 @@ export function UsuarioForm({ operador, returnTo }: UsuarioFormProps) {
           <input
             aria-invalid={Boolean(state.fieldErrors?.username)}
             autoComplete="username"
-            defaultValue={operador?.username}
+            defaultValue={usuario?.username}
             id="operator-username"
             name="username"
             placeholder="usuario"
@@ -71,7 +72,22 @@ export function UsuarioForm({ operador, returnTo }: UsuarioFormProps) {
         </div>
 
         <div className="field">
-          <label htmlFor="operator-pin">{operador ? "Novo PIN" : "PIN inicial"}</label>
+          <label htmlFor="operator-role">Função</label>
+          <select
+            aria-invalid={Boolean(state.fieldErrors?.role)}
+            defaultValue={usuario?.role ?? "vendedor"}
+            id="operator-role"
+            name="role"
+          >
+            {appUserRoles.map((role) => (
+              <option key={role} value={role}>{appUserRoleLabels[role]}</option>
+            ))}
+          </select>
+          {state.fieldErrors?.role ? <small className="field-error">{state.fieldErrors.role}</small> : null}
+        </div>
+
+        <div className="field">
+          <label htmlFor="operator-pin">{usuario ? "Novo PIN" : "PIN inicial"}</label>
           <div className="pin-input">
             <input
               aria-describedby="operator-pin-hint"
@@ -82,7 +98,7 @@ export function UsuarioForm({ operador, returnTo }: UsuarioFormProps) {
               name="pin"
               onInput={handlePinInput}
               pattern="[0-9]*"
-              placeholder={operador ? "Manter atual" : "Mínimo 4 dígitos"}
+              placeholder={usuario ? "Manter atual" : "Mínimo 4 dígitos"}
               type={showPin ? "text" : "password"}
             />
             <button
@@ -96,17 +112,18 @@ export function UsuarioForm({ operador, returnTo }: UsuarioFormProps) {
           </div>
           {state.fieldErrors?.pin ? <small className="field-error">{state.fieldErrors.pin}</small> : null}
           <small className="field-hint" id="operator-pin-hint">
-            {operador ? "Preencha somente para trocar o PIN." : "O PIN não fica visível depois de salvo."}
+            {usuario ? "Preencha somente para trocar o PIN." : "O PIN não fica visível depois de salvo."}
           </small>
         </div>
         <label className="checkbox-field usuario-form__status">
-          <input defaultChecked={operador?.active ?? true} name="active" type="checkbox" />
-          <span>Operador ativo</span>
+          <input aria-describedby={state.fieldErrors?.active ? "usuario-active-error" : undefined} defaultChecked={usuario?.active ?? true} name="active" type="checkbox" />
+          <span>Usuário ativo</span>
+          {state.fieldErrors?.active ? <small className="field-error" id="usuario-active-error">{state.fieldErrors.active}</small> : null}
         </label>
       </div>
 
       <div className="usuario-form__actions">
-        <SubmitButton isEdit={Boolean(operador)} />
+        <SubmitButton isEdit={Boolean(usuario)} />
       </div>
     </form>
   );
@@ -114,8 +131,8 @@ export function UsuarioForm({ operador, returnTo }: UsuarioFormProps) {
 
 function SubmitButton({ isEdit }: { isEdit: boolean }) {
   const { pending } = useFormStatus();
-  const idleLabel = isEdit ? "Salvar alterações" : "Cadastrar operador";
-  const pendingLabel = isEdit ? "Salvando alterações..." : "Cadastrando operador...";
+  const idleLabel = isEdit ? "Salvar alterações" : "Cadastrar usuário";
+  const pendingLabel = isEdit ? "Salvando alterações..." : "Cadastrando usuário...";
 
   return (
     <Button aria-disabled={pending} disabled={pending} type="submit">

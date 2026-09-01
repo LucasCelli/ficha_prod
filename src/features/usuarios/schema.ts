@@ -1,11 +1,13 @@
 import { z } from "zod";
+import { appUserRoles } from "@/features/auth/types";
 
-export const operadorSchema = z
+export const usuarioSchema = z
   .object({
     active: z.coerce.boolean().default(false),
     displayName: z.string().trim().min(2, "Informe o nome exibido.").max(120, "Nome muito longo."),
     id: z.string().trim().uuid("Usuário inválido.").optional(),
     pin: z.string().trim().regex(/^\d+$/, "Use apenas números no PIN.").max(12, "PIN muito longo.").optional(),
+    role: z.enum(appUserRoles, { required_error: "Selecione a função." }),
     username: z
       .string()
       .trim()
@@ -31,4 +33,4 @@ export const operadorSchema = z
     }
   });
 
-export type OperadorValues = z.infer<typeof operadorSchema>;
+export type UsuarioValues = z.infer<typeof usuarioSchema>;

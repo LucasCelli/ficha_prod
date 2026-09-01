@@ -55,7 +55,7 @@ export function AppShell({ children, session, title }: AppShellProps) {
             }
           </IconButton>
         </div>
-        <AppNavigation role={session?.user.role ?? "operador"} collapsed={collapsed} />
+        <AppNavigation role={session?.user.role ?? "vendedor"} collapsed={collapsed} />
         <div className="app-sidebar__footer">
           {session && !collapsed ? (
             <div className="app-user" aria-label="Usuário atual">

@@ -5,10 +5,11 @@ import { getActionError, requireSuperadminAction } from "@/lib/server/boundaries
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createPinHash } from "@/features/auth/crypto";
+import type { AppUserRole } from "@/features/auth/types";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { UsuarioFieldErrors, UsuarioFormState } from "./form-state";
-import { operadorSchema, type OperadorValues } from "./schema";
+import { usuarioSchema, type UsuarioValues } from "./schema";
 
 function getUsuarioInput(formData: FormData) {
   const id = String(formData.get("id") ?? "").trim();
@@ -19,6 +20,7 @@ function getUsuarioInput(formData: FormData) {
     displayName: formData.get("displayName"),
     id: id || undefined,
     pin: pin || undefined,
+    role: formData.get("role"),
     username: formData.get("username"),
   };
 }
@@ -26,7 +28,7 @@ function getUsuarioInput(formData: FormData) {
 function getValidationState(fieldErrors: UsuarioFieldErrors): UsuarioFormState {
   return {
     fieldErrors,
-    message: "Revise os campos destacados antes de salvar o operador.",
+    message: "Revise os campos destacados antes de salvar o usuário.",
     status: "error",
   };
 }
@@ -54,24 +56,24 @@ function withToastParam(path: string, value: string) {
   return nextQuery ? `${pathname}?${nextQuery}` : pathname;
 }
 
-function getOperadorBasePayload(values: OperadorValues) {
+function getUsuarioBasePayload(values: UsuarioValues) {
   return {
     active: values.active,
     display_name: values.displayName,
-    role: "operador" as const,
+    role: values.role,
     username: values.username,
   };
 }
 
-function getOperadorUpdatePayload(values: OperadorValues) {
+function getUsuarioUpdatePayload(values: UsuarioValues) {
   const payload: {
     active: boolean;
     display_name: string;
     pin_hash?: string;
     pin_salt?: string;
-    role: "operador";
+    role: AppUserRole;
     username: string;
-  } = getOperadorBasePayload(values);
+  } = getUsuarioBasePayload(values);
 
   if (values.pin) {
     const pin = createPinHash(values.pin);
@@ -82,44 +84,53 @@ function getOperadorUpdatePayload(values: OperadorValues) {
   return payload;
 }
 
-function getOperadorInsertPayload(values: OperadorValues) {
+function getUsuarioInsertPayload(values: UsuarioValues) {
   const pin = createPinHash(values.pin ?? "");
 
   return {
-    ...getOperadorBasePayload(values),
+    ...getUsuarioBasePayload(values),
     pin_hash: pin.hash,
     pin_salt: pin.salt,
   };
 }
 
-export async function saveOperadorAction(_previousState: UsuarioFormState, formData: FormData): Promise<UsuarioFormState> {
-  await requireSuperadminAction();
+export async function saveUsuarioAction(_previousState: UsuarioFormState, formData: FormData): Promise<UsuarioFormState> {
+  const session = await requireSuperadminAction();
 
-  const parsed = operadorSchema.safeParse(getUsuarioInput(formData));
+  const parsed = usuarioSchema.safeParse(getUsuarioInput(formData));
   if (!parsed.success) {
     return getValidationState(getParsedErrors(parsed.error.issues));
   }
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
     return {
-      message: "Operadores indisponíveis.",
+      message: "Usuários indisponíveis.",
       status: "error",
     };
   }
 
   const supabase = createServerSupabaseClient();
   const id = parsed.data.id;
+
+  if (id === session.user.id && (!parsed.data.active || parsed.data.role !== "superadmin")) {
+    return {
+      fieldErrors: !parsed.data.active ? { active: "Seu próprio acesso precisa permanecer ativo." } : { role: "Seu próprio acesso precisa permanecer como Admin." },
+      message: "Não é possível remover o seu próprio acesso administrativo.",
+      status: "error",
+    };
+  }
+
   const result = id
-    ? await supabase.from("app_users").update(getOperadorUpdatePayload(parsed.data)).eq("id", id).eq("role", "operador")
-    : await supabase.from("app_users").insert(getOperadorInsertPayload(parsed.data));
+    ? await supabase.from("app_users").update(getUsuarioUpdatePayload(parsed.data)).eq("id", id)
+    : await supabase.from("app_users").insert(getUsuarioInsertPayload(parsed.data));
 
   if (result.error) {
     const isDuplicate = result.error.code === "23505";
     return {
       fieldErrors: isDuplicate ? { username: "Este usuário já existe." } : undefined,
       message: isDuplicate
-        ? "Escolha outro usuário para o operador."
-        : getActionError("usuarios.save", result.error, "Não foi possível salvar o operador.").message,
+        ? "Escolha outro nome de usuário."
+        : getActionError("usuarios.save", result.error, "Não foi possível salvar o usuário.").message,
       status: "error",
     };
   }
@@ -127,7 +138,7 @@ export async function saveOperadorAction(_previousState: UsuarioFormState, formD
   if (id && (!parsed.data.active || parsed.data.pin)) {
     const { error: revokeError } = await supabase.from("app_sessions").delete().eq("user_id", id);
     if (revokeError) {
-      return getActionError("usuarios.revoke-sessions", revokeError, "O operador foi salvo, mas as sessões não foram revogadas.");
+      return getActionError("usuarios.revoke-sessions", revokeError, "O usuário foi salvo, mas as sessões não foram revogadas.");
     }
   }
 
@@ -135,11 +146,11 @@ export async function saveOperadorAction(_previousState: UsuarioFormState, formD
 
   const returnTo = getReturnTo(formData);
   if (returnTo) {
-    redirect(withToastParam(returnTo, id ? "operador-updated" : "operador-created"));
+    redirect(withToastParam(returnTo, id ? "usuario-updated" : "usuario-created"));
   }
 
   return {
-    message: id ? "Operador atualizado." : "Operador cadastrado.",
+    message: id ? "Usuário atualizado." : "Usuário cadastrado.",
     status: "success",
   };
 }

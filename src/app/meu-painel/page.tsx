@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CalendarClock, CheckCircle2, Clock3, FilePlus2, FileText, Package } from "lucide-react";
 import { Badge, DataTable, EmptyState } from "@/components/ui";
 import { requireAppSession } from "@/features/auth/session";
+import { appUserRoleLabels } from "@/features/auth/types";
 import { FichaRowActions } from "@/features/fichas/ficha-row-actions";
 import { FichaRowThumbnail } from "@/features/fichas/ficha-row-thumbnail";
 import { getPersonalDashboardData } from "@/features/meu-painel/data";
@@ -43,7 +44,7 @@ export default async function MeuPainelPage({ searchParams }: { searchParams: Pr
         <p className="eyebrow">Meu perfil</p><h1 id="personal-title">{data.user.displayName}</h1>
         <div className={styles.userMeta}>
           <Badge tone="neutral">@{data.user.username}</Badge>
-          <Badge tone="info">{data.user.role === "superadmin" ? "Superadministrador" : "Operador"}</Badge>
+          <Badge tone="info">{appUserRoleLabels[data.user.role]}</Badge>
           <small>Último acesso: {data.lastLoginAt ? formatBusinessDateTime(new Date(data.lastLoginAt)) : "primeiro acesso"}</small>
         </div>
       </div></div>
