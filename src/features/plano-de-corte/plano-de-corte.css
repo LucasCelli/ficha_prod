@@ -981,7 +981,7 @@
 .cut-plan-print-simple {
   width: 794px;
   background: #fff;
-  color: #172033;
+  color: #000;
   font-family: Arial, sans-serif;
   font-size: 12px;
 }
@@ -1002,14 +1002,14 @@
 
 .cut-plan-print-simple__header h1 {
   margin: 0 0 2px;
-  color: #172033;
+  color: #000;
   font-size: 30px;
 }
 
 .cut-plan-print-simple__header p {
   margin: 0;
-  color: #526276;
-  font-size: 12px;
+  color: #000;
+  font-size: 12pt;
 }
 
 .cut-plan-print-simple__sources {
@@ -1018,7 +1018,7 @@
 
 .cut-plan-print-simple__sources h2 {
   margin: 0 0 7px;
-  color: #40516a;
+  color: #000;
   font-size: 10px;
   text-transform: uppercase;
 }
@@ -1032,7 +1032,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  border: 1px solid #d8dee8;
+  border: 2px solid #1f2937;
   border-radius: 5px;
   background: #f5f7fa;
   padding: 6px;
@@ -1062,7 +1062,7 @@
 }
 
 .cut-plan-print-simple__sources small {
-  color: #526276;
+  color: #000;
   font-size: 10px;
   font-weight: 600;
 }
@@ -1078,18 +1078,18 @@
 
 .cut-plan-print-simple__fabric-header h2 {
   margin: 0;
-  color: #172033;
+  color: #000;
   font-size: 19px;
 }
 
 .cut-plan-print-simple__fabric-header p {
   margin: 2px 0 0;
-  color: #66758a;
+  color: #000;
   font-size: 11px;
 }
 
 .cut-plan-print-simple__fabric-header>strong {
-  color: #526276;
+  color: #000;
   font-size: 11px;
 }
 
@@ -1105,7 +1105,7 @@
   max-width: calc(50% - 5px);
   min-width: 0;
   overflow: hidden;
-  border: 1px solid #d8dee8;
+  border: 2px solid #1f2937;
   border-radius: 6px;
   break-inside: avoid;
 }
@@ -1133,8 +1133,8 @@
 
 .cut-plan-print-simple__lay header p {
   margin: 0;
-  color: #172033;
-  font-size: 10px;
+  color: #000;
+  font-size: 12pt;
   line-height: 1.4;
 }
 
@@ -1154,18 +1154,18 @@
 
 .cut-plan-print-simple__badge span {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   place-items: center;
   border-radius: 50%;
   background: #dbe7fb;
   color: #204f91;
-  font-size: 13px;
+  font-size: 16pt;
   font-weight: 800;
 }
 
 .cut-plan-print-simple__badge small {
-  color: #66758a;
+  color: #000;
   font-size: 7px;
   font-weight: 700;
   text-transform: uppercase;
@@ -1178,7 +1178,7 @@
 
 .cut-plan-print-simple__conference h3 {
   margin: 0 0 8px;
-  color: #40516a;
+  color: #000;
   font-size: 12px;
   text-transform: uppercase;
 }
@@ -1197,20 +1197,20 @@
 .cut-plan-print-simple table {
   width: 100%;
   border-collapse: collapse;
-  border-block: 1px solid #cbd3df;
-  font-size: 11px;
+  border-block: 2px solid #1f2937;
+  font-size: 12pt;
 }
 
 .cut-plan-print-simple th {
   background: #eef2f7;
-  color: #40516a;
+  color: #000;
   font-size: 10px;
   text-transform: uppercase;
 }
 
 .cut-plan-print-simple th,
 .cut-plan-print-simple td {
-  border-bottom: 1px solid #dce2ea;
+  border-bottom: 1px solid #334155;
   padding: 6px 8px;
   text-align: left;
   vertical-align: middle;
@@ -1218,7 +1218,7 @@
 
 .cut-plan-print-simple tfoot th,
 .cut-plan-print-simple tfoot td {
-  border-top: 2px solid #9eabbc;
+  border-top: 2px solid #1f2937;
   background: #eef2f7;
   font-weight: 700;
 }
@@ -1228,7 +1228,7 @@
 
 .cut-plan-print-simple__lay table {
   border-block: 0;
-  font-size: 10px;
+  font-size: 12pt;
 }
 
 .cut-plan-print-simple__lay th,
@@ -1256,7 +1256,7 @@
   .cut-plan-native-print-root .cut-plan-print-simple {
     width: 100%;
     background: #fff;
-    color: #172033;
+    color: #000;
   }
 
   .cut-plan-native-print-root .cut-plan-print-simple__page {
