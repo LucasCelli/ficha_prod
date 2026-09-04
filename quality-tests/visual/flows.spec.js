@@ -406,8 +406,9 @@ test.describe("plano de corte: tamanhos e mangas", () => {
     await expect(printRoot).not.toContainText("Máx. por enfesto");
     await expect(printRoot).not.toContainText("Confira cada grade no Audaces antes de liberar o corte.");
     await expect(printRoot).not.toContainText("Total de folhas");
-    await expect(printRoot).not.toContainText("Peças cortadas");
     await expect(printRoot).not.toContainText("Grades para conferir e montar no Audaces");
+    await expect(printRoot.locator(".cut-plan-print-simple__lay").first()).toContainText("Peças cortadas");
+    await expect(printRoot.locator(".cut-plan-print-simple__conference h3")).toHaveText("Conferência final");
     await expect(printRoot.locator(".cut-plan-print-simple__check tfoot").first()).toContainText("Totais");
   });
 });

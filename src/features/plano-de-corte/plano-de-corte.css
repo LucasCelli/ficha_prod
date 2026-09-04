@@ -1013,7 +1013,7 @@
 }
 
 .cut-plan-print-simple__sources {
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .cut-plan-print-simple__sources h2 {
@@ -1067,52 +1067,131 @@
   font-weight: 600;
 }
 
-.cut-plan-print-simple__fabric {
-  margin-top: 16px;
+.cut-plan-print-simple__fabric-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: 22px;
+  margin-bottom: 10px;
   break-inside: avoid;
 }
 
+.cut-plan-print-simple__fabric-header h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 19px;
+}
+
+.cut-plan-print-simple__fabric-header p {
+  margin: 2px 0 0;
+  color: #66758a;
+  font-size: 11px;
+}
+
+.cut-plan-print-simple__fabric-header>strong {
+  color: #526276;
+  font-size: 11px;
+}
+
+/* Cada enfesto vira um cartao compacto; duas colunas por linha, como na tela. */
+.cut-plan-print-simple__lay-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.cut-plan-print-simple__lay {
+  flex: 0 0 calc(50% - 5px);
+  max-width: calc(50% - 5px);
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+  break-inside: avoid;
+}
+
+/* Unica tabela do plano inteiro: pode ocupar a folha toda. */
+.cut-plan-print-simple__lay-row.is-solo .cut-plan-print-simple__lay {
+  flex-basis: 100%;
+  max-width: 100%;
+}
+
+.cut-plan-print-simple__lay>header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  background: #f5f7fa;
+  padding: 8px 10px;
+}
+
+.cut-plan-print-simple__lay h3 {
+  margin: 0 0 3px;
+  color: #204f91;
+  font-size: 13px;
+}
+
+.cut-plan-print-simple__lay header p {
+  margin: 0;
+  color: #172033;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.cut-plan-print-simple__length {
+  margin-top: 3px !important;
+  color: #204f91 !important;
+  font-size: 9px !important;
+  font-weight: 600;
+}
+
+.cut-plan-print-simple__badge {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: center;
+  gap: 2px;
+}
+
+.cut-plan-print-simple__badge span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: #dbe7fb;
+  color: #204f91;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.cut-plan-print-simple__badge small {
+  color: #66758a;
+  font-size: 7px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .cut-plan-print-simple__conference {
-  margin-top: 16px;
+  margin-top: 26px;
   break-inside: avoid;
 }
 
 .cut-plan-print-simple__conference h3 {
   margin: 0 0 8px;
   color: #40516a;
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
 }
 
-.cut-plan-print-simple__fabric>header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 8px;
+.cut-plan-print-simple table.cut-plan-print-simple__check {
+  width: auto;
+  min-width: 60%;
 }
 
-.cut-plan-print-simple__fabric h2 {
-  margin: 0;
-  color: #172033;
-  font-size: 19px;
-}
-
-.cut-plan-print-simple__fabric header p {
-  margin: 2px 0 0;
-  color: #66758a;
-  font-size: 11px;
-}
-
-.cut-plan-print-simple__fabric header>strong {
-  color: #526276;
-  font-size: 11px;
-}
-
-.cut-plan-print-simple__fabric h3 {
-  margin: 16px 0 8px;
-  color: #40516a;
-  font-size: 11px;
-  text-transform: uppercase;
+/* Quebra de pagina forcada: mantem no maximo 4 tabelas pequenas por folha. */
+.cut-plan-print-simple__break {
+  break-before: page;
+  page-break-before: always;
 }
 
 .cut-plan-print-simple table {
@@ -1120,11 +1199,6 @@
   border-collapse: collapse;
   border-block: 1px solid #cbd3df;
   font-size: 11px;
-}
-
-.cut-plan-print-simple table.cut-plan-print-simple__check {
-  width: auto;
-  min-width: 52%;
 }
 
 .cut-plan-print-simple th {
@@ -1142,10 +1216,6 @@
   vertical-align: middle;
 }
 
-.cut-plan-print-simple__check th,
-.cut-plan-print-simple__check td {
-  padding-block: 4px;
-}
 .cut-plan-print-simple tfoot th,
 .cut-plan-print-simple tfoot td {
   border-top: 2px solid #9eabbc;
@@ -1156,11 +1226,14 @@
   border-bottom: 0;
 }
 
-.cut-plan-print-simple__layers {
-  color: #204f91;
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1.2;
+.cut-plan-print-simple__lay table {
+  border-block: 0;
+  font-size: 10px;
+}
+
+.cut-plan-print-simple__lay th,
+.cut-plan-print-simple__lay td {
+  padding: 4px 8px;
 }
 
 @media print {
@@ -1195,10 +1268,6 @@
   .cut-plan-native-print-root>.cut-plan-print-simple:not(:last-child) {
     break-after: page;
     page-break-after: always;
-  }
-
-  .cut-plan-native-print-root .cut-plan-print-simple__fabric {
-    break-inside: avoid;
   }
 
   .cut-plan-native-print-root .cut-plan-print-simple__header,
