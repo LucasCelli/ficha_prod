@@ -1009,7 +1009,7 @@
 .cut-plan-print-simple__header p {
   margin: 0;
   color: #000;
-  font-size: 12pt;
+  font-size: 10pt;
 }
 
 .cut-plan-print-simple__sources {
@@ -1134,7 +1134,7 @@
 .cut-plan-print-simple__lay header p {
   margin: 0;
   color: #000;
-  font-size: 12pt;
+  font-size: 10pt;
   line-height: 1.4;
 }
 
@@ -1198,7 +1198,7 @@
   width: 100%;
   border-collapse: collapse;
   border-block: 2px solid #1f2937;
-  font-size: 12pt;
+  font-size: 10pt;
 }
 
 .cut-plan-print-simple th {
@@ -1228,7 +1228,7 @@
 
 .cut-plan-print-simple__lay table {
   border-block: 0;
-  font-size: 12pt;
+  font-size: 10pt;
 }
 
 .cut-plan-print-simple__lay th,
