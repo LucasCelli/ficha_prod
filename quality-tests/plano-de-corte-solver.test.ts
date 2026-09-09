@@ -4,7 +4,7 @@ import { performance } from "node:perf_hooks";
 import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, calculateShirtAreaCm2, ESTIMATED_NESTING_EFFICIENCY, estimateMarkerLengthCm, formatEstimatedLengthMeters, getDefaultMaximumFrequency, getLayerLimit, getMaximumEstimatedFrequency, normalizeCutPlanSizeKey } from "../src/features/plano-de-corte/dimensions.ts";
 import { cutPlanDemandKey, type CutPlanSizeProfile, type FabricType } from "../src/features/plano-de-corte/model.ts";
 import { solveMinimumLays } from "../src/features/plano-de-corte/solver.ts";
-import { calculateCutPlan, formatCutPlanSizeLabel, formatMarkerLabel, formatOperationalMarkerLabel } from "../src/features/plano-de-corte/calculator.ts";
+import { calculateCutPlan, formatCutPlanItemType, formatCutPlanSizeLabel, formatMarkerLabel, formatOperationalMarkerLabel } from "../src/features/plano-de-corte/calculator.ts";
 import { calculateCutPlanAlternatives } from "../src/features/plano-de-corte/alternatives.ts";
 import { validateCutPlan } from "../src/features/plano-de-corte/validation.ts";
 import { moveCutPlanItem } from "../src/features/plano-de-corte/item-order.ts";
@@ -53,6 +53,13 @@ test("formato operacional separa frequência de tamanhos numéricos", () => {
     { size: "14", sleeveType: "CURTA", frequency: 2 },
     { size: "EEGG (58)", sleeveType: "CURTA", frequency: 2 },
   ], false), "(2-14) (2-EEGG (58))");
+});
+
+test("apresenta o tipo da peca em vez de manga curta para itens inferiores", () => {
+  assert.equal(formatCutPlanItemType("CALÇA G", "CURTA"), "Calça");
+  assert.equal(formatCutPlanItemType("SHORT M", "CURTA"), "Short");
+  assert.equal(formatCutPlanItemType("G", "CURTA"), "Curta");
+  assert.equal(formatCutPlanItemType("G", "LONGA"), "Longa");
 });
 
 test("abrevia Baby Look como BL na apresentação", () => {
@@ -201,6 +208,16 @@ test("caso tubular real fecha em dois enfestos com frequencias pares", () => {
   const solution = solveMinimumLays(quantities, 30, "TUBULAR", 4, unconstrained)[0];
   assert.equal(solution?.lays.length, 2);
   assert.ok(solution.lays.every((lay) => lay.frequencies.every(({ frequency }) => frequency % 2 === 0)));
+});
+
+test("calca usa molde especifico de 120 por 44 cm e limita a frequencia na mesa", () => {
+  const index = buildSizeProfileIndex([]);
+  const lengthAt12 = estimateMarkerLengthCm([{ size: "CALÇA M", sleeveType: "CURTA", frequency: 12 }], "TUBULAR", 100, index)!;
+  const lengthAt14 = estimateMarkerLengthCm([{ size: "CALÇA M", sleeveType: "CURTA", frequency: 14 }], "TUBULAR", 100, index)!;
+
+  assert.ok(lengthAt12 < 800);
+  assert.ok(lengthAt14 > 800);
+  assert.equal(getMaximumEstimatedFrequency("CALÇA M", "CURTA", "TUBULAR", 100, 800, [], 14), 12);
 });
 
 test("prefere um unico enfesto tubular com frequencia 8 quando fecha em mais folhas", () => {

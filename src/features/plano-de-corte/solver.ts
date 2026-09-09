@@ -1,5 +1,5 @@
 import { compareUniformSizes } from "../../lib/uniform-sizes.ts";
-import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, normalizeCutPlanSizeKey } from "./dimensions.ts";
+import { buildSizeProfileIndex, calculateEntryLengthPerFrequencyCm } from "./dimensions.ts";
 import { parseCutPlanDemandKey, type CutPlanSizeProfile, type FabricType, type MarkerFrequency, type SleeveType } from "./model.ts";
 
 export type SolvedLay = { layers: number; frequencies: MarkerFrequency[]; markerLengthCm?: number };
@@ -154,10 +154,13 @@ function solveLayerSet(
 ) {
   const profileIndex = buildSizeProfileIndex(constraints.sizeProfiles);
   const prepared = entries.map((entry) => {
-    const profile = profileIndex.get(normalizeCutPlanSizeKey(entry.size));
-    const lengthPerFrequency = profile
-      ? calculateMarkerAreaLengthCm(profile, entry.sleeveType, type, constraints.fabricWidthCm, 1)
-      : 0;
+    const lengthPerFrequency = calculateEntryLengthPerFrequencyCm(
+      entry.size,
+      entry.sleeveType,
+      type,
+      constraints.fabricWidthCm,
+      profileIndex,
+    ) ?? 0;
     return {
       entry,
       options: getSizeAssignments(entry, layers, type, lengthPerFrequency, constraints.tableLengthCm, constraints.maxFrequency ?? 8, cache),

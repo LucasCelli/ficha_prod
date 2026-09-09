@@ -3,6 +3,8 @@ import type { CutPlanSizeProfile, FabricType, MarkerFrequency, SleeveType } from
 
 /** Margem conservadora para perdas do encaixe aproximado. */
 export const ESTIMATED_NESTING_EFFICIENCY = 0.82;
+export const PANTS_ESTIMATED_HEIGHT_CM = 120;
+export const PANTS_ESTIMATED_WIDTH_CM = 44;
 const estimatedLengthFormatter = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 export function formatEstimatedLengthMeters(lengthCm: number) {
@@ -69,6 +71,27 @@ export function calculateMarkerAreaLengthCm(
   return areaLengthCm;
 }
 
+function isPantsSize(size: string) {
+  const normalized = size.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+  return /^CALCA(?:\s|$)/.test(normalized);
+}
+
+/** Comprimento ocupado por uma unidade da grade. Calcas usam molde proprio. */
+export function calculateEntryLengthPerFrequencyCm(
+  size: string,
+  sleeveType: SleeveType,
+  type: FabricType,
+  fabricWidthCm: number,
+  profileIndex: Map<string, CutPlanSizeProfile>,
+) {
+  if (isPantsSize(size)) {
+    return (PANTS_ESTIMATED_HEIGHT_CM * PANTS_ESTIMATED_WIDTH_CM)
+      / (fabricWidthCm * ESTIMATED_NESTING_EFFICIENCY);
+  }
+  const profile = profileIndex.get(normalizeCutPlanSizeKey(size));
+  return profile ? calculateMarkerAreaLengthCm(profile, sleeveType, type, fabricWidthCm, 1) : null;
+}
+
 export function estimateMarkerLengthCm(
   frequencies: MarkerFrequency[],
   type: FabricType,
@@ -79,9 +102,9 @@ export function estimateMarkerLengthCm(
   let areaLengthCm = 0;
   let matchedEntries = 0;
   for (const { size, sleeveType, frequency } of frequencies) {
-    const profile = profileIndex.get(normalizeCutPlanSizeKey(size));
-    if (!profile) continue;
-    areaLengthCm += calculateMarkerAreaLengthCm(profile, sleeveType, type, fabricWidthCm, frequency);
+    const lengthPerFrequency = calculateEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex);
+    if (lengthPerFrequency === null) continue;
+    areaLengthCm += lengthPerFrequency * frequency;
     matchedEntries += 1;
   }
   if (!matchedEntries) return null;

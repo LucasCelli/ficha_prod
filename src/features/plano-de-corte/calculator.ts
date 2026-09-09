@@ -214,6 +214,12 @@ export function formatCutPlanSizeLabel(size: string) {
     .replace(/\bMASC(?:ULINA|ULINO)?\s+/i, "MASC. ");
 }
 
+export function formatCutPlanItemType(size: string, sleeveType: MarkerFrequency["sleeveType"]) {
+  const garment = size.trim().match(/^(SHORT|BERMUDA|CALÇA|SAIA|MACACÃO)(?:\s|$)/i)?.[1];
+  if (garment) return garment.charAt(0).toUpperCase() + garment.slice(1).toLocaleLowerCase("pt-BR");
+  return sleeveType === "LONGA" ? "Longa" : "Curta";
+}
+
 export function sortMarkerFrequenciesForDisplay(frequencies: MarkerFrequency[]) {
   return [...frequencies].sort((first, second) => {
     const modelOrder = Number(isUniformBabyLookText(first.size)) - Number(isUniformBabyLookText(second.size));
