@@ -441,6 +441,33 @@ test("orcamento combinatorio cai no fallback sem perder producao exata", () => {
   assert.ok(result.fabrics[0].lays.every((lay) => lay.layers <= 50 && lay.frequencies.every(({ frequency }) => frequency % 2 === 0)));
 });
 
+test("fallback agrupa subconjuntos compativeis quando mangas e quantidades sao mistas", () => {
+  const input = createInput("TUBULAR", 50);
+  input.maxFrequency = 14;
+  input.items = [
+    ["P", "CURTA", 5], ["P", "LONGA", 5],
+    ["M", "CURTA", 24], ["M", "LONGA", 13],
+    ["G", "CURTA", 14], ["G", "LONGA", 10],
+    ["GG", "CURTA", 19], ["GG", "LONGA", 12],
+    ["EGG", "CURTA", 5], ["EGG", "LONGA", 2],
+    ["EEGG (58)", "CURTA", 5], ["EEGG (58)", "LONGA", 5],
+    ["EGG (56)", "CURTA", 1], ["XG (52)", "CURTA", 1],
+  ].map(([size, sleeveType, quantity], index) => ({
+    id: `mixed-${index}`,
+    fabricId: "fabric",
+    size: String(size),
+    sleeveType: sleeveType as "CURTA" | "LONGA",
+    quantity: Number(quantity),
+  }));
+
+  const result = calculateCutPlan(input).fabrics[0];
+
+  assert.equal(result.lays.length, 3);
+  assert.ok(result.lays.some((lay) => lay.frequencies.length > 1));
+  assert.ok(result.lays.some((lay) => new Set(lay.frequencies.map(({ sleeveType }) => sleeveType)).size === 2));
+  assert.ok(result.sizes.every(({ requested, produced }) => produced === requested || produced === requested + 1));
+});
+
 function bruteMinimumLayCount(quantities: number[], maxLayers: number, type: FabricType, maxCount: number) {
   const options = type === "TUBULAR" ? [0, 2, 4, 6, 8] : [0, 1, 2, 3, 4, 5, 6, 7, 8];
   for (let count = 1; count <= maxCount; count += 1) {

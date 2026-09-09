@@ -45,20 +45,46 @@ function findJointCandidate(
   const tubular = fabric.type === "TUBULAR";
   const maxFrequency = input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type);
   const profileIndex = buildSizeProfileIndex(input.sizeProfiles);
-  const entries = [...remaining.entries()].filter(([, quantity]) => quantity > 0).slice(0, MAX_SIZES_PER_MARKER);
+  const entries = [...remaining.entries()].filter(([, quantity]) => quantity > 0);
   if (entries.length < 2) return null;
 
-  for (let layers = Math.min(maxLayers, ...entries.map(([, quantity]) => quantity)); layers >= 1; layers -= 1) {
-    const frequencies = entries.map(([key, quantity]) => ({ ...parseCutPlanDemandKey(key), frequency: quantity / layers }));
-    if (frequencies.every(({ frequency }) => Number.isInteger(frequency)
-      && frequency >= 1
-      && frequency <= maxFrequency
-      && (!tubular || frequency % 2 === 0))
-      && (estimateMarkerLengthCm(frequencies, fabric.type, fabric.widthCm, profileIndex) ?? 0) <= input.tableLengthCm) {
-      return { layers, frequencies };
-    }
+  let best: { layers: number; frequencies: MarkerFrequency[] } | null = null;
+  const maximumLayers = Math.min(maxLayers, Math.max(...entries.map(([, quantity]) => quantity)));
+
+  // Nem todas as demandas precisam compartilhar a mesma quantidade de folhas.
+  // Antes, uma unica entrada incompativel entre as cinco primeiras fazia o
+  // fallback desistir do grupo inteiro e gerar um enfesto por linha.
+  for (let layers = maximumLayers; layers >= 1; layers -= 1) {
+    const compatible = entries.flatMap(([key, quantity]) => {
+      const frequency = quantity / layers;
+      return Number.isInteger(frequency)
+        && frequency >= 1
+        && frequency <= maxFrequency
+        && (!tubular || frequency % 2 === 0)
+        ? [{ ...parseCutPlanDemandKey(key), frequency }]
+        : [];
+    });
+    if (compatible.length < 2) continue;
+
+    const visit = (index: number, selected: MarkerFrequency[]) => {
+      if (selected.length >= 2) {
+        const markerLength = estimateMarkerLengthCm(selected, fabric.type, fabric.widthCm, profileIndex) ?? 0;
+        if (markerLength <= input.tableLengthCm
+          && (!best || selected.length > best.frequencies.length
+            || (selected.length === best.frequencies.length && layers > best.layers))) {
+          best = { layers, frequencies: [...selected] };
+        }
+      }
+      if (selected.length === MAX_SIZES_PER_MARKER) return;
+      for (let candidateIndex = index; candidateIndex < compatible.length; candidateIndex += 1) {
+        selected.push(compatible[candidateIndex]);
+        visit(candidateIndex + 1, selected);
+        selected.pop();
+      }
+    };
+    visit(0, []);
   }
-  return null;
+  return best;
 }
 
 function subtractProduction(remaining: Map<string, number>, lay: Pick<LayPlan, "layers" | "frequencies">) {
