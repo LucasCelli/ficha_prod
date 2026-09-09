@@ -12,6 +12,7 @@ const COLOR_TERMS = [
   ["amarelo", "Amarelo"], ["amarela", "Amarelo"], ["rosa", "Rosa"], ["roxo", "Roxo"],
   ["roxa", "Roxo"], ["lilas", "Lilás"], ["vermelho", "Vermelho"], ["vermelha", "Vermelho"],
   ["bordo", "Bordô"], ["marsala", "Marsala"], ["bege", "Bege"], ["caqui", "Caqui"],
+  ["marrom", "Marrom"],
   ["laranja", "Laranja"], ["coral", "Coral"], ["vinho", "Vinho"], ["jeans", "Jeans"],
 ] as const;
 

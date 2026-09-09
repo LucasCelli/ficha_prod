@@ -28,3 +28,7 @@ test("cor explícita do item prevalece e os demais usam a cor técnica", () => {
   assert.equal(resolveItemColor("Detalhes: azul marinho", "Azul royal"), "Azul marinho");
   assert.equal(resolveItemColor("Camiseta básica", "Preta"), "Preto");
 });
+
+test("reconhece marrom na descricao do item sem herdar a cor da ficha", () => {
+  assert.equal(resolveItemColor("Calça Marrom", "Azul marinho"), "Marrom");
+});
