@@ -1,5 +1,5 @@
 import { compareUniformSizes } from "../../lib/uniform-sizes.ts";
-import { buildSizeProfileIndex, calculateEntryLengthPerFrequencyCm } from "./dimensions.ts";
+import { buildSizeProfileIndex, calculateEntryLengthPerFrequencyCm, isPantsCutPlanSize } from "./dimensions.ts";
 import { parseCutPlanDemandKey, type CutPlanSizeProfile, type FabricType, type MarkerFrequency, type SleeveType } from "./model.ts";
 
 export type SolvedLay = { layers: number; frequencies: MarkerFrequency[]; markerLengthCm?: number };
@@ -154,6 +154,7 @@ function solveLayerSet(
 ) {
   const profileIndex = buildSizeProfileIndex(constraints.sizeProfiles);
   const prepared = entries.map((entry) => {
+    const entryMaxFrequency = isPantsCutPlanSize(entry.size) ? (type === "TUBULAR" ? 2 : 1) : constraints.maxFrequency ?? 8;
     const lengthPerFrequency = calculateEntryLengthPerFrequencyCm(
       entry.size,
       entry.sleeveType,
@@ -163,7 +164,7 @@ function solveLayerSet(
     ) ?? 0;
     return {
       entry,
-      options: getSizeAssignments(entry, layers, type, lengthPerFrequency, constraints.tableLengthCm, constraints.maxFrequency ?? 8, cache),
+      options: getSizeAssignments(entry, layers, type, lengthPerFrequency, constraints.tableLengthCm, entryMaxFrequency, cache),
     };
   });
   if (prepared.some(({ options }) => options.length === 0)) return [];

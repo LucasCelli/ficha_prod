@@ -42,7 +42,7 @@ export function resolveItemGarmentSize(size: string, itemDescription: string) {
   const description = normalizeCutPlanDescription(itemDescription);
   const garment = [
     { label: "CALÇA", pattern: /\bcalca(?:s)?\b/ },
-    { label: "BERMUDA", pattern: /\bbermuda(?:s)?\b/ },
+    { label: "SHORT", pattern: /\bbermuda(?:s)?\b/ },
     { label: "SHORT", pattern: /\bshort(?:s)?\b/ },
     { label: "SAIA", pattern: /\bsaia(?:s)?\b/ },
     { label: "MACACÃO", pattern: /\bmacacao(?:s)?\b/ },

@@ -57,9 +57,23 @@ test("formato operacional separa frequência de tamanhos numéricos", () => {
 
 test("apresenta o tipo da peca em vez de manga curta para itens inferiores", () => {
   assert.equal(formatCutPlanItemType("CALÇA G", "CURTA"), "Calça");
-  assert.equal(formatCutPlanItemType("SHORT M", "CURTA"), "Short");
+  assert.equal(formatCutPlanItemType("SHORT M", "CURTA"), "Short/Bermuda");
+  assert.equal(formatCutPlanItemType("BERMUDA M", "CURTA"), "Short/Bermuda");
   assert.equal(formatCutPlanItemType("G", "CURTA"), "Curta");
   assert.equal(formatCutPlanItemType("G", "LONGA"), "Longa");
+});
+
+test("agrupa short e bermuda como a mesma categoria operacional", () => {
+  const input = createInput("TUBULAR", 50);
+  input.items = [
+    { id: "short-g", fabricId: "fabric", size: "SHORT G", sleeveType: "CURTA", quantity: 6 },
+    { id: "bermuda-g", fabricId: "fabric", size: "BERMUDA G", sleeveType: "CURTA", quantity: 8 },
+  ];
+
+  const result = calculateCutPlan(input).fabrics[0];
+  assert.deepEqual(result.sizes.map(({ size, requested, produced }) => ({ size, requested, produced })), [
+    { size: "SHORT G", requested: 14, produced: 14 },
+  ]);
 });
 
 test("abrevia Baby Look como BL na apresentação", () => {
@@ -210,14 +224,34 @@ test("caso tubular real fecha em dois enfestos com frequencias pares", () => {
   assert.ok(solution.lays.every((lay) => lay.frequencies.every(({ frequency }) => frequency % 2 === 0)));
 });
 
-test("calca usa molde especifico de 120 por 44 cm e limita a frequencia na mesa", () => {
+test("calca usa quatro paineis de 120 por 44 cm, reduzidos a dois no tubular", () => {
   const index = buildSizeProfileIndex([]);
-  const lengthAt12 = estimateMarkerLengthCm([{ size: "CALÇA M", sleeveType: "CURTA", frequency: 12 }], "TUBULAR", 100, index)!;
-  const lengthAt14 = estimateMarkerLengthCm([{ size: "CALÇA M", sleeveType: "CURTA", frequency: 14 }], "TUBULAR", 100, index)!;
+  const tubular = estimateMarkerLengthCm([{ size: "CALÇA M", sleeveType: "CURTA", frequency: 2 }], "TUBULAR", 100, index)!;
+  const flat = estimateMarkerLengthCm([{ size: "CALÇA M", sleeveType: "CURTA", frequency: 2 }], "PLANO", 100, index)!;
+  const lengthAt6 = estimateMarkerLengthCm([{ size: "CALÇA M", sleeveType: "CURTA", frequency: 6 }], "TUBULAR", 100, index)!;
+  const lengthAt8 = estimateMarkerLengthCm([{ size: "CALÇA M", sleeveType: "CURTA", frequency: 8 }], "TUBULAR", 100, index)!;
 
-  assert.ok(lengthAt12 < 800);
-  assert.ok(lengthAt14 > 800);
-  assert.equal(getMaximumEstimatedFrequency("CALÇA M", "CURTA", "TUBULAR", 100, 800, [], 14), 12);
+  assert.equal(flat, tubular * 2);
+  assert.ok(lengthAt6 < 800);
+  assert.ok(lengthAt8 > 800);
+  assert.equal(getMaximumEstimatedFrequency("CALÇA M", "CURTA", "TUBULAR", 100, 800, [], 14), 2);
+});
+
+test("calca prioriza frequencia minima e mais folhas", () => {
+  const input = createInput("TUBULAR", 50);
+  input.items = [{ id: "pants-g", fabricId: "fabric", size: "CALÇA G", sleeveType: "CURTA", quantity: 32 }];
+  const result = calculateCutPlan(input).fabrics[0];
+  assert.equal(result.lays.length, 1);
+  assert.equal(result.lays[0].frequencies[0].frequency, 2);
+  assert.equal(result.lays[0].layers, 16);
+});
+
+test("short e bermuda usam quatro paineis e entram no limite do marcador", () => {
+  const index = buildSizeProfileIndex([]);
+  const shortLength = estimateMarkerLengthCm([{ size: "SHORT G", sleeveType: "CURTA", frequency: 4 }], "TUBULAR", 100, index)!;
+  const bermudaLength = estimateMarkerLengthCm([{ size: "BERMUDA G", sleeveType: "CURTA", frequency: 4 }], "TUBULAR", 100, index)!;
+  assert.equal(shortLength, bermudaLength);
+  assert.ok(shortLength > 0);
 });
 
 test("prefere um unico enfesto tubular com frequencia 8 quando fecha em mais folhas", () => {

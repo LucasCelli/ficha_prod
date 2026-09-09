@@ -5,6 +5,9 @@ import type { CutPlanSizeProfile, FabricType, MarkerFrequency, SleeveType } from
 export const ESTIMATED_NESTING_EFFICIENCY = 0.82;
 export const PANTS_ESTIMATED_HEIGHT_CM = 120;
 export const PANTS_ESTIMATED_WIDTH_CM = 44;
+export const SHORTS_ESTIMATED_HEIGHT_CM = 60;
+export const SHORTS_ESTIMATED_WIDTH_CM = 44;
+const LOWER_GARMENT_PANEL_COUNT = 4;
 const estimatedLengthFormatter = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 export function formatEstimatedLengthMeters(lengthCm: number) {
@@ -71,9 +74,26 @@ export function calculateMarkerAreaLengthCm(
   return areaLengthCm;
 }
 
-function isPantsSize(size: string) {
+export function isPantsCutPlanSize(size: string) {
   const normalized = size.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
   return /^CALCA(?:\s|$)/.test(normalized);
+}
+
+function isShortsSize(size: string) {
+  const normalized = size.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+  return /^(?:SHORT|BERMUDA)(?:\s|$)/.test(normalized);
+}
+
+function calculateLowerGarmentLengthPerFrequencyCm(
+  heightCm: number,
+  widthCm: number,
+  type: FabricType,
+  fabricWidthCm: number,
+) {
+  // Cada peca tem frente esquerda/direita e costas esquerda/direita. No
+  // tubular, cada molde riscado corta as duas faces e equivale a dois paineis.
+  const drawnPanelCount = type === "TUBULAR" ? LOWER_GARMENT_PANEL_COUNT / 2 : LOWER_GARMENT_PANEL_COUNT;
+  return (heightCm * widthCm * drawnPanelCount) / (fabricWidthCm * ESTIMATED_NESTING_EFFICIENCY);
 }
 
 /** Comprimento ocupado por uma unidade da grade. Calcas usam molde proprio. */
@@ -84,9 +104,21 @@ export function calculateEntryLengthPerFrequencyCm(
   fabricWidthCm: number,
   profileIndex: Map<string, CutPlanSizeProfile>,
 ) {
-  if (isPantsSize(size)) {
-    return (PANTS_ESTIMATED_HEIGHT_CM * PANTS_ESTIMATED_WIDTH_CM)
-      / (fabricWidthCm * ESTIMATED_NESTING_EFFICIENCY);
+  if (isPantsCutPlanSize(size)) {
+    return calculateLowerGarmentLengthPerFrequencyCm(
+      PANTS_ESTIMATED_HEIGHT_CM,
+      PANTS_ESTIMATED_WIDTH_CM,
+      type,
+      fabricWidthCm,
+    );
+  }
+  if (isShortsSize(size)) {
+    return calculateLowerGarmentLengthPerFrequencyCm(
+      SHORTS_ESTIMATED_HEIGHT_CM,
+      SHORTS_ESTIMATED_WIDTH_CM,
+      type,
+      fabricWidthCm,
+    );
   }
   const profile = profileIndex.get(normalizeCutPlanSizeKey(size));
   return profile ? calculateMarkerAreaLengthCm(profile, sleeveType, type, fabricWidthCm, 1) : null;
@@ -127,8 +159,9 @@ export function getMaximumEstimatedFrequency(
 ) {
   const profileIndex = buildSizeProfileIndex(profiles);
   const step = type === "TUBULAR" ? 2 : 1;
+  const effectiveMaxFrequency = isPantsCutPlanSize(size) ? step : maxFrequency;
   let maximum = 0;
-  for (let frequency = step; frequency <= maxFrequency; frequency += step) {
+  for (let frequency = step; frequency <= effectiveMaxFrequency; frequency += step) {
     const length = estimateMarkerLengthCm([{ size, sleeveType, frequency }], type, fabricWidthCm, profileIndex);
     if (length === null || length <= tableLengthCm) maximum = frequency;
   }

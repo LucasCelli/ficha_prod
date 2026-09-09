@@ -19,7 +19,7 @@ function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"
       const requested = new Map<string, number>();
       const operational = new Map<string, number>();
       for (const item of input.items.filter((candidate) => candidate.fabricId === fabric.id)) {
-        const size = item.size.trim().replace(/\s+/g, " ");
+        const size = item.size.trim().replace(/\s+/g, " ").replace(/^BERMUDA(?=\s|$)/i, "SHORT");
         const key = cutPlanDemandKey(size, item.sleeveType);
         requested.set(key, (requested.get(key) ?? 0) + (item.importedQuantity ?? item.quantity));
         operational.set(key, (operational.get(key) ?? 0) + item.quantity);
@@ -164,7 +164,7 @@ function calculateMergedVariants(input: CutPlanInput, candidates: Array<{ result
 function aggregateFabricItems(input: CutPlanInput, fabricId: string, useImportedQuantity = false) {
   const requested = new Map<string, number>();
   for (const item of input.items.filter((candidate) => candidate.fabricId === fabricId)) {
-    const size = item.size.trim().replace(/\s+/g, " ");
+    const size = item.size.trim().replace(/\s+/g, " ").replace(/^BERMUDA(?=\s|$)/i, "SHORT");
     const key = cutPlanDemandKey(size, item.sleeveType);
     const quantity = useImportedQuantity ? (item.importedQuantity ?? item.quantity) : item.quantity;
     requested.set(key, (requested.get(key) ?? 0) + quantity);

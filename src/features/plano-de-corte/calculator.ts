@@ -7,7 +7,7 @@ import {
   type LayPlan,
   type MarkerFrequency,
 } from "./model.ts";
-import { buildSizeProfileIndex, estimateMarkerLengthCm, getDefaultMaximumFrequency, getMaximumEstimatedFrequency } from "./dimensions.ts";
+import { buildSizeProfileIndex, estimateMarkerLengthCm, getDefaultMaximumFrequency, getMaximumEstimatedFrequency, isPantsCutPlanSize } from "./dimensions.ts";
 import { solveMinimumLays } from "./solver.ts";
 import { compareUniformSizes, isUniformBabyLookText } from "../../lib/uniform-sizes.ts";
 
@@ -21,7 +21,7 @@ export class CutPlanCalculationError extends Error {
 const MAX_SIZES_PER_MARKER = 5;
 
 function normalizeSize(size: string) {
-  return size.trim().replace(/\s+/g, " ");
+  return size.trim().replace(/\s+/g, " ").replace(/^BERMUDA(?=\s|$)/i, "SHORT");
 }
 
 function aggregateItems(input: CutPlanInput, fabricId: string, useImportedQuantity = false) {
@@ -56,12 +56,14 @@ function findJointCandidate(
   // fallback desistir do grupo inteiro e gerar um enfesto por linha.
   for (let layers = maximumLayers; layers >= 1; layers -= 1) {
     const compatible = entries.flatMap(([key, quantity]) => {
+      const demand = parseCutPlanDemandKey(key);
       const frequency = quantity / layers;
+      const entryMaxFrequency = isPantsCutPlanSize(demand.size) ? (tubular ? 2 : 1) : maxFrequency;
       return Number.isInteger(frequency)
         && frequency >= 1
-        && frequency <= maxFrequency
+        && frequency <= entryMaxFrequency
         && (!tubular || frequency % 2 === 0)
-        ? [{ ...parseCutPlanDemandKey(key), frequency }]
+        ? [{ ...demand, frequency }]
         : [];
     });
     if (compatible.length < 2) continue;
@@ -216,6 +218,7 @@ export function formatCutPlanSizeLabel(size: string) {
 
 export function formatCutPlanItemType(size: string, sleeveType: MarkerFrequency["sleeveType"]) {
   const garment = size.trim().match(/^(SHORT|BERMUDA|CALÇA|SAIA|MACACÃO)(?:\s|$)/i)?.[1];
+  if (garment && /^(?:SHORT|BERMUDA)$/i.test(garment)) return "Short/Bermuda";
   if (garment) return garment.charAt(0).toUpperCase() + garment.slice(1).toLocaleLowerCase("pt-BR");
   return sleeveType === "LONGA" ? "Longa" : "Curta";
 }

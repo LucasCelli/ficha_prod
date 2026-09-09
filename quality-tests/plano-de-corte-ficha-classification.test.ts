@@ -14,9 +14,9 @@ test("mantém moldes masculino e feminino separados para o mesmo tamanho", () =>
   assert.equal(resolveItemModelSize("BABY P", "Camiseta feminina"), "BABY P");
 });
 
-test("mantém calça, bermuda e short separados para o mesmo tamanho", () => {
+test("mantém calça separada e unifica bermuda com short no mesmo tamanho", () => {
   assert.equal(resolveItemGarmentSize("G", "Calça de helanca"), "CALÇA G");
-  assert.equal(resolveItemGarmentSize("G", "Bermuda de helanca"), "BERMUDA G");
+  assert.equal(resolveItemGarmentSize("G", "Bermuda de helanca"), "SHORT G");
   assert.equal(resolveItemGarmentSize("G", "Short feminino de helanca"), "SHORT G");
   assert.equal(resolveItemGarmentSize("G", "Camiseta manga curta"), "G");
   assert.equal(resolveItemSleeveType("Calça longa de helanca", "Manga longa"), "CURTA");
