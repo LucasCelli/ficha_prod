@@ -1,5 +1,11 @@
 # Ficha Prod
 
+## Seleção de entidades
+
+Use `Combobox` quando a opção vem do banco, precisa de pesquisa, possui um ID diferente do texto exibido ou requer informação secundária. O `value` deve ser o ID estável; `label` e `description` são somente apresentação. O seletor de clientes em fichas usa `clientes.id`, mostra nome + Empresa/Instituição e mantém o texto digitado sem convertê-lo em cadastro.
+
+Listas pequenas e estáticas continuam usando `CustomSelect`. `CustomDatalist` permanece adequado para sugestões livres de catálogo, nas quais o texto é o próprio valor e não a identidade de uma entidade.
+
 Aplicacao Next.js App Router para operacao de fichas tecnicas em Next.js + TypeScript + Supabase + Vercel.
 
 ## Stack atual

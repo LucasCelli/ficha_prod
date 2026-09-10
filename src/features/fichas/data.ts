@@ -45,6 +45,7 @@ export type FichaFilters = {
   autor?: string;
   busca?: string;
   cliente?: string;
+  clienteId?: string;
   dataFim?: string;
   dataInicio?: string;
   evento?: boolean;
@@ -325,6 +326,10 @@ function applyFichaFilters<T extends FichaQuery>(query: T, filters: FichaFilters
 
   if (filters.id) {
     nextQuery = nextQuery.eq("id", filters.id) as T;
+  }
+
+  if (filters.clienteId) {
+    nextQuery = nextQuery.eq("cliente_id", filters.clienteId) as T;
   }
 
   if (filters.autor) {

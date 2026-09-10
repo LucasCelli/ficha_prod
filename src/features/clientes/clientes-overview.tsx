@@ -172,6 +172,7 @@ function ClienteRow({ cliente, filters }: { cliente: ClienteListItem; filters: C
           <Link className="ui-table__link" href={`/clientes/${cliente.id}`}>
             {cliente.nome}
           </Link>
+          {cliente.empresa ? <span className="ui-table__muted">{cliente.empresa}</span> : null}
           {cliente.telefone || cliente.email ? (
             <span className="ui-table__muted">{[cliente.telefone, cliente.email].filter(Boolean).join(" · ")}</span>
           ) : null}
@@ -184,7 +185,7 @@ function ClienteRow({ cliente, filters }: { cliente: ClienteListItem; filters: C
         <div className="cliente-row-actions">
           <Link
             className="ui-button ui-button--secondary ui-button--sm"
-            href={`/fichas?cliente=${encodeURIComponent(cliente.nome)}`}
+            href={`/fichas?clienteId=${encodeURIComponent(cliente.id)}`}
           >
             <FileText aria-hidden="true" size={15} />
             Ver fichas

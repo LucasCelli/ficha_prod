@@ -52,6 +52,7 @@ export type FichaFormInitialData = {
   arte: string;
   bolso: string;
   cliente: string;
+  clienteId: string;
   clienteAuxiliar: string;
   comNomes: string;
   composicao: string;
@@ -109,6 +110,7 @@ export function createEmptyFichaFormInitialData(): FichaFormInitialData {
     arte: "",
     bolso: "",
     cliente: "",
+    clienteId: "",
     clienteAuxiliar: "",
     comNomes: "",
     composicao: "",
@@ -161,6 +163,7 @@ export function mapFichaToInitialData(ficha?: FichaDetail): FichaFormInitialData
     arte: ficha.arte ?? "",
     bolso: ficha.bolso ?? "",
     cliente: ficha.cliente_nome_snapshot ?? "",
+    clienteId: ficha.cliente_id ?? "",
     clienteAuxiliar: ficha.cliente_auxiliar ?? "",
     comNomes: ficha.com_nomes?.toString() ?? "",
     composicao: ficha.composicao ?? "",

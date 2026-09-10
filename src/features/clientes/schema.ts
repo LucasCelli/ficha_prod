@@ -12,6 +12,10 @@ export const clienteFormSchema = z.object({
     emptyToUndefined,
     z.string().email("Informe um e-mail válido.").max(254, "E-mail muito longo.").optional(),
   ),
+  empresa: z.preprocess(
+    emptyToUndefined,
+    z.string().max(200, "Empresa/Instituição muito longa.").optional(),
+  ),
   nome: z.preprocess(
     (value) => (typeof value === "string" ? value.trim() : ""),
     z.string().min(1, "Nome é obrigatório.").max(200, "Nome muito longo."),

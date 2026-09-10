@@ -66,6 +66,7 @@ export function ClienteDetail({ result }: ClienteDetailProps) {
             <h1 id="cliente-title" className="app-title">
               {cliente.nome}
             </h1>
+            {cliente.empresa ? <p>{cliente.empresa}</p> : null}
           </div>
           <ClienteDeleteAction
             clienteId={cliente.id}
@@ -73,7 +74,7 @@ export function ClienteDetail({ result }: ClienteDetailProps) {
             editHref={`/clientes?edit=${encodeURIComponent(cliente.id)}`}
             returnTo="/clientes"
             variant="header"
-            viewFichasHref={`/fichas?cliente=${encodeURIComponent(cliente.nome)}`}
+            viewFichasHref={`/fichas?clienteId=${encodeURIComponent(cliente.id)}`}
           />
         </div>
       </header>
@@ -110,8 +111,8 @@ export function ClienteDetail({ result }: ClienteDetailProps) {
         ) : (
           <EmptyState
             actions={
-              <Link className="ui-button ui-button--secondary" href={`/fichas?cliente=${encodeURIComponent(cliente.nome)}`}>
-                Buscar por nome nas fichas
+              <Link className="ui-button ui-button--secondary" href={`/fichas?clienteId=${encodeURIComponent(cliente.id)}`}>
+                Ver fichas do cliente
               </Link>
             }
             title="Nenhuma ficha vinculada"

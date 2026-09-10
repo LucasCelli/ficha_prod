@@ -20,6 +20,8 @@
 }
 
 @media (max-width: 768px) {
+  .cliente-picker { grid-template-columns: 1fr; }
+  .cliente-picker__new { width: 100%; }
   .catalog-form,
   .ui-table .catalog-form {
     min-width: 0;

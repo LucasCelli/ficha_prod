@@ -1,11 +1,11 @@
-import type { CustomDatalistOption } from "@/components/ui";
+import type { ComboboxOption, CustomDatalistOption } from "@/components/ui";
 import { listCatalogOptionsForFichaForm, type CatalogOptionsByKind } from "@/features/catalogos/data";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type FichaFormOptions = {
   catalogOptions: CatalogOptionsByKind;
-  clienteOptions: CustomDatalistOption[];
+  clienteOptions: ComboboxOption[];
   vendedorOptions: CustomDatalistOption[];
 };
 
@@ -28,7 +28,7 @@ export async function listFichaFormOptions(): Promise<FichaFormOptions> {
     catalogOptionsPromise,
     supabase
       .from("clientes")
-      .select("nome,email,telefone")
+      .select("id,nome,empresa,email,telefone")
       .order("nome", { ascending: true })
       .limit(CLIENTE_OPTIONS_LIMIT),
     supabase
@@ -46,8 +46,9 @@ export async function listFichaFormOptions(): Promise<FichaFormOptions> {
       .filter((cliente) => cliente.nome?.trim())
       .map((cliente) => ({
         aliases: [cliente.email, cliente.telefone].filter((value): value is string => Boolean(value?.trim())),
+        description: cliente.empresa ?? undefined,
         label: cliente.nome,
-        value: cliente.nome,
+        value: cliente.id,
       })),
     vendedorOptions: (vendedoresResult.data ?? []).map((vendedor) => ({
       id: vendedor.id,

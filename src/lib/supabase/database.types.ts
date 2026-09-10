@@ -258,6 +258,8 @@ export type Database = {
           id: string;
           nome: string;
           nome_normalizado: string;
+          empresa: string | null;
+          empresa_normalizada: string;
           email: string | null;
           telefone: string | null;
           primeira_ficha: string | null;
@@ -269,6 +271,7 @@ export type Database = {
         Insert: {
           id?: string;
           nome: string;
+          empresa?: string | null;
           email?: string | null;
           telefone?: string | null;
           primeira_ficha?: string | null;
@@ -280,6 +283,7 @@ export type Database = {
         Update: {
           id?: string;
           nome?: string;
+          empresa?: string | null;
           email?: string | null;
           telefone?: string | null;
           primeira_ficha?: string | null;
@@ -611,7 +615,18 @@ export type Database = {
           user_id: string;
           username: string;
         }>;
-      };      save_ficha_atomic: {
+      };
+      save_cliente_atomic: {
+        Args: {
+          p_cliente_id: string | null;
+          p_email?: string | null;
+          p_empresa?: string | null;
+          p_nome: string;
+          p_telefone?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["clientes"]["Row"];
+      };
+      save_ficha_atomic: {
         Args: {
           p_actor_id: string;
           p_ficha: Json;

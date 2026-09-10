@@ -7,6 +7,7 @@ export type FieldErrors = Partial<
     | "bolso"
     | "comNomes"
     | "cliente"
+    | "clienteId"
     | "clienteAuxiliar"
     | "composicao"
     | "etiqueta"

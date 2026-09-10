@@ -4,6 +4,7 @@ export { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogDescripti
 export { Badge } from "./badge";
 export { Button } from "./button";
 export { Card } from "./card";
+export { Combobox, type ComboboxOption } from "./combobox";
 export { AppClientProviders } from "./app-client-providers";
 export { ChartDataTable, ChartFrame, type ChartSeries } from "./chart-frame";
 export { CustomDatalist, type CustomDatalistHandle, type CustomDatalistOption } from "./custom-datalist";

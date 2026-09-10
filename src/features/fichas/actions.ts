@@ -19,6 +19,7 @@ import { createUniformSizeDomain, DEFAULT_UNIFORM_SIZE_DEFINITIONS, type Uniform
 function getFichaFormInput(formData: FormData) {
   return {
     cliente: formData.get("cliente"),
+    clienteId: formData.get("clienteId"),
     clienteAuxiliar: formData.get("clienteAuxiliar"),
     dataInicio: formData.get("dataInicio"),
     dataEntrega: formData.get("dataEntrega"),
@@ -76,6 +77,7 @@ function getFichaPayload(values: FichaFormValues): Json {
     arte: nullableText(values.arte),
     bolso: nullableText(values.bolso),
     cliente_auxiliar: nullableText(values.clienteAuxiliar),
+    cliente_id: values.clienteId,
     cliente_nome_snapshot: normalizeNameOrCompany(values.cliente),
     com_nomes: values.comNomes ?? null,
     composicao: nullableText(values.composicao),

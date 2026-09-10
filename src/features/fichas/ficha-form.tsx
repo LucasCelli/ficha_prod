@@ -34,12 +34,13 @@ import {
   UserRound,
   Wand2,
 } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, Button, CustomDatalist, CustomSelect, IconButton, Modal, SortableHandle, SortableInstructions, Tooltip, type CustomDatalistOption } from "@/components/ui";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, Button, CustomDatalist, CustomSelect, IconButton, Modal, SortableHandle, SortableInstructions, Tooltip, type ComboboxOption, type CustomDatalistOption } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
 import { compareUniformSizeAndBabyLookText, DEFAULT_UNIFORM_SIZE_DEFINITIONS, type UniformSizeDefinition } from "@/lib/uniform-sizes";
 import { assertStableSortableIds } from "@/lib/sortable-items";
 import { createFichaAction, updateFichaAction } from "./actions";
 import { DatePickerField } from "./date-picker-field";
+import { ClientePicker } from "./cliente-picker";
 import { DeliveryDeadlineAlert, Field, SubmitButton, sumProductQuantities } from "./ficha-form-controls";
 import type { FichaDetail } from "./data";
 import { clearCreateFichaDraftSnapshot, CREATE_FICHA_DRAFT_STORAGE_KEY } from "./ficha-draft-storage";
@@ -55,7 +56,7 @@ import { buildDraftPrintFicha, DraftPrintLayer } from "./ficha-draft-print";
 type FichaFormProps = {
   canImportLegacyJson?: boolean;
   catalogOptions?: CatalogOptionsByKind;
-  clienteOptions?: CustomDatalistOption[];
+  clienteOptions?: ComboboxOption[];
   ficha?: FichaDetail;
   initialData?: FichaFormInitialData;
   mode?: "create" | "edit";
@@ -282,7 +283,7 @@ function isRegataProduct(value: string) {
 }
 
 function shouldLetServerValidateBeforeUpload(formData: FormData) {
-  const requiredTextFields = ["cliente", "dataEntrega", "vendedor"];
+  const requiredTextFields = ["cliente", "clienteId", "dataEntrega", "vendedor"];
   const hasMissingText = requiredTextFields.some((field) => !String(formData.get(field) ?? "").trim());
 
   if (hasMissingText) return true;
@@ -355,6 +356,7 @@ function buildFichaDraftSnapshot(
       arte: values.arte,
       bolso: formText(formData, "bolso"),
       cliente: formText(formData, "cliente"),
+      clienteId: formText(formData, "clienteId"),
       clienteAuxiliar: formText(formData, "clienteAuxiliar"),
       comNomes: values.comNomes,
       composicao: values.composicao,
@@ -1785,41 +1787,41 @@ function FichaFormInner({
             <UserRound aria-hidden="true" size={18} />
             <span>Informações do Cliente</span>
           </legend>
-          <Field label="Nome do Cliente" name="cliente" error={state.fieldErrors?.cliente} required>
-            <CustomDatalist
-              id="cliente"
-              name="cliente"
-              aria-describedby={state.fieldErrors?.cliente ? "cliente-error" : undefined}
-              aria-invalid={Boolean(state.fieldErrors?.cliente)}
-              defaultValue={initialData.cliente || undefined}
-              options={clienteOptions}
-              placeholder="Nome do cliente…"
-            />
-          </Field>
+          <div className="ficha-customer-primary-row">
+            <Field label="Nome do Cliente" name="cliente" error={state.fieldErrors?.clienteId ?? state.fieldErrors?.cliente} required>
+              <ClientePicker
+                describedBy={state.fieldErrors?.clienteId || state.fieldErrors?.cliente ? "cliente-error" : undefined}
+                initialLabel={initialData.cliente}
+                invalid={Boolean(state.fieldErrors?.clienteId || state.fieldErrors?.cliente)}
+                options={clienteOptions}
+                value={initialData.clienteId || null}
+              />
+            </Field>
 
-          <Field label="Complemento do Nome (Alias)" name="clienteAuxiliar" error={state.fieldErrors?.clienteAuxiliar}>
-            <input
-              id="clienteAuxiliar"
-              name="clienteAuxiliar"
-              aria-describedby={state.fieldErrors?.clienteAuxiliar ? "clienteAuxiliar-error" : undefined}
-              aria-invalid={Boolean(state.fieldErrors?.clienteAuxiliar)}
-              defaultValue={initialData.clienteAuxiliar || undefined}
-              placeholder="Local, detalhe, cor…"
-            />
-          </Field>
+            <Field label="Complemento do Nome (Alias)" name="clienteAuxiliar" error={state.fieldErrors?.clienteAuxiliar}>
+              <input
+                id="clienteAuxiliar"
+                name="clienteAuxiliar"
+                aria-describedby={state.fieldErrors?.clienteAuxiliar ? "clienteAuxiliar-error" : undefined}
+                aria-invalid={Boolean(state.fieldErrors?.clienteAuxiliar)}
+                defaultValue={initialData.clienteAuxiliar || undefined}
+                placeholder="Local, detalhe, cor…"
+              />
+            </Field>
 
-          <Field label="Vendedor" name="vendedor" error={state.fieldErrors?.vendedor} required>
-            <CustomSelect
-              id="vendedor"
-              key={`vendedor-${initialData.vendedor}`}
-              name="vendedor"
-              aria-describedby={state.fieldErrors?.vendedor ? "vendedor-error" : undefined}
-              aria-invalid={Boolean(state.fieldErrors?.vendedor)}
-              defaultValue={vendedorOptions.some((option) => option.value === initialData.vendedor) ? initialData.vendedor : ""}
-              options={vendedorOptions}
-              placeholder="Selecione o vendedor"
-            />
-          </Field>
+            <Field label="Vendedor" name="vendedor" error={state.fieldErrors?.vendedor} required>
+              <CustomSelect
+                id="vendedor"
+                key={`vendedor-${initialData.vendedor}`}
+                name="vendedor"
+                aria-describedby={state.fieldErrors?.vendedor ? "vendedor-error" : undefined}
+                aria-invalid={Boolean(state.fieldErrors?.vendedor)}
+                defaultValue={vendedorOptions.some((option) => option.value === initialData.vendedor) ? initialData.vendedor : ""}
+                options={vendedorOptions}
+                placeholder="Selecione o vendedor"
+              />
+            </Field>
+          </div>
 
           <Field label="Data de Início" name="dataInicio" error={state.fieldErrors?.dataInicio}>
             <DatePickerField

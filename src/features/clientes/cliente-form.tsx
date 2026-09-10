@@ -62,6 +62,18 @@ export function ClienteForm({ cliente, mode = "create", returnTo }: ClienteFormP
           />
         </Field>
 
+        <Field label="Empresa/Instituição" name="empresa" error={state.fieldErrors?.empresa}>
+          <input
+            id="empresa"
+            name="empresa"
+            aria-describedby={state.fieldErrors?.empresa ? "empresa-error" : undefined}
+            aria-invalid={Boolean(state.fieldErrors?.empresa)}
+            autoComplete="organization"
+            defaultValue={cliente?.empresa ?? undefined}
+            placeholder="Empresa ou instituição…"
+          />
+        </Field>
+
         <Field label="Telefone" name="telefone" error={state.fieldErrors?.telefone}>
           <input
             id="telefone"

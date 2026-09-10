@@ -80,6 +80,10 @@ const imagensJsonSchema = z.preprocess((value) => {
 }, z.array(fichaImageSchema).max(4, "Adicione no máximo 4 imagens."));
 
 export const fichaFormSchema = z.object({
+  clienteId: z.preprocess(
+    (value) => (typeof value === "string" ? value.trim() : ""),
+    z.string().uuid('Selecione um cliente cadastrado ou use "Novo Cliente" para cadastrar um novo cliente.'),
+  ),
   cliente: requiredText("Cliente"),
   clienteAuxiliar: optionalText,
   dataInicio: optionalDate,

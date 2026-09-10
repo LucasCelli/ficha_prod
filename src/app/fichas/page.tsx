@@ -43,6 +43,7 @@ export default async function FichasPage({ searchParams }: FichasPageProps) {
   const filters = {
     arte: normalizeTextFilter(params?.arte),
     busca,
+    clienteId: normalizeTextFilter(params?.clienteId),
     dataFim: normalizeDateFilter(params?.dataFim),
     dataInicio: normalizeDateFilter(params?.dataInicio),
     evento: normalizeBooleanFilter(params?.evento),

@@ -6,7 +6,7 @@ import type { FichaListItem } from "@/features/fichas/data";
 
 export type ClienteListItem = Pick<
   Database["public"]["Tables"]["clientes"]["Row"],
-  "id" | "nome" | "email" | "telefone" | "primeira_ficha" | "ultima_ficha" | "total_fichas"
+  "id" | "nome" | "empresa" | "email" | "telefone" | "primeira_ficha" | "ultima_ficha" | "total_fichas"
 >;
 
 export type ClienteSort = "recentes" | "antigos" | "mais_fichas" | "nome";
@@ -87,13 +87,14 @@ export async function listClientes(filters: ClienteFilters = {}): Promise<Client
     const supabase = createServerSupabaseClient();
     let query = supabase
       .from("clientes")
-      .select("id, nome, email, telefone, primeira_ficha, ultima_ficha, total_fichas", { count: "exact" });
+      .select("id, nome, empresa, email, telefone, primeira_ficha, ultima_ficha, total_fichas", { count: "exact" });
 
     query = applyClienteSort(query, filters.sort);
     query = query.range(getOffset(filters.page, CLIENTES_PAGE_SIZE), getOffset(filters.page, CLIENTES_PAGE_SIZE) + CLIENTES_PAGE_SIZE - 1);
 
     if (filters.termo) {
-      query = query.ilike("nome", `%${filters.termo}%`);
+      const termo = filters.termo.replace(/[,%()]/g, " ").replace(/\s+/g, " ").trim();
+      if (termo) query = query.or(`nome.ilike.%${termo}%,empresa.ilike.%${termo}%`);
     }
 
     if (filters.atividade === "ativos") {
