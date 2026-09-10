@@ -9,6 +9,16 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { CatalogoDeleteActionState, CatalogoFieldErrors, CatalogoFormState } from "./form-state";
 import { catalogItemSchema, type CatalogItemValues } from "./schema";
 import { catalogKinds, type CatalogKind } from "./types";
+import { normalizeSizeInput } from "@/lib/uniform-sizes";
+
+async function findSizeConfigurationConflict(id: string, name: string, aliases: readonly string[]) {
+  const { data, error } = await createServerSupabaseClient().from("catalog_items")
+    .select("id,name,aliases").eq("kind", "tamanho");
+  if (error) return "Não foi possível validar os aliases dos tamanhos.";
+  const requested = new Set([name, ...aliases].map(normalizeSizeInput).filter(Boolean));
+  const conflict = (data ?? []).find((item) => item.id !== id && [item.name, ...item.aliases].some((value) => requested.has(normalizeSizeInput(value))));
+  return conflict ? `Nome ou alias já utilizado pelo tamanho ${conflict.name}.` : null;
+}
 
 function slugify(value: string) {
   return value
@@ -49,7 +59,9 @@ function getCatalogItemPayload(values: CatalogItemValues) {
     fabric_type: values.kind === "tecido" ? values.fabricType ?? null : null,
     fabric_width_cm: values.kind === "tecido" ? values.fabricWidthCm ?? null : null,
     kind: values.kind,
-    metadata: values.composition ? { composition: values.composition } : {},
+    metadata: values.kind === "tamanho"
+      ? { sizeGroup: "traditional" }
+      : values.composition ? { composition: values.composition } : {},
     measure_back_height_cm: values.kind === "tamanho" ? values.measureBackHeightCm ?? null : null,
     measure_back_width_cm: values.kind === "tamanho" ? values.measureBackWidthCm ?? null : null,
     measure_front_height_cm: values.kind === "tamanho" ? values.measureFrontHeightCm ?? null : null,
@@ -119,6 +131,11 @@ export async function saveCatalogItemAction(_previousState: CatalogoFormState, f
   const supabase = createServerSupabaseClient();
   const payload = getCatalogItemPayload(parsed.data);
 
+  if (payload.kind === "tamanho") {
+    const conflict = await findSizeConfigurationConflict(id, payload.name, payload.aliases);
+    if (conflict) return { message: conflict, status: "error" };
+  }
+
   if (!id && payload.sort_order <= 0) {
     const { data } = await supabase
       .from("catalog_items")
@@ -179,6 +196,11 @@ export async function deleteCatalogItemAction(
     };
   }
 
+  const { data: item } = await createServerSupabaseClient().from("catalog_items").select("kind").eq("id", id).maybeSingle();
+  if (item?.kind === "tamanho") {
+    return { message: "Tamanhos com histórico devem ser desativados, não excluídos.", status: "error" };
+  }
+
   const { error } = await createServerSupabaseClient().from("catalog_items").delete().eq("id", id);
 
   if (error) {
@@ -205,6 +227,10 @@ export async function deleteCatalogItemsAction(kind: CatalogKind, itemIds: strin
       message: "Itens inválidos para exclusão.",
       status: "error" as const,
     };
+  }
+
+  if (parsedKind === "tamanho") {
+    return { message: "Tamanhos com histórico devem ser desativados, não excluídos.", status: "error" as const };
   }
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
@@ -295,14 +321,14 @@ export async function saveCatalogItemOrderAction(kind: CatalogKind, itemIds: str
     };
   }
 
-  const updates = ids.map((id, index) =>
-    supabase
-      .from("catalog_items")
-      .update({ sort_order: index + 1 })
-      .eq("id", id)
-      .eq("kind", parsedKind),
-  );
-  const results = await Promise.all(updates);
+  if (parsedKind === "tamanho") {
+    const { error } = await supabase.rpc("reorder_catalog_sizes", { p_size_ids: ids });
+    if (error) return { message: getActionError("catalogos.reorder", error, "Não foi possível salvar a ordem.").message, status: "error" as const };
+    revalidatePath("/catalogos"); revalidatePath("/ferramentas/plano-de-corte"); revalidatePath("/fichas");
+    return { status: "success" as const };
+  }
+
+  const results = await Promise.all(ids.map((id, index) => supabase.from("catalog_items").update({ sort_order: index + 1 }).eq("id", id).eq("kind", parsedKind)));
   const failed = results.find((result) => result.error);
 
   if (failed?.error) {

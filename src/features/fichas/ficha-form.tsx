@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, Button, CustomDatalist, CustomSelect, IconButton, Modal, SortableHandle, SortableInstructions, Tooltip, type CustomDatalistOption } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
-import { compareUniformSizeAndBabyLookText } from "@/lib/uniform-sizes";
+import { compareUniformSizeAndBabyLookText, DEFAULT_UNIFORM_SIZE_DEFINITIONS, type UniformSizeDefinition } from "@/lib/uniform-sizes";
 import { createFichaAction, updateFichaAction } from "./actions";
 import { DatePickerField } from "./date-picker-field";
 import { DeliveryDeadlineAlert, Field, SubmitButton, sumProductQuantities } from "./ficha-form-controls";
@@ -133,45 +133,10 @@ const FALLBACK_CATALOG_OPTIONS: CatalogOptionsByKind = {
   gola: ["Gola Redonda", "Gola V", "Gola Polo", "Gola Social", "Gola Padre com Zíper", "Gola Padre Esportiva", "Gola V Polo", "Gola Canoa"].map(createOption),
   manga: ["Curta", "Longa", "Curta e Longa", "Raglan Curta", "Raglan Longa", "3/4"].map(createOption),
   produto: [],
-  tamanho: [
-    "RN",
-    "1",
-    "2",
-    "4",
-    "6",
-    "PP",
-    "16",
-    "P",
-    "M",
-    "G",
-    "GG",
-    "52",
-    "XG",
-    "G1",
-    "54",
-    "EG",
-    "G2",
-    "56",
-    "EGG",
-    "EXG",
-    "G3",
-    "XXG",
-    "XGG",
-    "58",
-    "EEGG",
-    "G4",
-    "60",
-    "EXGG",
-    "G5",
-    "ESP1",
-    "62",
-    "XLG",
-    "G6",
-    "ESP2",
-    "64",
-    "G7",
-    "ESP3",
-  ].map(createOption),
+  tamanho: DEFAULT_UNIFORM_SIZE_DEFINITIONS.map((size) => ({
+    aliases: [...size.aliases], id: size.id, label: size.name,
+    metadata: { sizeId: size.id, sizeOrder: String(size.order) }, value: size.name,
+  })),
   tecido: MATERIAL_OPTIONS.map((option) => ({
     details: [option.composicao],
     label: option.nome,
@@ -743,6 +708,13 @@ function FichaFormInner({
   });
   const productOptions = getOptions(catalogOptions, "produto");
   const sizeOptions = getOptions(catalogOptions, "tamanho");
+  const sizeDefinitions = useMemo<UniformSizeDefinition[]>(() => sizeOptions.map((option, index) => ({
+    active: true,
+    aliases: option.aliases ?? [],
+    id: option.metadata?.sizeId ?? option.id ?? `size-${index}`,
+    name: option.label,
+    order: Number(option.metadata?.sizeOrder ?? index),
+  })), [sizeOptions]);
   const materialOptions = getOptions(catalogOptions, "tecido");
   const colorOptions = getOptions(catalogOptions, "cor");
   const mangaOptions = getOptions(catalogOptions, "manga");
@@ -1565,7 +1537,7 @@ function FichaFormInner({
 
   function sortProductItems() {
     const sortedItems = [...getValues("itens")].sort((a, b) => {
-      const bySize = compareUniformSizeAndBabyLookText(a, b);
+      const bySize = compareUniformSizeAndBabyLookText(a, b, sizeDefinitions);
       if (bySize !== 0) return bySize;
       return a.produto.localeCompare(b.produto, "pt-BR", { sensitivity: "base" });
     });

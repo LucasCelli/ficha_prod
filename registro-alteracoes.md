@@ -2663,3 +2663,22 @@
 - Foi criado o comando `npm run test:cut-plan:real`, uma auditoria somente leitura e anonimizada de pedidos do Supabase. A execucao validou 20 pedidos reais (10 tubulares e 10 planos), incluindo 18 multitemanho e 6 com pelo menos 50 pecas; todos conservaram a producao e 18 exibiram alternativas com contagens distintas de enfestos.
 - Os tres limites do passo Mesa e enfesto e a opcao de mescla passaram a ocupar uma unica linha no desktop, preservando a quebra em coluna no mobile.
 - Planos restaurados do historico nao reutilizam mais alternativas serializadas por versoes antigas: as entradas sao recalculadas com o solver e os perfis dimensionais atuais antes de voltar ao resultado.
+## 2026-09-09 - Fonte global de tamanhos e aliases
+
+- Módulos: domínio de tamanhos, Catálogos, criação/edição de fichas, listas de uniformes e Plano de Corte.
+- Arquivos principais: `src/lib/uniform-sizes.ts`, `src/features/catalogos/*`, `src/features/fichas/*`, `src/lib/ai/*`, tipos Supabase, testes e migration `20260910004223_canonical_uniform_size_configuration.sql`.
+
+### Resultado
+
+- `catalog_items` de tipo `tamanho` passou a ser a fonte persistida de identidade, nome canônico, aliases, ativação e ordem. A API central resolve alias e labels como `XG (52)` sem usar o label como identidade, separa `baby-look` como variante e aplica fallback determinístico após tamanhos conhecidos.
+- A ordem configurada pelo superadmin em `/catalogos?tipo=tamanho` alimenta o formulário e o salvamento. O DnD continua operando por UUID e tamanhos passam a ser reordenados numa única função transacional do banco.
+- Novas fichas persistem o nome canônico mesmo quando a entrada foi um alias ou label composto. Strings históricas continuam interpretáveis e não houve reescrita destrutiva de `ficha_itens`.
+- A migration preserva UUIDs e medidas dos tamanhos existentes, converte labels legados em nome + aliases, marca perfis Baby legados como inativos/compatíveis e impede sua exclusão pela aplicação; desativação preserva o histórico.
+- O parser de listas de uniformes passou a derivar sua lista e equivalências da mesma configuração padrão central, eliminando a segunda matriz de aliases.
+
+### Validação
+
+- Auditoria remota somente leitura encontrou 30 itens de catálogo e 984 itens de ficha com tamanho; confirmou labels compostos e aliases históricos, além de valores desconhecidos que permanecem preservados pelo fallback.
+- `npm run test:quality`: 79/79. `npm run typecheck`, `npm run build` e `npm run supabase:check`: aprovados.
+- `npm run lint` continua bloqueado apenas pela ocorrência preexistente `react-hooks/set-state-in-effect` em `src/features/plano-de-corte/plano-de-corte-workspace.tsx:115`, arquivo não alterado nesta frente.
+- O projeto Supabase não está ligado no CLI local; por isso a migration ficou versionada, mas não foi aplicada remotamente nesta etapa.

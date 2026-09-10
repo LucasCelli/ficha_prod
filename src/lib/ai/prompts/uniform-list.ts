@@ -1,3 +1,11 @@
+import { DEFAULT_UNIFORM_SIZE_DEFINITIONS } from "@/lib/uniform-sizes";
+
+const childNames = new Set(["RN", "1", "2", "4", "6", "8", "10", "12", "14"]);
+const promptSizes = DEFAULT_UNIFORM_SIZE_DEFINITIONS.flatMap((size) => [size.name, ...size.aliases]);
+const promptAdultSizes = DEFAULT_UNIFORM_SIZE_DEFINITIONS.filter((size) => !childNames.has(size.name)).flatMap((size) => [size.name, ...size.aliases]);
+const promptChildSizes = DEFAULT_UNIFORM_SIZE_DEFINITIONS.filter((size) => childNames.has(size.name)).flatMap((size) => [size.name, ...size.aliases]);
+const promptEquivalences = DEFAULT_UNIFORM_SIZE_DEFINITIONS.map((size) => [size.name, ...size.aliases].join("/")).join("; ");
+
 export const UNIFORM_LIST_SYSTEM_PROMPT = `
 Voce extrai listas informais de camisetas, uniformes e pecas personalizadas enviadas por clientes via WhatsApp.
 Retorne somente os campos do schema: items, e em cada item: grupo, nome, numero, tamanho, modelo, confianca e observacao.
@@ -65,19 +73,19 @@ Regras gerais:
 - Se uma linha tiver "Nome Numero Tamanho", extraia os tres campos.
 - Se houver marcador de numero, como n, nº, num, numero ou número, o valor seguinte tende a ser o numero da camisa.
 - Se houver marcador de tamanho, como tam, tm ou tamanho, o valor seguinte tende a ser o tamanho.
-- Se a ultima informacao da linha for RN, 1, 2, 4, 6, 8, 10, 12, 14, 16, PP, P, M, G, GG, 52, XG, G1, 54, EG, G2, 56, EGG, EXG, G3, XXG, XGG, 58, EEGG, G4, 60, EXGG, G5, ESP1, 62, XLG, G6, ESP2, 64, G7 ou ESP3, trate como tamanho.
+- Se a ultima informacao da linha estiver nesta configuracao de tamanhos (${promptSizes.join(", ")}), trate como tamanho.
 - Se a ultima informacao da linha for 10, 12, 14 ou 16 e houver outro numero antes, trate o ultimo como tamanho infantil.
 - Tamanho infantil raramente e numero impar. Se aparecer idade seguida de numero par, como "miguel 9 anos 10", interprete 9 anos como idade e use "10" como numero e tamanho, pois a operacao normalmente arredonda idade para o tamanho par acima.
-- Em listas informais, PP, P, M, G, GG, XG, EG, EGG, EXG, XXG, XGG, EEGG, EXGG, XLG, G1, G2, G3, G4, G5, G6, G7, ESP1, ESP2 e ESP3 quase sempre indicam tamanho, principalmente quando nao aparecem logo apos o nome.
+- Em listas informais, nomes e aliases presentes na configuracao acima quase sempre indicam tamanho, principalmente quando nao aparecem logo apos o nome.
 - Letra de tamanho solta entre nome e numero deve ser tratada como tamanho. Exemplo: em "joao g 10", "joao" e nome, "G" e tamanho, "10" e numero.
 - Nao confunda inicial abreviada do nome com tamanho quando estiver colada ao nome. Exemplo: em "gabriel g. num 12 tam", "gabriel g." e nome, numero e "12", tamanho null.
 - Para tratar uma letra como inicial do nome, ela normalmente deve estar marcada com ponto ou colada ao nome, como "g."; sem ponto e solta, prefira tamanho.
 - Se houver apenas um numero na linha, decida com cautela se e numero da camisa ou tamanho infantil.
 - Em duplicidades aparentes, mantenha ambos os registros e adicione observacao se necessario.
 
-Tamanhos adultos aceitos: PP, P, M, G, GG, 52, XG, G1, 54, EG, G2, 56, EGG, EXG, G3, XXG, XGG, 58, EEGG, G4, 60, EXGG, G5, ESP1, 62, XLG, G6, ESP2, 64, G7, ESP3.
-Tamanhos infantis aceitos: RN, 1, 2, 4, 6, 8, 10, 12, 14, 16.
-Equivalencias de tamanho para ordenacao operacional: RN; 1; 2; 4; 6; PP/16; P; M; G; GG; 52/XG/G1; 54/EG/G2; 56/EGG/EXG/G3/XXG/XGG; 58/EEGG/G4; 60/EXGG/G5/ESP1; 62/XLG/G6/ESP2; 64/G7/ESP3.
+Tamanhos adultos aceitos: ${promptAdultSizes.join(", ")}.
+Tamanhos infantis aceitos: ${promptChildSizes.join(", ")}.
+Equivalencias de tamanho para ordenacao operacional: ${promptEquivalences}.
 O campo tamanho deve ser string.
 
 Mapeamentos:

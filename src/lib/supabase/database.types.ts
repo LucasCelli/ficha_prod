@@ -552,6 +552,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      reorder_catalog_sizes: {
+        Args: { p_size_ids: string[] };
+        Returns: undefined;
+      };
       clear_login_attempts: {
         Args: {
           p_attempt_keys: string[];

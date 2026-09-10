@@ -2,6 +2,10 @@
 
 Backlog vivo de correções, refinos e decisões futuras. Itens concluídos estão detalhados em `registro-alteracoes.md`.
 
+## Tamanhos globais
+
+- [ ] Aplicar `20260910004223_canonical_uniform_size_configuration.sql` no Supabase remoto e validar em navegador o DnD, edição de aliases, desativação e criação de ficha com `XG (52)`, `52`, `G1` e Baby Look. O CLI deste checkout não está ligado ao projeto remoto.
+
 ## Frente de design system — status
 
 ### Concluído

@@ -1,4 +1,5 @@
 import { compareUniformSizeAndBabyLookText } from "../../lib/uniform-sizes.ts";
+import type { UniformSizeDefinition } from "../../lib/uniform-sizes.ts";
 
 type SortableFichaProductItem = {
   detalhesProduto?: string | null;
@@ -16,7 +17,7 @@ function normalizeDetailsGroup(value: string | null | undefined) {
 }
 
 /** Mantém a primeira posição de cada grupo de detalhes e ordena seus tamanhos. */
-export function sortFichaProductItemsForSave<T extends SortableFichaProductItem>(items: readonly T[]) {
+export function sortFichaProductItemsForSave<T extends SortableFichaProductItem>(items: readonly T[], definitions?: readonly UniformSizeDefinition[]) {
   const groupOrder = new Map<string, number>();
 
   items.forEach((item) => {
@@ -29,6 +30,6 @@ export function sortFichaProductItemsForSave<T extends SortableFichaProductItem>
     const secondGroup = groupOrder.get(normalizeDetailsGroup(second.detalhesProduto)) ?? 0;
 
     if (firstGroup !== secondGroup) return firstGroup - secondGroup;
-    return compareUniformSizeAndBabyLookText(first, second);
+    return compareUniformSizeAndBabyLookText(first, second, definitions);
   });
 }

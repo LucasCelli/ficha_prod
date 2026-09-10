@@ -13,6 +13,8 @@ import type { FichaDeleteActionState, FichaFormState, FichaStatusActionState, Fi
 import { fichaFormSchema, type FichaFormValues } from "./schema";
 import { getFichaDeleteConfirmationCode } from "./delete-confirmation";
 import { sortFichaProductItemsForSave } from "./product-item-sorting";
+import { listUniformSizeDefinitions } from "@/features/catalogos/data";
+import { createUniformSizeDomain, DEFAULT_UNIFORM_SIZE_DEFINITIONS, type UniformSizeDefinition } from "@/lib/uniform-sizes";
 
 function getFichaFormInput(formData: FormData) {
   return {
@@ -112,12 +114,13 @@ function getFichaPayload(values: FichaFormValues): Json {
   };
 }
 
-function getFichaItensPayload(values: FichaFormValues): Json {
-  return sortFichaProductItemsForSave(values.itens).map((item) => ({
+function getFichaItensPayload(values: FichaFormValues, definitions: readonly UniformSizeDefinition[]): Json {
+  const domain = createUniformSizeDomain(definitions);
+  return sortFichaProductItemsForSave(values.itens, definitions).map((item) => ({
     detalhes_produto: nullableText(item.detalhesProduto),
     produto: item.produto,
     quantidade: item.quantidade,
-    tamanho: nullableText(item.tamanho),
+    tamanho: nullableText(domain.resolveSize(item.tamanho).definition?.name ?? item.tamanho),
   }));
 }
 
@@ -133,12 +136,14 @@ function getFichaImagensPayload(values: FichaFormValues): Json {
 }
 
 async function saveFichaAtomic(fichaId: string | null, actorId: string, values: FichaFormValues) {
+  const configuredSizes = await listUniformSizeDefinitions();
+  const definitions = configuredSizes.length ? configuredSizes : DEFAULT_UNIFORM_SIZE_DEFINITIONS;
   return createServerSupabaseClient().rpc("save_ficha_atomic", {
     p_actor_id: actorId,
     p_ficha: getFichaPayload(values),
     p_ficha_id: fichaId,
     p_imagens: getFichaImagensPayload(values),
-    p_itens: getFichaItensPayload(values),
+    p_itens: getFichaItensPayload(values, definitions),
   });
 }
 

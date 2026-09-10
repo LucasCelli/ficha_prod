@@ -65,6 +65,12 @@ public/                 assets estaticos atuais
 - Nao use o atributo HTML nativo `title` para explicar controles, icones ou conteudo truncado.
 - Prefira sempre o componente compartilhado `Tooltip` de `@/components/ui`, mantendo tambem um nome acessivel com `label`, `aria-label` ou `aria-labelledby`.
 - Propriedades `title` que representam titulos reais de pagina, modal, painel, metadados ou dados de dominio continuam validas.
+
+## Regra de domínio de tamanhos
+
+- Identidade, aliases, ativação e ordem são configurados nos itens `tamanho` de `catalog_items`.
+- Todo código que resolve, compara, ordena ou apresenta tamanhos deve consumir `src/lib/uniform-sizes.ts`; listas e heurísticas locais de tamanhos não são permitidas.
+- Baby Look é uma variante do mesmo tamanho canônico, não outro tamanho. Labels como `XG (52)` são apenas apresentação e nunca identidade persistida.
 ## Como continuar
 
 1. Ler `AGENTS.md`.

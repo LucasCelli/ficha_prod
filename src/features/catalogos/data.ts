@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { CustomDatalistOption } from "@/components/ui";
 import type { Json } from "@/lib/supabase/database.types";
 import type { CatalogItem, CatalogKind } from "./types";
+import type { UniformSizeDefinition } from "@/lib/uniform-sizes";
 import { catalogKinds } from "./types";
 
 export type CatalogosResult =
@@ -138,7 +139,7 @@ export async function listCatalogOptionsForFichaForm(): Promise<CatalogOptionsBy
   try {
     const { data, error } = await createServerSupabaseClient()
       .from("catalog_items")
-      .select("kind,name,aliases,metadata,fabric_width_cm,fabric_type")
+      .select("id,kind,name,aliases,metadata,fabric_width_cm,fabric_type")
       .eq("active", true)
       .order("kind", { ascending: true })
       .order("sort_order", { ascending: true })
@@ -161,8 +162,9 @@ export async function listCatalogOptionsForFichaForm(): Promise<CatalogOptionsBy
       itemsByKind[item.kind].push({
         aliases: item.aliases,
         details: [...(getCatalogOptionDetails(item.aliases, metadata) ?? []), ...fabricDetails],
+        id: item.id,
         label: item.name,
-        metadata,
+        metadata: item.kind === "tamanho" ? { ...metadata, sizeId: item.id, sizeOrder: String(itemsByKind[item.kind].length) } : metadata,
         value: item.name,
       });
     });
@@ -189,4 +191,13 @@ export async function listCatalogSizesForCutPlan(): Promise<CatalogSizeForCutPla
   } catch {
     return [];
   }
+}
+
+export async function listUniformSizeDefinitions(options: { activeOnly?: boolean } = {}): Promise<UniformSizeDefinition[]> {
+  if (!getSupabaseConfigStatus().hasServerConfig) return [];
+  let query = createServerSupabaseClient().from("catalog_items")
+    .select("id,name,aliases,active,sort_order,metadata").eq("kind", "tamanho").contains("metadata", { sizeGroup: "traditional" }).order("sort_order", { ascending: true });
+  if (options.activeOnly) query = query.eq("active", true);
+  const { data, error } = await query;
+  return error ? [] : (data ?? []).map((item) => ({ active: item.active, aliases: item.aliases, id: item.id, name: item.name, order: item.sort_order }));
 }

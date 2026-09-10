@@ -1,39 +1,13 @@
 import { z } from "zod";
+import { DEFAULT_UNIFORM_SIZE_DEFINITIONS } from "../../uniform-sizes.ts";
 
-export const adultUniformSizes = [
-  "PP",
-  "P",
-  "M",
-  "G",
-  "GG",
-  "52",
-  "XG",
-  "G1",
-  "54",
-  "EG",
-  "G2",
-  "56",
-  "EGG",
-  "EXG",
-  "G3",
-  "XXG",
-  "XGG",
-  "58",
-  "EEGG",
-  "G4",
-  "60",
-  "EXGG",
-  "G5",
-  "ESP1",
-  "62",
-  "XLG",
-  "G6",
-  "ESP2",
-  "64",
-  "G7",
-  "ESP3",
-] as const;
-export const childUniformSizes = ["RN", "1", "2", "4", "6", "8", "10", "12", "14", "16"] as const;
+const CHILD_SIZE_NAMES = new Set(["RN", "1", "2", "4", "6", "8", "10", "12", "14"]);
+export const childUniformSizes = DEFAULT_UNIFORM_SIZE_DEFINITIONS
+  .filter((size) => CHILD_SIZE_NAMES.has(size.name))
+  .flatMap((size) => [size.name, ...size.aliases]);
+export const adultUniformSizes = DEFAULT_UNIFORM_SIZE_DEFINITIONS
+  .filter((size) => !CHILD_SIZE_NAMES.has(size.name))
+  .flatMap((size) => [size.name, ...size.aliases]);
 
 export const UniformListItemSchema = z.object({
   grupo: z.string().nullable().default(null),
