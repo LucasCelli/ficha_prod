@@ -231,6 +231,22 @@ test.describe("estrutura de pagina", () => {
 });
 
 test.describe("plano de corte: tamanhos e mangas", () => {
+  test("reordena oito linhas pela posição final do sortable", async ({ context, page }) => {
+    await openPage(page, context, "/ferramentas/plano-de-corte");
+    const add = page.getByRole("button", { name: /adicionar tamanho/i });
+    for (let index = 0; index < 8; index += 1) await add.click();
+
+    const sizes = page.locator('input[aria-label^="Tamanho da linha"]');
+    for (const [index, value] of [..."ABCDEFGH"].entries()) await sizes.nth(index).fill(value);
+
+    const handles = page.locator("button.cut-plan-items__drag");
+    await handles.nth(7).dragTo(handles.nth(1), { targetPosition: { x: 8, y: 2 } });
+
+    await expect.poll(async () => sizes.evaluateAll((inputs) => inputs.map((input) => input.value))).toEqual([
+      "A", "H", "B", "C", "D", "E", "F", "G",
+    ]);
+  });
+
   test("cada linha escolhe manga curta ou longa", async ({ context, page }) => {
     await openPage(page, context, "/ferramentas/plano-de-corte");
     const fabric = page.locator('input[id^="cut-plan-fabric-name-"]').first();

@@ -2,9 +2,10 @@
 
 import { useState, type ReactNode } from "react";
 import { DragDropProvider } from "@dnd-kit/react";
-import { useSortable } from "@dnd-kit/react/sortable";
+import { isSortable, useSortable } from "@dnd-kit/react/sortable";
 import { ArrowDown, ArrowUp, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button, CustomDatalist, SortableHandle, SortableInstructions, Tooltip, type CustomDatalistOption } from "@/components/ui";
+import { assertStableSortableIds } from "@/lib/sortable-items";
 import { compareUniformSizeAndBabyLookText } from "@/lib/uniform-sizes";
 import type { CutPlanFabric, CutPlanItem, SleeveType } from "./model";
 
@@ -43,6 +44,7 @@ function SortableRow({ children, id, index }: { children: (handleRef: (element: 
 
 export function CutPlanItemsEditor({ addItem, duplicateItem, fabrics, items, moveItem, removeItem, sizeOptions, sortItems, updateItem }: Props) {
   const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
+  assertStableSortableIds(items, "Planejador de corte");
 
   function handleQuantityFocus(item: CutPlanItem) {
     if (!Number.isFinite(item.quantity) || item.quantity === 0) return;
@@ -65,7 +67,12 @@ export function CutPlanItemsEditor({ addItem, duplicateItem, fabrics, items, mov
     <SortableInstructions />
     <div className="cut-plan-items__toolbar"><Button variant="secondary" onClick={sortItems} disabled={items.length < 2}><RotateCcw size={18} /> Ordenar por tamanho</Button><Button variant="secondary" onClick={() => addItem()}><Plus size={18} /> Adicionar tamanho</Button></div>
     <div className="cut-plan-items__head" aria-hidden="true"><span></span><span>Tamanho</span><span>Tipo</span><span>Quantidade</span><span>Tecido</span><span>Ações</span></div>
-    <DragDropProvider onDragEnd={(event) => { if (event.canceled) return; const source = event.operation.source?.id; const target = event.operation.target?.id; if (source == null || target == null || source === target) return; moveItem(String(source), String(target)); }}>
+    <DragDropProvider onDragEnd={(event) => {
+      if (event.canceled) return;
+      const { source } = event.operation;
+      if (!isSortable(source) || source.initialIndex === source.index) return;
+      moveItem(String(source.id), source.index);
+    }}>
       <div className="cut-plan-items__list" data-sortable-list="">{items.length ? items.map((item, index) => <SortableRow id={item.id} index={index} key={item.id}>{(handleRef) => <>
         <SortableHandle className="cut-plan-items__drag" handleRef={handleRef} itemLabel={item.size || `linha ${index + 1}`} onMove={(target) => moveItem(item.id, target)} position={index + 1} total={items.length} />
         <div className="cut-plan-items__cell field"><span>Tamanho</span><CustomDatalist aria-label={`Tamanho da linha ${index + 1}`} id={`cut-plan-size-${item.id}`} onValueChange={(value) => updateItem(item.id, { size: value.toUpperCase() })} options={sizeOptions} placeholder="Escolha um tamanho" value={item.size} /></div>

@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { DragDropProvider } from "@dnd-kit/react";
-import { useSortable } from "@dnd-kit/react/sortable";
+import { isSortable, useSortable } from "@dnd-kit/react/sortable";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, Badge, SortableHandle, SortableInstructions } from "@/components/ui";
+import { assertStableSortableIds } from "@/lib/sortable-items";
 import { deleteCatalogItemsAction, saveCatalogItemOrderAction } from "./actions";
 import { CatalogItemActions } from "./catalog-item-actions";
 import type { CatalogItem, CatalogKind } from "./types";
@@ -111,6 +112,7 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
     router.refresh();
   }, [router, selectedKind]);
 
+  assertStableSortableIds(localItems ?? items, "Catálogo");
   const visibleItems = useMemo(() => getUniqueItemsById(localItems ?? items), [items, localItems]);
 
   // Mesma persistencia usada pelo arraste, disparada pelo teclado.
@@ -237,10 +239,11 @@ export function CatalogItemsTable({ closeHref, items, selectedKind }: CatalogIte
             onDragEnd={(event) => {
               const itemId = activeDragRef.current;
               activeDragRef.current = null;
-              if (!itemId || event.canceled || event.operation.target?.id == null) return;
+              const { source } = event.operation;
+              if (!itemId || event.canceled || !isSortable(source)) return;
 
               const rollbackItems = rollbackItemsRef.current;
-              const destinationIndex = rollbackItems.findIndex((item) => item.id === String(event.operation.target?.id));
+              const destinationIndex = source.index;
               const nextItems = moveItem(rollbackItems, itemId, destinationIndex);
               if (destinationIndex < 0 || haveSameOrder(nextItems, rollbackItems)) return;
 

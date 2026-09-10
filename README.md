@@ -71,6 +71,16 @@ public/                 assets estaticos atuais
 - Identidade, aliases, ativação e ordem são configurados nos itens `tamanho` de `catalog_items`.
 - Todo código que resolve, compara, ordena ou apresenta tamanhos deve consumir `src/lib/uniform-sizes.ts`; listas e heurísticas locais de tamanhos não são permitidas.
 - Baby Look é uma variante do mesmo tamanho canônico, não outro tamanho. Labels como `XG (52)` são apenas apresentação e nunca identidade persistida.
+
+## Padrao de drag and drop
+
+- O projeto usa `@dnd-kit/react` 0.5 e `@dnd-kit/dom` 0.5. Nao adicionar outra biblioteca de DnD sem justificativa arquitetural.
+- Listas ordenaveis usam `DragDropProvider` e `useSortable`. A mesma identidade persistente deve alimentar `key` e `id`; indice, posicao e texto editavel nunca sao IDs.
+- O sortable otimista atualiza `source.index` durante o arraste. No `onDragEnd`, valide `source` com `isSortable` e aplique `source.initialIndex -> source.index`; `source.id/target.id` nao determina a posicao final nessa API.
+- A lista renderizada e a unica fonte de verdade. Filtros devem traduzir movimentos por ID, e persistencia/cache nao podem restaurar uma ordem antiga sobre uma interacao mais recente.
+- Preserve os recursos padrao de mouse, toque e teclado. Sensores, colisao, modifiers e overlay so devem ser customizados quando a superficie realmente exigir.
+- Nao estabilize DnD com `setTimeout`, remount por `key`, efeitos em cascata, ordenacao silenciosa ou estado duplicado.
+
 ## Como continuar
 
 1. Ler `AGENTS.md`.

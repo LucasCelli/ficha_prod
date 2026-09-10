@@ -4,7 +4,7 @@ import { useActionState, useCallback, useEffect, useMemo, useRef, useState, type
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { DragDropProvider } from "@dnd-kit/react";
-import { useSortable } from "@dnd-kit/react/sortable";
+import { isSortable, useSortable } from "@dnd-kit/react/sortable";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import UnderlineExtension from "@tiptap/extension-underline";
@@ -37,6 +37,7 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, Button, CustomDatalist, CustomSelect, IconButton, Modal, SortableHandle, SortableInstructions, Tooltip, type CustomDatalistOption } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
 import { compareUniformSizeAndBabyLookText, DEFAULT_UNIFORM_SIZE_DEFINITIONS, type UniformSizeDefinition } from "@/lib/uniform-sizes";
+import { assertStableSortableIds } from "@/lib/sortable-items";
 import { createFichaAction, updateFichaAction } from "./actions";
 import { DatePickerField } from "./date-picker-field";
 import { DeliveryDeadlineAlert, Field, SubmitButton, sumProductQuantities } from "./ficha-form-controls";
@@ -764,6 +765,8 @@ function FichaFormInner({
   const [productItems, setProductItems] = useState<ProductFormItem[]>(itens);
   const imageGridRef = useRef<HTMLDivElement>(null);
   const [imageItems, setImageItems] = useState<ImageFormItem[]>(imagens);
+  assertStableSortableIds(productItems, "Produtos da ficha");
+  assertStableSortableIds(imageItems, "Imagens da ficha");
 
   const syncComposicaoByMaterial = useCallback((nextMaterial: string, source: "auto" | "manual", compositionOverride?: string) => {
     const materialOption = MATERIAL_OPTIONS.find((option) => option.nome === nextMaterial);
@@ -904,10 +907,10 @@ function FichaFormInner({
       });
     }
 
-    const localImages = filesToAdd.map((file, index) => ({
+    const localImages = filesToAdd.map((file) => ({
       altText: "",
       file,
-      id: `local-${Date.now()}-${index}-${file.name}`,
+      id: `local-${crypto.randomUUID()}`,
       previewUrl: URL.createObjectURL(file),
     }));
 
@@ -1404,7 +1407,7 @@ function FichaFormInner({
 
   function addProductItem() {
     const current = getValues("itens");
-    const item = createEmptyProductItem(`item-${Date.now()}-${current.length}`);
+    const item = createEmptyProductItem(`item-${crypto.randomUUID()}`);
     appendProductItem(item);
     setProductItems([...current, item]);
     scheduleDraftSnapshotPersist();
@@ -1416,7 +1419,7 @@ function FichaFormInner({
     const item = current[itemIndex];
     if (!item || itemIndex < 0) return;
 
-    const duplicated = { ...item, id: `item-${Date.now()}-${current.length}`, quantidade: "", tamanho: "" };
+    const duplicated = { ...item, id: `item-${crypto.randomUUID()}`, quantidade: "", tamanho: "" };
     const nextItems = [...current];
     nextItems.splice(position === "above" ? itemIndex : itemIndex + 1, 0, duplicated);
     replaceProductItems(nextItems);
@@ -1911,14 +1914,9 @@ function FichaFormInner({
             <DragDropProvider
               onDragEnd={(event) => {
                 if (event.canceled) return;
-                const sourceId = event.operation.source?.id;
-                const targetId = event.operation.target?.id;
-                if (sourceId == null || targetId == null) return;
-
-                const current = getValues("itens");
-                const fromIndex = current.findIndex((item) => item.id === String(sourceId));
-                const toIndex = current.findIndex((item) => item.id === String(targetId));
-                moveProductItem(fromIndex, toIndex);
+                const { source } = event.operation;
+                if (!isSortable(source) || source.initialIndex === source.index) return;
+                moveProductItem(source.initialIndex, source.index);
               }}
             >
             <motion.div
@@ -2623,14 +2621,9 @@ function FichaFormInner({
               <DragDropProvider
                 onDragEnd={(event) => {
                   if (event.canceled) return;
-                  const sourceId = event.operation.source?.id;
-                  const targetId = event.operation.target?.id;
-                  if (sourceId == null || targetId == null) return;
-
-                  const current = getValues("imagens");
-                  const fromIndex = current.findIndex((item) => item.id === String(sourceId));
-                  const toIndex = current.findIndex((item) => item.id === String(targetId));
-                  moveImageItem(fromIndex, toIndex);
+                  const { source } = event.operation;
+                  if (!isSortable(source) || source.initialIndex === source.index) return;
+                  moveImageItem(source.initialIndex, source.index);
                 }}
               >
               <div ref={imageGridRef} className="image-upload-grid" data-count={imagens.length}>

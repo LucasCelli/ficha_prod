@@ -112,6 +112,8 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
   const input = useMemo<CutPlanInput>(() => ({ tableLengthCm, maxLayers, maxFrequency, mergeFabricsInLays, fabrics, items, sizeProfiles, sourceFichaIds: sourceFichas.map((ficha) => ficha.id) }), [tableLengthCm, maxLayers, maxFrequency, mergeFabricsInLays, fabrics, items, sizeProfiles, sourceFichas]);
   const selected = alternatives.find((alternative) => alternative.id === selectedId) ?? alternatives[0];
   useEffect(() => {
+    // O histórico é uma fonte externa do navegador e só pode ser lido após a hidratação.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHistory(readCutPlanHistory());
     setHistoryLoaded(true);
   }, []);
