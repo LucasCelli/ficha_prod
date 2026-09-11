@@ -1123,6 +1123,15 @@ function FichaFormInner({
 
     persistCurrentDraftSnapshot();
 
+    if (imagens.length === 0) {
+      event.preventDefault();
+      isSubmittingRef.current = false;
+      toast.error("Imagem obrigatória", {
+        description: "Adicione pelo menos uma imagem para salvar a ficha.",
+      });
+      return;
+    }
+
     const hasBlockedImportedImages = imagens.some((image) => image.saveBlocked);
     if (hasBlockedImportedImages) {
       event.preventDefault();
@@ -2600,7 +2609,11 @@ function FichaFormInner({
           </div>
         </fieldset>
 
-        <fieldset className="form-section form-section--media">
+        <fieldset
+          aria-describedby={state.fieldErrors?.imagensJson ? "imagensJson-error" : undefined}
+          aria-invalid={state.fieldErrors?.imagensJson ? "true" : undefined}
+          className="form-section form-section--media"
+        >
           <legend>
             <Images aria-hidden="true" size={18} />
             <span>Arte / Imagens do Produto</span>
@@ -2614,7 +2627,7 @@ function FichaFormInner({
             <div className="image-upload-panel__intro">
               <Images aria-hidden="true" size={28} />
               <div>
-                <strong>Imagens do produto</strong>
+                <strong>Imagens do produto (obrigatório)</strong>
                 <span>{imagens.length}/4 imagens adicionadas</span>
               </div>
             </div>

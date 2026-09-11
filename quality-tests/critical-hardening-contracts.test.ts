@@ -6,6 +6,8 @@ const migration = readFileSync("supabase/migrations/20260731032229_critical_inte
 const cloudinaryDeleteRoute = readFileSync("src/app/api/cloudinary/image/[...publicId]/route.ts", "utf8");
 const cloudinarySignatureRoute = readFileSync("src/app/api/cloudinary/signature/route.ts", "utf8");
 const fichaActions = readFileSync("src/features/fichas/actions.ts", "utf8");
+const fichaForm = readFileSync("src/features/fichas/ficha-form.tsx", "utf8");
+const fichaSchema = readFileSync("src/features/fichas/schema.ts", "utf8");
 
 test("mantém login e cotas operacionais persistentes e restritos ao service role", () => {
   assert.match(migration, /create table if not exists public\.app_login_rate_limits/);
@@ -18,6 +20,12 @@ test("salva ficha, itens e imagens por uma única RPC transacional", () => {
   assert.match(migration, /create or replace function public\.save_ficha_atomic/);
   assert.match(fichaActions, /\.rpc\("save_ficha_atomic"/);
   assert.doesNotMatch(fichaActions, /rollbackCreatedFicha|resolveClienteId/);
+});
+
+test("exige ao menos uma imagem ao criar ou editar uma ficha", () => {
+  assert.match(fichaSchema, /\.min\(1, "Adicione pelo menos uma imagem para salvar a ficha\."\)/);
+  assert.match(fichaForm, /if \(imagens\.length === 0\)/);
+  assert.match(fichaForm, /Imagens do produto \(obrigatório\)/);
 });
 
 test("não aceita autorização de exclusão nem public id definidos pelo cliente", () => {
