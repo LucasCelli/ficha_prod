@@ -17,13 +17,11 @@ export type SolverConstraints = {
   tableLengthCm: number;
   fabricWidthCm: number;
   sizeProfiles: CutPlanSizeProfile[];
-  maxSizesPerMarker?: number;
   maxFrequency?: number;
   /** Quantidades de enfestos acima do mínimo que também devem ser exploradas. */
   additionalLayCounts?: number;
 };
 
-const DEFAULT_MAX_SIZES_PER_MARKER = 5;
 const MAX_EXACT_LAYS = 4;
 const SOLUTIONS_PER_STATE = 6;
 const MAX_RETURNED_SOLUTIONS = 8;
@@ -35,7 +33,6 @@ type RankedEntry = { size: string; sleeveType: SleeveType; quantity: number; ran
 type SizeAssignment = { frequencies: number[]; markerLengths: number[]; totalFrequency: number };
 type PartialPlan = {
   assignments: number[][];
-  counts: number[];
   markerLengths: number[];
   sizeSpreadScore: number;
   totalFrequency: number;
@@ -133,7 +130,7 @@ function compareNumbers(a: number[], b: number[]) {
 
 function partialKey(plan: PartialPlan) {
   const lengths = plan.markerLengths.map((length) => length.toFixed(6)).join(",");
-  return `${plan.usedMask}:${plan.counts.join(",")}:${lengths}`;
+  return `${plan.usedMask}:${lengths}`;
 }
 
 function calculateSizeSpreadScore(assignments: number[][], layers: number[]) {
@@ -174,28 +171,22 @@ function solveLayerSet(
   const emptyAssignments = entries.map(() => [] as number[]);
   const initialPlan: PartialPlan = {
     assignments: emptyAssignments,
-    counts: layers.map(() => 0),
     markerLengths: layers.map(() => 0),
     sizeSpreadScore: 0,
     totalFrequency: 0,
     usedMask: 0,
   };
   let states = new Map<string, PartialPlan[]>([[partialKey(initialPlan), [initialPlan]]]);
-  const maxSizesPerMarker = constraints.maxSizesPerMarker ?? DEFAULT_MAX_SIZES_PER_MARKER;
-
   for (const { entry, options } of prepared) {
     const nextStates = new Map<string, PartialPlan[]>();
     for (const plans of states.values()) for (const plan of plans) for (const option of options) {
       if (budgetExhausted(budget)) return null;
-      const counts = plan.counts.map((count, index) => count + Number(option.frequencies[index] > 0));
-      if (counts.some((count) => count > maxSizesPerMarker)) continue;
       const markerLengths = plan.markerLengths.map((length, index) => length + option.markerLengths[index]);
       if (markerLengths.some((length) => length > constraints.tableLengthCm + Number.EPSILON)) continue;
       const usedMask = option.frequencies.reduce((mask, frequency, index) => mask | (frequency > 0 ? 1 << index : 0), plan.usedMask);
       const assignments = plan.assignments.map((frequencies, rank) => rank === entry.rank ? option.frequencies : frequencies);
       const candidate: PartialPlan = {
         assignments,
-        counts,
         markerLengths,
         sizeSpreadScore: calculateSizeSpreadScore(assignments, layers),
         totalFrequency: plan.totalFrequency + option.totalFrequency,
@@ -272,11 +263,9 @@ export function solveMinimumLays(
   });
   if (!ordered.length) return [];
   const entries = ordered.map(([key, quantity], rank) => ({ ...parseCutPlanDemandKey(key), quantity, rank }));
-  const maxSizesPerMarker = constraints.maxSizesPerMarker ?? DEFAULT_MAX_SIZES_PER_MARKER;
   const maxFrequency = constraints.maxFrequency ?? 8;
   const lowerBound = Math.max(
     1,
-    Math.ceil(entries.length / maxSizesPerMarker),
     Math.ceil(Math.max(...entries.map(({ quantity }) => quantity)) / (maxFrequency * maxLayers)),
   );
   const upperBound = Math.min(MAX_EXACT_LAYS, fallbackLayCount + (constraints.additionalLayCounts ?? 0));

@@ -188,12 +188,6 @@ function calculateOptimizedVariants(input: CutPlanInput) {
     };
     const allSolutions = solveMinimumLays(target, input.maxLayers, fabric.type, fabricResult.lays.length, constraints);
     const solutions = allSolutions.filter((solution, index) => allSolutions.slice(0, index).filter((previous) => previous.lays.length === solution.lays.length).length < 2);
-    if (solutions.length && requested.size > 3 && !solutions.some((solution) => solution.lays.every((lay) => lay.frequencies.length <= 3))) {
-      const simpler = solveMinimumLays(target, input.maxLayers, fabric.type, fabricResult.lays.length, { ...constraints, maxSizesPerMarker: 3 });
-      for (const solution of simpler) {
-        if (!solutions.some((existing) => existing.signature === solution.signature)) solutions.push(solution);
-      }
-    }
     return { fabric, requested, solutions };
   });
   const variantCount = Math.max(1, ...fabrics.map((entry) => entry.solutions.length));

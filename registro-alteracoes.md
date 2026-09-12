@@ -10,3 +10,11 @@
 - Migration remota: corrigida a inspeção da função PostgreSQL para usar marcadores estruturais, aplicada em produção e registrada no histórico remoto como `20260910012830`.
 - Validação: base remota auditada em modo leitura com 405 clientes, nenhum nome vazio, nenhum grupo duplicado pela normalização atual e 757 fichas já vinculadas por `cliente_id`; após a aplicação, coluna `empresa`, índice de identidade, RPC de cliente e resolução de `cliente_id` na ficha foram confirmados no banco.
 - Validação final: typecheck, lint, build, configuração Supabase, encoding, 87 testes de qualidade e Playwright em desktop/tablet/mobile passaram; o teste visual mede a proporção 2:1:1 e o padding do modal nos quatro lados.
+
+# 2026-09-11 — Plano de Corte: aproveitamento de tamanhos infantis
+
+- Módulo: Plano de Corte.
+- Arquivos alterados: `src/features/plano-de-corte/solver.ts`, `src/features/plano-de-corte/calculator.ts` e `quality-tests/plano-de-corte-solver.test.ts`.
+- Resultado: removido o teto artificial de tamanhos por mapa, permitindo distribuir pequenas grades tubulares entre enfestos já necessários em vez de criar um enfesto curto e exclusivo.
+- Decisão: a viabilidade do mapa passa a ser limitada pelo comprimento estimado da mesa e pela frequência máxima configurada, mantendo frequência tubular par e conservação exata da produção; pequenas quantidades podem ser repartidas entre mapas existentes para eliminar enfestos isolados, sem fabricar alternativas piores por meio de limites artificiais.
+- Caveat: a eficiência de 85% continua sendo uma estimativa por área das partes; o encaixe geométrico final permanece responsabilidade do Audaces.

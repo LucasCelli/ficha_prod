@@ -295,6 +295,57 @@ test("respeita a frequencia maxima personalizada no solver", () => {
   assert.ok(restricted.lays.every((lay) => lay.frequencies.every(({ frequency }) => frequency <= 8)));
 });
 
+test("distribui tamanho infantil tubular entre enfestos existentes", () => {
+  const quantities = new Map(Object.entries({
+    RN: 6,
+    "1": 14,
+    "2": 16,
+    "4": 8,
+    "6": 6,
+    "8": 4,
+    "10": 4,
+    "14": 6,
+    P: 4,
+    M: 10,
+    G: 10,
+    GG: 12,
+    EG: 6,
+  }).map(([size, quantity]) => [cutPlanDemandKey(size, "CURTA"), quantity]));
+
+  const solution = solveMinimumLays(quantities, 50, "TUBULAR", 4, {
+    ...unconstrained,
+    tableLengthCm: 800,
+    maxFrequency: 14,
+    additionalLayCounts: 1,
+  })[0];
+
+  assert.ok(solution && solution.lays.length < 4);
+  const sizeOneLays = solution.lays.filter((lay) => lay.frequencies.some(({ size }) => size === "1"));
+  assert.ok(sizeOneLays.length > 0);
+  assert.ok(sizeOneLays.every((lay) => lay.frequencies.length > 1));
+  assert.equal(sizeOneLays.reduce((total, lay) => {
+    const frequency = lay.frequencies.find(({ size }) => size === "1")!.frequency;
+    return total + lay.layers * frequency;
+  }, 0), 14);
+  assert.ok(solution.lays.some((lay) => lay.frequencies.length > 5));
+});
+
+test("nao limita artificialmente a quantidade de tamanhos no enfesto", () => {
+  const quantities = new Map(["RN", "1", "2", "4", "6", "8", "10"].map((size) => [
+    cutPlanDemandKey(size, "CURTA"),
+    2,
+  ]));
+
+  const solution = solveMinimumLays(quantities, 50, "TUBULAR", 7, {
+    ...unconstrained,
+    maxFrequency: 14,
+  })[0];
+
+  assert.equal(solution?.lays.length, 1);
+  assert.equal(solution.lays[0].frequencies.length, 7);
+  assert.ok(solution.lays[0].frequencies.every(({ frequency }) => frequency === 2));
+});
+
 test("mantem a quantidade importada como pedido ao aumentar o corte manualmente", () => {
   const input = createInput("TUBULAR", 50);
   input.items = [{
@@ -492,7 +543,7 @@ test("orcamento combinatorio cai no fallback sem perder producao exata", () => {
   assert.ok(result.fabrics[0].lays.every((lay) => lay.layers <= 50 && lay.frequencies.every(({ frequency }) => frequency % 2 === 0)));
 });
 
-test("fallback agrupa subconjuntos compativeis quando mangas e quantidades sao mistas", () => {
+test("agrupa demandas compativeis quando mangas e quantidades sao mistas", () => {
   const input = createInput("TUBULAR", 50);
   input.maxFrequency = 14;
   input.items = [
@@ -513,7 +564,7 @@ test("fallback agrupa subconjuntos compativeis quando mangas e quantidades sao m
 
   const result = calculateCutPlan(input).fabrics[0];
 
-  assert.equal(result.lays.length, 3);
+  assert.ok(result.lays.length <= 3);
   assert.ok(result.lays.some((lay) => lay.frequencies.length > 1));
   assert.ok(result.lays.some((lay) => new Set(lay.frequencies.map(({ sleeveType }) => sleeveType)).size === 2));
   assert.ok(result.sizes.every(({ requested, produced }) => produced === requested || produced === requested + 1));

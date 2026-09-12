@@ -18,8 +18,6 @@ export class CutPlanCalculationError extends Error {
   }
 }
 
-const MAX_SIZES_PER_MARKER = 5;
-
 function normalizeSize(size: string) {
   return size.trim().replace(/\s+/g, " ").replace(/^BERMUDA(?=\s|$)/i, "SHORT");
 }
@@ -77,7 +75,6 @@ function findJointCandidate(
           best = { layers, frequencies: [...selected] };
         }
       }
-      if (selected.length === MAX_SIZES_PER_MARKER) return;
       for (let candidateIndex = index; candidateIndex < compatible.length; candidateIndex += 1) {
         selected.push(compatible[candidateIndex]);
         visit(candidateIndex + 1, selected);
