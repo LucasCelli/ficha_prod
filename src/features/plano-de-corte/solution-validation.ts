@@ -23,12 +23,12 @@ export function validateCutPlanSolution(input: CutPlanInput, result: CutPlanResu
       let knownLength = 0;
       const seen = new Set<string>();
       for (const item of lay.frequencies) {
-        const key = cutPlanDemandKey(item.size, item.sleeveType);
-        const limit = Math.min(input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type), isPantsCutPlanSize(item.size) ? step : Infinity);
+        const key = cutPlanDemandKey(item.size, item.sleeveType, item.garmentType);
+        const limit = Math.min(input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type), item.garmentType === "PANTS" || isPantsCutPlanSize(item.size) ? step : Infinity);
         if (seen.has(key) || !expected.has(key) || !Number.isSafeInteger(item.frequency) || item.frequency < step || item.frequency > limit || item.frequency % step !== 0) fail();
         seen.add(key);
         produced.set(key, (produced.get(key) ?? 0) + item.frequency * lay.layers);
-        const measurement = resolveEntryLengthPerFrequencyCm(item.size, item.sleeveType, fabric.type, fabric.widthCm, index);
+        const measurement = resolveEntryLengthPerFrequencyCm(item.size, item.sleeveType, fabric.type, fabric.widthCm, index, item.garmentType);
         if (sourceRank[measurement.source] > sourceRank[measurementSource]) measurementSource = measurement.source;
         if (measurement.lengthCm === null) measurementsComplete = false;
         else knownLength += measurement.lengthCm * item.frequency;
@@ -40,9 +40,9 @@ export function validateCutPlanSolution(input: CutPlanInput, result: CutPlanResu
     for (const [key, quantity] of expected) {
       if (produced.get(key) !== step * Math.ceil(quantity / step)) fail();
     }
-    if (output.sizes.length !== expected.size || new Set(output.sizes.map((item) => cutPlanDemandKey(item.size, item.sleeveType))).size !== expected.size) fail();
+    if (output.sizes.length !== expected.size || new Set(output.sizes.map((item) => cutPlanDemandKey(item.size, item.sleeveType, item.garmentType))).size !== expected.size) fail();
     for (const item of output.sizes) {
-      const key = cutPlanDemandKey(item.size, item.sleeveType);
+      const key = cutPlanDemandKey(item.size, item.sleeveType, item.garmentType);
       if (item.produced !== produced.get(key) || item.requested !== requested.get(key) || item.difference !== item.produced - item.requested) fail();
     }
   }

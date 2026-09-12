@@ -1,17 +1,26 @@
 export type FabricType = "PLANO" | "TUBULAR";
 export type SleeveType = "CURTA" | "LONGA";
+export type GarmentType = "T_SHIRT" | "DRESS_SHIRT" | "PANTS" | "SHORTS";
 
 const CUT_PLAN_DEMAND_SEPARATOR = "\u001f";
 
-export function cutPlanDemandKey(size: string, sleeveType: SleeveType) {
-  return `${size}${CUT_PLAN_DEMAND_SEPARATOR}${sleeveType}`;
+export function inferCutPlanGarmentType(size: string): GarmentType {
+  if (/^CAL[CÇ]A(?:\s|$)/i.test(size.trim())) return "PANTS";
+  if (/^(?:SHORT|BERMUDA)(?:\s|$)/i.test(size.trim())) return "SHORTS";
+  return "T_SHIRT";
 }
 
-export function parseCutPlanDemandKey(key: string): { size: string; sleeveType: SleeveType } {
-  const separatorIndex = key.lastIndexOf(CUT_PLAN_DEMAND_SEPARATOR);
-  if (separatorIndex < 0) return { size: key, sleeveType: "CURTA" };
-  const sleeveType = key.slice(separatorIndex + 1) === "LONGA" ? "LONGA" : "CURTA";
-  return { size: key.slice(0, separatorIndex), sleeveType };
+export function cutPlanDemandKey(size: string, sleeveType: SleeveType, garmentType = inferCutPlanGarmentType(size)) {
+  return `${size}${CUT_PLAN_DEMAND_SEPARATOR}${sleeveType}${CUT_PLAN_DEMAND_SEPARATOR}${garmentType}`;
+}
+
+export function parseCutPlanDemandKey(key: string): { garmentType: GarmentType; size: string; sleeveType: SleeveType } {
+  const parts = key.split(CUT_PLAN_DEMAND_SEPARATOR);
+  if (parts.length < 2) return { garmentType: inferCutPlanGarmentType(key), size: key, sleeveType: "CURTA" };
+  const size = parts[0];
+  const sleeveType = parts[1] === "LONGA" ? "LONGA" : "CURTA";
+  const garmentType = (["T_SHIRT", "DRESS_SHIRT", "PANTS", "SHORTS"] as const).find((type) => type === parts[2]) ?? inferCutPlanGarmentType(size);
+  return { garmentType, size, sleeveType };
 }
 
 export interface CutPlanFabric {
@@ -27,6 +36,7 @@ export interface CutPlanItem {
   fabricId: string;
   size: string;
   sleeveType: SleeveType;
+  garmentType?: GarmentType;
   quantity: number;
   /** Quantidade original da ficha; `quantity` permanece como alvo operacional editável. */
   importedQuantity?: number;
@@ -63,7 +73,7 @@ export interface CutPlanSourceFicha {
   color: string;
   id: string;
   imageUrl: string | null;
-  items: Array<{ color?: string; material?: string; quantity: number; size: string; sleeveType?: SleeveType }>;
+  items: Array<{ color?: string; garmentType?: GarmentType; material?: string; quantity: number; size: string; sleeveType?: SleeveType }>;
   material: string;
   number: string | null;
   sleeveType: SleeveType;
@@ -74,6 +84,7 @@ export interface MarkerFrequency {
   size: string;
   sleeveType: SleeveType;
   frequency: number;
+  garmentType?: GarmentType;
 }
 
 export interface LayPlan {
@@ -88,6 +99,7 @@ export interface LayPlan {
 export interface SizeProductionResult {
   size: string;
   sleeveType: SleeveType;
+  garmentType?: GarmentType;
   requested: number;
   produced: number;
   difference: number;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveItemColor, resolveItemGarmentSize, resolveItemModelSize, resolveItemSleeveType } from "../src/features/plano-de-corte/ficha-item-classification.ts";
+import { resolveItemColor, resolveItemGarmentSize, resolveItemGarmentType, resolveItemModelSize, resolveItemSleeveType } from "../src/features/plano-de-corte/ficha-item-classification.ts";
 
 test("produto e detalhes separam manga antes da especificação técnica geral", () => {
   assert.equal(resolveItemSleeveType("Camiseta manga curta", "Curta e longa"), "CURTA");
@@ -22,6 +22,14 @@ test("mantém calça separada e unifica bermuda com short no mesmo tamanho", () 
   assert.equal(resolveItemSleeveType("Calça longa de helanca", "Manga longa"), "CURTA");
   assert.equal(resolveItemGarmentSize("G", "Saia feminina"), "G");
   assert.equal(resolveItemGarmentSize("G", "Macacão"), "G");
+});
+
+test("classifica camiseta e camisa social como modelagens distintas", () => {
+  assert.equal(resolveItemGarmentType("Camiseta básica manga curta"), "T_SHIRT");
+  assert.equal(resolveItemGarmentType("Camisa manga curta"), "DRESS_SHIRT");
+  assert.equal(resolveItemGarmentType("Camisa social masculina manga longa"), "DRESS_SHIRT");
+  assert.equal(resolveItemGarmentType("Calça de helanca"), "PANTS");
+  assert.equal(resolveItemGarmentType("Bermuda de helanca"), "SHORTS");
 });
 
 test("cor explícita do item prevalece e os demais usam a cor técnica", () => {

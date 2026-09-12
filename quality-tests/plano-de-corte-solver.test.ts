@@ -43,17 +43,17 @@ test("omite a manga na grade unica e preserva na grade mista", () => {
     { size: "P", sleeveType: "CURTA" as const, frequency: 2 },
     { size: "M", sleeveType: "LONGA" as const, frequency: 4 },
   ];
-  assert.equal(formatMarkerLabel(frequencies, false), "2P + 4M");
-  assert.equal(formatMarkerLabel(frequencies, true), "2P MC + 4M ML");
-  assert.equal(formatOperationalMarkerLabel(frequencies, false), "(2-P) (4-M)");
-  assert.equal(formatOperationalMarkerLabel(frequencies, true), "(2-P MC) (4-M ML)");
+  assert.equal(formatMarkerLabel(frequencies, false), "2-P + 4-M");
+  assert.equal(formatMarkerLabel(frequencies, true), "2-P MC + 4-M ML");
+  assert.equal(formatOperationalMarkerLabel(frequencies, false), "2-P, 4-M");
+  assert.equal(formatOperationalMarkerLabel(frequencies, true), "2-P MC, 4-M ML");
 });
 
 test("formato operacional separa frequência de tamanhos numéricos", () => {
   assert.equal(formatOperationalMarkerLabel([
     { size: "14", sleeveType: "CURTA", frequency: 2 },
     { size: "EEGG (58)", sleeveType: "CURTA", frequency: 2 },
-  ], false), "(2-14) (2-EEGG (58))");
+  ], false), "2-14, 2-EEGG (58)");
 });
 
 test("apresenta o tipo da peca em vez de manga curta para itens inferiores", () => {
@@ -81,14 +81,14 @@ test("abrevia Baby Look como BL na apresentação", () => {
   assert.equal(formatCutPlanSizeLabel("BABY PP"), "BL PP");
   assert.equal(formatCutPlanSizeLabel("FEM P"), "FEM. P");
   assert.equal(formatCutPlanSizeLabel("MASC P"), "MASC. P");
-  assert.equal(formatMarkerLabel([{ size: "BABY PP", sleeveType: "CURTA", frequency: 2 }], false), "2BL PP");
+  assert.equal(formatMarkerLabel([{ size: "BABY PP", sleeveType: "CURTA", frequency: 2 }], false), "2-BL PP");
   assert.equal(formatMarkerLabel([
     { size: "P", sleeveType: "CURTA", frequency: 2 },
     { size: "M", sleeveType: "CURTA", frequency: 2 },
     { size: "BABY M", sleeveType: "CURTA", frequency: 2 },
     { size: "G", sleeveType: "CURTA", frequency: 4 },
     { size: "GG", sleeveType: "CURTA", frequency: 2 },
-  ], false), "2P + 2M + 4G + 2GG + 2BL M");
+  ], false), "2-P + 2-M + 4-G + 2-GG + 2-BL M");
 });
 
 test("eficiencia estimada acompanha o mapa tubular real de 118 por 836,32 cm", () => {
@@ -265,7 +265,7 @@ test("prefere um unico enfesto tubular com frequencia 8 quando fecha em mais fol
 
   assert.equal(solution?.lays.length, 1);
   assert.equal(solution.lays[0].layers, 3);
-  assert.equal(formatMarkerLabel(solution.lays[0].frequencies, false), "8G + 2GG + 2BL GG");
+  assert.equal(formatMarkerLabel(solution.lays[0].frequencies, false), "8-G + 2-GG + 2-BL GG");
 });
 
 test("oferece alternativa intermediaria de dois enfestos com tamanhos pequenos juntos", () => {
@@ -294,6 +294,13 @@ test("respeita a frequencia maxima personalizada no solver", () => {
   assert.equal(expanded.lays[0].layers, 3);
   assert.equal(expanded.lays[0].frequencies[0].frequency, 14);
   assert.ok(restricted.lays.every((lay) => lay.frequencies.every(({ frequency }) => frequency <= 8)));
+});
+
+test("formato operacional identifica modelagens de camisa", () => {
+  assert.equal(formatOperationalMarkerLabel([
+    { garmentType: "DRESS_SHIRT", size: "M", sleeveType: "LONGA", frequency: 2 },
+    { garmentType: "T_SHIRT", size: "P", sleeveType: "CURTA", frequency: 1 },
+  ], true), "1-P MC, 2-M SOCIAL ML");
 });
 
 test("distribui tamanho infantil tubular entre enfestos existentes", () => {
@@ -361,6 +368,7 @@ test("mantem a quantidade importada como pedido ao aumentar o corte manualmente"
 
   const result = calculateCutPlanAlternatives(input)[0].result.fabrics[0].sizes[0];
   assert.deepEqual(result, {
+    garmentType: "T_SHIRT",
     size: "M",
     sleeveType: "CURTA",
     requested: 6,
@@ -387,8 +395,8 @@ test("pedido Intercement permanece em dois enfestos com a dobra conservada pela 
   const result = calculateCutPlan(input).fabrics[0];
   assert.deepEqual(result.lays.map(({ layers }) => layers), [15, 10]);
   assert.deepEqual(result.lays.map((lay) => formatMarkerLabel(lay.frequencies, false)), [
-    "4M + 2G + 2GG",
-    "4P + 2G",
+    "4-M + 2-G + 2-GG",
+    "4-P + 2-G",
   ]);
   assert.ok(result.lays.every((lay) => (lay.markerLengthCm ?? 0) <= input.tableLengthCm));
   assert.ok(result.sizes.every((size) => size.difference === 0));
@@ -504,6 +512,25 @@ test("mantem o mesmo tamanho separado por tipo de manga", () => {
     [cutPlanDemandKey("M", "CURTA"), 10],
     [cutPlanDemandKey("M", "LONGA"), 12],
   ]), 20, "PLANO", 4, unconstrained)[0]);
+});
+
+test("mantém o mesmo tamanho e manga separados por modelagem", () => {
+  const input = createInput("PLANO", 20);
+  input.items = ["T_SHIRT", "DRESS_SHIRT"].map((garmentType, index) => ({
+    id: `modeling-${index}`,
+    fabricId: "fabric",
+    garmentType: garmentType as "T_SHIRT" | "DRESS_SHIRT",
+    size: "M",
+    sleeveType: "CURTA" as const,
+    quantity: 2,
+  }));
+
+  const result = calculateCutPlan(input).fabrics[0];
+  assert.deepEqual(result.sizes.map(({ garmentType, requested, produced }) => ({ garmentType, requested, produced })), [
+    { garmentType: "DRESS_SHIRT", requested: 2, produced: 2 },
+    { garmentType: "T_SHIRT", requested: 2, produced: 2 },
+  ]);
+  assert.equal(result.lays.flatMap((lay) => lay.frequencies).length, 2);
 });
 
 test("coincide com busca exaustiva independente em entradas pequenas", () => {

@@ -7,21 +7,20 @@ import { ArrowDown, ArrowUp, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button, CustomDatalist, SortableHandle, SortableInstructions, Tooltip, type CustomDatalistOption } from "@/components/ui";
 import { assertStableSortableIds } from "@/lib/sortable-items";
 import { compareUniformSizeAndBabyLookText } from "@/lib/uniform-sizes";
-import type { CutPlanFabric, CutPlanItem, SleeveType } from "./model";
+import { inferCutPlanGarmentType, type CutPlanFabric, type CutPlanItem, type GarmentType, type SleeveType } from "./model";
 
 const fabricLabel = (fabric: CutPlanFabric) => `${fabric.name}${fabric.color.trim() ? ` — ${fabric.color.trim()}` : ""}`;
 
-const GARMENT_TYPES = ["SHORT", "BERMUDA", "CALÇA"] as const;
-
 function getItemType(item: CutPlanItem) {
-  const type = GARMENT_TYPES.find((candidate) => item.size.toUpperCase().startsWith(`${candidate} `));
-  return type === "BERMUDA" ? "SHORT" : type ?? item.sleeveType;
+  const garmentType = item.garmentType ?? inferCutPlanGarmentType(item.size);
+  return garmentType === "PANTS" || garmentType === "SHORTS" ? garmentType : `${garmentType}:${item.sleeveType}`;
 }
 
 function changeItemType(item: CutPlanItem, type: string): Partial<CutPlanItem> {
   const sizeWithoutGarment = item.size.replace(/^(?:SHORT|BERMUDA|CALÇA)\s+/i, "");
-  if (type === "CURTA" || type === "LONGA") return { size: sizeWithoutGarment, sleeveType: type as SleeveType };
-  return { size: `${type === "BERMUDA" ? "SHORT" : type} ${sizeWithoutGarment}`.trim(), sleeveType: "CURTA" };
+  if (type === "PANTS" || type === "SHORTS") return { garmentType: type, size: `${type === "PANTS" ? "CALÇA" : "SHORT"} ${sizeWithoutGarment}`.trim(), sleeveType: "CURTA" };
+  const [garmentType, sleeveType] = type.split(":") as [GarmentType, SleeveType];
+  return { garmentType, size: sizeWithoutGarment, sleeveType };
 }
 
 type Props = {
@@ -76,7 +75,7 @@ export function CutPlanItemsEditor({ addItem, duplicateItem, fabrics, items, mov
       <div className="cut-plan-items__list" data-sortable-list="">{items.length ? items.map((item, index) => <SortableRow id={item.id} index={index} key={item.id}>{(handleRef) => <>
         <SortableHandle className="cut-plan-items__drag" handleRef={handleRef} itemLabel={item.size || `linha ${index + 1}`} onMove={(target) => moveItem(item.id, target)} position={index + 1} total={items.length} />
         <div className="cut-plan-items__cell field"><span>Tamanho</span><CustomDatalist aria-label={`Tamanho da linha ${index + 1}`} id={`cut-plan-size-${item.id}`} onValueChange={(value) => updateItem(item.id, { size: value.toUpperCase() })} options={sizeOptions} placeholder="Escolha um tamanho" value={item.size} /></div>
-        <label className="cut-plan-items__cell field"><span>Tipo</span><select aria-label={`Tipo da linha ${index + 1}`} value={getItemType(item)} onChange={(event) => updateItem(item.id, changeItemType(item, event.currentTarget.value))}><option value="CURTA">Manga curta</option><option value="LONGA">Manga longa</option><option value="SHORT">Short/Bermuda</option><option value="CALÇA">Calça</option></select></label>
+        <label className="cut-plan-items__cell field"><span>Modelagem</span><select aria-label={`Modelagem da linha ${index + 1}`} value={getItemType(item)} onChange={(event) => updateItem(item.id, changeItemType(item, event.currentTarget.value))}><option value="T_SHIRT:CURTA">Camiseta · manga curta</option><option value="T_SHIRT:LONGA">Camiseta · manga longa</option><option value="DRESS_SHIRT:CURTA">Camisa social · manga curta</option><option value="DRESS_SHIRT:LONGA">Camisa social · manga longa</option><option value="SHORTS">Short/Bermuda</option><option value="PANTS">Calça</option></select></label>
         <label className="cut-plan-items__cell field"><span>Quantidade</span><input aria-label={`Quantidade da linha ${index + 1}`} inputMode="numeric" min="0" step="1" type="number" value={quantityDrafts[item.id] ?? (Number.isFinite(item.quantity) && item.quantity !== 0 ? String(item.quantity) : "")} onBlur={() => handleQuantityBlur(item)} onChange={(event) => handleQuantityChange(item, event.currentTarget.value)} onFocus={() => handleQuantityFocus(item)} placeholder="Qtd." /></label>
         <label className="cut-plan-items__cell field"><span>Tecido</span><select aria-label={`Tecido da linha ${index + 1}`} value={item.fabricId} onChange={(event) => updateItem(item.id, { fabricId: event.currentTarget.value })}>{fabrics.map((fabric) => <option value={fabric.id} key={fabric.id}>{fabricLabel(fabric)}</option>)}</select></label>
         <div className="cut-plan-items__actions"><div><Tooltip label="Duplicar acima"><button aria-label={`Duplicar linha ${index + 1} acima`} onClick={() => duplicateItem(item.id, "above")} type="button"><ArrowUp size={14} /></button></Tooltip><Tooltip label="Duplicar abaixo"><button aria-label={`Duplicar linha ${index + 1} abaixo`} onClick={() => duplicateItem(item.id, "below")} type="button"><ArrowDown size={14} /></button></Tooltip></div><Tooltip label="Remover"><button aria-label={`Remover linha ${index + 1}`} className="is-danger" onClick={() => removeItem(item.id)} type="button"><Trash2 size={16} /></button></Tooltip></div>

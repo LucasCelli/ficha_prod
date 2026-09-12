@@ -45,7 +45,7 @@ function findJointCandidate(
   // comprimentos crescentes é exato; não é necessário enumerar 2^n subconjuntos.
   const lengths = new Map(entries.map(([key]) => {
     const demand = parseCutPlanDemandKey(key);
-    return [key, calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, fabric.type, fabric.widthCm, profileIndex) ?? 0];
+    return [key, calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, fabric.type, fabric.widthCm, profileIndex, demand.garmentType) ?? 0];
   }));
   for (let layers = maximumLayers; layers >= 1; layers -= 1) {
     checkSearchBudget(budget);
@@ -61,7 +61,7 @@ function findJointCandidate(
     for (const item of compatible) {
       if (!fitsTable(length + item.length, input.tableLengthCm)) break;
       length += item.length;
-      selected.push({ size: item.size, sleeveType: item.sleeveType, frequency: item.frequency });
+      selected.push({ garmentType: item.garmentType, size: item.size, sleeveType: item.sleeveType, frequency: item.frequency });
     }
     if (selected.length >= 2 && (!best || selected.length > best.frequencies.length || (selected.length === best.frequencies.length && layers > best.layers))) best = { layers, frequencies: selected };
   }
@@ -70,21 +70,21 @@ function findJointCandidate(
 
 function subtractProduction(remaining: Map<string, number>, lay: Pick<LayPlan, "layers" | "frequencies">) {
   for (const marker of lay.frequencies) {
-    const key = cutPlanDemandKey(marker.size, marker.sleeveType);
+    const key = cutPlanDemandKey(marker.size, marker.sleeveType, marker.garmentType);
     remaining.set(key, (remaining.get(key) ?? 0) - marker.frequency * lay.layers);
   }
 }
 
 function calculateSizes(requested: Map<string, number>, lays: LayPlan[]) {
-  const keys = new Set([...requested.keys(), ...lays.flatMap((lay) => lay.frequencies.map((marker) => cutPlanDemandKey(marker.size, marker.sleeveType)))]);
+  const keys = new Set([...requested.keys(), ...lays.flatMap((lay) => lay.frequencies.map((marker) => cutPlanDemandKey(marker.size, marker.sleeveType, marker.garmentType)))]);
   return [...keys].map((key) => {
     const quantity = requested.get(key) ?? 0;
-    const { size, sleeveType } = parseCutPlanDemandKey(key);
+    const { garmentType, size, sleeveType } = parseCutPlanDemandKey(key);
     const produced = lays.reduce((total, lay) => {
-      const marker = lay.frequencies.find((frequency) => frequency.size === size && frequency.sleeveType === sleeveType);
+      const marker = lay.frequencies.find((frequency) => frequency.size === size && frequency.sleeveType === sleeveType && (frequency.garmentType ?? "T_SHIRT") === garmentType);
       return total + (marker ? marker.frequency * lay.layers : 0);
     }, 0);
-    return { size, sleeveType, requested: quantity, produced, difference: produced - quantity };
+    return { garmentType, size, sleeveType, requested: quantity, produced, difference: produced - quantity };
   });
 }
 
@@ -119,9 +119,9 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
     }
 
     const [demandKey, quantity] = [...remaining.entries()].find(([, value]) => value > 0)!;
-    const { size, sleeveType } = parseCutPlanDemandKey(demandKey);
+    const { garmentType, size, sleeveType } = parseCutPlanDemandKey(demandKey);
     const step = fabric.type === "TUBULAR" ? 2 : 1;
-    const maximumFrequency = Math.min(quantity, getMaximumEstimatedFrequency(size, sleeveType, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles, input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type)));
+    const maximumFrequency = Math.min(quantity, getMaximumEstimatedFrequency(size, sleeveType, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles, input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type), garmentType));
     if (maximumFrequency < step) throw new CutPlanCalculationError(`O tamanho ${size} ultrapassa a mesa mesmo na menor grade.`);
     let frequency = maximumFrequency;
     let layers = Math.min(input.maxLayers, Math.floor(quantity / frequency));
@@ -134,7 +134,7 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
         frequency = candidateFrequency; layers = candidateLayers; break;
       }
     }
-    addLay(layers, [{ size, sleeveType, frequency }]);
+    addLay(layers, [{ garmentType, size, sleeveType, frequency }]);
   }
 
   const constraints = {
@@ -214,7 +214,8 @@ export function formatCutPlanSizeLabel(size: string) {
     .replace(/\bMASC(?:ULINA|ULINO)?\s+/i, "MASC. ");
 }
 
-export function formatCutPlanItemType(size: string, sleeveType: MarkerFrequency["sleeveType"]) {
+export function formatCutPlanItemType(size: string, sleeveType: MarkerFrequency["sleeveType"], garmentType?: MarkerFrequency["garmentType"]) {
+  if (garmentType === "DRESS_SHIRT") return sleeveType === "LONGA" ? "Camisa social · longa" : "Camisa social · curta";
   const garment = size.trim().match(/^(SHORT|BERMUDA|CALÇA)(?:\s|$)/i)?.[1];
   if (garment && /^(?:SHORT|BERMUDA)$/i.test(garment)) return "Short/Bermuda";
   if (garment) return garment.charAt(0).toUpperCase() + garment.slice(1).toLocaleLowerCase("pt-BR");
@@ -225,18 +226,20 @@ export function sortMarkerFrequenciesForDisplay(frequencies: MarkerFrequency[]) 
   return [...frequencies].sort((first, second) => {
     const modelOrder = Number(isUniformBabyLookText(first.size)) - Number(isUniformBabyLookText(second.size));
     if (modelOrder !== 0) return modelOrder;
-    return compareUniformSizes(first.size, second.size);
+    return compareUniformSizes(first.size, second.size)
+      || (first.garmentType ?? "T_SHIRT").localeCompare(second.garmentType ?? "T_SHIRT")
+      || first.sleeveType.localeCompare(second.sleeveType);
   });
 }
 
 export function formatMarkerLabel(frequencies: MarkerFrequency[], showSleeveType = true) {
-  return sortMarkerFrequenciesForDisplay(frequencies).map(({ size, sleeveType, frequency }) => `${frequency}${formatCutPlanSizeLabel(size)}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`).join(" + ");
+  return sortMarkerFrequenciesForDisplay(frequencies).map(({ garmentType, size, sleeveType, frequency }) => `${frequency}-${formatCutPlanSizeLabel(size)}${garmentType === "DRESS_SHIRT" ? " SOCIAL" : ""}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`).join(" + ");
 }
 
 export function formatOperationalMarkerLabel(frequencies: MarkerFrequency[], showSleeveType = true) {
   return sortMarkerFrequenciesForDisplay(frequencies)
-    .map(({ size, sleeveType, frequency }) => `(${frequency}-${formatCutPlanSizeLabel(size)}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""})`)
-    .join(" ");
+    .map(({ garmentType, size, sleeveType, frequency }) => `${frequency}-${formatCutPlanSizeLabel(size)}${garmentType === "DRESS_SHIRT" ? " SOCIAL" : ""}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`)
+    .join(", ");
 }
 
 /** Rotulo contado no padrao do projeto: plural escrito, nunca "(s)". */

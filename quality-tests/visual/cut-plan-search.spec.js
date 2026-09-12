@@ -17,8 +17,8 @@ test("plano de corte preserva os IDs do servidor durante a hidratação", async 
   expect(await names.nth(1).getAttribute("id")).not.toBe(serverId);
   await page.getByRole("button", { name: /adicionar tamanho/i }).click();
   await expect(page.getByLabel("Tamanho da linha 1", { exact: true })).toBeVisible();
-  const itemType = page.getByLabel("Tipo da linha 1", { exact: true });
-  await expect(itemType.locator("option")).toHaveText(["Manga curta", "Manga longa", "Short/Bermuda", "Calça"]);
+  const itemType = page.getByLabel("Modelagem da linha 1", { exact: true });
+  await expect(itemType.locator("option")).toHaveText(["Camiseta · manga curta", "Camiseta · manga longa", "Camisa social · manga curta", "Camisa social · manga longa", "Short/Bermuda", "Calça"]);
   // Confere também o estado usado pelo cliente, mesmo se React mantiver o atributo SSR.
   await expect(page.getByLabel("Tecido da linha 1", { exact: true })).toHaveValue(serverId.replace("cut-plan-fabric-name-", ""));
   expect(errors).toEqual([]);

@@ -61,6 +61,21 @@ test("preserva a opção local de quatro folhas necessária às cores de 12 e 4 
   validateCutPlanSolution(input, result.result);
 });
 
+test("busca conjunta aceita três divisões locais quando elas reduzem os enfestos globais", () => {
+  const input = inputFor([20, 80, 80, 80]);
+  input.maxLayers = 4;
+  input.maxFrequency = 3;
+  input.items[0].quantity = 12;
+  for (const item of input.items.slice(1)) item.quantity = 4;
+
+  const result = calculateCutPlanAlternatives(input)[0];
+  assert.equal(result.layCount, 3);
+  assert.equal(result.result.mergedLays?.every((lay) => lay.markerLengthCm === 100), true);
+  assert.equal(result.result.mergedLays?.flatMap((lay) => lay.allocations).filter((lay) => lay.fabricId === "f0").length, 3);
+  assert.equal(result.result.search?.status, "feasible");
+  validateCutPlanSolution(input, result.result);
+});
+
 test("dominância preserva o melhor estado completo sob o critério de equilíbrio", () => {
   const sizes = ["PP", "P", "M", "G", "GG", "EG", "EEG"];
   const quantities = [9, 1, 8, 8, 7, 12, 12];

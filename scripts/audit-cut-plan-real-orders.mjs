@@ -2,7 +2,8 @@ import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { calculateCutPlanAlternatives } from "../src/features/plano-de-corte/alternatives.ts";
 import { getDefaultMaximumFrequency, getLayerLimit } from "../src/features/plano-de-corte/dimensions.ts";
-import { resolveItemGarmentSize, resolveItemModelSize, resolveItemSleeveType } from "../src/features/plano-de-corte/ficha-item-classification.ts";
+import { resolveItemGarmentSize, resolveItemGarmentType, resolveItemModelSize, resolveItemSleeveType } from "../src/features/plano-de-corte/ficha-item-classification.ts";
+import { cutPlanDemandKey } from "../src/features/plano-de-corte/model.ts";
 
 config({ path: ".env.local", quiet: true });
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -39,8 +40,9 @@ for (const order of orders ?? []) {
     const description = [item.produto, item.descricao, item.detalhes_produto, item.detalhes].filter(Boolean).join(" ");
     const size = resolveItemGarmentSize(resolveItemModelSize(item.tamanho.trim().toUpperCase(), description), description);
     const sleeveType = resolveItemSleeveType(description, order.manga);
-    const demandKey = `${size}\u001f${sleeveType}`;
-    grouped.set(demandKey, { size, sleeveType, quantity: (grouped.get(demandKey)?.quantity ?? 0) + item.quantidade });
+    const garmentType = resolveItemGarmentType(description, size);
+    const demandKey = cutPlanDemandKey(size, sleeveType, garmentType);
+    grouped.set(demandKey, { garmentType, size, sleeveType, quantity: (grouped.get(demandKey)?.quantity ?? 0) + item.quantidade });
   }
   if (!grouped.size) { skipped.noItems += 1; continue; }
   const type = fabricConfig.fabric_type;

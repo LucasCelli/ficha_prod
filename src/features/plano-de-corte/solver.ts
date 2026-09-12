@@ -1,6 +1,6 @@
 import { compareUniformSizes } from "../../lib/uniform-sizes.ts";
 import { buildSizeProfileIndex, calculateEntryLengthPerFrequencyCm, fitsTable, getDefaultMaximumFrequency, isPantsCutPlanSize, maximumFrequencyForLength, tableCapacityCm } from "./dimensions.ts";
-import { parseCutPlanDemandKey, type CutPlanSizeProfile, type FabricType, type MarkerFrequency, type SleeveType } from "./model.ts";
+import { parseCutPlanDemandKey, type CutPlanSizeProfile, type FabricType, type GarmentType, type MarkerFrequency, type SleeveType } from "./model.ts";
 import { checkSearchBudget, createSearchBudget, SearchInterrupted, type SearchBudget } from "./search-budget.ts";
 
 export type SolvedLay = { layers: number; frequencies: MarkerFrequency[]; markerLengthCm?: number };
@@ -34,8 +34,9 @@ export type SolverConstraints = {
 // Limita apenas o pool de alternativas completas, nunca a prova do melhor plano.
 const MAX_RETURNED_SOLUTIONS = 128;
 const MAX_STATES = 150_000;
+const RETAINED_STATES_AFTER_COMPACTION = 100_000;
 
-type RankedEntry = { size: string; sleeveType: SleeveType; quantity: number; rank: number; length: number; measured: boolean; maxFrequency: number };
+type RankedEntry = { garmentType: GarmentType; size: string; sleeveType: SleeveType; quantity: number; rank: number; length: number; measured: boolean; maxFrequency: number };
 type SizeAssignment = { frequencies: number[]; markerLengths: number[]; totalFrequency: number };
 type PartialPlan = {
   assignments: number[][];
@@ -164,13 +165,14 @@ function solveLayerSet(
   budget: SearchBudget,
   onComplete: (solution: SolvedPlan) => void,
 ) {
+  let pruned = false;
   const prepared = entries.map((entry) => {
     return {
       entry,
       options: getSizeAssignments(entry, layers, type, entry.length, constraints.tableLengthCm, entry.maxFrequency, cache, budget),
     };
   });
-  if (prepared.some(({ options }) => options.length === 0)) return;
+  if (prepared.some(({ options }) => options.length === 0)) return pruned;
 
   // Tamanhos mais restritos primeiro reduzem a DP sem alterar o rank fisico.
   prepared.sort((a, b) => a.options.length - b.options.length || b.entry.quantity - a.entry.quantity || a.entry.rank - b.entry.rank);
@@ -216,13 +218,18 @@ function solveLayerSet(
       const existing = nextStates.get(key);
       if (!existing || comparePartialPlans(candidate, existing) < 0) nextStates.set(key, candidate);
       if (nextStates.size > MAX_STATES) {
-        budget.termination = "state_limit";
-        throw new SearchInterrupted();
+        const kept = [...nextStates.entries()]
+          .sort(([, left], [, right]) => comparePartialPlans(left, right))
+          .slice(0, RETAINED_STATES_AFTER_COMPACTION);
+        nextStates.clear();
+        for (const [stateKey, state] of kept) nextStates.set(stateKey, state);
+        pruned = true;
       }
     }
     states = nextStates;
-    if (!states.size) return;
+    if (!states.size) return pruned;
   }
+  return pruned;
 }
 
 function comparePartialPlans(a: PartialPlan, b: PartialPlan) {
@@ -237,9 +244,9 @@ function comparePartialPlans(a: PartialPlan, b: PartialPlan) {
 function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPlan, searchComplete: boolean): SolvedPlan {
   const lays = layers.map((layerCount, layIndex) => ({
     layers: layerCount,
-    frequencies: entries.flatMap(({ size, sleeveType, rank }) => {
+    frequencies: entries.flatMap(({ garmentType, size, sleeveType, rank }) => {
       const frequency = plan.assignments[rank][layIndex];
-      return frequency ? [{ size, sleeveType, frequency }] : [];
+      return frequency ? [{ garmentType, size, sleeveType, frequency }] : [];
     }),
     ...(entries.every((entry) => !plan.assignments[entry.rank][layIndex] || entry.measured) ? { markerLengthCm: plan.markerLengths[layIndex] } : {}),
   }));
@@ -261,7 +268,7 @@ function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPl
     layerHeightImbalance: Math.max(...layers) / Math.min(...layers),
     balanceAdjustedMarkerLengthCm: totalMarkerLengthCm * (1 + sizeEntryImbalance * SIZE_ENTRY_IMBALANCE_PENALTY),
   };
-  const signature = lays.map((lay) => `${lay.layers}:${lay.frequencies.map((item) => `${item.size}:${item.sleeveType}=${item.frequency}`).join(",")}`).join("|");
+  const signature = lays.map((lay) => `${lay.layers}:${lay.frequencies.map((item) => `${item.garmentType ?? "T_SHIRT"}:${item.size}:${item.sleeveType}=${item.frequency}`).join(",")}`).join("|");
   return { lays, metrics, signature, searchComplete };
 }
 
@@ -291,10 +298,11 @@ export function assessLays(lays: SolvedLay[], quantities: Map<string, number>, t
     return compareUniformSizes(a.size, b.size) || a.sleeveType.localeCompare(b.sleeveType) || left.localeCompare(right);
   }).map(([key, quantity], rank) => {
     const demand = parseCutPlanDemandKey(key);
-    const length = calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, type, constraints.fabricWidthCm, index);
+    const length = calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, type, constraints.fabricWidthCm, index, demand.garmentType);
     return { ...demand, quantity, rank, length: length ?? 0, measured: length !== null, maxFrequency: 0 };
   });
-  const assignments = entries.map((entry) => lays.map((lay) => lay.frequencies.find((item) => item.size === entry.size && item.sleeveType === entry.sleeveType)?.frequency ?? 0));
+  const assignments = entries.map((entry) => lays.map((lay) => lay.frequencies.find((item) => item.size === entry.size && item.sleeveType === entry.sleeveType
+    && (item.garmentType ?? "T_SHIRT") === entry.garmentType)?.frequency ?? 0));
   const markerLengths = lays.map((_, j) => entries.reduce((sum, entry) => sum + entry.length * assignments[entry.rank][j], 0));
   return buildSolution(entries, lays.map((lay) => lay.layers), { assignments, markerLengths, totalFrequency: 0, sizeSpreadScore: 0, usedMask: BigInt(0) }, false);
 }
@@ -322,8 +330,8 @@ export function solveMinimumLays(
   const profileIndex = buildSizeProfileIndex(constraints.sizeProfiles);
   const entries: RankedEntry[] = ordered.map(([key, quantity], rank) => {
     const demand = parseCutPlanDemandKey(key);
-    const length = calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, type, constraints.fabricWidthCm, profileIndex);
-    const configured = Math.min(maxFrequency, isPantsCutPlanSize(demand.size) ? step : maxFrequency, quantity);
+    const length = calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, type, constraints.fabricWidthCm, profileIndex, demand.garmentType);
+    const configured = Math.min(maxFrequency, demand.garmentType === "PANTS" || isPantsCutPlanSize(demand.size) ? step : maxFrequency, quantity);
     const limit = maximumFrequencyForLength(length, constraints.tableLengthCm, configured, step);
     return { ...demand, quantity, rank, length: length ?? 0, measured: length !== null, maxFrequency: limit };
   });
@@ -362,10 +370,11 @@ export function solveMinimumLays(
         if (!canRepresentAllQuantities(entries, layers, type, maxFrequency)) continue;
         if (!fitsTable(volume, layers.reduce((sum, h) => sum + h, 0) * constraints.tableLengthCm)) continue;
         // O cache é local: conjuntos de folhas distintos não reutilizam atribuições.
-        solveLayerSet(entries, layers, type, constraints, new Map(), budget, (solution) => {
+        const pruned = solveLayerSet(entries, layers, type, constraints, new Map(), budget, (solution) => {
           found = true;
           retain(solution);
         });
+        if (pruned) complete = false;
       }
       if (found) lastCountToSearch = Math.min(lastCountToSearch, count + additional);
     }

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { CutPlanAlternative } from "./alternatives";
-import { countLabel, formatCutPlanItemType, formatCutPlanSizeLabel, formatOperationalMarkerLabel } from "./calculator";
+import { countLabel, formatCutPlanItemType, formatCutPlanSizeLabel, formatOperationalMarkerLabel, sortMarkerFrequenciesForDisplay } from "./calculator";
 import { formatEstimatedLengthMeters } from "./dimensions";
 import { compareUniformSizes } from "../../lib/uniform-sizes";
 import { cutPlanDemandKey, parseCutPlanDemandKey, type CutPlanFabric, type CutPlanInput, type CutPlanSourceFicha, type FabricCutPlanResult, type LayPlan, type MergedLayPlan } from "./model";
@@ -63,6 +63,14 @@ function mergedLayRowCount(lay: MergedLayPlan) {
   return lay.allocations.reduce((sum, allocation) => sum + allocation.frequencies.length, 0);
 }
 
+function sortedMergedMarkers(lay: MergedLayPlan) {
+  return lay.allocations
+    .flatMap((allocation) => allocation.frequencies.map((marker) => ({ allocation, marker })))
+    .sort((left, right) => compareUniformSizes(left.marker.size, right.marker.size)
+      || left.marker.sleeveType.localeCompare(right.marker.sleeveType)
+      || left.allocation.fabricId.localeCompare(right.allocation.fabricId));
+}
+
 function MergedLayCard({ fabricResults, fabrics, index, lay }: { fabricResults: FabricCutPlanResult[]; fabrics: CutPlanFabric[]; index: number; lay: MergedLayPlan }) {
   return <LayCard badgeLayers={lay.layers} header={<>
     <h3>Enfesto {String(index + 1).padStart(2, "0")}</h3>
@@ -75,9 +83,9 @@ function MergedLayCard({ fabricResults, fabrics, index, lay }: { fabricResults: 
     {lay.markerLengthCm ? <p className="cut-plan-print-simple__length">Comprimento estimado: {formatEstimatedLengthMeters(lay.markerLengthCm)}</p> : null}
   </>} rows={<>
     <thead><tr><th>Tecido</th><th>Tamanho</th><th>Tipo</th><th>Frequência</th><th>Peças cortadas</th></tr></thead>
-    <tbody>{lay.allocations.flatMap((allocation) => {
+    <tbody>{sortedMergedMarkers(lay).map(({ allocation, marker }) => {
       const fabric = fabrics.find((item) => item.id === allocation.fabricId)!;
-      return allocation.frequencies.map((marker) => <tr key={`${allocation.id}-${marker.size}-${marker.sleeveType}`}><td>{fabricLabel(fabric)}</td><td>{formatCutPlanSizeLabel(marker.size)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>);
+      return <tr key={`${allocation.id}-${marker.garmentType}-${marker.size}-${marker.sleeveType}`}><td>{fabricLabel(fabric)}</td><td>{formatCutPlanSizeLabel(marker.size)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>;
     })}</tbody>
   </>} />;
 }
@@ -89,7 +97,7 @@ function FabricLayCard({ index, lay, showSleeveType }: { index: number; lay: Lay
     {lay.markerLengthCm ? <p className="cut-plan-print-simple__length">Comprimento estimado: {formatEstimatedLengthMeters(lay.markerLengthCm)}</p> : null}
   </>} rows={<>
     <thead><tr><th>Tamanho</th><th>Tipo</th><th>Frequência</th><th>Peças cortadas</th></tr></thead>
-    <tbody>{lay.frequencies.map((marker) => <tr key={`${marker.size}-${marker.sleeveType}`}><td>{formatCutPlanSizeLabel(marker.size)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>)}</tbody>
+    <tbody>{sortMarkerFrequenciesForDisplay(lay.frequencies).map((marker) => <tr key={`${marker.garmentType}-${marker.size}-${marker.sleeveType}`}><td>{formatCutPlanSizeLabel(marker.size)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>)}</tbody>
   </>} />;
 }
 
@@ -103,7 +111,7 @@ function aggregateOverallSizes(fabricResults: FabricCutPlanResult[]) {
   const totals = new Map<string, { produced: number; requested: number }>();
   for (const fabricResult of fabricResults) {
     for (const size of fabricResult.sizes) {
-      const key = cutPlanDemandKey(size.size, size.sleeveType);
+      const key = cutPlanDemandKey(size.size, size.sleeveType, size.garmentType);
       const current = totals.get(key) ?? { produced: 0, requested: 0 };
       current.produced += size.produced;
       current.requested += size.requested;
@@ -112,10 +120,12 @@ function aggregateOverallSizes(fabricResults: FabricCutPlanResult[]) {
   }
   return [...totals.entries()]
     .map(([key, value]) => {
-      const { size, sleeveType } = parseCutPlanDemandKey(key);
-      return { difference: value.produced - value.requested, produced: value.produced, requested: value.requested, size, sleeveType };
+      const { garmentType, size, sleeveType } = parseCutPlanDemandKey(key);
+      return { difference: value.produced - value.requested, garmentType, produced: value.produced, requested: value.requested, size, sleeveType };
     })
-    .sort((left, right) => compareUniformSizes(left.size, right.size) || left.sleeveType.localeCompare(right.sleeveType));
+    .sort((left, right) => compareUniformSizes(left.size, right.size)
+      || left.sleeveType.localeCompare(right.sleeveType)
+      || left.garmentType.localeCompare(right.garmentType));
 }
 
 function OverallConference({ rows }: { rows: ReturnType<typeof aggregateOverallSizes> }) {
@@ -124,7 +134,7 @@ function OverallConference({ rows }: { rows: ReturnType<typeof aggregateOverallS
     produced: sum.produced + row.produced,
     requested: sum.requested + row.requested,
   }), { difference: 0, produced: 0, requested: 0 });
-  return <section className="cut-plan-print-simple__conference"><h3>Conferência final</h3><table className="cut-plan-print-simple__check"><thead><tr><th>Tamanho</th><th>Tipo</th><th>Pedido</th><th>Vai cortar</th><th>Diferença</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.size}-${row.sleeveType}`}><td><strong>{formatCutPlanSizeLabel(row.size)}</strong></td><td>{formatCutPlanItemType(row.size, row.sleeveType)}</td><td>{row.requested}</td><td>{row.produced}</td><td>{row.difference > 0 ? "+" : ""}{row.difference}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>Totais</th><td><strong>{totals.requested}</strong></td><td><strong>{totals.produced}</strong></td><td><strong>{totals.difference}</strong></td></tr></tfoot></table></section>;
+  return <section className="cut-plan-print-simple__conference"><h3>Conferência final</h3><table className="cut-plan-print-simple__check"><thead><tr><th>Tamanho</th><th>Tipo</th><th>Pedido</th><th>Vai cortar</th><th>Diferença</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.garmentType}-${row.size}-${row.sleeveType}`}><td><strong>{formatCutPlanSizeLabel(row.size)}</strong></td><td>{formatCutPlanItemType(row.size, row.sleeveType, row.garmentType)}</td><td>{row.requested}</td><td>{row.produced}</td><td>{row.difference > 0 ? "+" : ""}{row.difference}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>Totais</th><td><strong>{totals.requested}</strong></td><td><strong>{totals.produced}</strong></td><td><strong>{totals.difference}</strong></td></tr></tfoot></table></section>;
 }
 
 export function CutPlanPrintSimple({ alternative, input, sourceFichas = [] }: { alternative: CutPlanAlternative; input: CutPlanInput; sourceFichas?: CutPlanSourceFicha[] }) {

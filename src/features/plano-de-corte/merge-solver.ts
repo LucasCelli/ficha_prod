@@ -5,6 +5,25 @@ import { fabricCompatibilityKey, normalizeCompatibilityValue } from "./solution-
 
 type Group = MergedLayPlan & { compatibility: string; colors: string[]; fabrics: string[] };
 
+/** Bound inferior aditivo por compatibilidade, altura, comprimento e cor. */
+export function calculateMergedLayLowerBound(input: CutPlanInput, result: CutPlanResult) {
+  const fabricIndex = new Map(input.fabrics.map((fabric) => [fabric.id, fabric]));
+  const classes = new Map<string, { length: number; colors: Map<string, number> }>();
+  let isolated = 0;
+  for (const lay of result.fabrics.flatMap((fabric) => fabric.lays)) {
+    const fabric = fabricIndex.get(lay.fabricId)!;
+    const color = normalizeCompatibilityValue(fabric.color);
+    if (lay.markerLengthCm === undefined || !color) { isolated++; continue; }
+    const key = JSON.stringify([fabricCompatibilityKey(fabric), lay.layers]);
+    const entry = classes.get(key) ?? { length: 0, colors: new Map<string, number>() };
+    entry.length += lay.markerLengthCm;
+    entry.colors.set(color, (entry.colors.get(color) ?? 0) + 1);
+    classes.set(key, entry);
+  }
+  return isolated + [...classes.values()].reduce((sum, entry) => sum
+    + Math.max(Math.ceil(entry.length / input.tableLengthCm - 1e-12), ...entry.colors.values()), 0);
+}
+
 /** Empacotamento exato das alocações disponíveis, com incumbente guloso. */
 export function buildMergedLays(input: CutPlanInput, result: CutPlanResult, budget: SearchBudget): MergedLayPlan[] {
   const fabricIndex = new Map(input.fabrics.map((fabric) => [fabric.id, fabric]));
@@ -27,18 +46,7 @@ export function buildMergedLays(input: CutPlanInput, result: CutPlanResult, budg
     if (index < 0) best.push(make(lay));
     else best[index] = append(best[index], lay);
   }
-  const classes = new Map<string, { length: number; colors: Map<string, number> }>();
-  let isolated = 0;
-  for (const lay of allocations) {
-    const { compatibility, color } = properties(lay);
-    if (lay.markerLengthCm === undefined || !color) { isolated++; continue; }
-    const key = JSON.stringify([compatibility, lay.layers]);
-    const entry = classes.get(key) ?? { length: 0, colors: new Map<string, number>() };
-    entry.length += lay.markerLengthCm;
-    entry.colors.set(color, (entry.colors.get(color) ?? 0) + 1);
-    classes.set(key, entry);
-  }
-  const lower = isolated + [...classes.values()].reduce((sum, entry) => sum + Math.max(Math.ceil(entry.length / input.tableLengthCm - 1e-12), ...entry.colors.values()), 0);
+  const lower = calculateMergedLayLowerBound(input, result);
   const seen = new Set<string>();
   function visit(index: number, groups: Group[]) {
     if (best.length === lower) return;
@@ -48,7 +56,9 @@ export function buildMergedLays(input: CutPlanInput, result: CutPlanResult, budg
     const signature = JSON.stringify([index, groups.map((group) => [group.compatibility, group.layers, group.markerLengthCm, [...group.colors].sort(), [...group.fabrics].sort()]).sort()]);
     if (seen.has(signature)) return;
     seen.add(signature);
-    if (seen.size > 150_000) { budget.termination = "state_limit"; throw new SearchInterrupted(); }
+    // Este cache evita trabalho repetido, mas nao participa da correcao da busca.
+    // Reinicia-lo limita a memoria e permite continuar ate o prazo global.
+    if (seen.size > 150_000) seen.clear();
     const lay = allocations[index];
     for (let i = 0; i < groups.length; i++) {
       if (!fits(groups[i], lay)) continue;

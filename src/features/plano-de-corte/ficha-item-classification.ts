@@ -1,4 +1,4 @@
-import type { SleeveType } from "./model";
+import type { GarmentType, SleeveType } from "./model";
 
 const COLOR_TERMS = [
   ["azul marinho", "Azul marinho"], ["azul royal", "Azul royal"], ["azul celeste", "Azul celeste"],
@@ -47,6 +47,14 @@ export function resolveItemGarmentSize(size: string, itemDescription: string) {
   ].find(({ pattern }) => pattern.test(description));
   if (!garment || normalizeCutPlanDescription(size).startsWith(normalizeCutPlanDescription(garment.label))) return size.trim();
   return `${garment.label} ${size.trim()}`;
+}
+
+export function resolveItemGarmentType(itemDescription: string): GarmentType {
+  const description = normalizeCutPlanDescription(itemDescription);
+  if (/\bcalca(?:s)?\b/.test(description)) return "PANTS";
+  if (/\b(?:bermuda|short)(?:s)?\b/.test(description)) return "SHORTS";
+  if (/\b(?:camisa|camisete)(?:s)?\b|\bsocial\b/.test(description) && !/\bcamiseta(?:s)?\b/.test(description)) return "DRESS_SHIRT";
+  return "T_SHIRT";
 }
 
 export function resolveItemColor(itemDescription: string, technicalColor: string | null) {

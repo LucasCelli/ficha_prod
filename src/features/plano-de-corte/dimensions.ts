@@ -1,5 +1,5 @@
 import { isUniformBabyLookText, normalizeUniformSizeKey } from "../../lib/uniform-sizes.ts";
-import type { CutPlanSizeProfile, FabricType, MarkerFrequency, SleeveType } from "./model.ts";
+import type { CutPlanSizeProfile, FabricType, GarmentType, MarkerFrequency, SleeveType } from "./model.ts";
 import { resolveLowerGarmentFallback, resolveShirtFallback, type MeasurementSource } from "./fallback-dimensions.ts";
 
 /** Margem conservadora para perdas do encaixe aproximado. */
@@ -116,8 +116,9 @@ export function calculateEntryLengthPerFrequencyCm(
   type: FabricType,
   fabricWidthCm: number,
   profileIndex: Map<string, CutPlanSizeProfile>,
+  garmentType?: GarmentType,
 ) {
-  return resolveEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex).lengthCm;
+  return resolveEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex, garmentType).lengthCm;
 }
 
 export function resolveEntryLengthPerFrequencyCm(
@@ -126,15 +127,19 @@ export function resolveEntryLengthPerFrequencyCm(
   type: FabricType,
   fabricWidthCm: number,
   profileIndex: Map<string, CutPlanSizeProfile>,
+  garmentType?: GarmentType,
 ): { lengthCm: number | null; source: MeasurementSource } {
-  if (isPantsCutPlanSize(size)) {
+  if (garmentType === "PANTS" || isPantsCutPlanSize(size)) {
     return calculateFallbackLowerGarmentLength(size, "PANTS", type, fabricWidthCm)
       ?? { lengthCm: calculateLowerGarmentLengthPerFrequencyCm(PANTS_ESTIMATED_HEIGHT_CM, PANTS_ESTIMATED_WIDTH_CM, type, fabricWidthCm), source: "FALLBACK_LOW" };
   }
-  if (isShortsSize(size)) {
+  if (garmentType === "SHORTS" || isShortsSize(size)) {
     return calculateFallbackLowerGarmentLength(size, "SHORTS", type, fabricWidthCm)
       ?? { lengthCm: calculateLowerGarmentLengthPerFrequencyCm(SHORTS_ESTIMATED_HEIGHT_CM, SHORTS_ESTIMATED_WIDTH_CM, type, fabricWidthCm), source: "FALLBACK_LOW" };
   }
+  // Os perfis cadastrados e o fallback atual descrevem camisetas. Camisas
+  // permanecem sem estimativa até terem tabelas próprias por modelagem.
+  if (garmentType === "DRESS_SHIRT") return { lengthCm: null, source: "UNKNOWN" };
   const profile = profileIndex.get(normalizeCutPlanSizeKey(size));
   if (profile) return { lengthCm: calculateMarkerAreaLengthCm(profile, sleeveType, type, fabricWidthCm, 1), source: "REGISTERED" };
   const fallback = resolveShirtFallback(size, sleeveType);
@@ -155,8 +160,8 @@ export function estimateMarkerLengthCm(
   if (!Number.isFinite(fabricWidthCm) || fabricWidthCm <= 0) return null;
   let areaLengthCm = 0;
   let matchedEntries = 0;
-  for (const { size, sleeveType, frequency } of frequencies) {
-    const lengthPerFrequency = calculateEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex);
+  for (const { garmentType, size, sleeveType, frequency } of frequencies) {
+    const lengthPerFrequency = calculateEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex, garmentType);
     if (lengthPerFrequency === null) return null;
     areaLengthCm += lengthPerFrequency * frequency;
     matchedEntries += 1;
@@ -178,11 +183,12 @@ export function getMaximumEstimatedFrequency(
   tableLengthCm: number,
   profiles: CutPlanSizeProfile[],
   maxFrequency = getDefaultMaximumFrequency(type),
+  garmentType?: GarmentType,
 ) {
   const profileIndex = buildSizeProfileIndex(profiles);
   const step = type === "TUBULAR" ? 2 : 1;
-  const effectiveMaxFrequency = isPantsCutPlanSize(size) ? Math.min(step, maxFrequency) : maxFrequency;
-  const length = calculateEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex);
+  const effectiveMaxFrequency = garmentType === "PANTS" || isPantsCutPlanSize(size) ? Math.min(step, maxFrequency) : maxFrequency;
+  const length = calculateEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex, garmentType);
   return maximumFrequencyForLength(length, tableLengthCm, effectiveMaxFrequency, step);
 }
 

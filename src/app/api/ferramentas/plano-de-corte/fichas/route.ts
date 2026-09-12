@@ -1,6 +1,7 @@
 import { getServerErrorMessage, withAuthenticatedRoute } from "@/lib/server/boundaries";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { resolveItemColor, resolveItemGarmentSize, resolveItemModelSize, resolveItemSleeveType } from "@/features/plano-de-corte/ficha-item-classification";
+import { resolveItemColor, resolveItemGarmentSize, resolveItemGarmentType, resolveItemModelSize, resolveItemSleeveType } from "@/features/plano-de-corte/ficha-item-classification";
+import type { GarmentType } from "@/features/plano-de-corte/model";
 
 export const runtime = "nodejs";
 
@@ -22,7 +23,7 @@ function normalizeSearchText(value: string) {
 }
 
 function mapFicha(row: FichaRow) {
-  const quantitiesByVariant = new Map<string, { color: string; material: string; quantity: number; size: string; sleeveType: "CURTA" | "LONGA" }>();
+  const quantitiesByVariant = new Map<string, { color: string; garmentType: GarmentType; material: string; quantity: number; size: string; sleeveType: "CURTA" | "LONGA" }>();
   for (const item of row.ficha_itens ?? []) {
     const rawSize = item.tamanho?.trim().toUpperCase() ?? "";
     if (!rawSize || item.quantidade <= 0) continue;
@@ -31,9 +32,10 @@ function mapFicha(row: FichaRow) {
     const color = resolveItemColor(description, row.cor_material);
     const material = row.material?.trim() ?? "";
     const sleeveType = resolveItemSleeveType(description, row.manga);
-    const key = [size, sleeveType, material, color].join("\u001f");
+    const garmentType = resolveItemGarmentType(description);
+    const key = [size, sleeveType, garmentType, material, color].join("\u001f");
     const current = quantitiesByVariant.get(key);
-    quantitiesByVariant.set(key, { color, material, quantity: (current?.quantity ?? 0) + item.quantidade, size, sleeveType });
+    quantitiesByVariant.set(key, { color, garmentType, material, quantity: (current?.quantity ?? 0) + item.quantidade, size, sleeveType });
   }
   const items = [...quantitiesByVariant.values()];
   const sleeveType = normalizeSearchText(row.manga ?? "").includes("long") ? "LONGA" as const : "CURTA" as const;
