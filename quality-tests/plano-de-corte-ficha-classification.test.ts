@@ -20,6 +20,8 @@ test("mantém calça separada e unifica bermuda com short no mesmo tamanho", () 
   assert.equal(resolveItemGarmentSize("G", "Short feminino de helanca"), "SHORT G");
   assert.equal(resolveItemGarmentSize("G", "Camiseta manga curta"), "G");
   assert.equal(resolveItemSleeveType("Calça longa de helanca", "Manga longa"), "CURTA");
+  assert.equal(resolveItemGarmentSize("G", "Saia feminina"), "G");
+  assert.equal(resolveItemGarmentSize("G", "Macacão"), "G");
 });
 
 test("cor explícita do item prevalece e os demais usam a cor técnica", () => {

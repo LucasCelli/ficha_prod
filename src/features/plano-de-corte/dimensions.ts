@@ -1,5 +1,6 @@
 import { isUniformBabyLookText, normalizeUniformSizeKey } from "../../lib/uniform-sizes.ts";
 import type { CutPlanSizeProfile, FabricType, MarkerFrequency, SleeveType } from "./model.ts";
+import { resolveLowerGarmentFallback, resolveShirtFallback, type MeasurementSource } from "./fallback-dimensions.ts";
 
 /** Margem conservadora para perdas do encaixe aproximado. */
 export const ESTIMATED_NESTING_EFFICIENCY = 0.82;
@@ -96,6 +97,18 @@ function calculateLowerGarmentLengthPerFrequencyCm(
   return (heightCm * widthCm * drawnPanelCount) / (fabricWidthCm * ESTIMATED_NESTING_EFFICIENCY);
 }
 
+function calculateFallbackLowerGarmentLength(size: string, garment: "PANTS" | "SHORTS", type: FabricType, fabricWidthCm: number) {
+  const fallback = resolveLowerGarmentFallback(size, garment);
+  if (!fallback) return null;
+  // Quatro painéis principais equivalem aproximadamente a comprimento ×
+  // contorno. Os 8% representam cós, bolsos e vista em espaços residuais.
+  const drawnAreaCm2 = fallback.heightCm * fallback.circumferenceCm * 1.08 / (type === "TUBULAR" ? 2 : 1);
+  const base = drawnAreaCm2 / (fabricWidthCm * ESTIMATED_NESTING_EFFICIENCY);
+  const foldDivisor = type === "TUBULAR" ? 2 : 1;
+  const margin = fallback.confidence === "FALLBACK_LOW" ? Math.min(5, base * 0.03) : 2 / foldDivisor;
+  return { lengthCm: base + margin, source: fallback.confidence };
+}
+
 /** Comprimento ocupado por uma unidade da grade. Calcas usam molde proprio. */
 export function calculateEntryLengthPerFrequencyCm(
   size: string,
@@ -104,24 +117,33 @@ export function calculateEntryLengthPerFrequencyCm(
   fabricWidthCm: number,
   profileIndex: Map<string, CutPlanSizeProfile>,
 ) {
+  return resolveEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex).lengthCm;
+}
+
+export function resolveEntryLengthPerFrequencyCm(
+  size: string,
+  sleeveType: SleeveType,
+  type: FabricType,
+  fabricWidthCm: number,
+  profileIndex: Map<string, CutPlanSizeProfile>,
+): { lengthCm: number | null; source: MeasurementSource } {
   if (isPantsCutPlanSize(size)) {
-    return calculateLowerGarmentLengthPerFrequencyCm(
-      PANTS_ESTIMATED_HEIGHT_CM,
-      PANTS_ESTIMATED_WIDTH_CM,
-      type,
-      fabricWidthCm,
-    );
+    return calculateFallbackLowerGarmentLength(size, "PANTS", type, fabricWidthCm)
+      ?? { lengthCm: calculateLowerGarmentLengthPerFrequencyCm(PANTS_ESTIMATED_HEIGHT_CM, PANTS_ESTIMATED_WIDTH_CM, type, fabricWidthCm), source: "FALLBACK_LOW" };
   }
   if (isShortsSize(size)) {
-    return calculateLowerGarmentLengthPerFrequencyCm(
-      SHORTS_ESTIMATED_HEIGHT_CM,
-      SHORTS_ESTIMATED_WIDTH_CM,
-      type,
-      fabricWidthCm,
-    );
+    return calculateFallbackLowerGarmentLength(size, "SHORTS", type, fabricWidthCm)
+      ?? { lengthCm: calculateLowerGarmentLengthPerFrequencyCm(SHORTS_ESTIMATED_HEIGHT_CM, SHORTS_ESTIMATED_WIDTH_CM, type, fabricWidthCm), source: "FALLBACK_LOW" };
   }
   const profile = profileIndex.get(normalizeCutPlanSizeKey(size));
-  return profile ? calculateMarkerAreaLengthCm(profile, sleeveType, type, fabricWidthCm, 1) : null;
+  if (profile) return { lengthCm: calculateMarkerAreaLengthCm(profile, sleeveType, type, fabricWidthCm, 1), source: "REGISTERED" };
+  const fallback = resolveShirtFallback(size, sleeveType);
+  if (!fallback) return { lengthCm: null, source: "UNKNOWN" };
+  const base = calculateMarkerAreaLengthCm(fallback.profile, sleeveType, type, fabricWidthCm, 1);
+  const lengthCm = fallback.margin.kind === "fixed"
+    ? base + fallback.margin.value
+    : base + Math.min(fallback.margin.maximumCm, base * (fallback.margin.value - 1));
+  return { lengthCm, source: fallback.confidence };
 }
 
 export function estimateMarkerLengthCm(
@@ -135,7 +157,7 @@ export function estimateMarkerLengthCm(
   let matchedEntries = 0;
   for (const { size, sleeveType, frequency } of frequencies) {
     const lengthPerFrequency = calculateEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex);
-    if (lengthPerFrequency === null) continue;
+    if (lengthPerFrequency === null) return null;
     areaLengthCm += lengthPerFrequency * frequency;
     matchedEntries += 1;
   }
@@ -159,11 +181,20 @@ export function getMaximumEstimatedFrequency(
 ) {
   const profileIndex = buildSizeProfileIndex(profiles);
   const step = type === "TUBULAR" ? 2 : 1;
-  const effectiveMaxFrequency = isPantsCutPlanSize(size) ? step : maxFrequency;
-  let maximum = 0;
-  for (let frequency = step; frequency <= effectiveMaxFrequency; frequency += step) {
-    const length = estimateMarkerLengthCm([{ size, sleeveType, frequency }], type, fabricWidthCm, profileIndex);
-    if (length === null || length <= tableLengthCm) maximum = frequency;
-  }
-  return maximum;
+  const effectiveMaxFrequency = isPantsCutPlanSize(size) ? Math.min(step, maxFrequency) : maxFrequency;
+  const length = calculateEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex);
+  return maximumFrequencyForLength(length, tableLengthCm, effectiveMaxFrequency, step);
+}
+
+/** Mantém precisão de cálculo; arredondamento visual pertence ao formatter. */
+export function tableCapacityCm(tableLengthCm: number) {
+  return tableLengthCm + Number.EPSILON * Math.max(1, tableLengthCm) * 8;
+}
+
+export function fitsTable(lengthCm: number, tableLengthCm: number) {
+  return Number.isFinite(lengthCm) && lengthCm <= tableCapacityCm(tableLengthCm);
+}
+
+export function maximumFrequencyForLength(lengthCm: number | null, tableLengthCm: number, configured: number, step: number) {
+  return step * Math.floor(Math.min(configured, lengthCm === null ? configured : tableCapacityCm(tableLengthCm) / lengthCm) / step);
 }

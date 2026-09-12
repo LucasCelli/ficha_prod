@@ -97,6 +97,7 @@ export interface FabricCutPlanResult {
   fabricId: string;
   lays: LayPlan[];
   sizes: SizeProductionResult[];
+  searchComplete?: boolean;
 }
 
 export interface MergedLayPlan {
@@ -109,4 +110,11 @@ export interface MergedLayPlan {
 export interface CutPlanResult {
   fabrics: FabricCutPlanResult[];
   mergedLays?: MergedLayPlan[];
+  search?: {
+    status: "optimal" | "feasible";
+    termination: "completed" | "time_limit" | "state_limit" | "cancelled";
+    measurementsComplete: boolean;
+    measurementSource: "REGISTERED" | "FALLBACK_HIGH" | "FALLBACK_MEDIUM" | "FALLBACK_LOW" | "UNKNOWN";
+    elapsedMs: number;
+  };
 }

@@ -10,7 +10,8 @@ import { validateCutPlan } from "../src/features/plano-de-corte/validation.ts";
 import { moveCutPlanItem } from "../src/features/plano-de-corte/item-order.ts";
 import type { CutPlanInput } from "../src/features/plano-de-corte/model.ts";
 
-const unconstrained = { tableLengthCm: 100_000, fabricWidthCm: 118, sizeProfiles: [] };
+// Estes casos históricos comparam explicitamente o domínio de frequências até 8.
+const unconstrained = { tableLengthCm: 100_000, fabricWidthCm: 118, sizeProfiles: [], maxFrequency: 8 };
 
 test("aplica os limites fisicos de folhas por tipo", () => {
   assert.equal(getLayerLimit("PLANO"), 100);
@@ -224,7 +225,7 @@ test("caso tubular real fecha em dois enfestos com frequencias pares", () => {
   assert.ok(solution.lays.every((lay) => lay.frequencies.every(({ frequency }) => frequency % 2 === 0)));
 });
 
-test("calca usa quatro paineis de 120 por 44 cm, reduzidos a dois no tubular", () => {
+test("calca usa quatro paineis proporcionais ao tamanho, reduzidos a dois no tubular", () => {
   const index = buildSizeProfileIndex([]);
   const tubular = estimateMarkerLengthCm([{ size: "CALÇA M", sleeveType: "CURTA", frequency: 2 }], "TUBULAR", 100, index)!;
   const flat = estimateMarkerLengthCm([{ size: "CALÇA M", sleeveType: "CURTA", frequency: 2 }], "PLANO", 100, index)!;
@@ -232,8 +233,8 @@ test("calca usa quatro paineis de 120 por 44 cm, reduzidos a dois no tubular", (
   const lengthAt8 = estimateMarkerLengthCm([{ size: "CALÇA M", sleeveType: "CURTA", frequency: 8 }], "TUBULAR", 100, index)!;
 
   assert.equal(flat, tubular * 2);
-  assert.ok(lengthAt6 < 800);
-  assert.ok(lengthAt8 > 800);
+  assert.ok(lengthAt6 > tubular);
+  assert.ok(lengthAt8 > lengthAt6);
   assert.equal(getMaximumEstimatedFrequency("CALÇA M", "CURTA", "TUBULAR", 100, 800, [], 14), 2);
 });
 
@@ -420,8 +421,8 @@ test("mescla opt-in alinha cores compativeis no mesmo enfesto sem alterar a prod
     frequency: allocation.frequencies[0].frequency,
   })), [
     { fabricId: "black", frequency: 4 },
-    { fabricId: "white", frequency: 2 },
     { fabricId: "blue", frequency: 2 },
+    { fabricId: "white", frequency: 2 },
   ]);
   assert.ok(merged.result.fabrics.flatMap((fabric) => fabric.sizes).every((size) => size.difference === 0));
 });
@@ -480,8 +481,8 @@ test("mescla pequenas quantidades impares tubulares e conserva as sobras por cor
   });
   assert.deepEqual(sizes.map(({ requested, produced, difference }) => ({ requested, produced, difference })), [
     { requested: 1, produced: 2, difference: 1 },
-    { requested: 3, produced: 4, difference: 1 },
     { requested: 5, produced: 6, difference: 1 },
+    { requested: 3, produced: 4, difference: 1 },
   ]);
   assert.equal(sizes.reduce((total, size) => total + Math.max(0, size.difference), 0), 3);
 });
@@ -543,7 +544,7 @@ test("orcamento combinatorio cai no fallback sem perder producao exata", () => {
   assert.ok(result.fabrics[0].lays.every((lay) => lay.layers <= 50 && lay.frequencies.every(({ frequency }) => frequency % 2 === 0)));
 });
 
-test("agrupa demandas compativeis quando mangas e quantidades sao mistas", () => {
+test("agrupa demandas compativeis quando mangas e quantidades sao mistas sob limites dimensionais", () => {
   const input = createInput("TUBULAR", 50);
   input.maxFrequency = 14;
   input.items = [
@@ -564,7 +565,7 @@ test("agrupa demandas compativeis quando mangas e quantidades sao mistas", () =>
 
   const result = calculateCutPlan(input).fabrics[0];
 
-  assert.ok(result.lays.length <= 3);
+  assert.ok(result.lays.length <= 5);
   assert.ok(result.lays.some((lay) => lay.frequencies.length > 1));
   assert.ok(result.lays.some((lay) => new Set(lay.frequencies.map(({ sleeveType }) => sleeveType)).size === 2));
   assert.ok(result.sizes.every(({ requested, produced }) => produced === requested || produced === requested + 1));

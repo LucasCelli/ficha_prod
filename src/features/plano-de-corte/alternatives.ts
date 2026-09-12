@@ -1,6 +1,10 @@
-import { calculateCutPlan, formatMarkerLabel } from "./calculator.ts";
-import { cutPlanDemandKey, parseCutPlanDemandKey, type CutPlanInput, type CutPlanResult, type FabricCutPlanResult, type LayPlan, type MergedLayPlan } from "./model.ts";
-import { solveMinimumLays } from "./solver.ts";
+import { calculateCutPlan } from "./calculator.ts";
+import { cutPlanDemandKey, parseCutPlanDemandKey, type CutPlanInput, type CutPlanResult, type FabricCutPlanResult, type LayPlan } from "./model.ts";
+import { aggregateCutPlanItems, normalizeCutPlanInput } from "./normalization.ts";
+import { checkSearchBudget, createSearchBudget, searchExpired, SearchInterrupted, sliceSearchBudget, type SearchBudget } from "./search-budget.ts";
+import { buildMergedLays } from "./merge-solver.ts";
+import { validateCutPlanSolution } from "./solution-validation.ts";
+import { SIZE_ENTRY_IMBALANCE_PENALTY, solveMinimumLays } from "./solver.ts";
 import { compareUniformSizes } from "../../lib/uniform-sizes.ts";
 import { buildSizeProfileIndex, estimateMarkerLengthCm, getDefaultMaximumFrequency, getMaximumEstimatedFrequency } from "./dimensions.ts";
 
@@ -13,17 +17,11 @@ export interface CutPlanAlternative {
   layCount: number;
 }
 
-function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"): CutPlanResult {
+function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple", budget: SearchBudget): CutPlanResult {
   return {
     fabrics: input.fabrics.filter((fabric) => input.items.some((item) => item.fabricId === fabric.id)).map((fabric) => {
-      const requested = new Map<string, number>();
-      const operational = new Map<string, number>();
-      for (const item of input.items.filter((candidate) => candidate.fabricId === fabric.id)) {
-        const size = item.size.trim().replace(/\s+/g, " ").replace(/^BERMUDA(?=\s|$)/i, "SHORT");
-        const key = cutPlanDemandKey(size, item.sleeveType);
-        requested.set(key, (requested.get(key) ?? 0) + (item.importedQuantity ?? item.quantity));
-        operational.set(key, (operational.get(key) ?? 0) + item.quantity);
-      }
+      const requested = aggregateCutPlanItems(input, fabric.id, true);
+      const operational = aggregateCutPlanItems(input, fabric.id);
       const lays: LayPlan[] = [];
       for (const [key, requestedQuantity] of operational) {
         const { size, sleeveType } = parseCutPlanDemandKey(key);
@@ -31,11 +29,13 @@ function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"
         const configuredMaximumFrequency = input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type);
         const maximumFrequency = getMaximumEstimatedFrequency(size, sleeveType, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles, configuredMaximumFrequency);
         while (remaining > 0) {
+          checkSearchBudget(budget);
           let frequency = fabric.type === "TUBULAR" ? 2 : 1;
           let layers = Math.min(input.maxLayers, remaining / frequency);
           if (mode === "compact") {
             const step = fabric.type === "TUBULAR" ? 2 : 1;
             for (let candidate = step; candidate <= maximumFrequency; candidate += step) {
+              checkSearchBudget(budget);
               const candidateLayers = remaining / candidate;
               if (Number.isInteger(candidateLayers) && candidateLayers >= 1 && candidateLayers <= input.maxLayers) {
                 frequency = candidate;
@@ -44,6 +44,7 @@ function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"
               }
             }
           }
+          if (maximumFrequency < frequency) throw new Error(`O tamanho ${size} não cabe na menor grade.`);
           layers = Math.max(1, Math.floor(layers));
           const produced = frequency * layers;
           lays.push({ id: `${fabric.id}-${mode}-${lays.length + 1}`, fabricId: fabric.id, layers, frequencies: [{ size, sleeveType, frequency }] });
@@ -53,7 +54,7 @@ function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"
       const profileIndex = buildSizeProfileIndex(input.sizeProfiles);
       for (const lay of lays) {
         const markerLength = estimateMarkerLengthCm(lay.frequencies, fabric.type, fabric.widthCm, profileIndex);
-        lay.markerLengthCm = markerLength === null ? undefined : Math.ceil(markerLength);
+        lay.markerLengthCm = markerLength === null ? undefined : markerLength;
       }
       return buildFabricResult(fabric.id, requested, lays);
     }),
@@ -71,9 +72,14 @@ function buildFabricResult(fabricId: string, requested: Map<string, number>, lay
   return { fabricId, lays, sizes };
 }
 
+function laySignature(lay: LayPlan) {
+  return JSON.stringify([lay.fabricId, lay.layers, lay.frequencies.map((item) => [item.size, item.sleeveType, item.frequency]).sort()]);
+}
+
 function planSignature(result: CutPlanResult) {
-  if (result.mergedLays) return result.mergedLays.map((lay) => `${lay.layers}:${lay.allocations.map((allocation) => `${allocation.fabricId}:${formatMarkerLabel(allocation.frequencies)}`).join("+")}`).join("||");
-  return result.fabrics.map((fabric) => fabric.lays.map((lay) => `${lay.fabricId}:${lay.layers}:${formatMarkerLabel(lay.frequencies)}`).join("|")).join("||");
+  return JSON.stringify(result.mergedLays
+    ? result.mergedLays.map((lay) => lay.allocations.map(laySignature).sort()).sort()
+    : result.fabrics.flatMap((fabric) => fabric.lays.map(laySignature)).sort());
 }
 
 function score(result: CutPlanResult) {
@@ -83,103 +89,120 @@ function score(result: CutPlanResult) {
   const complexity = markerFrequencies.reduce((total, value) => total + value, 0);
   const peakFrequency = Math.max(0, ...markerFrequencies);
   const sizeEntries = fabricLays.reduce((total, lay) => total + lay.frequencies.length, 0);
+  const entriesPerLay = fabricLays.map((lay) => lay.frequencies.length);
+  const minimumSizeEntriesPerLay = Math.min(...entriesPerLay);
+  const sizeEntryImbalance = entriesPerLay.reduce((total, count, index) => total
+    + entriesPerLay.slice(index + 1).reduce((sum, other) => sum + Math.abs(count - other), 0), 0);
+  const sparseLayCount = entriesPerLay.filter((count) => count <= 2).length;
   const totalLayers = operationalLays.reduce((total, lay) => total + lay.layers, 0);
+  const layerHeights = operationalLays.map((lay) => lay.layers);
+  const layerHeightImbalance = Math.max(...layerHeights) / Math.min(...layerHeights);
   const totalMarkerLengthCm = operationalLays.reduce((total, lay) => total + (lay.markerLengthCm ?? 0), 0);
   const sizeSpreadScore = result.fabrics.reduce((total, fabric) => {
-    const orderedSizes = [...new Set(fabric.sizes.map((size) => cutPlanDemandKey(size.size, size.sleeveType)))].sort((left, right) => compareUniformSizes(parseCutPlanDemandKey(left).size, parseCutPlanDemandKey(right).size));
+    const orderedSizes = [...new Set(fabric.sizes.map((size) => cutPlanDemandKey(size.size, size.sleeveType)))].sort((left, right) => {
+      const a = parseCutPlanDemandKey(left), b = parseCutPlanDemandKey(right);
+      return compareUniformSizes(a.size, b.size) || a.sleeveType.localeCompare(b.sleeveType) || left.localeCompare(right);
+    });
     const ranks = new Map(orderedSizes.map((size, index) => [size, index]));
     return total + fabric.lays.reduce((fabricTotal, lay) => {
       const activeRanks = lay.frequencies.map((item) => ranks.get(cutPlanDemandKey(item.size, item.sleeveType)) ?? 0).sort((a, b) => a - b);
       return fabricTotal + (activeRanks.length > 1 ? (activeRanks.at(-1)! - activeRanks[0]) * lay.layers : 0);
     }, 0);
   }, 0);
-  return { mapCount: operationalLays.length, layCount: operationalLays.length, complexity, peakFrequency, sizeEntries, sizeSpreadScore, totalLayers, totalMarkerLengthCm };
+  const balanceAdjustedMarkerLengthCm = totalMarkerLengthCm * (1 + sizeEntryImbalance * SIZE_ENTRY_IMBALANCE_PENALTY);
+  return { mapCount: operationalLays.length, layCount: operationalLays.length, layerHeightImbalance, balanceAdjustedMarkerLengthCm, complexity, minimumSizeEntriesPerLay, peakFrequency, sizeEntries, sizeEntryImbalance, sizeSpreadScore, sparseLayCount, totalLayers, totalMarkerLengthCm };
 }
 
-function normalizeCompatibilityValue(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, " ").trim().toLowerCase();
-}
+type Candidate = { result: CutPlanResult; description: string };
 
-function buildMergedLays(input: CutPlanInput, result: CutPlanResult): MergedLayPlan[] {
-  const groups: Array<MergedLayPlan & { compatibilityKey: string; colors: Set<string> }> = [];
-  const allocations = result.fabrics.flatMap((fabricResult) => fabricResult.lays).sort((left, right) =>
-    right.layers - left.layers || (right.markerLengthCm ?? 0) - (left.markerLengthCm ?? 0));
-
-  for (const allocation of allocations) {
-    const fabric = input.fabrics.find((candidate) => candidate.id === allocation.fabricId)!;
-    const color = normalizeCompatibilityValue(fabric.color);
-    const compatibilityKey = `${normalizeCompatibilityValue(fabric.name)}:${fabric.widthCm}:${fabric.type}`;
-    const allocationLength = allocation.markerLengthCm ?? 0;
-    const target = color && allocation.markerLengthCm !== undefined ? groups.find((group) => group.compatibilityKey === compatibilityKey
-      && group.layers === allocation.layers
-      && !group.allocations.some((existing) => existing.fabricId === allocation.fabricId)
-      && !group.colors.has(color)
-      && group.markerLengthCm !== undefined
-      && group.markerLengthCm + allocationLength <= input.tableLengthCm) : undefined;
-    if (target) {
-      target.allocations.push(allocation);
-      target.colors.add(color);
-      target.markerLengthCm = target.markerLengthCm !== undefined && allocation.markerLengthCm !== undefined
-        ? target.markerLengthCm + allocation.markerLengthCm
-        : undefined;
-      continue;
-    }
-    groups.push({
-      id: `merged-lay-${groups.length + 1}`,
-      layers: allocation.layers,
-      allocations: [allocation],
-      ...(allocation.markerLengthCm !== undefined ? { markerLengthCm: allocation.markerLengthCm } : {}),
-      compatibilityKey,
-      colors: new Set(color ? [color] : []),
-    });
+function uniqueCandidates(candidates: Candidate[]) {
+  const unique = new Map<string, Candidate>();
+  const certificates = (candidate: Candidate) => candidate.result.fabrics.filter((fabric) => fabric.searchComplete).length;
+  for (const candidate of candidates) {
+    const key = planSignature(candidate.result);
+    const previous = unique.get(key);
+    // Uma heurística que repetiu o mesmo plano não apaga a prova já obtida.
+    if (!previous || certificates(candidate) > certificates(previous)) unique.set(key, candidate);
   }
-  return groups.map((group, index) => ({
-    id: `merged-lay-${index + 1}`,
-    layers: group.layers,
-    allocations: group.allocations,
-    ...(group.markerLengthCm !== undefined ? { markerLengthCm: group.markerLengthCm } : {}),
-  }));
+  return [...unique.values()];
 }
 
-function calculateMergedVariants(input: CutPlanInput, candidates: Array<{ result: CutPlanResult; description: string }>) {
-  const activeFabricIds = input.fabrics.filter((fabric) => input.items.some((item) => item.fabricId === fabric.id)).map((fabric) => fabric.id);
-  const options = new Map(activeFabricIds.map((fabricId) => {
-    const choices = candidates.map(({ result }) => result.fabrics.find((fabric) => fabric.fabricId === fabricId)!).filter(Boolean);
-    return [fabricId, [...new Map(choices.map((choice) => [choice.lays.map((lay) => `${lay.layers}:${formatMarkerLabel(lay.frequencies)}`).join("|"), choice])).values()]];
-  }));
-  let beam: FabricCutPlanResult[][] = [[]];
-  for (const fabricId of activeFabricIds) {
-    beam = beam.flatMap((selected) => options.get(fabricId)!.map((choice) => [...selected, choice]))
-      .sort((left, right) => buildMergedLays(input, { fabrics: left }).length - buildMergedLays(input, { fabrics: right }).length)
-      .slice(0, 64);
-  }
-  return beam.map((fabrics) => {
+function compareCandidates(a: Candidate, b: Candidate) {
+  const left = score(a.result), right = score(b.result);
+  return left.layCount - right.layCount
+    || left.balanceAdjustedMarkerLengthCm - right.balanceAdjustedMarkerLengthCm
+    || left.sparseLayCount - right.sparseLayCount
+    || left.totalMarkerLengthCm - right.totalMarkerLengthCm
+    || right.minimumSizeEntriesPerLay - left.minimumSizeEntriesPerLay
+    || left.layerHeightImbalance - right.layerHeightImbalance
+    || right.totalLayers - left.totalLayers
+    || right.sizeSpreadScore - left.sizeSpreadScore
+    || left.complexity - right.complexity || left.peakFrequency - right.peakFrequency
+    || left.sizeEntries - right.sizeEntries || planSignature(a.result).localeCompare(planSignature(b.result));
+}
+
+export function compareCutPlanResults(a: CutPlanResult, b: CutPlanResult) {
+  return compareCandidates({ result: a, description: "" }, { result: b, description: "" });
+}
+
+function calculateMergedVariants(input: CutPlanInput, candidates: Candidate[], budget: SearchBudget, publish: (candidates: Candidate[]) => void) {
+  const active = candidates[0].result.fabrics.map((fabric) => fabric.fabricId);
+  const options = active.map((id) => [...new Map(candidates.flatMap(({ result }) => result.fabrics.filter((fabric) => fabric.fabricId === id))
+    .map((fabric) => [JSON.stringify(fabric.lays.map(laySignature).sort()), fabric])).values()]);
+  const pool = new Map<string, Candidate>();
+  let best: Candidate | undefined;
+  const consider = (fabrics: FabricCutPlanResult[]) => {
     const result: CutPlanResult = { fabrics };
-    result.mergedLays = buildMergedLays(input, result);
-    return { result, description: "Cores compatíveis reunidas no menor número de enfestos, com grade e folhas separadas por tecido." };
-  });
-}
-
-
-function aggregateFabricItems(input: CutPlanInput, fabricId: string, useImportedQuantity = false) {
-  const requested = new Map<string, number>();
-  for (const item of input.items.filter((candidate) => candidate.fabricId === fabricId)) {
-    const size = item.size.trim().replace(/\s+/g, " ").replace(/^BERMUDA(?=\s|$)/i, "SHORT");
-    const key = cutPlanDemandKey(size, item.sleeveType);
-    const quantity = useImportedQuantity ? (item.importedQuantity ?? item.quantity) : item.quantity;
-    requested.set(key, (requested.get(key) ?? 0) + quantity);
+    result.mergedLays = buildMergedLays(input, result, budget);
+    const candidate = { result, description: "Cores compatíveis com grades separadas por tecido." };
+    pool.set(planSignature(result), candidate);
+    if (!best || compareCandidates(candidate, best) < 0) { best = candidate; publish([candidate]); }
+    if (pool.size > 128) {
+      const kept = [...pool.values()].sort(compareCandidates).slice(0, 32);
+      pool.clear();
+      for (const item of kept) pool.set(planSignature(item.result), item);
+    }
+  };
+  // Prioriza alturas compartilháveis antes do produto cartesiano completo.
+  const heightSupport = new Map<number, Set<number>>();
+  options.forEach((choices, index) => choices.forEach((choice) => choice.lays.forEach((lay) => {
+    const support = heightSupport.get(lay.layers) ?? new Set<number>(); support.add(index); heightSupport.set(lay.layers, support);
+  })));
+  options.forEach((choices) => choices.sort((a, b) => {
+    const support = (choice: FabricCutPlanResult) => choice.lays.reduce((sum, lay) => sum + (heightSupport.get(lay.layers)?.size ?? 0), 0) / choice.lays.length;
+    return support(b) - support(a) || a.lays.length - b.lays.length;
+  }));
+  consider(candidates[0].result.fabrics);
+  function visit(index: number, fabrics: FabricCutPlanResult[]) {
+    if (searchExpired(budget)) return;
+    if (index === options.length) { consider(fabrics); return; }
+    for (const option of options[index]) {
+      if (searchExpired(budget)) break;
+      visit(index + 1, [...fabrics, option]);
+    }
   }
-  return requested;
+  visit(0, []);
+  return [...pool.values()];
 }
 
-function calculateOptimizedVariants(input: CutPlanInput) {
-  const primary = calculateCutPlan(input, false);
-  const fabrics = primary.fabrics.map((fabricResult) => {
+function calculateOptimizedVariants(input: CutPlanInput, primary: CutPlanResult, budget: SearchBudget, publish: (candidates: Candidate[]) => void, interruptions: Set<SearchBudget["termination"]>) {
+  const incumbent = [...primary.fabrics];
+  const fabrics = primary.fabrics.map((fabricResult, fabricIndex) => {
     const fabric = input.fabrics.find((candidate) => candidate.id === fabricResult.fabricId)!;
-    const requested = aggregateFabricItems(input, fabric.id, true);
-    const operational = aggregateFabricItems(input, fabric.id);
+    const requested = aggregateCutPlanItems(input, fabric.id, true);
+    const operational = aggregateCutPlanItems(input, fabric.id);
     const target = new Map([...operational].map(([size, quantity]) => [size, fabric.type === "TUBULAR" && quantity % 2 !== 0 ? quantity + 1 : quantity]));
+    const localBudget = sliceSearchBudget(budget, (budget.deadline - budget.now()) * (input.mergeFabricsInLays ? 0.65 : 1) / (primary.fabrics.length - fabricIndex));
     const constraints = {
+      budget: localBudget,
+      onSolution: (solution: import("./solver.ts").SolvedPlan) => {
+        const lays = solution.lays.map((lay, index) => ({ ...lay, id: `${fabric.id}-progress-${index}`, fabricId: fabric.id }));
+        const candidate = { result: { fabrics: incumbent.map((entry) => entry.fabricId === fabric.id ? buildFabricResult(fabric.id, requested, lays) : entry) }, description: "Melhor plano encontrado." };
+        if (compareCandidates(candidate, { result: { fabrics: incumbent }, description: "" }) <= 0) {
+          incumbent[fabricIndex] = candidate.result.fabrics[fabricIndex];
+          publish([candidate]);
+        }
+      },
       tableLengthCm: input.tableLengthCm,
       fabricWidthCm: fabric.widthCm,
       sizeProfiles: input.sizeProfiles,
@@ -187,41 +210,65 @@ function calculateOptimizedVariants(input: CutPlanInput) {
       additionalLayCounts: 1,
     };
     const allSolutions = solveMinimumLays(target, input.maxLayers, fabric.type, fabricResult.lays.length, constraints);
-    const solutions = allSolutions.filter((solution, index) => allSolutions.slice(0, index).filter((previous) => previous.lays.length === solution.lays.length).length < 2);
+    const solutions = allSolutions;
+    if (localBudget.termination !== "completed") interruptions.add(localBudget.termination);
     return { fabric, requested, solutions };
   });
   const variantCount = Math.max(1, ...fabrics.map((entry) => entry.solutions.length));
-  return Array.from({ length: variantCount }, (_, rank) => ({
+  const variants = Array.from({ length: variantCount }, (_, rank) => ({
     result: {
       fabrics: fabrics.map(({ fabric, requested, solutions }) => {
         const solution = solutions[rank] ?? solutions[0];
         if (!solution) return primary.fabrics.find((entry) => entry.fabricId === fabric.id)!;
         const lays = solution.lays.map((lay, index) => ({ ...lay, id: `${fabric.id}-optimized-${rank + 1}-${index + 1}`, fabricId: fabric.id }));
-        return buildFabricResult(fabric.id, requested, lays);
+        return { ...buildFabricResult(fabric.id, requested, lays), searchComplete: solution.searchComplete };
       }),
     },
     description: rank === 0
-      ? "O menor número de enfestos, juntando tamanhos pequenos e grandes na mesma grade."
-      : "Mesmo número de enfestos, com outra divisão de folhas e frequências.",
+      ? "Tamanhos combinados, priorizando menos enfestos e mais folhas."
+      : "Outra distribuição de folhas e frequências.",
   }));
+  return [{ result: { fabrics: incumbent }, description: "Melhor plano encontrado." }, ...variants];
 }
-export function calculateCutPlanAlternatives(input: CutPlanInput): CutPlanAlternative[] {
-  const baseCandidates = [
-    ...calculateOptimizedVariants(input),
-    { result: calculateIndividualPlan(input, "compact"), description: "Um enfesto por tamanho, com a frequência mais alta que couber." },
-    { result: calculateIndividualPlan(input, "simple"), description: "Um enfesto por tamanho, com a grade mais simples de conferir." },
-  ];
-  const candidates = input.mergeFabricsInLays ? calculateMergedVariants(input, baseCandidates) : baseCandidates;
-  const unique = [...new Map(candidates.map((candidate) => [planSignature(candidate.result), candidate])).values()]
-    .map((candidate) => ({ ...candidate, ...score(candidate.result) }))
-    .sort((a, b) => a.layCount - b.layCount || b.totalLayers - a.totalLayers || a.totalMarkerLengthCm - b.totalMarkerLengthCm || b.sizeSpreadScore - a.sizeSpreadScore || a.complexity - b.complexity || a.peakFrequency - b.peakFrequency || a.sizeEntries - b.sizeEntries)
-    .slice(0, 4);
-  return unique.map((candidate, index) => ({
-    id: `alternative-${index + 1}`,
-    label: index === 0 ? "Principal" : `Opção ${index + 1}`,
-    description: candidate.description,
-    result: candidate.result,
-    mapCount: candidate.mapCount,
-    layCount: candidate.layCount,
-  }));
+export type CutPlanSearchOptions = {
+  budget?: SearchBudget;
+  onProgress?: (alternatives: CutPlanAlternative[]) => void;
+};
+
+export function calculateCutPlanAlternatives(rawInput: CutPlanInput, options: CutPlanSearchOptions = {}): CutPlanAlternative[] {
+  const budget = options.budget ?? createSearchBudget();
+  const input = normalizeCutPlanInput(rawInput);
+  const interruptions = new Set<SearchBudget["termination"]>();
+  const primary = calculateCutPlan(input, false, budget);
+  const live = new Map<string, Candidate>();
+  function finish(candidates: Candidate[], final = false): CutPlanAlternative[] {
+    return uniqueCandidates(candidates)
+      .sort(compareCandidates).slice(0, 4).map((candidate, index) => {
+        const validation = validateCutPlanSolution(input, candidate.result);
+        const termination = budget.termination !== "completed" ? budget.termination : interruptions.has("state_limit") ? "state_limit" : interruptions.has("time_limit") ? "time_limit" : "completed";
+        const optimal = final && index === 0 && candidate.result.fabrics.length === 1 && !input.mergeFabricsInLays && candidate.result.fabrics[0].searchComplete && validation.measurementsComplete;
+        return { id: `alternative-${index + 1}`, label: index === 0 ? "Principal" : `Opção ${index + 1}`, description: candidate.description,
+          result: { ...candidate.result, search: { status: optimal ? "optimal" : "feasible", termination, measurementsComplete: validation.measurementsComplete, measurementSource: validation.measurementSource, elapsedMs: budget.now() - budget.startedAt } },
+          mapCount: score(candidate.result).mapCount, layCount: score(candidate.result).layCount };
+      });
+  }
+  function publish(candidates: Candidate[]) {
+    for (const candidate of candidates) live.set(planSignature(candidate.result), candidate);
+    if (live.size > 32) {
+      const kept = [...live.entries()].sort(([, a], [, b]) => compareCandidates(a, b)).slice(0, 8);
+      live.clear(); for (const [key, value] of kept) live.set(key, value);
+    }
+    options.onProgress?.(finish([...live.values()]));
+  }
+  const seed: Candidate = { result: primary, description: "Plano inicial com produção conferida." };
+  // Publica cedo para permitir cancelar mantendo um plano válido.
+  publish([seed]);
+  const optimized = calculateOptimizedVariants(input, primary, budget, input.mergeFabricsInLays ? () => {} : publish, interruptions);
+  const baseCandidates = [seed, ...optimized];
+  try {
+    if (!searchExpired(budget)) baseCandidates.push({ result: calculateIndividualPlan(input, "compact", budget), description: "Grades individuais com folhas e frequências ajustadas." });
+    if (!searchExpired(budget)) baseCandidates.push({ result: calculateIndividualPlan(input, "simple", budget), description: "Grades individuais com frequência mínima." });
+  } catch (error) { if (!(error instanceof SearchInterrupted)) throw error; }
+  const candidates = input.mergeFabricsInLays ? calculateMergedVariants(input, baseCandidates, budget, publish) : baseCandidates;
+  return finish(candidates, true);
 }

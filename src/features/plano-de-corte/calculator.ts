@@ -7,8 +7,12 @@ import {
   type LayPlan,
   type MarkerFrequency,
 } from "./model.ts";
-import { buildSizeProfileIndex, estimateMarkerLengthCm, getDefaultMaximumFrequency, getMaximumEstimatedFrequency, isPantsCutPlanSize } from "./dimensions.ts";
-import { solveMinimumLays } from "./solver.ts";
+import { buildSizeProfileIndex, estimateMarkerLengthCm, getDefaultMaximumFrequency, getMaximumEstimatedFrequency, isPantsCutPlanSize, calculateEntryLengthPerFrequencyCm, fitsTable } from "./dimensions.ts";
+import { aggregateCutPlanItems, normalizeCutPlanInput } from "./normalization.ts";
+import { checkSearchBudget, createSearchBudget, searchExpired, SearchInterrupted, sliceSearchBudget, type SearchBudget } from "./search-budget.ts";
+import { validateCutPlan } from "./validation.ts";
+import { validateCutPlanSolution } from "./solution-validation.ts";
+import { assessLays, compareSolutionMetrics, solveMinimumLays } from "./solver.ts";
 import { compareUniformSizes, isUniformBabyLookText } from "../../lib/uniform-sizes.ts";
 
 export class CutPlanCalculationError extends Error {
@@ -18,26 +22,14 @@ export class CutPlanCalculationError extends Error {
   }
 }
 
-function normalizeSize(size: string) {
-  return size.trim().replace(/\s+/g, " ").replace(/^BERMUDA(?=\s|$)/i, "SHORT");
-}
-
-function aggregateItems(input: CutPlanInput, fabricId: string, useImportedQuantity = false) {
-  const quantities = new Map<string, number>();
-  for (const item of input.items.filter((candidate) => candidate.fabricId === fabricId)) {
-    const size = normalizeSize(item.size);
-    const key = cutPlanDemandKey(size, item.sleeveType);
-    const quantity = useImportedQuantity ? (item.importedQuantity ?? item.quantity) : item.quantity;
-    quantities.set(key, (quantities.get(key) ?? 0) + quantity);
-  }
-  return quantities;
-}
+const aggregateItems = aggregateCutPlanItems;
 
 function findJointCandidate(
   remaining: Map<string, number>,
   maxLayers: number,
   input: CutPlanInput,
   fabricId: string,
+  budget: SearchBudget,
 ): { layers: number; frequencies: MarkerFrequency[] } | null {
   const fabric = input.fabrics.find((candidate) => candidate.id === fabricId)!;
   const tubular = fabric.type === "TUBULAR";
@@ -49,39 +41,29 @@ function findJointCandidate(
   let best: { layers: number; frequencies: MarkerFrequency[] } | null = null;
   const maximumLayers = Math.min(maxLayers, Math.max(...entries.map(([, quantity]) => quantity)));
 
-  // Nem todas as demandas precisam compartilhar a mesma quantidade de folhas.
-  // Antes, uma unica entrada incompativel entre as cinco primeiras fazia o
-  // fallback desistir do grupo inteiro e gerar um enfesto por linha.
+  // Para maximizar a quantidade de entradas com uma altura fixa, selecionar
+  // comprimentos crescentes é exato; não é necessário enumerar 2^n subconjuntos.
+  const lengths = new Map(entries.map(([key]) => {
+    const demand = parseCutPlanDemandKey(key);
+    return [key, calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, fabric.type, fabric.widthCm, profileIndex) ?? 0];
+  }));
   for (let layers = maximumLayers; layers >= 1; layers -= 1) {
+    checkSearchBudget(budget);
     const compatible = entries.flatMap(([key, quantity]) => {
       const demand = parseCutPlanDemandKey(key);
       const frequency = quantity / layers;
-      const entryMaxFrequency = isPantsCutPlanSize(demand.size) ? (tubular ? 2 : 1) : maxFrequency;
-      return Number.isInteger(frequency)
-        && frequency >= 1
-        && frequency <= entryMaxFrequency
-        && (!tubular || frequency % 2 === 0)
-        ? [{ ...demand, frequency }]
-        : [];
-    });
-    if (compatible.length < 2) continue;
-
-    const visit = (index: number, selected: MarkerFrequency[]) => {
-      if (selected.length >= 2) {
-        const markerLength = estimateMarkerLengthCm(selected, fabric.type, fabric.widthCm, profileIndex) ?? 0;
-        if (markerLength <= input.tableLengthCm
-          && (!best || selected.length > best.frequencies.length
-            || (selected.length === best.frequencies.length && layers > best.layers))) {
-          best = { layers, frequencies: [...selected] };
-        }
-      }
-      for (let candidateIndex = index; candidateIndex < compatible.length; candidateIndex += 1) {
-        selected.push(compatible[candidateIndex]);
-        visit(candidateIndex + 1, selected);
-        selected.pop();
-      }
-    };
-    visit(0, []);
+      const limit = Math.min(maxFrequency, isPantsCutPlanSize(demand.size) ? (tubular ? 2 : 1) : maxFrequency);
+      return Number.isInteger(frequency) && frequency >= 1 && frequency <= limit && (!tubular || frequency % 2 === 0)
+        ? [{ ...demand, frequency, length: lengths.get(key)! * frequency }] : [];
+    }).sort((a, b) => a.length - b.length || compareUniformSizes(a.size, b.size) || a.sleeveType.localeCompare(b.sleeveType));
+    let length = 0;
+    const selected: MarkerFrequency[] = [];
+    for (const item of compatible) {
+      if (!fitsTable(length + item.length, input.tableLengthCm)) break;
+      length += item.length;
+      selected.push({ size: item.size, sleeveType: item.sleeveType, frequency: item.frequency });
+    }
+    if (selected.length >= 2 && (!best || selected.length > best.frequencies.length || (selected.length === best.frequencies.length && layers > best.layers))) best = { layers, frequencies: selected };
   }
   return best;
 }
@@ -106,7 +88,10 @@ function calculateSizes(requested: Map<string, number>, lays: LayPlan[]) {
   });
 }
 
-export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optimize = true): FabricCutPlanResult {
+export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optimize = true, budget = createSearchBudget()): FabricCutPlanResult {
+  input = normalizeCutPlanInput(input);
+  const errors = validateCutPlan(input, false);
+  if (errors.length) throw new CutPlanCalculationError(errors.join(" "));
   const fabric = input.fabrics.find((candidate) => candidate.id === fabricId);
   if (!fabric) throw new CutPlanCalculationError("Uma das linhas está apontando para um tecido que não existe mais.");
 
@@ -126,7 +111,8 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
   };
 
   while ([...remaining.values()].some((quantity) => quantity > 0)) {
-    const joint = findJointCandidate(remaining, input.maxLayers, input, fabricId);
+    checkSearchBudget(budget);
+    const joint = findJointCandidate(remaining, input.maxLayers, input, fabricId, budget);
     if (joint) {
       addLay(joint.layers, joint.frequencies);
       continue;
@@ -134,43 +120,41 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
 
     const [demandKey, quantity] = [...remaining.entries()].find(([, value]) => value > 0)!;
     const { size, sleeveType } = parseCutPlanDemandKey(demandKey);
-    if (fabric.type === "TUBULAR") {
-      const layers = Math.min(input.maxLayers, quantity / 2);
-      const markerLength = estimateMarkerLengthCm([{ size, sleeveType, frequency: 2 }], fabric.type, fabric.widthCm, buildSizeProfileIndex(input.sizeProfiles)) ?? 0;
-      if (markerLength > input.tableLengthCm) throw new CutPlanCalculationError(`O tamanho ${size} ultrapassa a mesa mesmo na menor grade tubular.`);
-      addLay(layers, [{ size, sleeveType, frequency: 2 }]);
-    } else {
-      let frequency = 1;
-      let layers = Math.min(input.maxLayers, quantity);
-      const configuredMaximumFrequency = input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type);
-      const maximumFrequency = getMaximumEstimatedFrequency(size, sleeveType, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles, configuredMaximumFrequency);
-      if (!maximumFrequency) throw new CutPlanCalculationError(`O tamanho ${size} ultrapassa a mesa mesmo na grade de frequência 1.`);
-      for (let candidate = 1; candidate <= maximumFrequency; candidate += 1) {
-        const candidateLayers = quantity / candidate;
-        if (Number.isInteger(candidateLayers) && candidateLayers <= input.maxLayers) {
-          frequency = candidate;
-          layers = candidateLayers;
-          break;
-        }
+    const step = fabric.type === "TUBULAR" ? 2 : 1;
+    const maximumFrequency = Math.min(quantity, getMaximumEstimatedFrequency(size, sleeveType, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles, input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type)));
+    if (maximumFrequency < step) throw new CutPlanCalculationError(`O tamanho ${size} ultrapassa a mesa mesmo na menor grade.`);
+    let frequency = maximumFrequency;
+    let layers = Math.min(input.maxLayers, Math.floor(quantity / frequency));
+    // A altura é limitada a 50/100: procurar divisores por altura evita percorrer
+    // uma frequência configurada enorme e fecha a demanda inteira quando possível.
+    for (let candidateLayers = Math.min(input.maxLayers, Math.floor(quantity / step)); candidateLayers >= 1; candidateLayers--) {
+      checkSearchBudget(budget);
+      const candidateFrequency = quantity / candidateLayers;
+      if (Number.isInteger(candidateFrequency) && candidateFrequency % step === 0 && candidateFrequency <= maximumFrequency) {
+        frequency = candidateFrequency; layers = candidateLayers; break;
       }
-      addLay(layers, [{ size, sleeveType, frequency }]);
     }
+    addLay(layers, [{ size, sleeveType, frequency }]);
   }
 
-  const optimized = optimize ? solveMinimumLays(optimizationTarget, input.maxLayers, fabric.type, lays.length, {
+  const constraints = {
+    budget,
     tableLengthCm: input.tableLengthCm,
     fabricWidthCm: fabric.widthCm,
     sizeProfiles: input.sizeProfiles,
     maxFrequency: input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type),
-  })[0] : undefined;
-  if (optimized) {
+  };
+  const baseline = assessLays(lays, optimizationTarget, fabric.type, constraints);
+  const optimized = optimize && !searchExpired(budget) ? solveMinimumLays(optimizationTarget, input.maxLayers, fabric.type, lays.length, constraints)[0] : undefined;
+  const useOptimized = optimized && compareSolutionMetrics(optimized, baseline) <= 0;
+  if (useOptimized) {
     lays.splice(0, lays.length, ...optimized.lays.map((lay, index) => ({ ...lay, id: `${fabricId}-lay-${index + 1}`, fabricId })));
   }
 
   const profileIndex = buildSizeProfileIndex(input.sizeProfiles);
   for (const lay of lays) {
     const markerLength = estimateMarkerLengthCm(lay.frequencies, fabric.type, fabric.widthCm, profileIndex);
-    lay.markerLengthCm = markerLength === null ? undefined : Math.ceil(markerLength);
+    lay.markerLengthCm = markerLength === null ? undefined : markerLength;
   }
 
   const sizes = calculateSizes(requested, lays);
@@ -183,13 +167,30 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
     || targetSizes.some(({ difference }) => difference !== 0)) {
     throw new CutPlanCalculationError("Não deu para fechar a conta com esses limites. Aumente o máximo de folhas por enfesto ou revise as quantidades.");
   }
-  return { fabricId, lays, sizes };
+  const result = { fabricId, lays, sizes, searchComplete: Boolean(useOptimized && optimized.searchComplete) };
+  validateCutPlanSolution({ ...input, fabrics: [fabric], items: input.items.filter((item) => item.fabricId === fabricId) }, { fabrics: [result] });
+  return result;
 }
 
-export function calculateCutPlan(input: CutPlanInput, optimize = true): CutPlanResult {
-  return { fabrics: input.fabrics
+export function calculateCutPlan(input: CutPlanInput, optimize = true, budget = createSearchBudget()): CutPlanResult {
+  input = normalizeCutPlanInput(input);
+  const errors = validateCutPlan(input, false);
+  if (errors.length) throw new CutPlanCalculationError(errors.join(" "));
+  const result: CutPlanResult = { fabrics: input.fabrics
     .filter((fabric) => input.items.some((item) => item.fabricId === fabric.id))
-    .map((fabric) => calculateFabricPlan(input, fabric.id, optimize)) };
+    .map((fabric) => calculateFabricPlan(input, fabric.id, false, budget)) };
+  let termination = budget.termination;
+  // Todos os tecidos já possuem um plano antes de gastar o prazo com otimização.
+  if (optimize) for (let i = 0; i < result.fabrics.length; i++) {
+    if (searchExpired(budget)) { termination = budget.termination; break; }
+    const local = sliceSearchBudget(budget, (budget.deadline - budget.now()) / (result.fabrics.length - i));
+    try { result.fabrics[i] = calculateFabricPlan(input, result.fabrics[i].fabricId, true, local); }
+    catch (error) { if (!(error instanceof SearchInterrupted)) throw error; }
+    if (local.termination !== "completed") termination = local.termination;
+  }
+  const validation = validateCutPlanSolution(input, result);
+  result.search = { status: result.fabrics.length === 1 && result.fabrics[0].searchComplete && validation.measurementsComplete ? "optimal" : "feasible", termination, measurementsComplete: validation.measurementsComplete, measurementSource: validation.measurementSource, elapsedMs: budget.now() - budget.startedAt };
+  return result;
 }
 
 export function recalculateFabricResult(
@@ -201,7 +202,7 @@ export function recalculateFabricResult(
   const profileIndex = buildSizeProfileIndex(input.sizeProfiles);
   const measuredLays = lays.map((lay) => {
     const markerLength = estimateMarkerLengthCm(lay.frequencies, fabric.type, fabric.widthCm, profileIndex);
-    return { ...lay, markerLengthCm: markerLength === null ? undefined : Math.ceil(markerLength) };
+    return { ...lay, markerLengthCm: markerLength === null ? undefined : markerLength };
   });
   return { fabricId, lays: measuredLays, sizes: calculateSizes(aggregateItems(input, fabricId), measuredLays) };
 }
@@ -214,7 +215,7 @@ export function formatCutPlanSizeLabel(size: string) {
 }
 
 export function formatCutPlanItemType(size: string, sleeveType: MarkerFrequency["sleeveType"]) {
-  const garment = size.trim().match(/^(SHORT|BERMUDA|CALÇA|SAIA|MACACÃO)(?:\s|$)/i)?.[1];
+  const garment = size.trim().match(/^(SHORT|BERMUDA|CALÇA)(?:\s|$)/i)?.[1];
   if (garment && /^(?:SHORT|BERMUDA)$/i.test(garment)) return "Short/Bermuda";
   if (garment) return garment.charAt(0).toUpperCase() + garment.slice(1).toLocaleLowerCase("pt-BR");
   return sleeveType === "LONGA" ? "Longa" : "Curta";
