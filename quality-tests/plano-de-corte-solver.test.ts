@@ -78,7 +78,10 @@ test("agrupa short e bermuda como a mesma categoria operacional", () => {
 });
 
 test("abrevia Baby Look como BL na apresentação", () => {
+  assert.equal(formatCutPlanSizeLabel("P"), "P");
   assert.equal(formatCutPlanSizeLabel("BABY PP"), "BL PP");
+  assert.equal(formatCutPlanSizeLabel("P", "DRESS_SHIRT"), "MASC. P");
+  assert.equal(formatCutPlanSizeLabel("BABY PP", "DRESS_SHIRT"), "FEM. PP");
   assert.equal(formatCutPlanSizeLabel("FEM P"), "FEM. P");
   assert.equal(formatCutPlanSizeLabel("MASC P"), "MASC. P");
   assert.equal(formatMarkerLabel([{ size: "BABY PP", sleeveType: "CURTA", frequency: 2 }], false), "2-BL PP");
@@ -331,7 +334,7 @@ test("formato operacional identifica modelagens de camisa", () => {
   assert.equal(formatOperationalMarkerLabel([
     { garmentType: "DRESS_SHIRT", size: "M", sleeveType: "LONGA", frequency: 2 },
     { garmentType: "T_SHIRT", size: "P", sleeveType: "CURTA", frequency: 1 },
-  ], true), "1-P MC, 2-M SOCIAL ML");
+  ], true), "1-P MC, 2-MASC. M SOCIAL ML");
 });
 
 test("distribui tamanho infantil tubular entre enfestos existentes", () => {

@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import type { CutPlanAlternative } from "./alternatives";
 import { countLabel, formatCutPlanItemType, formatCutPlanSizeLabel, formatOperationalMarkerLabel, sortMarkerFrequenciesForDisplay } from "./calculator";
-import { formatEstimatedLengthMeters } from "./dimensions";
 import { compareUniformSizes } from "../../lib/uniform-sizes";
 import { cutPlanDemandKey, parseCutPlanDemandKey, type CutPlanFabric, type CutPlanInput, type CutPlanSourceFicha, type FabricCutPlanResult, type LayPlan, type MergedLayPlan } from "./model";
 
@@ -80,7 +79,6 @@ function MergedLayCard({ fabricResults, fabrics, index, lay }: { fabricResults: 
       const showSleeveType = new Set(fabricResult.sizes.map((size) => size.sleeveType)).size > 1;
       return <p key={allocation.id}><strong>{fabricLabel(fabric)}</strong> {formatOperationalMarkerLabel(allocation.frequencies, showSleeveType)}</p>;
     })}
-    {lay.markerLengthCm ? <p className="cut-plan-print-simple__length">Comprimento estimado: {formatEstimatedLengthMeters(lay.markerLengthCm)}</p> : null}
   </>} rows={<>
     <thead><tr><th>Tecido</th><th>Tamanho</th><th>Tipo</th><th>Frequência</th><th>Peças cortadas</th></tr></thead>
     <tbody>{sortedMergedMarkers(lay).map(({ allocation, marker }) => {
@@ -94,7 +92,6 @@ function FabricLayCard({ index, lay, showSleeveType }: { index: number; lay: Lay
   return <LayCard badgeLayers={lay.layers} header={<>
     <h3>Enfesto {String(index + 1).padStart(2, "0")}</h3>
     <p><strong>{formatOperationalMarkerLabel(lay.frequencies, showSleeveType)}</strong></p>
-    {lay.markerLengthCm ? <p className="cut-plan-print-simple__length">Comprimento estimado: {formatEstimatedLengthMeters(lay.markerLengthCm)}</p> : null}
   </>} rows={<>
     <thead><tr><th>Tamanho</th><th>Tipo</th><th>Frequência</th><th>Peças cortadas</th></tr></thead>
     <tbody>{sortMarkerFrequenciesForDisplay(lay.frequencies).map((marker) => <tr key={`${marker.garmentType}-${marker.size}-${marker.sleeveType}`}><td>{formatCutPlanSizeLabel(marker.size)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>)}</tbody>
