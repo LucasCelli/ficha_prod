@@ -47,7 +47,12 @@ function NovoClienteModal({ onCancel, onCreated }: { onCancel: () => void; onCre
 
   return (
     <Modal description="Cadastre o cliente e retorne à ficha." onClose={onCancel} size="sm" title="Novo cliente">
-      <form action={action} className="cliente-inline-form" noValidate>
+      <form
+        action={action}
+        className="cliente-inline-form"
+        noValidate
+        onSubmit={(event) => event.stopPropagation()}
+      >
         <header><h2>Novo cliente</h2></header>
         {state.message ? <div className="form-banner" role="alert">{state.message}</div> : null}
         <InlineField error={state.fieldErrors?.nome} label="Nome" name="nome" required />

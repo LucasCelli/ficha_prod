@@ -34,3 +34,7 @@ test("cancelar cadastro não executa criação nem usa atrasos artificiais", () 
   assert.match(picker, /onClose=\{onCancel\}/);
   assert.doesNotMatch(picker, /setTimeout/);
 });
+
+test("salvar cliente inline não dispara o envio da ficha", () => {
+  assert.match(picker, /onSubmit=\{\(event\) => event\.stopPropagation\(\)\}/);
+});
