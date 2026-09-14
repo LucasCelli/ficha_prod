@@ -2012,9 +2012,9 @@
   --color-surface: #ffffff;
   --color-surface-2: #e8f0fe;
   --color-surface-3: #d0e2ff;
-  --color-text: #141b2d;
-  --color-text-secondary: #3d4a5c;
-  --color-muted: #5f6b7a;
+  --color-text: #000000;
+  --color-text-secondary: #000000;
+  --color-muted: #000000;
   --color-border: #dce3ed;
   --color-border-subtle: #e8edf5;
   --color-primary: #1677ff;

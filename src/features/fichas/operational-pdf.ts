@@ -67,12 +67,12 @@ const TABLE = {
 const COLORS = {
   badge: {
     danger: [192, 57, 43] as [number, number, number],
-    neutral: [99, 110, 114] as [number, number, number],
+    neutral: [0, 0, 0] as [number, number, number],
     success: [39, 174, 96] as [number, number, number],
     warning: [230, 126, 34] as [number, number, number],
   },
   border: [218, 223, 231] as [number, number, number],
-  muted: [92, 104, 118] as [number, number, number],
+  muted: [0, 0, 0] as [number, number, number],
   paper: [255, 255, 255] as [number, number, number],
   rowAlt: [255, 255, 255] as [number, number, number],
   rowOverdue: [255, 255, 255] as [number, number, number],
@@ -80,7 +80,7 @@ const COLORS = {
     danger: [190, 24, 93] as [number, number, number],
     info: [37, 99, 235] as [number, number, number],
   },
-  text: [17, 24, 39] as [number, number, number],
+  text: [0, 0, 0] as [number, number, number],
 };
 
 const STATUS_LABELS: Record<FichaStatus, string> = {

@@ -13,10 +13,10 @@ const COLORS = {
   border: [218, 223, 231] as [number, number, number],
   danger: [207, 19, 34] as [number, number, number],
   info: [22, 119, 255] as [number, number, number],
-  muted: [95, 107, 122] as [number, number, number],
+  muted: [0, 0, 0] as [number, number, number],
   paper: [255, 255, 255] as [number, number, number],
   surface: [247, 250, 252] as [number, number, number],
-  text: [20, 27, 45] as [number, number, number],
+  text: [0, 0, 0] as [number, number, number],
 };
 
 type PdfRow = Array<number | string>;

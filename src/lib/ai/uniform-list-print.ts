@@ -78,9 +78,9 @@ export function buildUniformListPrintHtml(input: UniformListPrintInput) {
         <style>
           @page { margin: 12mm; }
           * { box-sizing: border-box; }
-          body { color: #111827; font-family: Arial, sans-serif; font-size: 12px; margin: 0; }
+          body { color: #000; font-family: Arial, sans-serif; font-size: 12px; margin: 0; }
           header { display: grid; gap: 4px; margin-bottom: 12px; }
-          header span { color: #4b5563; font-size: 11px; font-weight: 700; }
+          header span { color: #000; font-size: 11px; font-weight: 700; }
           h1 { font-size: 18px; line-height: 1.2; margin: 0; }
           table { border-collapse: collapse; width: 100%; }
           th, td { border: 1px solid #d1d5db; padding: 6px 7px; text-align: left; vertical-align: top; }

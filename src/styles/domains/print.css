@@ -39,6 +39,9 @@
   }
 
   .print-container {
+    --color-text: #000;
+    --color-text-secondary: #000;
+    --color-muted: #000;
     display: flex;
     width: 100%;
     max-width: 100%;
