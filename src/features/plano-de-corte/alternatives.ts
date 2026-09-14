@@ -94,6 +94,7 @@ function score(result: CutPlanResult) {
   const sizeEntryImbalance = entriesPerLay.reduce((total, count, index) => total
     + entriesPerLay.slice(index + 1).reduce((sum, other) => sum + Math.abs(count - other), 0), 0);
   const sparseLayCount = entriesPerLay.filter((count) => count <= 2).length;
+  const singleLayerLayCount = operationalLays.filter((lay) => lay.layers === 1).length;
   const totalLayers = operationalLays.reduce((total, lay) => total + lay.layers, 0);
   const layerHeights = operationalLays.map((lay) => lay.layers);
   const layerHeightImbalance = Math.max(...layerHeights) / Math.min(...layerHeights);
@@ -110,7 +111,7 @@ function score(result: CutPlanResult) {
     }, 0);
   }, 0);
   const balanceAdjustedMarkerLengthCm = totalMarkerLengthCm * (1 + sizeEntryImbalance * SIZE_ENTRY_IMBALANCE_PENALTY);
-  return { mapCount: operationalLays.length, layCount: operationalLays.length, layerHeightImbalance, balanceAdjustedMarkerLengthCm, complexity, minimumSizeEntriesPerLay, peakFrequency, sizeEntries, sizeEntryImbalance, sizeSpreadScore, sparseLayCount, totalLayers, totalMarkerLengthCm };
+  return { mapCount: operationalLays.length, layCount: operationalLays.length, layerHeightImbalance, balanceAdjustedMarkerLengthCm, complexity, minimumSizeEntriesPerLay, peakFrequency, sizeEntries, sizeEntryImbalance, sizeSpreadScore, sparseLayCount, singleLayerLayCount, totalLayers, totalMarkerLengthCm };
 }
 
 type Candidate = { result: CutPlanResult; description: string };
@@ -130,6 +131,7 @@ function uniqueCandidates(candidates: Candidate[]) {
 function compareCandidates(a: Candidate, b: Candidate) {
   const left = score(a.result), right = score(b.result);
   return left.layCount - right.layCount
+    || left.singleLayerLayCount - right.singleLayerLayCount
     || left.balanceAdjustedMarkerLengthCm - right.balanceAdjustedMarkerLengthCm
     || left.sparseLayCount - right.sparseLayCount
     || left.totalMarkerLengthCm - right.totalMarkerLengthCm

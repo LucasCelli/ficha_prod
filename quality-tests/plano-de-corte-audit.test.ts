@@ -80,8 +80,8 @@ test("dominância preserva o melhor estado completo sob o critério de equilíbr
   const sizes = ["PP", "P", "M", "G", "GG", "EG", "EEG"];
   const quantities = [9, 1, 8, 8, 7, 12, 12];
   const result = solveMinimumLays(new Map(sizes.map((size, i) => [size, quantities[i]])), 4, "PLANO", 3,
-    { tableLengthCm: 12, fabricWidthCm: 100, maxFrequency: 3, sizeProfiles: sizes.map((size) => profile(size, 1)) })[0];
-  assert.deepEqual(result.metrics, { totalFrequency: 18, peakFrequency: 7, sizeSpreadScore: 40, totalLayers: 9, totalMarkerLengthCm: 18, sizeEntries: 9, minimumSizeEntriesPerLay: 3, sizeEntryImbalance: 0, sparseLayCount: 0, layerHeightImbalance: 4, balanceAdjustedMarkerLengthCm: 18 });
+    { tableLengthCm: 12, fabricWidthCm: 100, maxFrequency: 7, sizeProfiles: sizes.map((size) => profile(size, 1)) })[0];
+  assert.deepEqual(result.metrics, { totalFrequency: 18, peakFrequency: 7, sizeSpreadScore: 40, totalLayers: 9, totalMarkerLengthCm: 18, sizeEntries: 9, minimumSizeEntriesPerLay: 3, sizeEntryImbalance: 0, sparseLayCount: 0, singleLayerLayCount: 1, layerHeightImbalance: 4, balanceAdjustedMarkerLengthCm: 18 });
   assert.equal(result.searchComplete, true);
 });
 
@@ -101,7 +101,7 @@ test("perfil ausente não produz um comprimento parcial apresentado como complet
   const result = calculateCutPlanAlternatives(input)[0].result;
   assert.equal(result.search?.measurementsComplete, false);
   assert.equal(result.search?.status, "feasible");
-  assert.equal(result.fabrics[0].lays[0].markerLengthCm, undefined);
+  assert.ok(result.fabrics[0].lays.some((lay) => lay.markerLengthCm === undefined));
 });
 
 test("aliases são agregados antes do arredondamento tubular", () => {

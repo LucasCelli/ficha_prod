@@ -15,6 +15,7 @@ export type SolverMetrics = {
   minimumSizeEntriesPerLay: number;
   sizeEntryImbalance: number;
   sparseLayCount: number;
+  singleLayerLayCount: number;
   layerHeightImbalance: number;
   balanceAdjustedMarkerLengthCm: number;
 };
@@ -193,6 +194,9 @@ function solveLayerSet(
       checkSearchBudget(budget);
       const markerLengths = plan.markerLengths.map((length, index) => length + option.markerLengths[index]);
       if (markerLengths.some((length) => !fitsTable(length, constraints.tableLengthCm))) continue;
+      const markerFrequencies = layers.map((_, index) => plan.assignments.reduce((sum, values) => sum
+        + (values[index] ?? 0), 0) + option.frequencies[index]);
+      if (markerFrequencies.some((frequency) => frequency > (constraints.maxFrequency ?? getDefaultMaximumFrequency(type)))) continue;
       const usedMask = option.frequencies.reduce((mask, frequency, index) => mask | (frequency > 0 ? BigInt(1) << BigInt(index) : BigInt(0)), plan.usedMask);
       const assignments = plan.assignments.map((frequencies, rank) => rank === entry.rank ? option.frequencies : frequencies);
       const candidate: PartialPlan = {
@@ -265,6 +269,7 @@ function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPl
     minimumSizeEntriesPerLay: Math.min(...entriesPerLay),
     sizeEntryImbalance,
     sparseLayCount: entriesPerLay.filter((count) => count <= 2).length,
+    singleLayerLayCount: layers.filter((count) => count === 1).length,
     layerHeightImbalance: Math.max(...layers) / Math.min(...layers),
     balanceAdjustedMarkerLengthCm: totalMarkerLengthCm * (1 + sizeEntryImbalance * SIZE_ENTRY_IMBALANCE_PENALTY),
   };
@@ -278,6 +283,7 @@ export function compareSolutions(a: SolvedPlan, b: SolvedPlan) {
 
 export function compareSolutionMetrics(a: SolvedPlan, b: SolvedPlan) {
   return a.lays.length - b.lays.length
+    || a.metrics.singleLayerLayCount - b.metrics.singleLayerLayCount
     || a.metrics.balanceAdjustedMarkerLengthCm - b.metrics.balanceAdjustedMarkerLengthCm
     || a.metrics.sparseLayCount - b.metrics.sparseLayCount
     || a.metrics.totalMarkerLengthCm - b.metrics.totalMarkerLengthCm
@@ -339,6 +345,7 @@ export function solveMinimumLays(
   const volume = entries.reduce((sum, entry) => sum + entry.quantity * entry.length, 0);
   const volumeTolerance = Number.EPSILON * Math.max(1, volume) * entries.length * 8;
   const lowerBound = Math.max(1, Math.ceil(Math.max(0, volume - volumeTolerance) / (maxLayers * tableCapacityCm(constraints.tableLengthCm))),
+    Math.ceil(entries.reduce((sum, entry) => sum + entry.quantity, 0) / (maxFrequency * maxLayers)),
     ...entries.map((entry) => Math.ceil(entry.quantity / (entry.maxFrequency * maxLayers))));
   const additional = constraints.additionalLayCounts ?? 0;
   const upperBound = fallbackLayCount + additional;

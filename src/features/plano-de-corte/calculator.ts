@@ -57,10 +57,13 @@ function findJointCandidate(
         ? [{ ...demand, frequency, length: lengths.get(key)! * frequency }] : [];
     }).sort((a, b) => a.length - b.length || compareUniformSizes(a.size, b.size) || a.sleeveType.localeCompare(b.sleeveType));
     let length = 0;
+    let totalFrequency = 0;
     const selected: MarkerFrequency[] = [];
     for (const item of compatible) {
       if (!fitsTable(length + item.length, input.tableLengthCm)) break;
+      if (totalFrequency + item.frequency > maxFrequency) continue;
       length += item.length;
+      totalFrequency += item.frequency;
       selected.push({ garmentType: item.garmentType, size: item.size, sleeveType: item.sleeveType, frequency: item.frequency });
     }
     if (selected.length >= 2 && (!best || selected.length > best.frequencies.length || (selected.length === best.frequencies.length && layers > best.layers))) best = { layers, frequencies: selected };
@@ -145,7 +148,11 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
     maxFrequency: input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type),
   };
   const baseline = assessLays(lays, optimizationTarget, fabric.type, constraints);
-  const optimized = optimize && !searchExpired(budget) ? solveMinimumLays(optimizationTarget, input.maxLayers, fabric.type, lays.length, constraints)[0] : undefined;
+  // Acima deste porte, a combinação exata sob teto global cresce muito rápido.
+  // O incumbente construtivo já é válido e deve ser devolvido sem consumir todo o prazo.
+  const optimized = optimize && optimizationTarget.size <= 12 && !searchExpired(budget)
+    ? solveMinimumLays(optimizationTarget, input.maxLayers, fabric.type, lays.length, constraints)[0]
+    : undefined;
   const useOptimized = optimized && compareSolutionMetrics(optimized, baseline) <= 0;
   if (useOptimized) {
     lays.splice(0, lays.length, ...optimized.lays.map((lay, index) => ({ ...lay, id: `${fabricId}-lay-${index + 1}`, fabricId })));

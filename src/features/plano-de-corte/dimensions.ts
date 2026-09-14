@@ -8,6 +8,8 @@ export const PANTS_ESTIMATED_HEIGHT_CM = 120;
 export const PANTS_ESTIMATED_WIDTH_CM = 44;
 export const SHORTS_ESTIMATED_HEIGHT_CM = 60;
 export const SHORTS_ESTIMATED_WIDTH_CM = 44;
+/** Reserva para pala, colarinho, pé de gola, vistas, punhos e bolsos. */
+export const DRESS_SHIRT_COMPONENT_ALLOWANCE = 1.18;
 const LOWER_GARMENT_PANEL_COUNT = 4;
 const estimatedLengthFormatter = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
@@ -137,17 +139,20 @@ export function resolveEntryLengthPerFrequencyCm(
     return calculateFallbackLowerGarmentLength(size, "SHORTS", type, fabricWidthCm)
       ?? { lengthCm: calculateLowerGarmentLengthPerFrequencyCm(SHORTS_ESTIMATED_HEIGHT_CM, SHORTS_ESTIMATED_WIDTH_CM, type, fabricWidthCm), source: "FALLBACK_LOW" };
   }
-  // Os perfis cadastrados e o fallback atual descrevem camisetas. Camisas
-  // permanecem sem estimativa até terem tabelas próprias por modelagem.
-  if (garmentType === "DRESS_SHIRT") return { lengthCm: null, source: "UNKNOWN" };
+  // Camisas sociais usam as mesmas medidas-base, acrescidas dos componentes
+  // próprios da modelagem que não existem numa camiseta.
   const profile = profileIndex.get(normalizeCutPlanSizeKey(size));
-  if (profile) return { lengthCm: calculateMarkerAreaLengthCm(profile, sleeveType, type, fabricWidthCm, 1), source: "REGISTERED" };
+  if (profile) {
+    const base = calculateMarkerAreaLengthCm(profile, sleeveType, type, fabricWidthCm, 1);
+    return { lengthCm: garmentType === "DRESS_SHIRT" ? base * DRESS_SHIRT_COMPONENT_ALLOWANCE : base, source: "REGISTERED" };
+  }
   const fallback = resolveShirtFallback(size, sleeveType);
   if (!fallback) return { lengthCm: null, source: "UNKNOWN" };
   const base = calculateMarkerAreaLengthCm(fallback.profile, sleeveType, type, fabricWidthCm, 1);
-  const lengthCm = fallback.margin.kind === "fixed"
+  const estimated = fallback.margin.kind === "fixed"
     ? base + fallback.margin.value
     : base + Math.min(fallback.margin.maximumCm, base * (fallback.margin.value - 1));
+  const lengthCm = garmentType === "DRESS_SHIRT" ? estimated * DRESS_SHIRT_COMPONENT_ALLOWANCE : estimated;
   return { lengthCm, source: fallback.confidence };
 }
 

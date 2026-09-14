@@ -261,7 +261,7 @@ test("prefere um unico enfesto tubular com frequencia 8 quando fecha em mais fol
     ["GG", 6],
     ["BABY GG", 6],
   ]);
-  const solution = solveMinimumLays(quantities, 50, "TUBULAR", 3, unconstrained)[0];
+  const solution = solveMinimumLays(quantities, 50, "TUBULAR", 3, { ...unconstrained, maxFrequency: 14 })[0];
 
   assert.equal(solution?.lays.length, 1);
   assert.equal(solution.lays[0].layers, 3);
@@ -294,6 +294,37 @@ test("respeita a frequencia maxima personalizada no solver", () => {
   assert.equal(expanded.lays[0].layers, 3);
   assert.equal(expanded.lays[0].frequencies[0].frequency, 14);
   assert.ok(restricted.lays.every((lay) => lay.frequencies.every(({ frequency }) => frequency <= 8)));
+});
+
+test("teto de frequencia limita globalmente a soma da grade no enfesto", () => {
+  const quantities = new Map([
+    [cutPlanDemandKey("P", "LONGA", "DRESS_SHIRT"), 8],
+    [cutPlanDemandKey("M", "LONGA", "DRESS_SHIRT"), 8],
+  ]);
+  const solutions = solveMinimumLays(quantities, 8, "PLANO", 2, { ...unconstrained, maxFrequency: 4 });
+
+  assert.ok(solutions[0]);
+  assert.ok(solutions[0].lays.every((lay) => lay.frequencies.reduce((sum, item) => sum + item.frequency, 0) <= 4));
+});
+
+test("teto global também limita grades de camiseta", () => {
+  const quantities = new Map([
+    [cutPlanDemandKey("P", "CURTA", "T_SHIRT"), 8],
+    [cutPlanDemandKey("M", "CURTA", "T_SHIRT"), 8],
+  ]);
+  const solutions = solveMinimumLays(quantities, 8, "PLANO", 2, { ...unconstrained, maxFrequency: 4 });
+
+  assert.ok(solutions[0]);
+  assert.ok(solutions[0].lays.every((lay) => lay.frequencies.reduce((sum, item) => sum + item.frequency, 0) <= 4));
+});
+
+test("camisa social tem metragem estimada e respeita a mesa", () => {
+  const index = buildSizeProfileIndex([]);
+  const social = estimateMarkerLengthCm([{ garmentType: "DRESS_SHIRT", size: "M", sleeveType: "LONGA", frequency: 2 }], "PLANO", 150, index);
+  const camiseta = estimateMarkerLengthCm([{ garmentType: "T_SHIRT", size: "M", sleeveType: "LONGA", frequency: 2 }], "PLANO", 150, index);
+
+  assert.ok(social !== null && camiseta !== null && social > camiseta);
+  assert.equal(getMaximumEstimatedFrequency("M", "LONGA", "PLANO", 150, social - 1, [], 8, "DRESS_SHIRT"), 1);
 });
 
 test("formato operacional identifica modelagens de camisa", () => {
@@ -602,10 +633,18 @@ function bruteMinimumLayCount(quantities: number[], maxLayers: number, type: Fab
   const options = type === "TUBULAR" ? [0, 2, 4, 6, 8] : [0, 1, 2, 3, 4, 5, 6, 7, 8];
   for (let count = 1; count <= maxCount; count += 1) {
     for (const layers of bruteLayerSets(maxLayers, count)) {
-      if (quantities.every((quantity) => canAssign(quantity, layers, options))) return count;
+      const assignments = quantities.map((quantity) => assignmentVectors(quantity, layers, options));
+      if (assignments.every((values) => values.length) && assignments[0].some((left) => assignments[1].some((right) =>
+        left.every((frequency, index) => frequency + right[index] <= 8)))) return count;
     }
   }
   return null;
+}
+
+function assignmentVectors(quantity: number, layers: number[], options: number[], index = 0, frequencies: number[] = []): number[][] {
+  if (index === layers.length) return quantity === 0 ? [frequencies] : [];
+  return options.flatMap((frequency) => quantity - frequency * layers[index] >= 0
+    ? assignmentVectors(quantity - frequency * layers[index], layers, options, index + 1, [...frequencies, frequency]) : []);
 }
 
 function *bruteLayerSets(maxLayers: number, count: number, ceiling = maxLayers, prefix: number[] = []): Generator<number[]> {

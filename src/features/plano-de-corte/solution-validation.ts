@@ -22,17 +22,20 @@ export function validateCutPlanSolution(input: CutPlanInput, result: CutPlanResu
       if (lay.fabricId !== fabric.id || !Number.isSafeInteger(lay.layers) || lay.layers < 1 || lay.layers > Math.min(input.maxLayers, getLayerLimit(fabric.type)) || !lay.frequencies.length) fail();
       let knownLength = 0;
       const seen = new Set<string>();
+      let totalFrequency = 0;
       for (const item of lay.frequencies) {
         const key = cutPlanDemandKey(item.size, item.sleeveType, item.garmentType);
         const limit = Math.min(input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type), item.garmentType === "PANTS" || isPantsCutPlanSize(item.size) ? step : Infinity);
         if (seen.has(key) || !expected.has(key) || !Number.isSafeInteger(item.frequency) || item.frequency < step || item.frequency > limit || item.frequency % step !== 0) fail();
         seen.add(key);
+        totalFrequency += item.frequency;
         produced.set(key, (produced.get(key) ?? 0) + item.frequency * lay.layers);
         const measurement = resolveEntryLengthPerFrequencyCm(item.size, item.sleeveType, fabric.type, fabric.widthCm, index, item.garmentType);
         if (sourceRank[measurement.source] > sourceRank[measurementSource]) measurementSource = measurement.source;
         if (measurement.lengthCm === null) measurementsComplete = false;
         else knownLength += measurement.lengthCm * item.frequency;
       }
+      if (totalFrequency > (input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type))) fail();
       if (!fitsTable(knownLength, input.tableLengthCm)) fail();
       const length = estimateMarkerLengthCm(lay.frequencies, fabric.type, fabric.widthCm, index);
       if (length === null ? lay.markerLengthCm !== undefined : lay.markerLengthCm === undefined || Math.abs(length - lay.markerLengthCm) > 1e-8) fail();
