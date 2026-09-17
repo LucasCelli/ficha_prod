@@ -16,6 +16,14 @@ const DOCUMENT_STYLE = `
   .print-card, .print-table, .print-table th, .print-table td { border-color: black; }
   .print-raster-page { display: flex !important; align-items: flex-start; }
   .print-raster-page img { display: block; margin: 0 auto; }
+  .print-direct .print-container,
+  .print-direct .print-header h1, .print-direct .print-header p,
+  .print-direct .print-card h2, .print-direct .print-table,
+  .print-direct .print-total, .print-direct .print-observacoes,
+  .print-direct .print-raw-name-list-page pre { font-size: 13px; }
+  .print-direct .print-total-produtos, .print-direct .print-image-description { font-size: 10px; }
+  .print-direct .print-raw-name-list-page h2 { font-size: 15px; }
+  .print-direct .print-raw-name-list-page p { font-size: 11px; }
 `;
 
 export async function printFichaAutomatically(element: HTMLElement, onFinished?: () => void) {
@@ -66,6 +74,7 @@ export async function printFichaAutomatically(element: HTMLElement, onFinished?:
     style.textContent = DOCUMENT_STYLE;
     doc.head.appendChild(style);
     const copy = element.cloneNode(true) as HTMLElement;
+    copy.classList.add("print-direct");
     doc.body.appendChild(copy);
     for (const image of copy.querySelectorAll("img")) image.loading = "eager";
     await Promise.all(styleLoads);
@@ -80,10 +89,12 @@ export async function printFichaAutomatically(element: HTMLElement, onFinished?:
     const height = mainPage.getBoundingClientRect().height;
     if (height > CONTENT_HEIGHT_MM * PX_PER_MM) {
       try {
+        copy.classList.remove("print-direct");
+        const captureHeight = mainPage.getBoundingClientRect().height;
         const { default: html2canvas } = await import("html2canvas");
         const canvas = await html2canvas(mainPage, {
           backgroundColor: "#ffffff", logging: false, scale: 1.6, useCORS: true,
-          windowWidth: 794, windowHeight: Math.ceil(height),
+          windowWidth: 794, windowHeight: Math.ceil(captureHeight),
         });
         if (!canvas.width || !canvas.height) throw new Error("Captura vazia.");
         const scale = Math.min(CONTENT_WIDTH_MM / canvas.width, CONTENT_HEIGHT_MM / canvas.height);
@@ -98,6 +109,7 @@ export async function printFichaAutomatically(element: HTMLElement, onFinished?:
         mainPage.replaceWith(raster);
         await waitForImages(raster);
       } catch (error) {
+        copy.classList.add("print-direct");
         console.error("Falha ao ajustar ficha; usando impressão direta.", error);
       }
     }

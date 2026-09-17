@@ -2154,6 +2154,12 @@
   font-weight: var(--font-weight-semibold);
 }
 
+.print-table td:nth-child(-n + 2) {
+  color: #000 !important;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
 .print-total {
   display: inline-flex;
   align-items: center;
