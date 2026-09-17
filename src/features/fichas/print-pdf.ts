@@ -1,194 +1,118 @@
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+﻿const CONTENT_WIDTH_MM = 198;
+const CONTENT_HEIGHT_MM = 285;
+const PX_PER_MM = 96 / 25.4;
 
-const PRINT_RENDER_WIDTH_PX = 794;
-const PRINT_RENDER_SCALE = 1.6;
-const PRINT_PAGE_MARGIN_MM = 6;
-const PRINT_FRAME_CLEANUP_MS = 60_000;
-const PRINT_FRAME_LOAD_FALLBACK_MS = 1_500;
-const PRINT_FRAME_PRINT_DELAY_MS = 500;
+// Shared layout for measurement and the printed document.
+const DOCUMENT_STYLE = `
+  @page { size: A4 portrait; margin: 6mm; }
+  html, body { margin: 0 !important; padding: 0 !important; background: white !important; }
+  .print-document { display: block !important; width: 198mm !important; }
+  .print-container { width: 198mm !important; max-width: none !important;
+    height: auto !important; min-height: 0 !important; max-height: none !important;
+    margin: 0 !important; padding: 0 !important; overflow: visible !important;
+    color: black; --color-text: #000; --color-text-secondary: #000; --color-muted: #000; }
+  .print-page { break-after: auto !important; page-break-after: auto !important; }
+  .print-page + .print-page { break-before: page; page-break-before: always; }
+  .print-card, .print-table, .print-table th, .print-table td { border-color: black; }
+  .print-raster-page { display: flex !important; align-items: flex-start; }
+  .print-raster-page img { display: block; margin: 0 auto; }
+`;
 
-type ManagedStyle = Pick<CSSStyleDeclaration, "height" | "margin" | "maxHeight" | "minHeight" | "overflow" | "padding" | "width">;
-
-type ManagedFrame = {
-  dispose: () => void;
-  iframe: HTMLIFrameElement;
-};
-
-export async function printElementToPdf(element: HTMLElement) {
-  const blobUrl = await renderElementToPdfUrl(element);
-  await openPdfInPrintFrame(blobUrl);
-}
-
-async function renderElementToPdfUrl(element: HTMLElement) {
-  const pdf = new jsPDF({
-    compress: true,
-    format: "a4",
-    orientation: "portrait",
-    unit: "mm",
-  });
-  const pages = getPrintPages(element);
-
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const contentWidth = pageWidth - PRINT_PAGE_MARGIN_MM * 2;
-  const contentHeight = pageHeight - PRINT_PAGE_MARGIN_MM * 2;
-  const pxToMm = 25.4 / 96;
-  let hasRenderedPage = false;
-
-  for (const page of pages) {
-    const canvas = await capturePrintCanvas(page);
-    let renderWidth = canvas.width * pxToMm;
-    let renderHeight = canvas.height * pxToMm;
-    const fitScale = Math.min(contentWidth / renderWidth, contentHeight / renderHeight, 1);
-
-    renderWidth *= fitScale;
-    renderHeight *= fitScale;
-
-    if (renderWidth <= 0 || renderHeight <= 0) {
-      continue;
-    }
-
-    if (hasRenderedPage) {
-      pdf.addPage();
-    }
-
-    const offsetX = (pageWidth - renderWidth) / 2;
-    pdf.addImage(canvas.toDataURL("image/jpeg", 0.9), "JPEG", offsetX, PRINT_PAGE_MARGIN_MM, renderWidth, renderHeight, undefined, "FAST");
-    hasRenderedPage = true;
-  }
-
-  if (!hasRenderedPage) {
-    pdf.text("Ficha em branco ou sem conteúdo para imprimir", 10, 20);
-  }
-
-  return URL.createObjectURL(pdf.output("blob"));
-}
-
-function getPrintPages(element: HTMLElement) {
-  const pages = Array.from(element.querySelectorAll<HTMLElement>(":scope > .print-page"));
-  return pages.length > 0 ? pages : [element];
-}
-
-async function capturePrintCanvas(element: HTMLElement) {
-  return withPreparedPrintElement(element, async () =>
-    html2canvas(element, {
-      backgroundColor: "#ffffff",
-      logging: false,
-      scale: PRINT_RENDER_SCALE,
-      useCORS: true,
-    }),
-  );
-}
-
-async function withPreparedPrintElement<T>(element: HTMLElement, run: () => Promise<T>) {
-  const originalStyle: ManagedStyle = {
-    height: element.style.height,
-    margin: element.style.margin,
-    maxHeight: element.style.maxHeight,
-    minHeight: element.style.minHeight,
-    overflow: element.style.overflow,
-    padding: element.style.padding,
-    width: element.style.width,
+export async function printFichaAutomatically(element: HTMLElement, onFinished?: () => void) {
+  const frame = document.createElement("iframe");
+  frame.title = "Impressão da ficha";
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;";
+  document.body.appendChild(frame);
+  let cleanupTimer: number | undefined;
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    window.clearTimeout(cleanupTimer);
+    frame.remove();
+    onFinished?.();
   };
 
-  element.style.height = "auto";
-  element.style.margin = "0 auto";
-  element.style.maxHeight = "none";
-  element.style.minHeight = "0";
-  element.style.overflow = "visible";
-  element.style.padding = "0";
-  element.style.width = `${PRINT_RENDER_WIDTH_PX}px`;
-
   try {
-    await waitForLayout();
-    return await run();
-  } finally {
-    restoreElementStyle(element, originalStyle);
-  }
-}
+    const doc = frame.contentDocument;
+    const frameWindow = frame.contentWindow;
+    if (!doc || !frameWindow) throw new Error("Janela de impressão indisponível.");
+    doc.documentElement.className = document.documentElement.className;
+    for (const property of ["--font-sans", "--font-mono", "--font-serif-display"]) {
+      doc.documentElement.style.setProperty(property, getComputedStyle(document.documentElement).getPropertyValue(property));
+    }
+    doc.title = document.title;
+    const base = doc.createElement("base");
+    base.href = document.baseURI;
+    doc.head.appendChild(base);
+    const styleLoads: Promise<void>[] = [];
+    for (const source of document.querySelectorAll('style, link[rel="stylesheet"]')) {
+      const copy = source.cloneNode(true) as HTMLElement;
+      if (copy.tagName === "LINK") {
+        styleLoads.push(new Promise((resolve, reject) => {
+          copy.onload = () => resolve();
+          copy.onerror = () => reject(new Error("Falha ao carregar estilos de impressão."));
+        }));
+      }
+      doc.head.appendChild(copy);
+    }
+    const style = doc.createElement("style");
+    style.textContent = DOCUMENT_STYLE;
+    doc.head.appendChild(style);
+    const copy = element.cloneNode(true) as HTMLElement;
+    doc.body.appendChild(copy);
+    for (const image of copy.querySelectorAll("img")) image.loading = "eager";
+    await Promise.all(styleLoads);
+    await doc.fonts.ready;
+    await waitForImages(copy);
+    await new Promise<void>((resolve) => frameWindow.requestAnimationFrame(() => frameWindow.requestAnimationFrame(() => resolve())));
 
-function restoreElementStyle(element: HTMLElement, style: ManagedStyle) {
-  element.style.height = style.height;
-  element.style.margin = style.margin;
-  element.style.maxHeight = style.maxHeight;
-  element.style.minHeight = style.minHeight;
-  element.style.overflow = style.overflow;
-  element.style.padding = style.padding;
-  element.style.width = style.width;
-}
-
-function waitForLayout() {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, 100);
-  });
-}
-
-function waitForPrintFrameReady() {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, PRINT_FRAME_PRINT_DELAY_MS);
-  });
-}
-
-async function openPdfInPrintFrame(blobUrl: string) {
-  const { dispose, iframe } = createPrintFrame();
-
-  try {
-    await waitForFrameLoad(iframe, blobUrl);
-    await waitForPrintFrameReady();
-
-    const frameWindow = iframe.contentWindow;
-    if (!frameWindow) {
-      throw new Error("Janela de impressão indisponível.");
+    const mainPage = copy.querySelector<HTMLElement>(":scope > .print-page:not(.print-raw-name-list-page)") ?? copy;
+    const height = mainPage.getBoundingClientRect().height;
+    if (height > CONTENT_HEIGHT_MM * PX_PER_MM) {
+      try {
+        const { default: html2canvas } = await import("html2canvas");
+        const canvas = await html2canvas(mainPage, {
+          backgroundColor: "#ffffff", logging: false, scale: 1.6, useCORS: true,
+          windowWidth: 794, windowHeight: Math.ceil(height),
+        });
+        if (!canvas.width || !canvas.height) throw new Error("Captura vazia.");
+        const scale = Math.min(CONTENT_WIDTH_MM / canvas.width, CONTENT_HEIGHT_MM / canvas.height);
+        const raster = doc.createElement("div");
+        raster.className = "print-page print-raster-page";
+        const image = doc.createElement("img");
+        image.alt = "Ficha ajustada para uma página";
+        image.style.width = `${canvas.width * scale}mm`;
+        image.style.height = `${canvas.height * scale}mm`;
+        image.src = canvas.toDataURL("image/jpeg", 0.9);
+        raster.appendChild(image);
+        mainPage.replaceWith(raster);
+        await waitForImages(raster);
+      } catch (error) {
+        console.error("Falha ao ajustar ficha; usando impressão direta.", error);
+      }
     }
 
+    frameWindow.addEventListener("afterprint", dispose, { once: true });
+    // Safety net for browsers that omit afterprint, after preparation completes.
+    cleanupTimer = window.setTimeout(dispose, 60_000);
     frameWindow.focus();
     frameWindow.print();
-  } finally {
-    window.setTimeout(() => {
-      dispose();
-      URL.revokeObjectURL(blobUrl);
-    }, PRINT_FRAME_CLEANUP_MS);
+  } catch (error) {
+    dispose();
+    throw error;
   }
 }
 
-function createPrintFrame(): ManagedFrame {
-  const iframe = document.createElement("iframe");
-  iframe.setAttribute("aria-hidden", "true");
-  iframe.style.cssText = "position:fixed;left:-10000px;top:0;width:1px;height:1px;border:0;opacity:0.01;";
-  document.body.appendChild(iframe);
-
-  return {
-    dispose: () => iframe.remove(),
-    iframe,
-  };
-}
-
-function waitForFrameLoad(iframe: HTMLIFrameElement, blobUrl: string) {
-  return new Promise<void>((resolve, reject) => {
-    const fallback = window.setTimeout(() => {
-      cleanup();
-      resolve();
-    }, PRINT_FRAME_LOAD_FALLBACK_MS);
-
-    function cleanup() {
-      window.clearTimeout(fallback);
-      iframe.removeEventListener("error", handleError);
-      iframe.removeEventListener("load", handleLoad);
+async function waitForImages(element: HTMLElement) {
+  await Promise.all(Array.from(element.querySelectorAll("img"), async (image) => {
+    if (!image.complete) {
+      await new Promise<void>((resolve) => {
+        image.addEventListener("load", () => resolve(), { once: true });
+        image.addEventListener("error", () => resolve(), { once: true });
+      });
     }
-
-    function handleLoad() {
-      cleanup();
-      resolve();
-    }
-
-    function handleError() {
-      cleanup();
-      reject(new Error("Falha ao carregar a impressão."));
-    }
-
-    iframe.addEventListener("load", handleLoad, { once: true });
-    iframe.addEventListener("error", handleError, { once: true });
-    iframe.src = blobUrl;
-  });
+    if (image.naturalWidth > 0) await image.decode().catch(() => undefined);
+  }));
 }

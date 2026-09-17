@@ -7,7 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { FichaDetail } from "./data";
 import { PrintFicha } from "./print-ficha";
-import { printElementToPdf } from "./print-pdf";
+import { printFichaAutomatically } from "./print-pdf";
 import { PrintTriggerButton } from "./print-trigger-button";
 
 type FichaPrintPreviewShellProps = {
@@ -39,20 +39,20 @@ export function FichaPrintPreviewShell({ children, duplicateHref, printHref }: F
 
     setIsPrinting(true);
     toast.loading("Preparando impressão", {
-      description: "Montando o PDF da ficha.",
+      description: "Preparando a ficha para impressão.",
       duration: Infinity,
       id: PREVIEW_PRINT_TOAST_ID,
     });
 
     try {
-      await printElementToPdf(element);
+      await printFichaAutomatically(element);
       toast.success("Impressão pronta", {
-        description: "O PDF foi enviado para impressão.",
+        description: "A janela de impressão foi aberta.",
       });
     } catch (error) {
-      console.error("Error generating PDF:", error);
+      console.error("Error preparing print:", error);
       toast.error("Falha ao imprimir", {
-        description: "Não foi possível gerar o PDF desta ficha.",
+        description: "Não foi possível imprimir esta ficha.",
       });
     } finally {
       toast.dismiss(PREVIEW_PRINT_TOAST_ID);
@@ -80,7 +80,7 @@ export function FichaPrintPreviewShell({ children, duplicateHref, printHref }: F
             onClick={handlePrint}
           >
             <Printer aria-hidden="true" size={18} />
-            {isPrinting ? "Gerando PDF..." : "Imprimir"}
+            {isPrinting ? "Preparando impressão..." : "Imprimir"}
           </PrintTriggerButton>
         </div>
       </header>

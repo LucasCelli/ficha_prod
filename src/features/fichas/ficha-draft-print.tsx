@@ -7,6 +7,7 @@ import { sanitizeObservationHtmlInBrowser } from "@/lib/sanitize-observations.cl
 import type { FichaDetail } from "./data";
 import type { FichaFormClientValues } from "./ficha-form-seed";
 import { PrintFicha } from "./print-ficha";
+import { printFichaAutomatically } from "./print-pdf";
 
 export function DraftPrintLayer({
   ficha,
@@ -18,18 +19,18 @@ export function DraftPrintLayer({
   onPrinted: () => void;
 }) {
   useEffect(() => {
-    function handleAfterPrint() {
-      onPrinted();
-    }
-
-    window.addEventListener("afterprint", handleAfterPrint);
-    const printTimer = window.setTimeout(() => window.print(), 120);
-    const cleanupTimer = window.setTimeout(onPrinted, 3000);
+    const printTimer = window.setTimeout(async () => {
+      const element = document.querySelector<HTMLElement>(".draft-print-root #print-version");
+      if (!element) return;
+      try {
+        await printFichaAutomatically(element, onPrinted);
+      } catch (error) {
+        console.error("Error preparing draft print:", error);
+      }
+    }, 120);
 
     return () => {
-      window.removeEventListener("afterprint", handleAfterPrint);
       window.clearTimeout(printTimer);
-      window.clearTimeout(cleanupTimer);
     };
   }, [onPrinted]);
 

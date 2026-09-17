@@ -49,6 +49,7 @@ export function PrintTriggerButton({ children, className, disabled, href, label,
       cleanupJob = null;
 
       if (ready) {
+        window.setTimeout(() => frame.remove(), FRAME_CLEANUP_MS);
         toast.success("Impressão pronta", {
           description: "A janela de impressão foi aberta.",
         });
@@ -56,10 +57,6 @@ export function PrintTriggerButton({ children, className, disabled, href, label,
     }
 
     cleanupJob = watchPrintSignal(printJobId, finish);
-
-    frame.onload = () => {
-      window.setTimeout(() => frame.remove(), FRAME_CLEANUP_MS);
-    };
 
     frame.onerror = () => {
       finish();
