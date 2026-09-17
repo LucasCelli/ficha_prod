@@ -7,12 +7,22 @@ const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarg
 const browser = await chromium.launch({ channel: 'chrome' });
 try {
  const context = await browser.newContext(); const page = await context.newPage();
+ const fontFile = fs.readdirSync('.next/static/media').find(name => name.endsWith('.woff2'));
+ assert.ok(fontFile, 'Build font fixture must exist');
+ await context.route('https://print-test.invalid/font.woff2', async route => {
+  await new Promise(resolve => setTimeout(resolve, 150));
+  await route.fulfill({ contentType: 'font/woff2', headers: { 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(`.next/static/media/${fontFile}`) });
+ });
  await context.route('https://print-test.invalid/image.png', async route => { await new Promise(resolve => setTimeout(resolve, 150)); await route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK1sAAAAASUVORK5CYII=', 'base64') }); });
- const styles = ['src/styles/tokens/colors.css', 'src/styles/domains/base.css', 'src/styles/domains/fichas.css', 'src/styles/domains/print.css'].map(p => fs.readFileSync(p,'utf8')).join('\n');
+ const styles = ['src/styles/tokens/colors.css', 'src/styles/domains/base.css', 'src/styles/domains/fichas.css', 'src/styles/domains/print.css'].map(p => fs.readFileSync(p,'utf8')).join('\n') + `
+ @font-face { font-family: PrintTest; src: url('https://print-test.invalid/font.woff2') format('woff2'); font-display: swap; }
+ .next-font-test { --font-sans: PrintTest; }
+ `;
  for (const [height, raster, fail] of [[200,false,false],[284.9,false,false],[285.1,true,false],[500,true,false],[500,false,true]]) {
   await page.setViewportSize({width: height > 285 ? 390 : 1440, height: 900});
   await page.setContent(`<style>${styles}</style><div id="print-version" class="print-document"><div class="print-container print-page"><div style="height:${height}mm;flex:none">Texto da ficha<img src="https://print-test.invalid/image.png" style="width:1px;height:1px" /></div></div><div class="print-container print-page print-raw-name-list-page">Lista de nomes</div></div>`);
   await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), height > 285);
+  await page.evaluate(() => document.body.classList.add('next-font-test'));
   await page.addScriptTag({ path: 'node_modules/html2canvas/dist/html2canvas.min.js' });
   await page.evaluate(fail => {
    window.captures = 0;
@@ -25,6 +35,16 @@ try {
   }, fail);
   await page.addScriptTag({content: js});
   await page.evaluate(() => printFichaAutomatically(document.getElementById('print-version'), () => window.finished++));
+  const font = await page.evaluate(() => {
+   const frame = document.querySelector('iframe');
+   const doc = frame.contentDocument;
+   return {
+    family: frame.contentWindow.getComputedStyle(doc.querySelector('.print-raw-name-list-page')).fontFamily,
+    loaded: [...doc.fonts].some(face => face.family === 'PrintTest' && face.status === 'loaded'),
+   };
+  });
+  assert.match(font.family, /PrintTest/);
+  assert.equal(font.loaded, true, 'Custom body font must load before printing');
   const result = await page.evaluate(() => { const doc = document.querySelector('iframe').contentDocument; return { raster: !!doc.querySelector('.print-raster-page'), annex: doc.querySelector('.print-raw-name-list-page').textContent, printed: window.printed, captures: window.captures, loaded: [...doc.images].every(image => image.complete && image.naturalWidth > 0), width: doc.querySelector('.print-document').getBoundingClientRect().width }; });
   assert.equal(result.loaded,true); assert.equal(result.raster,raster); assert.equal(result.annex,'Lista de nomes'); assert.equal(result.printed,1); assert.equal(result.captures, height > 285 ? 1 : 0); assert.ok(Math.abs(result.width-198*96/25.4)<1);
   const printPage = await context.newPage(); await printPage.setContent(await page.evaluate(() => document.querySelector('iframe').contentDocument.documentElement.outerHTML)); await printPage.emulateMedia({media:'print'});

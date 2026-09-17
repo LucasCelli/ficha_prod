@@ -39,8 +39,13 @@ export async function printFichaAutomatically(element: HTMLElement, onFinished?:
     const frameWindow = frame.contentWindow;
     if (!doc || !frameWindow) throw new Error("Janela de impressão indisponível.");
     doc.documentElement.className = document.documentElement.className;
+    // next/font defines its variables on body, rather than on html.
+    doc.body.className = document.body.className;
+    const sourceStyle = getComputedStyle(element);
+    doc.body.style.fontFamily = sourceStyle.fontFamily;
     for (const property of ["--font-sans", "--font-mono", "--font-serif-display"]) {
-      doc.documentElement.style.setProperty(property, getComputedStyle(document.documentElement).getPropertyValue(property));
+      const value = sourceStyle.getPropertyValue(property);
+      if (value.trim()) doc.body.style.setProperty(property, value);
     }
     doc.title = document.title;
     const base = doc.createElement("base");
@@ -64,6 +69,9 @@ export async function printFichaAutomatically(element: HTMLElement, onFinished?:
     doc.body.appendChild(copy);
     for (const image of copy.querySelectorAll("img")) image.loading = "eager";
     await Promise.all(styleLoads);
+    // Force layout to request the fonts used by both regular and bold text
+    // before reading fonts.ready (which otherwise may resolve too early).
+    copy.getBoundingClientRect();
     await doc.fonts.ready;
     await waitForImages(copy);
     await new Promise<void>((resolve) => frameWindow.requestAnimationFrame(() => frameWindow.requestAnimationFrame(() => resolve())));
