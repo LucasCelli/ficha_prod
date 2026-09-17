@@ -3,7 +3,7 @@ import test from "node:test";
 import { performance } from "node:perf_hooks";
 import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, calculateShirtAreaCm2, ESTIMATED_NESTING_EFFICIENCY, estimateMarkerLengthCm, formatEstimatedLengthMeters, getDefaultMaximumFrequency, getLayerLimit, getMaximumEstimatedFrequency, normalizeCutPlanSizeKey } from "../src/features/plano-de-corte/dimensions.ts";
 import { cutPlanDemandKey, type CutPlanSizeProfile, type FabricType } from "../src/features/plano-de-corte/model.ts";
-import { solveMinimumLays } from "../src/features/plano-de-corte/solver.ts";
+import { hasSingleMold, solveMinimumLays } from "../src/features/plano-de-corte/solver.ts";
 import { calculateCutPlan, formatCutPlanItemType, formatCutPlanSizeLabel, formatMarkerLabel, formatOperationalMarkerLabel } from "../src/features/plano-de-corte/calculator.ts";
 import { calculateCutPlanAlternatives } from "../src/features/plano-de-corte/alternatives.ts";
 import { validateCutPlan } from "../src/features/plano-de-corte/validation.ts";
@@ -691,3 +691,41 @@ function measuredProfile(
     longSleeveWidthCm,
   };
 }
+
+
+test("prefere dois moldes por mapa no caso tubular de 20 P e 12 PP", () => {
+  const input = createInput("TUBULAR", 50);
+  input.items = [
+    { id: "p", fabricId: "fabric", size: "P", sleeveType: "CURTA", quantity: 20 },
+    { id: "pp", fabricId: "fabric", size: "PP", sleeveType: "CURTA", quantity: 12 },
+  ];
+  const alternatives = calculateCutPlanAlternatives(input);
+  const result = alternatives[0].result.fabrics[0];
+  assert.equal(result.lays.length, 2);
+  assert.ok(result.lays.every((lay) => !hasSingleMold(lay.frequencies, "TUBULAR")));
+  assert.ok(result.sizes.every((size) => size.difference === 0));
+  assert.ok(alternatives.some(({ result }) => result.fabrics[0].lays.every((lay) =>
+    lay.frequencies.length === 1 && lay.frequencies[0].frequency === 4
+      && lay.layers === (lay.frequencies[0].size === "P" ? 5 : 3))));
+});
+
+test("avalia o total do mapa tubular e plano sem penalizar grades mistas", () => {
+  const marker = (size: string, frequency: number) => ({ size, sleeveType: "CURTA" as const, frequency });
+  assert.equal(hasSingleMold([marker("P", 2)], "TUBULAR"), true);
+  assert.equal(hasSingleMold([marker("P", 4)], "TUBULAR"), false);
+  assert.equal(hasSingleMold([marker("P", 2), marker("PP", 2)], "TUBULAR"), false);
+  assert.equal(hasSingleMold([marker("P", 1)], "PLANO"), true);
+  assert.equal(hasSingleMold([marker("P", 1), marker("PP", 1)], "PLANO"), false);
+});
+
+test("prefere frequência 2 no plano e mantém mapa único quando o limite exige", () => {
+  const input = createInput("PLANO", 100);
+  input.maxFrequency = 2;
+  const result = calculateCutPlanAlternatives(input)[0].result.fabrics[0];
+  assert.equal(result.lays[0].frequencies[0].frequency, 2);
+  assert.equal(result.lays[0].layers, 5);
+  input.maxFrequency = 1;
+  const limited = calculateCutPlanAlternatives(input)[0].result.fabrics[0];
+  assert.equal(limited.lays[0].frequencies[0].frequency, 1);
+  assert.equal(limited.sizes[0].difference, 0);
+});

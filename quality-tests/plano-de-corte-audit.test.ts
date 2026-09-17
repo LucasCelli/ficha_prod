@@ -81,7 +81,7 @@ test("dominância preserva o melhor estado completo sob o critério de equilíbr
   const quantities = [9, 1, 8, 8, 7, 12, 12];
   const result = solveMinimumLays(new Map(sizes.map((size, i) => [size, quantities[i]])), 4, "PLANO", 3,
     { tableLengthCm: 12, fabricWidthCm: 100, maxFrequency: 7, sizeProfiles: sizes.map((size) => profile(size, 1)) })[0];
-  assert.deepEqual(result.metrics, { totalFrequency: 18, peakFrequency: 7, sizeSpreadScore: 40, totalLayers: 9, totalMarkerLengthCm: 18, sizeEntries: 9, minimumSizeEntriesPerLay: 3, sizeEntryImbalance: 0, sparseLayCount: 0, singleLayerLayCount: 1, layerHeightImbalance: 4, balanceAdjustedMarkerLengthCm: 18 });
+  assert.deepEqual(result.metrics, { totalFrequency: 18, peakFrequency: 7, sizeSpreadScore: 40, totalLayers: 9, totalMarkerLengthCm: 18, sizeEntries: 9, minimumSizeEntriesPerLay: 3, sizeEntryImbalance: 0, sparseLayCount: 0, singleLayerLayCount: 1, singleMoldLayCount: 0, layerHeightImbalance: 4, balanceAdjustedMarkerLengthCm: 18 });
   assert.equal(result.searchComplete, true);
 });
 

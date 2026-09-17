@@ -16,6 +16,7 @@ export type SolverMetrics = {
   sizeEntryImbalance: number;
   sparseLayCount: number;
   singleLayerLayCount: number;
+  singleMoldLayCount: number;
   layerHeightImbalance: number;
   balanceAdjustedMarkerLengthCm: number;
 };
@@ -210,7 +211,7 @@ function solveLayerSet(
       // o melhor, inclusive se o prazo expirar antes de terminar esta altura.
       if (stage === prepared.length - 1) {
         if (usedMask === fullMask) {
-          const solution = buildSolution(entries, layers, candidate, false);
+          const solution = buildSolution(entries, layers, candidate, false, type);
           if (!bestComplete || compareSolutions(solution, bestComplete) < 0) {
             bestComplete = solution;
             onComplete(solution);
@@ -245,7 +246,7 @@ function comparePartialPlans(a: PartialPlan, b: PartialPlan) {
     || JSON.stringify(a.assignments).localeCompare(JSON.stringify(b.assignments));
 }
 
-function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPlan, searchComplete: boolean): SolvedPlan {
+function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPlan, searchComplete: boolean, type: FabricType): SolvedPlan {
   const lays = layers.map((layerCount, layIndex) => ({
     layers: layerCount,
     frequencies: entries.flatMap(({ garmentType, size, sleeveType, rank }) => {
@@ -269,6 +270,7 @@ function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPl
     minimumSizeEntriesPerLay: Math.min(...entriesPerLay),
     sizeEntryImbalance,
     sparseLayCount: entriesPerLay.filter((count) => count <= 2).length,
+    singleMoldLayCount: lays.filter((lay) => hasSingleMold(lay.frequencies, type)).length,
     singleLayerLayCount: layers.filter((count) => count === 1).length,
     layerHeightImbalance: Math.max(...layers) / Math.min(...layers),
     balanceAdjustedMarkerLengthCm: totalMarkerLengthCm * (1 + sizeEntryImbalance * SIZE_ENTRY_IMBALANCE_PENALTY),
@@ -283,6 +285,7 @@ export function compareSolutions(a: SolvedPlan, b: SolvedPlan) {
 
 export function compareSolutionMetrics(a: SolvedPlan, b: SolvedPlan) {
   return a.lays.length - b.lays.length
+    || a.metrics.singleMoldLayCount - b.metrics.singleMoldLayCount
     || a.metrics.singleLayerLayCount - b.metrics.singleLayerLayCount
     || a.metrics.balanceAdjustedMarkerLengthCm - b.metrics.balanceAdjustedMarkerLengthCm
     || a.metrics.sparseLayCount - b.metrics.sparseLayCount
@@ -310,7 +313,7 @@ export function assessLays(lays: SolvedLay[], quantities: Map<string, number>, t
   const assignments = entries.map((entry) => lays.map((lay) => lay.frequencies.find((item) => item.size === entry.size && item.sleeveType === entry.sleeveType
     && (item.garmentType ?? "T_SHIRT") === entry.garmentType)?.frequency ?? 0));
   const markerLengths = lays.map((_, j) => entries.reduce((sum, entry) => sum + entry.length * assignments[entry.rank][j], 0));
-  return buildSolution(entries, lays.map((lay) => lay.layers), { assignments, markerLengths, totalFrequency: 0, sizeSpreadScore: 0, usedMask: BigInt(0) }, false);
+  return buildSolution(entries, lays.map((lay) => lay.layers), { assignments, markerLengths, totalFrequency: 0, sizeSpreadScore: 0, usedMask: BigInt(0) }, false, type);
 }
 
 export function solveMinimumLays(
@@ -391,4 +394,9 @@ export function solveMinimumLays(
   }
   return [...collected.values()].sort(compareSolutions).slice(0, MAX_RETURNED_SOLUTIONS)
     .map((solution) => ({ ...solution, searchComplete: complete }));
+}
+
+/** A frequência tubular conta as duas faces; avalia o mapa inteiro. */
+export function hasSingleMold(frequencies: MarkerFrequency[], type: FabricType): boolean {
+  return frequencies.reduce((total, marker) => total + marker.frequency, 0) === (type === "TUBULAR" ? 2 : 1);
 }

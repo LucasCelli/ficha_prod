@@ -4,7 +4,7 @@ import { aggregateCutPlanItems, normalizeCutPlanInput } from "./normalization.ts
 import { checkSearchBudget, createSearchBudget, searchExpired, SearchInterrupted, sliceSearchBudget, type SearchBudget } from "./search-budget.ts";
 import { buildMergedLays, calculateMergedLayLowerBound } from "./merge-solver.ts";
 import { fabricCompatibilityKey, validateCutPlanSolution } from "./solution-validation.ts";
-import { SIZE_ENTRY_IMBALANCE_PENALTY, solveMinimumLays } from "./solver.ts";
+import { hasSingleMold, SIZE_ENTRY_IMBALANCE_PENALTY, solveMinimumLays } from "./solver.ts";
 import { compareUniformSizes } from "../../lib/uniform-sizes.ts";
 import { buildSizeProfileIndex, estimateMarkerLengthCm, getDefaultMaximumFrequency, getMaximumEstimatedFrequency } from "./dimensions.ts";
 
@@ -82,7 +82,7 @@ function planSignature(result: CutPlanResult) {
     : result.fabrics.flatMap((fabric) => fabric.lays.map(laySignature)).sort());
 }
 
-function score(result: CutPlanResult) {
+function score(result: CutPlanResult, input?: CutPlanInput) {
   const fabricLays = result.fabrics.flatMap((fabric) => fabric.lays);
   const operationalLays = result.mergedLays ?? fabricLays;
   const markerFrequencies = fabricLays.map((lay) => lay.frequencies.reduce((sum, item) => sum + item.frequency, 0));
@@ -94,6 +94,11 @@ function score(result: CutPlanResult) {
   const sizeEntryImbalance = entriesPerLay.reduce((total, count, index) => total
     + entriesPerLay.slice(index + 1).reduce((sum, other) => sum + Math.abs(count - other), 0), 0);
   const sparseLayCount = entriesPerLay.filter((count) => count <= 2).length;
+  const singleMoldLayCount = operationalLays.filter((lay) => {
+    const allocations = "allocations" in lay ? lay.allocations : [lay];
+    const type = input?.fabrics.find((fabric) => fabric.id === allocations[0]?.fabricId)?.type;
+    return type !== undefined && hasSingleMold(allocations.flatMap((allocation) => allocation.frequencies), type);
+  }).length;
   const singleLayerLayCount = operationalLays.filter((lay) => lay.layers === 1).length;
   const totalLayers = operationalLays.reduce((total, lay) => total + lay.layers, 0);
   const layerHeights = operationalLays.map((lay) => lay.layers);
@@ -111,7 +116,7 @@ function score(result: CutPlanResult) {
     }, 0);
   }, 0);
   const balanceAdjustedMarkerLengthCm = totalMarkerLengthCm * (1 + sizeEntryImbalance * SIZE_ENTRY_IMBALANCE_PENALTY);
-  return { mapCount: operationalLays.length, layCount: operationalLays.length, layerHeightImbalance, balanceAdjustedMarkerLengthCm, complexity, minimumSizeEntriesPerLay, peakFrequency, sizeEntries, sizeEntryImbalance, sizeSpreadScore, sparseLayCount, singleLayerLayCount, totalLayers, totalMarkerLengthCm };
+  return { mapCount: operationalLays.length, layCount: operationalLays.length, layerHeightImbalance, balanceAdjustedMarkerLengthCm, complexity, minimumSizeEntriesPerLay, peakFrequency, sizeEntries, sizeEntryImbalance, sizeSpreadScore, sparseLayCount, singleMoldLayCount, singleLayerLayCount, totalLayers, totalMarkerLengthCm };
 }
 
 type Candidate = { result: CutPlanResult; description: string };
@@ -128,9 +133,10 @@ function uniqueCandidates(candidates: Candidate[]) {
   return [...unique.values()];
 }
 
-function compareCandidates(a: Candidate, b: Candidate) {
-  const left = score(a.result), right = score(b.result);
+function compareCandidates(a: Candidate, b: Candidate, input?: CutPlanInput) {
+  const left = score(a.result, input), right = score(b.result, input);
   return left.layCount - right.layCount
+    || left.singleMoldLayCount - right.singleMoldLayCount
     || left.singleLayerLayCount - right.singleLayerLayCount
     || left.balanceAdjustedMarkerLengthCm - right.balanceAdjustedMarkerLengthCm
     || left.sparseLayCount - right.sparseLayCount
@@ -143,8 +149,8 @@ function compareCandidates(a: Candidate, b: Candidate) {
     || left.sizeEntries - right.sizeEntries || planSignature(a.result).localeCompare(planSignature(b.result));
 }
 
-export function compareCutPlanResults(a: CutPlanResult, b: CutPlanResult) {
-  return compareCandidates({ result: a, description: "" }, { result: b, description: "" });
+export function compareCutPlanResults(a: CutPlanResult, b: CutPlanResult, input?: CutPlanInput) {
+  return compareCandidates({ result: a, description: "" }, { result: b, description: "" }, input);
 }
 
 function calculateMergedVariants(input: CutPlanInput, candidates: Candidate[], budget: SearchBudget, publish: (candidates: Candidate[]) => void) {
@@ -158,9 +164,9 @@ function calculateMergedVariants(input: CutPlanInput, candidates: Candidate[], b
     result.mergedLays = buildMergedLays(input, result, budget);
     const candidate = { result, description: "Cores compatíveis com grades separadas por tecido." };
     pool.set(planSignature(result), candidate);
-    if (!best || compareCandidates(candidate, best) < 0) { best = candidate; publish([candidate]); }
+    if (!best || compareCandidates(candidate, best, input) < 0) { best = candidate; publish([candidate]); }
     if (pool.size > 128) {
-      const kept = [...pool.values()].sort(compareCandidates).slice(0, 32);
+      const kept = [...pool.values()].sort((a, b) => compareCandidates(a, b, input)).slice(0, 32);
       pool.clear();
       for (const item of kept) pool.set(planSignature(item.result), item);
     }
@@ -206,7 +212,7 @@ function calculateOptimizedVariants(input: CutPlanInput, primary: CutPlanResult,
       onSolution: (solution: import("./solver.ts").SolvedPlan) => {
         const lays = solution.lays.map((lay, index) => ({ ...lay, id: `${fabric.id}-progress-${index}`, fabricId: fabric.id }));
         const candidate = { result: { fabrics: incumbent.map((entry) => entry.fabricId === fabric.id ? buildFabricResult(fabric.id, requested, lays) : entry) }, description: "Melhor plano encontrado." };
-        if (compareCandidates(candidate, { result: { fabrics: incumbent }, description: "" }) <= 0) {
+        if (compareCandidates(candidate, { result: { fabrics: incumbent }, description: "" }, input) <= 0) {
           incumbent[fabricIndex] = candidate.result.fabrics[fabricIndex];
           publish([candidate]);
         }
@@ -258,19 +264,19 @@ export function calculateCutPlanAlternatives(rawInput: CutPlanInput, options: Cu
   const live = new Map<string, Candidate>();
   function finish(candidates: Candidate[], final = false): CutPlanAlternative[] {
     return uniqueCandidates(candidates)
-      .sort(compareCandidates).slice(0, 4).map((candidate, index) => {
+      .sort((a, b) => compareCandidates(a, b, input)).slice(0, 4).map((candidate, index) => {
         const validation = validateCutPlanSolution(input, candidate.result);
         const termination = budget.termination !== "completed" ? budget.termination : interruptions.has("state_limit") ? "state_limit" : interruptions.has("time_limit") ? "time_limit" : "completed";
         const optimal = final && index === 0 && candidate.result.fabrics.length === 1 && !input.mergeFabricsInLays && candidate.result.fabrics[0].searchComplete && validation.measurementsComplete;
         return { id: `alternative-${index + 1}`, label: index === 0 ? "Principal" : `Opção ${index + 1}`, description: candidate.description,
           result: { ...candidate.result, search: { status: optimal ? "optimal" : "feasible", termination, measurementsComplete: validation.measurementsComplete, measurementSource: validation.measurementSource, elapsedMs: budget.now() - budget.startedAt } },
-          mapCount: score(candidate.result).mapCount, layCount: score(candidate.result).layCount };
+          mapCount: score(candidate.result, input).mapCount, layCount: score(candidate.result, input).layCount };
       });
   }
   function publish(candidates: Candidate[]) {
     for (const candidate of candidates) live.set(planSignature(candidate.result), candidate);
     if (live.size > 32) {
-      const kept = [...live.entries()].sort(([, a], [, b]) => compareCandidates(a, b)).slice(0, 8);
+      const kept = [...live.entries()].sort(([, a], [, b]) => compareCandidates(a, b, input)).slice(0, 8);
       live.clear(); for (const [key, value] of kept) live.set(key, value);
     }
     options.onProgress?.(finish([...live.values()]));
