@@ -16,6 +16,8 @@ export type SolverMetrics = {
   sizeEntryImbalance: number;
   sparseLayCount: number;
   singleLayerLayCount: number;
+  flatSingleLayerLayCount: number;
+  flatSingleLayerLengthCm: number;
   singleMoldLayCount: number;
   layerHeightImbalance: number;
   balanceAdjustedMarkerLengthCm: number;
@@ -270,6 +272,8 @@ function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPl
     minimumSizeEntriesPerLay: Math.min(...entriesPerLay),
     sizeEntryImbalance,
     sparseLayCount: entriesPerLay.filter((count) => count <= 2).length,
+    flatSingleLayerLengthCm: type === "PLANO" ? plan.markerLengths.reduce((sum, length, index) => sum + (layers[index] === 1 ? length : 0), 0) : 0,
+    flatSingleLayerLayCount: type === "PLANO" ? layers.filter((count) => count === 1).length : 0,
     singleMoldLayCount: lays.filter((lay) => hasSingleMold(lay.frequencies, type)).length,
     singleLayerLayCount: layers.filter((count) => count === 1).length,
     layerHeightImbalance: Math.max(...layers) / Math.min(...layers),
@@ -284,7 +288,9 @@ export function compareSolutions(a: SolvedPlan, b: SolvedPlan) {
 }
 
 export function compareSolutionMetrics(a: SolvedPlan, b: SolvedPlan) {
-  return a.lays.length - b.lays.length
+  return a.metrics.flatSingleLayerLengthCm - b.metrics.flatSingleLayerLengthCm
+    || a.lays.length - b.lays.length
+    || a.metrics.flatSingleLayerLayCount - b.metrics.flatSingleLayerLayCount
     || a.metrics.singleMoldLayCount - b.metrics.singleMoldLayCount
     || a.metrics.singleLayerLayCount - b.metrics.singleLayerLayCount
     || a.metrics.balanceAdjustedMarkerLengthCm - b.metrics.balanceAdjustedMarkerLengthCm

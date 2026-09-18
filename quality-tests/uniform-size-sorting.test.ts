@@ -53,3 +53,12 @@ test("detecta baby look pelo produto antes de ordenar o tamanho", () => {
     "Baby Look G",
   ]);
 });
+
+
+test("equivalencia Priscilla e FIEMS resolve GG1 a GG5 pelos tamanhos numericos", () => {
+  const sizes = createUniformSizeDomain();
+  for (const [alias, numeric] of [["GG1", "52"], ["GG2", "54"], ["GG3", "56"], ["GG4", "58"], ["GG5", "60"]]) {
+    assert.equal(sizes.resolveSize(alias).sizeId, sizes.resolveSize(numeric).sizeId);
+    assert.equal(sizes.resolveSize(`FEM ${alias}`).sizeId, sizes.resolveSize(numeric).sizeId);
+  }
+});

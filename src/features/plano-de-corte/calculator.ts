@@ -142,6 +142,7 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
 
   const constraints = {
     budget,
+    additionalLayCounts: fabric.type === "PLANO" ? 1 : 0,
     tableLengthCm: input.tableLengthCm,
     fabricWidthCm: fabric.widthCm,
     sizeProfiles: input.sizeProfiles,
@@ -216,7 +217,7 @@ export function recalculateFabricResult(
 
 export function formatCutPlanSizeLabel(size: string, garmentType?: MarkerFrequency["garmentType"]) {
   const labeled = size
-    .replace(/^BABY(?:\s+LOOK)?\s+/i, garmentType === "DRESS_SHIRT" ? "FEM. " : "BL ")
+    .replace(/^(?:BABY(?:\s+LOOK)?|BL)\s+/i, garmentType === "DRESS_SHIRT" ? "FEM. " : "BL ")
     .replace(/\bFEM(?:ININA)?\s+/i, "FEM. ")
     .replace(/\bMASC(?:ULINA|ULINO)?\s+/i, "MASC. ");
   if (labeled !== size) return labeled;

@@ -74,10 +74,14 @@ function fallbackProfile(size: string, values: ShirtFallback): CutPlanSizeProfil
   };
 }
 
-export function resolveShirtFallback(size: string, sleeveType: SleeveType) {
+export function resolveShirtFallback(size: string, sleeveType: SleeveType, conservativeUnknown = false) {
   const key = normalizeUniformSizeKey(size);
   const table = isUniformBabyLookText(size) ? BABY_LOOK : TRADITIONAL;
-  const values = table[key];
+  // Sem medida feminina documentada, usa a base tradicional conservadora
+  // e identifica a estimativa como de baixa confianca.
+  const values = table[key] ?? (table === BABY_LOOK && TRADITIONAL[key]
+    ? { ...TRADITIONAL[key], confidence: "FALLBACK_LOW" as const }
+    : conservativeUnknown ? { ...TRADITIONAL.EGG, confidence: "FALLBACK_LOW" as const } : undefined);
   if (!values) return null;
   const profile = fallbackProfile(size, values);
   // +2 cm por unidade de frequência é a margem indicada para tabelas com boa

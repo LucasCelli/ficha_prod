@@ -146,7 +146,7 @@ export function resolveEntryLengthPerFrequencyCm(
     const base = calculateMarkerAreaLengthCm(profile, sleeveType, type, fabricWidthCm, 1);
     return { lengthCm: garmentType === "DRESS_SHIRT" ? base * DRESS_SHIRT_COMPONENT_ALLOWANCE : base, source: "REGISTERED" };
   }
-  const fallback = resolveShirtFallback(size, sleeveType);
+  const fallback = resolveShirtFallback(size, sleeveType, garmentType === "DRESS_SHIRT");
   if (!fallback) return { lengthCm: null, source: "UNKNOWN" };
   const base = calculateMarkerAreaLengthCm(fallback.profile, sleeveType, type, fabricWidthCm, 1);
   const estimated = fallback.margin.kind === "fixed"

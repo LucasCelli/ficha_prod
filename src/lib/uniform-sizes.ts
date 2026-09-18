@@ -6,9 +6,9 @@ const CANONICAL_SIZE_SEED = [
   ["size_rn", "RN", []], ["size_1", "1", []], ["size_2", "2", []], ["size_4", "4", []],
   ["size_6", "6", []], ["size_8", "8", []], ["size_10", "10", []], ["size_12", "12", []],
   ["size_14", "14", []], ["size_pp", "PP", ["16"]], ["size_p", "P", ["18"]], ["size_m", "M", []],
-  ["size_g", "G", []], ["size_gg", "GG", []], ["size_xg", "XG", ["52", "G1"]],
-  ["size_eg", "EG", ["54", "XGG", "G2"]], ["size_egg", "EGG", ["56", "XXG", "G3"]],
-  ["size_eegg", "EEGG", ["58", "XXGG", "G4"]], ["size_60", "60", ["XLG", "ESP1", "G5"]],
+  ["size_g", "G", []], ["size_gg", "GG", []], ["size_xg", "XG", ["52", "G1", "GG1"]],
+  ["size_eg", "EG", ["54", "XGG", "G2", "GG2"]], ["size_egg", "EGG", ["56", "XXG", "G3", "GG3"]],
+  ["size_eegg", "EEGG", ["58", "XXGG", "G4", "GG4"]], ["size_60", "60", ["XLG", "ESP1", "G5", "GG5"]],
   ["size_62", "62", ["XLGG", "ESP2", "G6"]], ["size_64", "64", ["XLGGG", "ESP3", "G7"]],
 ] as const;
 

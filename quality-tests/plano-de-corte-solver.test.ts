@@ -3,7 +3,7 @@ import test from "node:test";
 import { performance } from "node:perf_hooks";
 import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, calculateShirtAreaCm2, ESTIMATED_NESTING_EFFICIENCY, estimateMarkerLengthCm, formatEstimatedLengthMeters, getDefaultMaximumFrequency, getLayerLimit, getMaximumEstimatedFrequency, normalizeCutPlanSizeKey } from "../src/features/plano-de-corte/dimensions.ts";
 import { cutPlanDemandKey, type CutPlanSizeProfile, type FabricType } from "../src/features/plano-de-corte/model.ts";
-import { hasSingleMold, solveMinimumLays } from "../src/features/plano-de-corte/solver.ts";
+import { assessLays, compareSolutionMetrics, hasSingleMold, solveMinimumLays } from "../src/features/plano-de-corte/solver.ts";
 import { calculateCutPlan, formatCutPlanItemType, formatCutPlanSizeLabel, formatMarkerLabel, formatOperationalMarkerLabel } from "../src/features/plano-de-corte/calculator.ts";
 import { calculateCutPlanAlternatives } from "../src/features/plano-de-corte/alternatives.ts";
 import { validateCutPlan } from "../src/features/plano-de-corte/validation.ts";
@@ -728,4 +728,52 @@ test("prefere frequência 2 no plano e mantém mapa único quando o limite exige
   const limited = calculateCutPlanAlternatives(input)[0].result.fabrics[0];
   assert.equal(limited.lays[0].frequencies[0].frequency, 1);
   assert.equal(limited.sizes[0].difference, 0);
+});
+
+
+test("plano prefere mais camadas mesmo quando uma folha evita mapa de um molde", () => {
+  const quantities = new Map([["P", 2]]);
+  const marker = { size: "P", sleeveType: "CURTA" as const };
+  const oneLayer = [{ layers: 1, frequencies: [{ ...marker, frequency: 2 }] }];
+  const twoLayers = [{ layers: 2, frequencies: [{ ...marker, frequency: 1 }] }];
+  const assess = (lays: typeof oneLayer) => assessLays(lays, quantities, "PLANO", unconstrained);
+  assert.ok(compareSolutionMetrics(assess(twoLayers), assess(oneLayer)) < 0);
+  const input = createInput("PLANO", 100);
+  input.items[0].quantity = 2;
+  const result = calculateCutPlanAlternatives(input)[0].result.fabrics[0];
+  assert.equal(result.lays[0].layers, 2);
+  assert.equal(result.sizes[0].difference, 0);
+  input.maxLayers = 1;
+  assert.equal(calculateCutPlanAlternatives(input)[0].result.fabrics[0].lays[0].layers, 1);
+});
+
+test("camisas femininas aceitam aliases Baby Look e BL nas tabelas", () => {
+  assert.equal(formatCutPlanSizeLabel("BABY LOOK P", "DRESS_SHIRT"), "FEM. P");
+  assert.equal(formatCutPlanSizeLabel("BL P", "DRESS_SHIRT"), "FEM. P");
+  assert.equal(formatCutPlanSizeLabel("BL P", "T_SHIRT"), "BL P");
+});
+
+
+test("separa a camisa avulsa do mapa plano comprido de uma folha", () => {
+  const input = createInput("PLANO", 100);
+  input.tableLengthCm = 2000;
+  input.items = [["GG1", 1], ["BL P", 2], ["BL G", 2], ["BL EG", 2]].map(([size, quantity], index) => ({
+    id: `social-${index}`, fabricId: "fabric", size: String(size), quantity: Number(quantity), sleeveType: "CURTA", garmentType: "DRESS_SHIRT",
+  }));
+  const result = calculateCutPlanAlternatives(input)[0].result;
+  const lays = result.fabrics[0].lays;
+  assert.equal(lays.length, 2);
+  assert.equal(lays.find((lay) => lay.layers === 1)?.frequencies.length, 1);
+  assert.equal(lays.find((lay) => lay.layers === 2)?.frequencies.length, 3);
+  assert.ok(lays.every((lay) => lay.markerLengthCm !== undefined && lay.markerLengthCm > 0));
+  assert.ok(result.fabrics[0].sizes.every((size) => size.difference === 0));
+  assert.equal(result.search?.measurementsComplete, true);
+});
+
+
+test("GG1 social usa a medida aproximada de 52 em vez da maior base", () => {
+  const index = buildSizeProfileIndex([]);
+  const marker = (size: string) => [{ size, sleeveType: "CURTA" as const, garmentType: "DRESS_SHIRT" as const, frequency: 1 }];
+  assert.equal(estimateMarkerLengthCm(marker("GG1"), "PLANO", 118, index), estimateMarkerLengthCm(marker("52"), "PLANO", 118, index));
+  assert.ok(estimateMarkerLengthCm(marker("GG1"), "PLANO", 118, index)! < estimateMarkerLengthCm(marker("EGG"), "PLANO", 118, index)!);
 });

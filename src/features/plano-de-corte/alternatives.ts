@@ -99,6 +99,14 @@ function score(result: CutPlanResult, input?: CutPlanInput) {
     const type = input?.fabrics.find((fabric) => fabric.id === allocations[0]?.fabricId)?.type;
     return type !== undefined && hasSingleMold(allocations.flatMap((allocation) => allocation.frequencies), type);
   }).length;
+  const flatSingleLayerLengthCm = operationalLays.reduce((sum, lay) => {
+    const fabricId = "allocations" in lay ? lay.allocations[0]?.fabricId : lay.fabricId;
+    return sum + (lay.layers === 1 && input?.fabrics.find((fabric) => fabric.id === fabricId)?.type === "PLANO" ? lay.markerLengthCm ?? 0 : 0);
+  }, 0);
+  const flatSingleLayerLayCount = operationalLays.filter((lay) => {
+    const fabricId = "allocations" in lay ? lay.allocations[0]?.fabricId : lay.fabricId;
+    return lay.layers === 1 && input?.fabrics.find((fabric) => fabric.id === fabricId)?.type === "PLANO";
+  }).length;
   const singleLayerLayCount = operationalLays.filter((lay) => lay.layers === 1).length;
   const totalLayers = operationalLays.reduce((total, lay) => total + lay.layers, 0);
   const layerHeights = operationalLays.map((lay) => lay.layers);
@@ -116,7 +124,7 @@ function score(result: CutPlanResult, input?: CutPlanInput) {
     }, 0);
   }, 0);
   const balanceAdjustedMarkerLengthCm = totalMarkerLengthCm * (1 + sizeEntryImbalance * SIZE_ENTRY_IMBALANCE_PENALTY);
-  return { mapCount: operationalLays.length, layCount: operationalLays.length, layerHeightImbalance, balanceAdjustedMarkerLengthCm, complexity, minimumSizeEntriesPerLay, peakFrequency, sizeEntries, sizeEntryImbalance, sizeSpreadScore, sparseLayCount, singleMoldLayCount, singleLayerLayCount, totalLayers, totalMarkerLengthCm };
+  return { mapCount: operationalLays.length, layCount: operationalLays.length, layerHeightImbalance, balanceAdjustedMarkerLengthCm, complexity, minimumSizeEntriesPerLay, peakFrequency, sizeEntries, sizeEntryImbalance, sizeSpreadScore, sparseLayCount, flatSingleLayerLengthCm, flatSingleLayerLayCount, singleMoldLayCount, singleLayerLayCount, totalLayers, totalMarkerLengthCm };
 }
 
 type Candidate = { result: CutPlanResult; description: string };
@@ -135,7 +143,9 @@ function uniqueCandidates(candidates: Candidate[]) {
 
 function compareCandidates(a: Candidate, b: Candidate, input?: CutPlanInput) {
   const left = score(a.result, input), right = score(b.result, input);
-  return left.layCount - right.layCount
+  return left.flatSingleLayerLengthCm - right.flatSingleLayerLengthCm
+    || left.layCount - right.layCount
+    || left.flatSingleLayerLayCount - right.flatSingleLayerLayCount
     || left.singleMoldLayCount - right.singleMoldLayCount
     || left.singleLayerLayCount - right.singleLayerLayCount
     || left.balanceAdjustedMarkerLengthCm - right.balanceAdjustedMarkerLengthCm

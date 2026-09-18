@@ -83,7 +83,7 @@ function MergedLayCard({ fabricResults, fabrics, index, lay }: { fabricResults: 
     <thead><tr><th>Tecido</th><th>Tamanho</th><th>Tipo</th><th>Frequência</th><th>Peças cortadas</th></tr></thead>
     <tbody>{sortedMergedMarkers(lay).map(({ allocation, marker }) => {
       const fabric = fabrics.find((item) => item.id === allocation.fabricId)!;
-      return <tr key={`${allocation.id}-${marker.garmentType}-${marker.size}-${marker.sleeveType}`}><td>{fabricLabel(fabric)}</td><td>{formatCutPlanSizeLabel(marker.size)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>;
+      return <tr key={`${allocation.id}-${marker.garmentType}-${marker.size}-${marker.sleeveType}`}><td>{fabricLabel(fabric)}</td><td>{formatCutPlanSizeLabel(marker.size, marker.garmentType)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>;
     })}</tbody>
   </>} />;
 }
@@ -94,7 +94,7 @@ function FabricLayCard({ index, lay, showSleeveType }: { index: number; lay: Lay
     <p><strong>{formatOperationalMarkerLabel(lay.frequencies, showSleeveType)}</strong></p>
   </>} rows={<>
     <thead><tr><th>Tamanho</th><th>Tipo</th><th>Frequência</th><th>Peças cortadas</th></tr></thead>
-    <tbody>{sortMarkerFrequenciesForDisplay(lay.frequencies).map((marker) => <tr key={`${marker.garmentType}-${marker.size}-${marker.sleeveType}`}><td>{formatCutPlanSizeLabel(marker.size)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>)}</tbody>
+    <tbody>{sortMarkerFrequenciesForDisplay(lay.frequencies).map((marker) => <tr key={`${marker.garmentType}-${marker.size}-${marker.sleeveType}`}><td>{formatCutPlanSizeLabel(marker.size, marker.garmentType)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>)}</tbody>
   </>} />;
 }
 
@@ -131,7 +131,7 @@ function OverallConference({ rows }: { rows: ReturnType<typeof aggregateOverallS
     produced: sum.produced + row.produced,
     requested: sum.requested + row.requested,
   }), { difference: 0, produced: 0, requested: 0 });
-  return <section className="cut-plan-print-simple__conference"><h3>Conferência final</h3><table className="cut-plan-print-simple__check"><thead><tr><th>Tamanho</th><th>Tipo</th><th>Pedido</th><th>Vai cortar</th><th>Diferença</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.garmentType}-${row.size}-${row.sleeveType}`}><td><strong>{formatCutPlanSizeLabel(row.size)}</strong></td><td>{formatCutPlanItemType(row.size, row.sleeveType, row.garmentType)}</td><td>{row.requested}</td><td>{row.produced}</td><td>{row.difference > 0 ? "+" : ""}{row.difference}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>Totais</th><td><strong>{totals.requested}</strong></td><td><strong>{totals.produced}</strong></td><td><strong>{totals.difference}</strong></td></tr></tfoot></table></section>;
+  return <section className="cut-plan-print-simple__conference"><h3>Conferência final</h3><table className="cut-plan-print-simple__check"><thead><tr><th>Tamanho</th><th>Tipo</th><th>Pedido</th><th>Vai cortar</th><th>Diferença</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.garmentType}-${row.size}-${row.sleeveType}`}><td><strong>{formatCutPlanSizeLabel(row.size, row.garmentType)}</strong></td><td>{formatCutPlanItemType(row.size, row.sleeveType, row.garmentType)}</td><td>{row.requested}</td><td>{row.produced}</td><td>{row.difference > 0 ? "+" : ""}{row.difference}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>Totais</th><td><strong>{totals.requested}</strong></td><td><strong>{totals.produced}</strong></td><td><strong>{totals.difference}</strong></td></tr></tfoot></table></section>;
 }
 
 export function CutPlanPrintSimple({ alternative, input, sourceFichas = [] }: { alternative: CutPlanAlternative; input: CutPlanInput; sourceFichas?: CutPlanSourceFicha[] }) {
