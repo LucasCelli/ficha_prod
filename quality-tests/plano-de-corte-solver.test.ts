@@ -567,6 +567,22 @@ test("mantém o mesmo tamanho e manga separados por modelagem", () => {
   assert.equal(result.lays.flatMap((lay) => lay.frequencies).length, 2);
 });
 
+test("mantém modelagens femininas separadas das masculinas", () => {
+  const input = createInput("PLANO", 20);
+  input.items = ["T_SHIRT", "BABY_LOOK", "DRESS_SHIRT", "CAMISETE"].map((garmentType, index) => ({
+    id: `gender-modeling-${index}`,
+    fabricId: "fabric",
+    garmentType: garmentType as "T_SHIRT" | "BABY_LOOK" | "DRESS_SHIRT" | "CAMISETE",
+    size: "M",
+    sleeveType: "CURTA" as const,
+    quantity: 2,
+  }));
+
+  const result = calculateCutPlan(input).fabrics[0];
+  assert.deepEqual(new Set(result.sizes.map(({ garmentType }) => garmentType)), new Set(["T_SHIRT", "BABY_LOOK", "DRESS_SHIRT", "CAMISETE"]));
+  assert.equal(result.lays.flatMap((lay) => lay.frequencies).length, 4);
+});
+
 test("coincide com busca exaustiva independente em entradas pequenas", () => {
   for (const type of ["PLANO", "TUBULAR"] satisfies FabricType[]) {
     const step = type === "TUBULAR" ? 2 : 1;

@@ -139,20 +139,23 @@ export function resolveEntryLengthPerFrequencyCm(
     return calculateFallbackLowerGarmentLength(size, "SHORTS", type, fabricWidthCm)
       ?? { lengthCm: calculateLowerGarmentLengthPerFrequencyCm(SHORTS_ESTIMATED_HEIGHT_CM, SHORTS_ESTIMATED_WIDTH_CM, type, fabricWidthCm), source: "FALLBACK_LOW" };
   }
+  const isFemaleModel = garmentType === "BABY_LOOK" || garmentType === "CAMISETE";
+  const isDressShirt = garmentType === "DRESS_SHIRT" || garmentType === "CAMISETE";
+  const measurementSize = isFemaleModel && !isUniformBabyLookText(size) ? `FEM ${size}` : size;
   // Camisas sociais usam as mesmas medidas-base, acrescidas dos componentes
   // próprios da modelagem que não existem numa camiseta.
-  const profile = profileIndex.get(normalizeCutPlanSizeKey(size));
+  const profile = profileIndex.get(normalizeCutPlanSizeKey(measurementSize));
   if (profile) {
     const base = calculateMarkerAreaLengthCm(profile, sleeveType, type, fabricWidthCm, 1);
-    return { lengthCm: garmentType === "DRESS_SHIRT" ? base * DRESS_SHIRT_COMPONENT_ALLOWANCE : base, source: "REGISTERED" };
+    return { lengthCm: isDressShirt ? base * DRESS_SHIRT_COMPONENT_ALLOWANCE : base, source: "REGISTERED" };
   }
-  const fallback = resolveShirtFallback(size, sleeveType, garmentType === "DRESS_SHIRT");
+  const fallback = resolveShirtFallback(measurementSize, sleeveType, isDressShirt);
   if (!fallback) return { lengthCm: null, source: "UNKNOWN" };
   const base = calculateMarkerAreaLengthCm(fallback.profile, sleeveType, type, fabricWidthCm, 1);
   const estimated = fallback.margin.kind === "fixed"
     ? base + fallback.margin.value
     : base + Math.min(fallback.margin.maximumCm, base * (fallback.margin.value - 1));
-  const lengthCm = garmentType === "DRESS_SHIRT" ? estimated * DRESS_SHIRT_COMPONENT_ALLOWANCE : estimated;
+  const lengthCm = isDressShirt ? estimated * DRESS_SHIRT_COMPONENT_ALLOWANCE : estimated;
   return { lengthCm, source: fallback.confidence };
 }
 

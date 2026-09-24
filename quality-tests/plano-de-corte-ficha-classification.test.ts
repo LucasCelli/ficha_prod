@@ -26,8 +26,12 @@ test("mantém calça separada e unifica bermuda com short no mesmo tamanho", () 
 
 test("classifica camiseta e camisa social como modelagens distintas", () => {
   assert.equal(resolveItemGarmentType("Camiseta básica manga curta"), "T_SHIRT");
+  assert.equal(resolveItemGarmentType("Camiseta feminina manga curta"), "BABY_LOOK");
+  assert.equal(resolveItemGarmentType("Baby look manga longa"), "BABY_LOOK");
   assert.equal(resolveItemGarmentType("Camisa manga curta"), "DRESS_SHIRT");
   assert.equal(resolveItemGarmentType("Camisa social masculina manga longa"), "DRESS_SHIRT");
+  assert.equal(resolveItemGarmentType("Camisa manga longa feminina nos detalhes"), "CAMISETE");
+  assert.equal(resolveItemGarmentType("Camisete manga curta"), "CAMISETE");
   assert.equal(resolveItemGarmentType("Calça de helanca"), "PANTS");
   assert.equal(resolveItemGarmentType("Bermuda de helanca"), "SHORTS");
 });

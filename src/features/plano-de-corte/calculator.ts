@@ -216,15 +216,18 @@ export function recalculateFabricResult(
 }
 
 export function formatCutPlanSizeLabel(size: string, garmentType?: MarkerFrequency["garmentType"]) {
+  const isFemaleModel = garmentType === "BABY_LOOK" || garmentType === "CAMISETE";
   const labeled = size
-    .replace(/^(?:BABY(?:\s+LOOK)?|BL)\s+/i, garmentType === "DRESS_SHIRT" ? "FEM. " : "BL ")
-    .replace(/\bFEM(?:ININA)?\s+/i, "FEM. ")
+    .replace(/^(?:BABY(?:\s+LOOK)?|BL)\s+/i, isFemaleModel ? "" : garmentType === "DRESS_SHIRT" ? "FEM. " : "BL ")
+    .replace(/^FEM(?:ININA)?\.?\s+/i, isFemaleModel ? "" : "FEM. ")
     .replace(/\bMASC(?:ULINA|ULINO)?\s+/i, "MASC. ");
   if (labeled !== size) return labeled;
   return garmentType === "DRESS_SHIRT" && /^(?:PP|P|M|G|GG|XG|EG|EGG|EEGG)(?:\s*\(\d+\))?$/i.test(size.trim()) ? `MASC. ${size.trim()}` : size;
 }
 
 export function formatCutPlanItemType(size: string, sleeveType: MarkerFrequency["sleeveType"], garmentType?: MarkerFrequency["garmentType"]) {
+  if (garmentType === "BABY_LOOK") return sleeveType === "LONGA" ? "Babylook · longa" : "Babylook · curta";
+  if (garmentType === "CAMISETE") return sleeveType === "LONGA" ? "Camisete · longa" : "Camisete · curta";
   if (garmentType === "DRESS_SHIRT") return sleeveType === "LONGA" ? "Camisa social · longa" : "Camisa social · curta";
   const garment = size.trim().match(/^(SHORT|BERMUDA|CALÇA)(?:\s|$)/i)?.[1];
   if (garment && /^(?:SHORT|BERMUDA)$/i.test(garment)) return "Short/Bermuda";
@@ -243,12 +246,12 @@ export function sortMarkerFrequenciesForDisplay(frequencies: MarkerFrequency[]) 
 }
 
 export function formatMarkerLabel(frequencies: MarkerFrequency[], showSleeveType = true) {
-  return sortMarkerFrequenciesForDisplay(frequencies).map(({ garmentType, size, sleeveType, frequency }) => `${frequency}-${formatCutPlanSizeLabel(size, garmentType)}${garmentType === "DRESS_SHIRT" ? " SOCIAL" : ""}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`).join(" + ");
+  return sortMarkerFrequenciesForDisplay(frequencies).map(({ garmentType, size, sleeveType, frequency }) => `${frequency}-${formatCutPlanSizeLabel(size, garmentType)}${garmentType === "DRESS_SHIRT" ? " SOCIAL" : garmentType === "BABY_LOOK" ? " BABYLOOK" : garmentType === "CAMISETE" ? " CAMISETE" : ""}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`).join(" + ");
 }
 
 export function formatOperationalMarkerLabel(frequencies: MarkerFrequency[], showSleeveType = true) {
   return sortMarkerFrequenciesForDisplay(frequencies)
-    .map(({ garmentType, size, sleeveType, frequency }) => `${frequency}-${formatCutPlanSizeLabel(size, garmentType)}${garmentType === "DRESS_SHIRT" ? " SOCIAL" : ""}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`)
+    .map(({ garmentType, size, sleeveType, frequency }) => `${frequency}-${formatCutPlanSizeLabel(size, garmentType)}${garmentType === "DRESS_SHIRT" ? " SOCIAL" : garmentType === "BABY_LOOK" ? " BABYLOOK" : garmentType === "CAMISETE" ? " CAMISETE" : ""}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`)
     .join(", ");
 }
 

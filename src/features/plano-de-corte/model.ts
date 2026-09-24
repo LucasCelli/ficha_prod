@@ -1,6 +1,6 @@
 export type FabricType = "PLANO" | "TUBULAR";
 export type SleeveType = "CURTA" | "LONGA";
-export type GarmentType = "T_SHIRT" | "DRESS_SHIRT" | "PANTS" | "SHORTS";
+export type GarmentType = "T_SHIRT" | "BABY_LOOK" | "DRESS_SHIRT" | "CAMISETE" | "PANTS" | "SHORTS";
 
 const CUT_PLAN_DEMAND_SEPARATOR = "\u001f";
 
@@ -19,7 +19,7 @@ export function parseCutPlanDemandKey(key: string): { garmentType: GarmentType; 
   if (parts.length < 2) return { garmentType: inferCutPlanGarmentType(key), size: key, sleeveType: "CURTA" };
   const size = parts[0];
   const sleeveType = parts[1] === "LONGA" ? "LONGA" : "CURTA";
-  const garmentType = (["T_SHIRT", "DRESS_SHIRT", "PANTS", "SHORTS"] as const).find((type) => type === parts[2]) ?? inferCutPlanGarmentType(size);
+  const garmentType = (["T_SHIRT", "BABY_LOOK", "DRESS_SHIRT", "CAMISETE", "PANTS", "SHORTS"] as const).find((type) => type === parts[2]) ?? inferCutPlanGarmentType(size);
   return { garmentType, size, sleeveType };
 }
 

@@ -53,6 +53,11 @@ export function resolveItemGarmentType(itemDescription: string): GarmentType {
   const description = normalizeCutPlanDescription(itemDescription);
   if (/\bcalca(?:s)?\b/.test(description)) return "PANTS";
   if (/\b(?:bermuda|short)(?:s)?\b/.test(description)) return "SHORTS";
+  if (/\bcamisete(?:s)?\b/.test(description)) return "CAMISETE";
+  if (/\b(?:baby\s*look|babylook|bl)\b/.test(description)) return "BABY_LOOK";
+  const female = /\b(?:feminina|feminino|fem)\b/.test(description);
+  if (female && /\b(?:camisa|social)(?:s)?\b/.test(description) && !/\bcamiseta(?:s)?\b/.test(description)) return "CAMISETE";
+  if (female && /\bcamiseta(?:s)?\b/.test(description)) return "BABY_LOOK";
   if (/\b(?:camisa|camisete)(?:s)?\b|\bsocial\b/.test(description) && !/\bcamiseta(?:s)?\b/.test(description)) return "DRESS_SHIRT";
   return "T_SHIRT";
 }
