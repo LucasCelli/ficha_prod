@@ -1,11 +1,12 @@
 "use client";
 
 import { Plus, Save } from "lucide-react";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, type FormEventHandler } from "react";
 import { useFormStatus } from "react-dom";
 import { Button, Combobox, Modal, type ComboboxOption } from "@/components/ui";
 import { createClienteInlineAction } from "@/features/clientes/actions";
 import { getInitialClienteInlineFormState } from "@/features/clientes/form-state";
+import { forceUppercaseInput } from "@/lib/name-normalizer";
 
 type ClientePickerProps = {
   describedBy?: string;
@@ -55,7 +56,7 @@ function NovoClienteModal({ onCancel, onCreated }: { onCancel: () => void; onCre
       >
         <header><h2>Novo cliente</h2></header>
         {state.message ? <div className="form-banner" role="alert">{state.message}</div> : null}
-        <InlineField error={state.fieldErrors?.nome} label="Nome" name="nome" required />
+        <InlineField error={state.fieldErrors?.nome} label="Nome" name="nome" onInput={forceUppercaseInput} required />
         <InlineField error={state.fieldErrors?.empresa} label="Empresa/Instituição" name="empresa" />
         <InlineField error={state.fieldErrors?.telefone} label="Telefone" name="telefone" type="tel" />
         <InlineField error={state.fieldErrors?.email} label="E-mail" name="email" type="email" />
@@ -65,8 +66,8 @@ function NovoClienteModal({ onCancel, onCreated }: { onCancel: () => void; onCre
   );
 }
 
-function InlineField({ error, label, name, required = false, type = "text" }: { error?: string; label: string; name: string; required?: boolean; type?: string }) {
-  return <div className="field"><label htmlFor={`novo-cliente-${name}`}>{label}{required ? " *" : ""}</label><input aria-describedby={error ? `novo-cliente-${name}-error` : undefined} aria-invalid={Boolean(error)} id={`novo-cliente-${name}`} name={name} type={type} />{error ? <p className="field-error" id={`novo-cliente-${name}-error`}>{error}</p> : null}</div>;
+function InlineField({ error, label, name, onInput, required = false, type = "text" }: { error?: string; label: string; name: string; onInput?: FormEventHandler<HTMLInputElement>; required?: boolean; type?: string }) {
+  return <div className="field"><label htmlFor={`novo-cliente-${name}`}>{label}{required ? " *" : ""}</label><input aria-describedby={error ? `novo-cliente-${name}-error` : undefined} aria-invalid={Boolean(error)} id={`novo-cliente-${name}`} name={name} onInput={onInput} type={type} />{error ? <p className="field-error" id={`novo-cliente-${name}-error`}>{error}</p> : null}</div>;
 }
 
 function SaveClienteButton() {

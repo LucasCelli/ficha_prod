@@ -62,9 +62,9 @@ export function CutPlanItemsEditor({ addItem, duplicateItem, fabrics, items, mov
     });
   }
 
-  return <div className="cut-plan-items">
+  return <section aria-labelledby="cut-plan-items-title" className="cut-plan-items">
     <SortableInstructions />
-    <div className="cut-plan-items__toolbar"><Button variant="secondary" onClick={sortItems} disabled={items.length < 2}><RotateCcw size={18} /> Ordenar por tamanho</Button><Button variant="secondary" onClick={() => addItem()}><Plus size={18} /> Adicionar tamanho</Button></div>
+    <div className="cut-plan-items__toolbar"><h3 className="cut-plan__subheading" id="cut-plan-items-title">Itens do plano</h3><Button variant="ghost" onClick={sortItems} disabled={items.length < 2}><RotateCcw size={18} /> Ordenar por tamanho</Button><Button variant="secondary" onClick={() => addItem()}><Plus size={18} /> Adicionar tamanho</Button></div>
     <div className="cut-plan-items__head" aria-hidden="true"><span></span><span>Tamanho</span><span>Tipo</span><span>Quantidade</span><span>Tecido</span><span>Ações</span></div>
     <DragDropProvider onDragEnd={(event) => {
       if (event.canceled) return;
@@ -82,7 +82,7 @@ export function CutPlanItemsEditor({ addItem, duplicateItem, fabrics, items, mov
       </>}</SortableRow>) : <div className="cut-plan-items__empty">Nenhum tamanho adicionado ainda.</div>}</div>
     </DragDropProvider>
     <div className="cut-plan-items__total" aria-live="polite"><span>Total de peças</span><strong>{items.reduce((total, item) => total + (Number.isFinite(item.quantity) ? item.quantity : 0), 0)}</strong></div>
-  </div>;
+  </section>;
 }
 
 export function sortCutPlanItems(items: CutPlanItem[]) {

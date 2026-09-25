@@ -321,6 +321,9 @@ export type Database = {
           acabamento_manga: string | null;
           cor_acabamento_manga: string | null;
           largura_manga: string | null;
+          acabamento_manga_longa: string | null;
+          largura_manga_longa: string | null;
+          cor_acabamento_manga_longa: string | null;
           gola: string | null;
           acabamento_gola: string | null;
           cor_detalhe_gola: string | null;
@@ -384,6 +387,9 @@ export type Database = {
           acabamento_manga?: string | null;
           cor_acabamento_manga?: string | null;
           largura_manga?: string | null;
+          acabamento_manga_longa?: string | null;
+          largura_manga_longa?: string | null;
+          cor_acabamento_manga_longa?: string | null;
           gola?: string | null;
           acabamento_gola?: string | null;
           cor_detalhe_gola?: string | null;

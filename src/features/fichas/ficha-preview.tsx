@@ -184,7 +184,7 @@ function getTechnicalGroups(ficha: FichaDetail) {
     { label: "Material", value: ficha.material },
     { label: "Cor do material", value: ficha.cor_material },
     { label: "Composição", value: ficha.composicao },
-    { label: "Manga", value: joinValues(ficha.manga, ficha.acabamento_manga) },
+    { label: "Manga", value: joinValues(ficha.manga, ficha.acabamento_manga, ficha.acabamento_manga_longa) },
     { label: "Gola", value: joinValues(ficha.gola, ficha.acabamento_gola) },
     { label: "Bolso", value: ficha.bolso },
     { label: "Filete", value: joinValues(ficha.filete, ficha.filete_local, ficha.filete_cor) },

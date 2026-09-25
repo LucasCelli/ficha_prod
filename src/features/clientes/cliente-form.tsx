@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui";
+import { forceUppercaseInput } from "@/lib/name-normalizer";
 import type { ClienteDetail } from "./data";
 import { createClienteAction, updateClienteAction } from "./actions";
 import { getInitialClienteFormState } from "./form-state";
@@ -58,6 +59,7 @@ export function ClienteForm({ cliente, mode = "create", returnTo }: ClienteFormP
             aria-invalid={Boolean(state.fieldErrors?.nome)}
             autoComplete="organization"
             defaultValue={cliente?.nome}
+            onInput={forceUppercaseInput}
             placeholder="Nome do cliente…"
           />
         </Field>

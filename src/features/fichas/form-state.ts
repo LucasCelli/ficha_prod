@@ -2,6 +2,9 @@ export type FieldErrors = Partial<
   Record<
     | "acabamentoGola"
     | "acabamentoManga"
+    | "acabamentoMangaLonga"
+    | "corAcabamentoMangaLonga"
+    | "larguraMangaLonga"
     | "aberturaLateral"
     | "arte"
     | "bolso"

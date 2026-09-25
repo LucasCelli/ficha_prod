@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { Calculator, ChevronDown, ChevronUp, Plus, Printer, RotateCcw, Scissors, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Calculator, ChevronDown, ChevronUp, Eraser, FilePlus, Plus, Printer, Scissors, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, Badge, Button, CustomDatalist, IconButton, type CustomDatalistOption } from "@/components/ui";
 import type { CatalogSizeForCutPlan } from "@/features/catalogos/data";
@@ -87,7 +87,8 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
   const [sourceFichas, setSourceFichas] = useState<CutPlanSourceFicha[]>([]);
   const [alternatives, setAlternatives] = useState<CutPlanAlternative[]>([]);
   const [selectedId, setSelectedId] = useState("");
-  const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmReset, setConfirmReset] = useState<"clear" | "new" | null>(null);
+  const focusFirstStepOnClose = useRef(false);
   const [printSelection, setPrintSelection] = useState<CutPlanAlternative[] | null>(null);
   const { calculating, start: startSearch, cancel: cancelSearch } = useCutPlanSearch();
   const [history, setHistory] = useState<CutPlanHistoryEntry[]>([]);
@@ -115,6 +116,20 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
   })), [catalogSizes]);
   const input = useMemo<CutPlanInput>(() => ({ tableLengthCm, maxLayers, maxFrequency, mergeFabricsInLays, fabrics, items, sizeProfiles, sourceFichaIds: sourceFichas.map((ficha) => ficha.id) }), [tableLengthCm, maxLayers, maxFrequency, mergeFabricsInLays, fabrics, items, sizeProfiles, sourceFichas]);
   const selected = alternatives.find((alternative) => alternative.id === selectedId) ?? alternatives[0];
+  const issueCount = useMemo(() => validateCutPlan(input).length, [input]);
+  const totalPieces = items.reduce((sum, item) => sum + (Number.isFinite(item.quantity) ? item.quantity : 0), 0);
+  const hasContent = items.length > 0 || sourceFichas.length > 0 || alternatives.length > 0 || calculating;
+  const planStatus = calculating ? { state: "calculating", label: "Calculando plano…" }
+    : selected ? { state: "calculated", label: "Plano calculado" }
+      : !items.length ? { state: "empty", label: "Plano vazio" }
+        : issueCount ? { state: "invalid", label: "Revise os dados" }
+          : { state: "ready", label: "Pronto para calcular" };
+  const planSummary = calculating ? "Buscando opções · até 30 s" : items.length ? [
+    countLabel(fabrics.length, "tecido"),
+    countLabel(new Set(items.map((item) => item.size.trim()).filter(Boolean)).size, "tamanho"),
+    sourceFichas.length ? countLabel(sourceFichas.length, "ficha") : "",
+    countLabel(totalPieces, "peça"),
+  ].filter(Boolean).join(" · ") : "";
   useEffect(() => {
     // O histórico é uma fonte externa do navegador e só pode ser lido após a hidratação.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -271,7 +286,27 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
   function clearHistory() {
     setHistory([]);
     toast.success("Histórico apagado.");
-  }  function clear() { cancelSearch(); setTableLengthCm(800); setMaxLayers(50); setMaxFrequency(getDefaultMaximumFrequency(defaultFabricSettings.type ?? "TUBULAR")); setMergeFabricsInLays(false); setFabrics([createFabric(defaultFabricName, undefined, defaultFabricSettings)]); setItems([]); setSourceFichas([]); setAlternatives([]); setConfirmClear(false); }
+  }
+  /** Limpar apaga o conteúdo e mantém a configuração da mesa. */
+  function clearContent() {
+    const defaultType = defaultFabricSettings.type ?? "TUBULAR";
+    cancelSearch(); setMaxLayers((current) => Math.min(current, getLayerLimit(defaultType))); setMaxFrequency(getDefaultMaximumFrequency(defaultType));
+    setFabrics([createFabric(defaultFabricName, undefined, defaultFabricSettings)]); setItems([]); setSourceFichas([]); setAlternatives([]); setSelectedId(""); setConfirmReset(null);
+  }
+  /** Novo plano volta tudo ao padrão e leva o usuário de volta à primeira etapa. */
+  function startNewPlan() {
+    // Com o diálogo aberto, o foco só pode mudar depois que ele devolve o foco ao fechar.
+    if (confirmReset) focusFirstStepOnClose.current = true; else focusFirstStep();
+    clearContent(); setTableLengthCm(800); setMaxLayers(50); setMergeFabricsInLays(false); setHistoryCollapsed(true);
+  }
+  function focusFirstStep() {
+    window.scrollTo({ top: 0 });
+    document.getElementById("cut-plan-table-length")?.focus({ preventScroll: true });
+  }
+  function requestReset(kind: "clear" | "new") {
+    if (hasContent) return setConfirmReset(kind);
+    if (kind === "new") startNewPlan(); else clearContent();
+  }
   const finishPrinting = useCallback(() => setPrintSelection(null), []);
   function printPlan(scope: "current" | "all") {
     if (!selected) return;
@@ -283,23 +318,41 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
     <section className={`cut-plan__history${historyCollapsed ? " is-collapsed" : ""}`} aria-labelledby="cut-plan-history-title">
       <header><div><h2 id="cut-plan-history-title">Últimos planos <span>{history.length}</span></h2>{historyCollapsed ? null : <p>Restaure qualquer uma das 15 gerações mais recentes.</p>}</div><div className="cut-plan__history-actions">{!historyCollapsed && history.length ? <Button onClick={clearHistory} variant="ghost"><Trash2 size={16} /> Apagar todos</Button> : null}<IconButton label={historyCollapsed ? "Expandir histórico" : "Recolher histórico"} onClick={() => setHistoryCollapsed((current) => !current)} size="sm"><>{historyCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}</></IconButton></div></header>
       {historyCollapsed ? null : history.length ? <div className="cut-plan__history-list">{history.map((entry) => { const total = entry.input.items.reduce((sum, item) => sum + item.quantity, 0); const fabricsLabel = entry.input.fabrics.map(fabricLabel).join(" · "); return <article key={entry.id}><button className="cut-plan__history-restore" onClick={() => restoreHistoryEntry(entry)} type="button"><strong>{fabricsLabel || "Plano de corte"}</strong><span>{total} peças · {countLabel(entry.alternatives[0]?.layCount ?? 0, "enfesto")} · {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.createdAt))}</span></button><IconButton label={`Excluir plano de ${fabricsLabel || "corte"}`} onClick={() => removeHistoryEntry(entry.id)} size="sm" tone="danger"><Trash2 size={16} /></IconButton></article>; })}</div> : <p className="cut-plan__history-empty">Os planos calculados aparecerão aqui.</p>}
-    </section>    <Panel number="1" title="Mesa e enfesto"><div className="cut-plan__settings"><NumberField id="cut-plan-table-length" label="Tamanho da mesa" unit="cm" value={tableLengthCm} onChange={(value) => { setTableLengthCm(value); invalidate(); }} /><NumberField key={fabrics[0]?.type ?? "TUBULAR"} id="cut-plan-max-layers" label="Máximo de folhas por enfesto" max={getLayerLimit(fabrics[0]?.type ?? "TUBULAR")} unit="folhas" integer value={maxLayers} onChange={(value) => { setMaxLayers(Math.min(value, getLayerLimit(fabrics[0]?.type ?? "TUBULAR"))); invalidate(); }} /><NumberField id="cut-plan-max-frequency" label="Frequência máxima" unit="peças" integer value={maxFrequency} onChange={(value) => { setMaxFrequency(value); invalidate(); }} /><label className="cut-plan__merge-option"><input checked={mergeFabricsInLays} onChange={(event) => { setMergeFabricsInLays(event.currentTarget.checked); invalidate(); }} type="checkbox" /><span><strong>Mesclar tecidos nos enfestos</strong><small>Combina cores compatíveis do mesmo tecido, largura e tipo.</small></span></label></div></Panel>
-    <Panel number="2" title="Tecidos" action={<Button variant="secondary" onClick={addFabric}><Plus size={17} /> Adicionar tecido</Button>}><div className="cut-plan__fabric-list">{fabrics.map((fabric, index) => <article className="cut-plan__fabric" key={fabric.id}><div className="cut-plan__fabric-title"><strong>{fabricLabel(fabric)}</strong><IconButton label={`Remover ${fabricLabel(fabric)}`} onClick={() => removeFabric(fabric.id)} size="sm" tone="danger"><Trash2 size={17} /></IconButton></div><div className="cut-plan__fabric-fields"><div className="field"><label htmlFor={`cut-plan-fabric-name-${fabric.id}`}>Tecido</label><CustomDatalist id={`cut-plan-fabric-name-${fabric.id}`} onValueChange={(value, option) => updateFabric(fabric.id, { name: value, ...getFabricCutSettings(option) })} options={catalogFabricOptions} placeholder="Escolha um tecido" value={fabric.name} /></div><Field id={`cut-plan-fabric-color-${fabric.id}`} label="Cor"><input id={`cut-plan-fabric-color-${fabric.id}`} value={fabric.color} placeholder="Ex.: Azul Marinho" onChange={(event) => updateFabric(fabric.id, { color: event.currentTarget.value })} /></Field><NumberField id={`cut-plan-fabric-width-${fabric.id}`} label="Largura" unit="cm" value={fabric.widthCm} onChange={(value) => updateFabric(fabric.id, { widthCm: value })} /><Field id={`cut-plan-fabric-type-${fabric.id}`} label="Plano ou tubular"><select id={`cut-plan-fabric-type-${fabric.id}`} value={fabric.type} onChange={(event) => updateFabric(fabric.id, { type: event.currentTarget.value as FabricType })}><option value="PLANO">Plano</option><option value="TUBULAR">Tubular</option></select></Field></div><small>{index ? "A largura e o tipo seguem o primeiro tecido." : fabric.type === "TUBULAR" ? "No tubular, a frequência de cada tamanho sai sempre em número par." : "A frequência de cada tamanho vai de 1 a 6."}</small></article>)}</div></Panel>
-    <Panel number="3" title="Tamanhos e quantidades"><CutPlanFichaPicker added={sourceFichas} onAdd={addSourceFicha} onRemove={removeSourceFicha} /><CutPlanItemsEditor fabrics={fabrics} items={items} addItem={addItem} duplicateItem={duplicateItem} moveItem={moveItem} sizeOptions={sizeOptions} sortItems={sortItems} updateItem={updateItem} removeItem={(itemId) => { setItems((current) => current.filter((item) => item.id !== itemId)); invalidate(); }} /></Panel>
-    <div className="form-actions"><Button variant="ghost" onClick={() => setConfirmClear(true)}><RotateCcw size={17} /> Limpar plano</Button>{calculating ? <Button variant="secondary" onClick={() => cancelSearch(true)}>Usar melhor resultado</Button> : null}<Button aria-busy={calculating} disabled={calculating} onClick={calculate}>{calculating ? <span className="button-spinner" aria-hidden="true" /> : <Calculator aria-hidden="true" size={18} />} {calculating ? "Buscando opções · até 30 s" : "Calcular plano"}</Button></div>
-    {selected ? <Panel number="4" title="Resultado">
+    </section>    <Panel complete={tableLengthCm > 0 && maxLayers >= 1} meta={`${tableLengthCm} cm · até ${countLabel(maxLayers, "folha")}`} number="1" title="Mesa e enfesto"><div className="cut-plan__settings"><NumberField id="cut-plan-table-length" label="Tamanho da mesa" unit="cm" value={tableLengthCm} onChange={(value) => { setTableLengthCm(value); invalidate(); }} /><NumberField key={fabrics[0]?.type ?? "TUBULAR"} id="cut-plan-max-layers" label="Máximo de folhas por enfesto" max={getLayerLimit(fabrics[0]?.type ?? "TUBULAR")} unit="folhas" integer value={maxLayers} onChange={(value) => { setMaxLayers(Math.min(value, getLayerLimit(fabrics[0]?.type ?? "TUBULAR"))); invalidate(); }} /><NumberField id="cut-plan-max-frequency" label="Frequência máxima" unit="peças" integer value={maxFrequency} onChange={(value) => { setMaxFrequency(value); invalidate(); }} /><label className="cut-plan__merge-option"><input checked={mergeFabricsInLays} onChange={(event) => { setMergeFabricsInLays(event.currentTarget.checked); invalidate(); }} type="checkbox" /><span><strong>Mesclar tecidos nos enfestos</strong><small>Combina cores compatíveis do mesmo tecido, largura e tipo.</small></span></label></div></Panel>
+    <Panel complete={fabrics.length > 0 && fabrics.every((fabric) => fabric.name.trim() && fabric.widthCm > 0)} meta={countLabel(fabrics.length, "tecido")} number="2" title="Tecidos" action={<Button variant="secondary" onClick={addFabric}><Plus size={17} /> Adicionar tecido</Button>}><div className="cut-plan__fabric-list">{fabrics.map((fabric, index) => <article className="cut-plan__fabric" key={fabric.id}><div className="cut-plan__fabric-title"><div><strong>{fabric.name.trim() || "Tecido"}</strong>{fabric.color.trim() ? <span>{fabric.color.trim()}</span> : null}</div><IconButton label={`Remover ${fabricLabel(fabric)}`} onClick={() => removeFabric(fabric.id)} size="sm" tone="danger"><Trash2 size={17} /></IconButton></div><div className="cut-plan__fabric-body"><div className="cut-plan__fabric-fields"><div className="field"><label htmlFor={`cut-plan-fabric-name-${fabric.id}`}>Tecido</label><CustomDatalist id={`cut-plan-fabric-name-${fabric.id}`} onValueChange={(value, option) => updateFabric(fabric.id, { name: value, ...getFabricCutSettings(option) })} options={catalogFabricOptions} placeholder="Escolha um tecido" value={fabric.name} /></div><Field id={`cut-plan-fabric-color-${fabric.id}`} label="Cor"><input id={`cut-plan-fabric-color-${fabric.id}`} value={fabric.color} placeholder="Ex.: Azul Marinho" onChange={(event) => updateFabric(fabric.id, { color: event.currentTarget.value })} /></Field><NumberField id={`cut-plan-fabric-width-${fabric.id}`} label="Largura" unit="cm" value={fabric.widthCm} onChange={(value) => updateFabric(fabric.id, { widthCm: value })} /><Field id={`cut-plan-fabric-type-${fabric.id}`} label="Plano ou tubular"><select id={`cut-plan-fabric-type-${fabric.id}`} value={fabric.type} onChange={(event) => updateFabric(fabric.id, { type: event.currentTarget.value as FabricType })}><option value="PLANO">Plano</option><option value="TUBULAR">Tubular</option></select></Field></div><small>{index ? "A largura e o tipo seguem o primeiro tecido." : fabric.type === "TUBULAR" ? "No tubular, a frequência de cada tamanho sai sempre em número par." : "A frequência de cada tamanho vai de 1 a 6."}</small></div></article>)}</div></Panel>
+    <Panel complete={items.length > 0 && items.every((item) => item.size.trim() && item.quantity >= 1)} meta={items.length ? countLabel(totalPieces, "peça") : undefined} number="3" title="Tamanhos e quantidades"><CutPlanFichaPicker added={sourceFichas} onAdd={addSourceFicha} onRemove={removeSourceFicha} /><CutPlanItemsEditor fabrics={fabrics} items={items} addItem={addItem} duplicateItem={duplicateItem} moveItem={moveItem} sizeOptions={sizeOptions} sortItems={sortItems} updateItem={updateItem} removeItem={(itemId) => { setItems((current) => current.filter((item) => item.id !== itemId)); invalidate(); }} /></Panel>
+    {selected ? <Panel className="cut-plan__section--result" meta={countLabel(alternatives.length, "opção", "opções")} number="4" title="Resultado">
       <div className="cut-plan__result-toolbar"><div className="cut-plan__tabs" role="group" aria-label="Opções de plano">{alternatives.map((alternative) => <button aria-pressed={alternative.id === selected.id} className={alternative.id === selected.id ? "is-active" : ""} key={alternative.id} onClick={() => setSelectedId(alternative.id)} type="button"><span>{alternative.label}</span><small>{countLabel(alternative.layCount, "enfesto")}</small></button>)}</div></div><p className="cut-plan__alternative-description" role="status">{calculating ? "Buscando melhores opções…" : selected.result.search?.status === "optimal" ? "Melhor plano comprovado para as medidas estimadas." : "Melhor plano encontrado."}{selected.result.search?.termination === "time_limit" ? " Prazo de busca atingido." : ""}{selected.result.search && !selected.result.search.measurementsComplete ? " Comprimento não validado: faltam medidas." : selected.result.search?.measurementSource?.startsWith("FALLBACK") ? " Comprimento calculado com medidas aproximadas." : ""}</p><PlanResult alternative={selected} fabrics={fabrics} /><div className="cut-plan__print-actions cut-plan__print-actions--bottom"><Button onClick={() => printPlan("current")} variant="secondary"><Printer size={17} /> Imprimir esta</Button>{alternatives.length > 1 ? <Button onClick={() => printPlan("all")} variant="ghost"><Printer size={17} /> Imprimir todas</Button> : null}</div>
     </Panel> : null}
+    <div aria-label="Ações do plano" className="cut-plan__command-bar" role="region">
+      <div className="cut-plan__command-status" data-state={planStatus.state}>
+        <span aria-hidden="true" className="cut-plan__command-dot" />
+        <div><strong role="status">{planStatus.label}</strong>{planSummary ? <span>{planSummary}</span> : null}</div>
+      </div>
+      <div className="cut-plan__command-actions">
+        <div className="cut-plan__command-reset">
+          <Button disabled={!hasContent} onClick={() => requestReset("clear")} variant="ghost"><Eraser aria-hidden="true" size={17} /> Limpar plano</Button>
+          <Button onClick={() => requestReset("new")} variant="secondary"><FilePlus aria-hidden="true" size={17} /> Novo plano</Button>
+        </div>
+        {calculating ? <Button onClick={() => cancelSearch(true)} variant="secondary">Usar melhor resultado</Button> : null}
+        <Button aria-busy={calculating} className="cut-plan__calculate" disabled={calculating} onClick={calculate}>{calculating ? <span className="button-spinner" aria-hidden="true" /> : <Calculator aria-hidden="true" size={18} />} {calculating ? "Calculando…" : "Calcular plano"}</Button>
+      </div>
+    </div>
     {printSelection ? <CutPlanNativePrintLayer alternatives={printSelection} input={input} sourceFichas={sourceFichas} onPrinted={finishPrinting} /> : null}
-    {confirmClear ? <AlertDialog title="Limpar plano" description="Os tecidos, os tamanhos, as quantidades e o resultado calculado serão apagados." onClose={() => setConfirmClear(false)}>
-      <section className="confirm-dialog" aria-describedby="cut-plan-clear-description">
-        <header className="confirm-dialog__header"><div><span className="confirm-dialog__eyebrow">Confirmação necessária</span><h2>Limpar este plano?</h2></div></header>
-        <p id="cut-plan-clear-description">Os tecidos, os tamanhos, as quantidades e o resultado calculado serão apagados.</p>
-        <div className="confirm-dialog__actions"><AlertDialogCancel asChild><Button variant="ghost">Cancelar</Button></AlertDialogCancel><AlertDialogAction asChild><Button variant="danger" onClick={clear}>Limpar plano</Button></AlertDialogAction></div>
+    {confirmReset ? <AlertDialog title={confirmReset === "new" ? "Novo plano" : "Limpar plano"} description={resetCopy[confirmReset].description} onClose={() => setConfirmReset(null)} onCloseAutoFocus={(event) => { if (!focusFirstStepOnClose.current) return; focusFirstStepOnClose.current = false; event.preventDefault(); focusFirstStep(); }}>
+      <section className="confirm-dialog" aria-describedby="cut-plan-reset-description">
+        <header className="confirm-dialog__header"><div><span className="confirm-dialog__eyebrow">Confirmação necessária</span><h2>{resetCopy[confirmReset].heading}</h2></div></header>
+        <p id="cut-plan-reset-description">{resetCopy[confirmReset].description}</p>
+        <div className="confirm-dialog__actions"><AlertDialogCancel asChild><Button variant="ghost">Cancelar</Button></AlertDialogCancel><AlertDialogAction asChild>{confirmReset === "new" ? <Button onClick={startNewPlan}>Novo plano</Button> : <Button variant="danger" onClick={clearContent}>Limpar plano</Button>}</AlertDialogAction></div>
       </section>
     </AlertDialog> : null}
   </section>;
 }
+
+const resetCopy = {
+  clear: { heading: "Limpar este plano?", description: "Os tecidos, os tamanhos, as quantidades e o resultado serão apagados. A mesa continua configurada." },
+  new: { heading: "Começar um novo plano?", description: "O plano atual será descartado e a mesa volta ao padrão. Os planos calculados continuam no histórico." },
+};
 
 function layClipboardText(frequencies: MarkerFrequency[], layers: number, showSleeveType: boolean) {
   const grade = formatOperationalMarkerLabel(frequencies, showSleeveType);
@@ -340,7 +393,10 @@ function PlanResult({ alternative, fabrics }: { alternative: CutPlanAlternative;
     {alternative.result.fabrics.map((fabricResult) => { const fabric = fabrics.find((entry) => entry.id === fabricResult.fabricId)!; const orderedSizes = [...fabricResult.sizes].sort((left, right) => compareUniformSizes(left.size, right.size) || left.sleeveType.localeCompare(right.sleeveType) || (left.garmentType ?? "").localeCompare(right.garmentType ?? "")); const totals = fabricResult.sizes.reduce((sum, size) => ({ requested: sum.requested + size.requested, produced: sum.produced + size.produced, difference: sum.difference + Math.max(0, size.difference) }), { requested: 0, produced: 0, difference: 0 }); return <div className="cut-plan__check" key={`check-${fabric.id}`}><h4>Conferência — {fabricLabel(fabric)}</h4><ResultTable><thead><tr><th>Tamanho</th><th>Tipo</th><th>Pedido</th><th>Vai cortar</th><th>Diferença</th></tr></thead><tbody>{orderedSizes.map((size) => <tr key={`${size.garmentType}-${size.size}-${size.sleeveType}`}><td>{formatCutPlanSizeLabel(size.size, size.garmentType)}</td><td>{formatCutPlanItemType(size.size, size.sleeveType, size.garmentType)}</td><td>{size.requested}</td><td>{size.produced}</td><td><span className={size.difference === 0 ? "is-exact" : "is-changed"}>{size.difference > 0 ? "+" : ""}{size.difference}</span></td></tr>)}</tbody><tfoot><tr><th colSpan={2}>Totais</th><td>{totals.requested}</td><td>{totals.produced}</td><td>{totals.difference}</td></tr></tfoot></ResultTable></div>; })}</>;
 }
 
-function Panel({ number, title, action, children }: { number: string; title: string; action?: React.ReactNode; children: React.ReactNode }) { return <section className="cut-plan__section"><div className="cut-plan__section-top"><div className="cut-plan__section-heading"><span aria-hidden="true">{number}</span><h2>{title}</h2></div>{action}</div>{children}</section>; }
+function Panel({ number, title, meta, complete, className, action, children }: { number: string; title: string; meta?: string; complete?: boolean; className?: string; action?: React.ReactNode; children: React.ReactNode }) {
+  const titleId = `cut-plan-step-${number}`;
+  return <section aria-labelledby={titleId} className={["cut-plan__section", className].filter(Boolean).join(" ")} data-complete={complete || undefined}><div className="cut-plan__section-top"><div className="cut-plan__section-heading"><span aria-hidden="true">{number}</span><div><h2 id={titleId}>{title}</h2>{meta ? <p>{meta}</p> : null}</div></div>{action}</div>{children}</section>;
+}
 function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) { return <div className="field"><label htmlFor={id}>{label}</label>{children}</div>; }
 /**
  * Numero com rascunho local: sem ele, limpar o campo devolve `NaN` para o

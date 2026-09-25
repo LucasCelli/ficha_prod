@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, Button, CustomDatalist, CustomSelect, IconButton, Modal, SortableHandle, SortableInstructions, Tooltip, type ComboboxOption, type CustomDatalistOption } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
-import { compareUniformSizeAndBabyLookText, DEFAULT_UNIFORM_SIZE_DEFINITIONS, type UniformSizeDefinition } from "@/lib/uniform-sizes";
+import { DEFAULT_UNIFORM_SIZE_DEFINITIONS, type UniformSizeDefinition } from "@/lib/uniform-sizes";
 import { assertStableSortableIds } from "@/lib/sortable-items";
 import { createFichaAction, updateFichaAction } from "./actions";
 import { DatePickerField } from "./date-picker-field";
@@ -49,14 +49,18 @@ import { createEmptyFichaFormInitialData, createEmptyProductItem, mapFichaToInit
 import { getInitialFichaFormState } from "./form-state";
 import type { LegacyFichaImportWarning } from "./legacy-import";
 import { mapLegacyDraftToFichaFormInitialData, parseLegacyFichaJson } from "./legacy-import";
-import { buildObservacoesTecnicas, uppercaseObservationHtml } from "./observacoes-autofill";
+import { buildObservacoesTecnicas } from "./observacoes-autofill";
+import { sortFichaProductItemsForSave } from "./product-item-sorting";
 import { PrintTriggerButton } from "./print-trigger-button";
+import { isMissingRequiredLayout, MISSING_LAYOUT_MESSAGE } from "./print-requirements";
+import { getMissingConditionalFields, isMangaCurtaELonga, isRegataProduct, normalizeProductForRule } from "./schema";
 import { buildDraftPrintFicha, DraftPrintLayer } from "./ficha-draft-print";
 
 type FichaFormProps = {
   canImportLegacyJson?: boolean;
   catalogOptions?: CatalogOptionsByKind;
   clienteOptions?: ComboboxOption[];
+  currentUserName?: string;
   ficha?: FichaDetail;
   initialData?: FichaFormInitialData;
   mode?: "create" | "edit";
@@ -185,15 +189,6 @@ function getCloudinaryImagePath(publicId: string) {
   return publicId.split("/").map(encodeURIComponent).join("/");
 }
 
-function normalizeProductForRule(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function normalizeProductSize(value: string) {
   return value.toLocaleUpperCase("pt-BR");
 }
@@ -277,11 +272,6 @@ function getControlLabel(form: HTMLFormElement | null, field: string) {
   return getFormText(form, field);
 }
 
-function isRegataProduct(value: string) {
-  const product = normalizeProductForRule(value);
-  return product.includes("regata") || product.includes("colete");
-}
-
 function shouldLetServerValidateBeforeUpload(formData: FormData) {
   const requiredTextFields = ["cliente", "clienteId", "dataEntrega", "vendedor"];
   const hasMissingText = requiredTextFields.some((field) => !String(formData.get(field) ?? "").trim());
@@ -290,7 +280,17 @@ function shouldLetServerValidateBeforeUpload(formData: FormData) {
 
   try {
     const itens = JSON.parse(String(formData.get("itensJson") ?? "[]")) as Array<{ produto?: string }>;
-    return !itens.some((item) => item.produto?.trim());
+    const produtos = itens.map((item) => item.produto ?? "");
+    if (!produtos.some((produto) => produto.trim())) return true;
+    return getMissingConditionalFields({
+      acabamentoGola: formData.get("acabamentoGola"),
+      acabamentoManga: formData.get("acabamentoManga"),
+      acabamentoMangaLonga: formData.get("acabamentoMangaLonga"),
+      gola: formData.get("gola"),
+      larguraGola: formData.get("larguraGola"),
+      manga: formData.get("manga"),
+      produtos,
+    }).length > 0;
   } catch {
     return true;
   }
@@ -352,6 +352,7 @@ function buildFichaDraftSnapshot(
       ...createEmptyFichaFormInitialData(),
       acabamentoGola: values.acabamentoGola,
       acabamentoManga: values.acabamentoManga,
+      acabamentoMangaLonga: values.acabamentoMangaLonga,
       aberturaLateral: values.aberturaLateral,
       arte: values.arte,
       bolso: formText(formData, "bolso"),
@@ -363,6 +364,7 @@ function buildFichaDraftSnapshot(
       etiqueta: formText(formData, "etiqueta"),
       corAberturaLateral: formText(formData, "corAberturaLateral"),
       corAcabamentoManga: formText(formData, "corAcabamentoManga"),
+      corAcabamentoMangaLonga: formText(formData, "corAcabamentoMangaLonga"),
       corBotao: formText(formData, "corBotao"),
       corDetalheGola: formText(formData, "corDetalheGola"),
       corGola: formText(formData, "corGola"),
@@ -387,8 +389,9 @@ function buildFichaDraftSnapshot(
       itens: normalizeProductItems(values.itens),
       larguraGola: formText(formData, "larguraGola"),
       larguraManga: formText(formData, "larguraManga"),
+      larguraMangaLonga: formText(formData, "larguraMangaLonga"),
       listaNomesRaw: values.listaNomesRaw,
-      manga: formText(formData, "manga"),
+      manga: values.manga,
       material: values.material,
       numeroVenda: formText(formData, "numeroVenda"),
       observacoes: values.observacoes,
@@ -398,6 +401,11 @@ function buildFichaDraftSnapshot(
     savedAt: new Date().toISOString(),
     version: 1,
   };
+}
+
+function hasAcabamentoMangaExtras(value: string) {
+  const normalized = normalizeProductForRule(value ?? "");
+  return ["punho", "vies", "ribana", "sublimado"].some((item) => normalized.includes(item));
 }
 
 function formText(formData: FormData, field: string) {
@@ -559,6 +567,7 @@ function FichaFormInner({
   canImportLegacyJson = false,
   catalogOptions,
   clienteOptions = [],
+  currentUserName,
   ficha,
   initialData: seededInitialData,
   importedLegacyState,
@@ -599,6 +608,7 @@ function FichaFormInner({
     defaultValues: {
       acabamentoGola: initialData.acabamentoGola,
       acabamentoManga: initialData.acabamentoManga,
+      acabamentoMangaLonga: initialData.acabamentoMangaLonga,
       aberturaLateral: initialData.aberturaLateral,
       arte: initialData.arte,
       comNomes: initialData.comNomes,
@@ -608,6 +618,7 @@ function FichaFormInner({
       gola: initialData.gola,
       imagens: getInitialImageItems(initialData),
       itens: getInitialProductItems(initialData),
+      manga: initialData.manga,
       material: initialData.material,
       listaNomesRaw: initialData.listaNomesRaw,
       observacoes: initialData.observacoes,
@@ -635,15 +646,17 @@ function FichaFormInner({
     keyName: "fieldId",
     name: "imagens",
   });
-  const [gola, material, composicao, acabamentoGola, acabamentoManga, reforcoGola, aberturaLateral, filete, faixa, viesRegata, arte, comNomes, listaNomesRaw, observacoes, itens, imagens] =
+  const [gola, manga, material, composicao, acabamentoGola, acabamentoManga, acabamentoMangaLonga, reforcoGola, aberturaLateral, filete, faixa, viesRegata, arte, comNomes, listaNomesRaw, observacoes, itens, imagens] =
     useWatch({
       control,
       name: [
         "gola",
+        "manga",
         "material",
         "composicao",
         "acabamentoGola",
         "acabamentoManga",
+        "acabamentoMangaLonga",
         "reforcoGola",
         "aberturaLateral",
         "filete",
@@ -692,14 +705,10 @@ function FichaFormInner({
     ],
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
-      const rawHtml = editor.isEmpty ? "" : editor.getHTML();
-      const nextHtml = uppercaseObservationHtml(rawHtml);
+      // Uppercase is applied on save/print; resetting content here would move the cursor to the end.
+      const nextHtml = editor.isEmpty ? "" : editor.getHTML();
       const nextText = normalizeObservationComparison(nextHtml);
       const lastText = normalizeObservationComparison(lastObservacoesAutofillRef.current);
-
-      if (rawHtml !== nextHtml) {
-        editor.commands.setContent(nextHtml, { emitUpdate: false });
-      }
 
       if (!applyingObservacoesAutoRef.current && nextText && nextText !== lastText) {
         observacoesAutoBlockedRef.current = true;
@@ -728,15 +737,14 @@ function FichaFormInner({
   const produtosPreenchidos = itens.map((item) => item.produto.trim()).filter(Boolean);
   const isRegataMode = produtosPreenchidos.length > 0 && produtosPreenchidos.every(isRegataProduct);
   const normalizedGola = normalizeProductForRule(gola);
-  const normalizedAcabamentoManga = normalizeProductForRule(acabamentoManga);
   const isPolo = normalizedGola.includes("polo");
   const isSocial = normalizedGola.includes("social");
   const isPadreEsportiva = normalizedGola.includes("padre") && normalizedGola.includes("esportiva");
   const temGola = Boolean(gola);
   const acabamentoMangaValue = isRegataMode ? (viesRegata === "sim" ? "vies" : "") : acabamentoManga;
-  const showMangaExtras = isRegataMode
-    ? viesRegata === "sim"
-    : ["punho", "vies", "ribana", "sublimado"].some((value) => normalizedAcabamentoManga.includes(value));
+  const isMangaLonga = !isRegataMode && isMangaCurtaELonga(manga);
+  const showMangaExtras = isRegataMode ? viesRegata === "sim" : hasAcabamentoMangaExtras(acabamentoManga);
+  const showMangaLongaExtras = isMangaLonga && hasAcabamentoMangaExtras(acabamentoMangaLonga);
   const showLarguraGola = !isPolo && !isSocial && Boolean(acabamentoGola);
   const showCorReforco = !isSocial && reforcoGola === "sim";
   const showCorAbertura = isPolo && aberturaLateral === "sim";
@@ -987,6 +995,8 @@ function FichaFormInner({
       "manga",
       "larguraManga",
       "corAcabamentoManga",
+      "larguraMangaLonga",
+      "corAcabamentoMangaLonga",
       "gola",
       "corGola",
       "corDetalheGola",
@@ -1550,11 +1560,7 @@ function FichaFormInner({
   }
 
   function sortProductItems() {
-    const sortedItems = [...getValues("itens")].sort((a, b) => {
-      const bySize = compareUniformSizeAndBabyLookText(a, b, sizeDefinitions);
-      if (bySize !== 0) return bySize;
-      return a.produto.localeCompare(b.produto, "pt-BR", { sensitivity: "base" });
-    });
+    const sortedItems = sortFichaProductItemsForSave(getValues("itens"), sizeDefinitions);
 
     showProductSortFeedback();
     setSortAnimationKey((current) => current + 1);
@@ -1586,6 +1592,7 @@ function FichaFormInner({
     return buildObservacoesTecnicas({
       acabamentoGola: currentValues.acabamentoGola,
       acabamentoManga: currentAcabamentoManga,
+      acabamentoMangaLonga: isMangaLonga ? currentValues.acabamentoMangaLonga : "",
       arte: currentValues.arte,
       arteLabel: getControlLabel(form, "arte"),
       bolso: getControlLabel(form, "bolso"),
@@ -1593,6 +1600,7 @@ function FichaFormInner({
       corBotao: getControlLabel(form, "corBotao"),
       corAberturaLateral: getControlLabel(form, "corAberturaLateral"),
       corAcabamentoManga: getControlLabel(form, "corAcabamentoManga"),
+      corAcabamentoMangaLonga: getControlLabel(form, "corAcabamentoMangaLonga"),
       corFaixa: getControlLabel(form, "faixaCor"),
       corFilete: getControlLabel(form, "fileteCor"),
       corDetalheGola: getControlLabel(form, "corDetalheGola"),
@@ -1611,6 +1619,7 @@ function FichaFormInner({
       gola: currentValues.gola,
       larguraGola: getControlLabel(form, "larguraGola"),
       larguraManga: getControlLabel(form, "larguraManga"),
+      larguraMangaLonga: getControlLabel(form, "larguraMangaLonga"),
       manga: getControlLabel(form, "manga"),
       material: currentValues.material,
       produto: produtoPrincipal,
@@ -1710,6 +1719,10 @@ function FichaFormInner({
 
   function handleDraftPrint() {
     if (!formRef.current) return;
+    if (isMissingRequiredLayout(getValues("arte"), getValues("imagens").length)) {
+      toast.error("Layout obrigatório", { description: MISSING_LAYOUT_MESSAGE });
+      return;
+    }
     setDraftPrintFicha(buildDraftPrintFicha(formRef.current, getValues()));
   }
 
@@ -2107,12 +2120,13 @@ function FichaFormInner({
                   name="manga"
                   aria-describedby={state.fieldErrors?.manga ? "manga-error" : undefined}
                   aria-invalid={Boolean(state.fieldErrors?.manga)}
-                  defaultValue={initialData.manga || undefined}
+                  onValueChange={(value) => setValue("manga", value, { shouldDirty: true })}
                   options={mangaOptions}
                   placeholder="-"
+                  value={manga ?? ""}
                 />
               </Field>
-              <Field label="Acabamento da manga" name="acabamentoManga" error={state.fieldErrors?.acabamentoManga}>
+              <Field label={isMangaLonga ? "Acabamento manga curta" : "Acabamento da manga"} name="acabamentoManga" error={state.fieldErrors?.acabamentoManga} required>
                 <CustomDatalist
                   id="acabamentoManga"
                   name="acabamentoManga"
@@ -2128,7 +2142,7 @@ function FichaFormInner({
           )}
           {showMangaExtras ? (
             <>
-              <Field label="Largura da manga" name="larguraManga" error={state.fieldErrors?.larguraManga}>
+              <Field label={`Largura do acabamento${isMangaLonga ? " (curta)" : ""}`} name="larguraManga" error={state.fieldErrors?.larguraManga}>
                 <input
                   id="larguraManga"
                   name="larguraManga"
@@ -2138,13 +2152,52 @@ function FichaFormInner({
                   placeholder="Ex: 3,5…"
                 />
               </Field>
-              <Field label="Cor do acabamento" name="corAcabamentoManga" error={state.fieldErrors?.corAcabamentoManga}>
+              <Field label={`Cor do acabamento${isMangaLonga ? " (curta)" : ""}`} name="corAcabamentoManga" error={state.fieldErrors?.corAcabamentoManga}>
                 <CustomDatalist
                   id="corAcabamentoManga"
                   name="corAcabamentoManga"
                   aria-describedby={state.fieldErrors?.corAcabamentoManga ? "corAcabamentoManga-error" : undefined}
                   aria-invalid={Boolean(state.fieldErrors?.corAcabamentoManga)}
                   defaultValue={initialData.corAcabamentoManga || undefined}
+                  options={colorOptions}
+                  placeholder="Cor ou combinação…"
+                />
+              </Field>
+            </>
+          ) : null}
+          {isMangaLonga ? (
+            <Field label="Acabamento manga longa" name="acabamentoMangaLonga" error={state.fieldErrors?.acabamentoMangaLonga} required>
+              <CustomDatalist
+                id="acabamentoMangaLonga"
+                name="acabamentoMangaLonga"
+                aria-describedby={state.fieldErrors?.acabamentoMangaLonga ? "acabamentoMangaLonga-error" : undefined}
+                aria-invalid={Boolean(state.fieldErrors?.acabamentoMangaLonga)}
+                onValueChange={(value) => setValue("acabamentoMangaLonga", value, { shouldDirty: true })}
+                options={acabamentoMangaOptions}
+                placeholder="-"
+                value={acabamentoMangaLonga ?? ""}
+              />
+            </Field>
+          ) : null}
+          {showMangaLongaExtras ? (
+            <>
+              <Field label="Largura do acabamento (longa)" name="larguraMangaLonga" error={state.fieldErrors?.larguraMangaLonga}>
+                <input
+                  id="larguraMangaLonga"
+                  name="larguraMangaLonga"
+                  aria-describedby={state.fieldErrors?.larguraMangaLonga ? "larguraMangaLonga-error" : undefined}
+                  aria-invalid={Boolean(state.fieldErrors?.larguraMangaLonga)}
+                  defaultValue={initialData.larguraMangaLonga || undefined}
+                  placeholder="Ex: 3,5…"
+                />
+              </Field>
+              <Field label="Cor do acabamento (longa)" name="corAcabamentoMangaLonga" error={state.fieldErrors?.corAcabamentoMangaLonga}>
+                <CustomDatalist
+                  id="corAcabamentoMangaLonga"
+                  name="corAcabamentoMangaLonga"
+                  aria-describedby={state.fieldErrors?.corAcabamentoMangaLonga ? "corAcabamentoMangaLonga-error" : undefined}
+                  aria-invalid={Boolean(state.fieldErrors?.corAcabamentoMangaLonga)}
+                  defaultValue={initialData.corAcabamentoMangaLonga || undefined}
                   options={colorOptions}
                   placeholder="Cor ou combinação…"
                 />
@@ -2198,7 +2251,7 @@ function FichaFormInner({
             </Field>
           ) : null}
           {showLarguraGola ? (
-            <Field label="Largura da gola" name="larguraGola" error={state.fieldErrors?.larguraGola}>
+            <Field label="Largura da gola" name="larguraGola" error={state.fieldErrors?.larguraGola} required>
               <input
                 id="larguraGola"
                 name="larguraGola"
@@ -2601,7 +2654,7 @@ function FichaFormInner({
               </div>
               <EditorContent
                 className="rich-editor__content"
-                data-empty={getPlainTextFromHtml(observacoes) ? "false" : "true"}
+                data-empty={(observacoesEditor ? observacoesEditor.isEmpty : !getPlainTextFromHtml(observacoes)) ? "true" : "false"}
                 editor={observacoesEditor}
               />
             </div>
@@ -2770,7 +2823,7 @@ function FichaFormInner({
         )}
         <SubmitButton isUploading={isUploadingImage} label={mode === "edit" ? "Salvar alterações" : "Salvar ficha"} />
       </div>
-        {draftPrintFicha ? <DraftPrintLayer ficha={draftPrintFicha} includeRawNameList={includeRawNameListOnPrint} onPrinted={() => setDraftPrintFicha(null)} /> : null}
+        {draftPrintFicha ? <DraftPrintLayer authorName={ficha?.author?.display_name ?? currentUserName} ficha={draftPrintFicha} includeRawNameList={includeRawNameListOnPrint} onPrinted={() => setDraftPrintFicha(null)} /> : null}
       </form>
 
       {listaNomesModalOpen ? (

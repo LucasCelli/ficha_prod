@@ -189,3 +189,18 @@ export function normalizeNameOrCompany(input: unknown, options: NormalizeNameOrC
     })
     .join(" ");
 }
+
+// Espelha public.normalize_client_name: nomes de clientes são sempre MAIÚSCULOS.
+export function normalizeClientName(input: unknown) {
+  if (!input || typeof input !== "string") return "";
+  return normalizeSpaces(input).toLocaleUpperCase("pt-BR");
+}
+
+export function forceUppercaseInput(event: { currentTarget: HTMLInputElement }) {
+  const input = event.currentTarget;
+  const upper = input.value.toLocaleUpperCase("pt-BR");
+  if (upper === input.value) return;
+  const { selectionEnd, selectionStart } = input;
+  input.value = upper;
+  input.setSelectionRange(selectionStart, selectionEnd);
+}

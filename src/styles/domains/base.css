@@ -418,8 +418,11 @@ a {
   padding-inline-start: 22px;
 }
 
-.rich-editor__content[data-empty="true"] .rich-editor__surface::before {
+/* Float with zero height so the placeholder overlays the empty line instead of adding one. */
+.rich-editor__content[data-empty="true"] .rich-editor__surface > :first-child::before {
   content: "Detalhes importantes para producao...";
+  float: left;
+  height: 0;
   color: var(--color-muted);
   pointer-events: none;
 }

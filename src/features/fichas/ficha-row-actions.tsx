@@ -51,6 +51,7 @@ export function FichaRowActions({
   const [removeListaRawState, removeListaRawFormAction] = useActionState(removeFichaListaNomesRawAction, getInitialFichaStatusActionState());
   const [revertState, revertFormAction] = useActionState(revertFichaToPendenteAction, getInitialFichaStatusActionState());
   const editHref = `/fichas/${fichaId}`;
+  const printNameListHref = `${printHref}?somenteListaNomes=1`;
   const organizeNameListHref = `/ferramentas/organizar-nomes-ia?fichaId=${encodeURIComponent(fichaId)}`;
 
   useEffect(() => {
@@ -95,7 +96,7 @@ export function FichaRowActions({
           <input name="returnTo" type="hidden" value={returnTo} />
           <FullDeliverSubmitButton fichaLabel={fichaLabel} />
         </form>
-          <FloatingMenu label={`Mais ações da ficha ${fichaLabel}`} trigger={<MoreHorizontal aria-hidden="true" size={18} />}>
+          <FloatingMenu contextMenuTarget="tr" label={`Mais ações da ficha ${fichaLabel}`} trigger={<MoreHorizontal aria-hidden="true" size={18} />}>
             <FloatingMenuLink href={previewHref} prefetch={false} scroll={false}>
               <Eye aria-hidden="true" size={16} />
               Prévia de impressão
@@ -104,6 +105,12 @@ export function FichaRowActions({
               <Printer aria-hidden="true" size={16} />
               Imprimir
             </PrintTriggerButton>
+            {hasRawNameList ? (
+              <PrintTriggerButton className="floating-menu__item" href={printNameListHref} label={`Imprimir lista de nomes da ficha ${fichaLabel}`} role="menuitem">
+                <Printer aria-hidden="true" size={16} />
+                Imprimir lista de nomes
+              </PrintTriggerButton>
+            ) : null}
             <FloatingMenuLink href={editHref}>
               <Pencil aria-hidden="true" size={16} />
               Editar
@@ -201,7 +208,7 @@ export function FichaRowActions({
           </form>
         )}
 
-        <FloatingMenu label={`Mais ações da ficha ${fichaLabel}`} trigger={<MoreHorizontal aria-hidden="true" size={18} />}>
+        <FloatingMenu contextMenuTarget="tr" label={`Mais ações da ficha ${fichaLabel}`} trigger={<MoreHorizontal aria-hidden="true" size={18} />}>
           <FloatingMenuLink href={previewHref} prefetch={false} scroll={false}>
             <Eye aria-hidden="true" size={16} />
             Prévia de impressão
@@ -210,6 +217,12 @@ export function FichaRowActions({
             <Printer aria-hidden="true" size={16} />
             Imprimir
           </PrintTriggerButton>
+          {hasRawNameList ? (
+            <PrintTriggerButton className="floating-menu__item" href={printNameListHref} label={`Imprimir lista de nomes da ficha ${fichaLabel}`} role="menuitem">
+              <Printer aria-hidden="true" size={16} />
+              Imprimir lista de nomes
+            </PrintTriggerButton>
+          ) : null}
           <FloatingMenuLink href={editHref}>
             <Pencil aria-hidden="true" size={16} />
             Editar

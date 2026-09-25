@@ -2,28 +2,28 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, FileText, Star, X } from "lucide-react";
+import { ChevronDown, Printer, Star, X } from "lucide-react";
+import { toast } from "sonner";
 import { Tooltip } from "@/components/ui";
 import type { FichaFilters } from "./data";
 import { DatePickerField } from "./date-picker-field";
+import { getPrintPeriodError } from "./print-period";
+import { PrintTriggerButton } from "./print-trigger-button";
 
 type FichasFilterToolbarProps = {
-  canExportPdf: boolean;
+  canPrint: boolean;
   filters: FichaFilters;
-  pdfHref: string;
+  printHref: string;
 };
 
 const SEARCH_DEBOUNCE_MS = 450;
-const PDF_EXPORT_TIMEOUT_MS = 12_000;
 
-export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFilterToolbarProps) {
+export function FichasFilterToolbar({ canPrint, filters, printHref }: FichasFilterToolbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
-  const exportTimeoutRef = useRef<number | null>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
-  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const externalSearchValue = filters.busca ?? "";
   const [isEditingSearch, setIsEditingSearch] = useState(false);
@@ -41,15 +41,6 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
 
     return () => window.clearTimeout(timeoutId);
   }, [isEditingSearch, pathname, router, searchParams, searchValue, startTransition]);
-
-  useEffect(() => {
-    return () => {
-      if (exportTimeoutRef.current) {
-        window.clearTimeout(exportTimeoutRef.current);
-        exportTimeoutRef.current = null;
-      }
-    };
-  }, [pdfHref]);
 
   useEffect(() => {
     if (!isExportMenuOpen) {
@@ -77,25 +68,6 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isExportMenuOpen]);
-
-  function handleExportPdf(includeOverdue: boolean) {
-    if (!canExportPdf || isExportingPdf) {
-      return;
-    }
-
-    if (exportTimeoutRef.current) {
-      window.clearTimeout(exportTimeoutRef.current);
-    }
-
-    setIsExportingPdf(true);
-    setIsExportMenuOpen(false);
-    exportTimeoutRef.current = window.setTimeout(() => {
-      setIsExportingPdf(false);
-      exportTimeoutRef.current = null;
-    }, PDF_EXPORT_TIMEOUT_MS);
-
-    window.location.assign(getPdfHref(pdfHref, includeOverdue));
-  }
 
   function clearSearch() {
     setSearchDraftValue("");
@@ -220,26 +192,46 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
       </div>
       <div className="fichas-toolbar__export" ref={exportMenuRef}>
         <button
-          aria-disabled={!canExportPdf || isExportingPdf}
+          aria-disabled={!canPrint}
           aria-expanded={isExportMenuOpen}
           aria-haspopup="menu"
           className="ui-button ui-button--secondary fichas-toolbar__export-trigger"
-          disabled={!canExportPdf || isExportingPdf}
-          onClick={() => setIsExportMenuOpen((current) => !current)}
+          disabled={!canPrint}
+          onClick={() => {
+            const periodError = getPrintPeriodError(filters.dataInicio, filters.dataFim);
+
+            if (periodError) {
+              toast.error(periodError);
+              document.getElementById(filters.dataInicio ? "dataFim" : "dataInicio")?.focus();
+              return;
+            }
+
+            setIsExportMenuOpen((current) => !current);
+          }}
           type="button"
         >
-          {isExportingPdf ? <span className="button-spinner" aria-hidden="true" /> : <FileText aria-hidden="true" size={18} />}
-          {isExportingPdf ? "Exportando" : "Exportar PDF"}
+          <Printer aria-hidden="true" size={18} />
+          Imprimir
           <ChevronDown aria-hidden="true" size={16} />
         </button>
         {isExportMenuOpen ? (
           <div className="fichas-toolbar__export-menu" role="menu">
-            <button onClick={() => handleExportPdf(false)} role="menuitem" type="button">
+            <PrintTriggerButton
+              href={getPrintHref(printHref, false)}
+              label="Imprimir somente o período selecionado"
+              onClick={() => setIsExportMenuOpen(false)}
+              role="menuitem"
+            >
               Somente período selecionado
-            </button>
-            <button onClick={() => handleExportPdf(true)} role="menuitem" type="button">
+            </PrintTriggerButton>
+            <PrintTriggerButton
+              href={getPrintHref(printHref, true)}
+              label="Imprimir incluindo atrasadas"
+              onClick={() => setIsExportMenuOpen(false)}
+              role="menuitem"
+            >
               Incluir atrasadas
-            </button>
+            </PrintTriggerButton>
           </div>
         ) : null}
       </div>
@@ -255,8 +247,8 @@ export function FichasFilterToolbar({ canExportPdf, filters, pdfHref }: FichasFi
   );
 }
 
-function getPdfHref(pdfHref: string, includeOverdue: boolean) {
-  const [pathname, query = ""] = pdfHref.split("?");
+function getPrintHref(printHref: string, includeOverdue: boolean) {
+  const [pathname, query = ""] = printHref.split("?");
   const params = new URLSearchParams(query);
 
   if (includeOverdue) {

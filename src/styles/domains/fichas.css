@@ -1247,6 +1247,130 @@
   pointer-events: none;
 }
 
+/* Relatório operacional impresso: documento em papel, cores fixas independentes do tema. */
+.ops-report {
+  width: 100%;
+  padding: 0;
+  background: #fff;
+  color: #000;
+  font-size: 11px;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.ops-report__header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  padding-block-end: 6px;
+  margin-block-end: 12px;
+  border-block-end: 1.5px solid #000;
+}
+
+.ops-report__header h1 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.ops-report__header span,
+.ops-report__header p {
+  margin: 0;
+  color: #475569;
+  font-size: 10px;
+}
+
+.ops-report__header p {
+  grid-column: 1 / -1;
+}
+
+.ops-report__empty {
+  color: #475569;
+}
+
+.ops-report__section {
+  margin-block-end: 14px;
+}
+
+.ops-report__section h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  break-after: avoid;
+}
+
+.ops-report__section--evento h2,
+.ops-report__section--evento .ops-report__group th {
+  color: #b45309;
+}
+
+.ops-report__section--danger h2,
+.ops-report__section--danger .ops-report__group th {
+  color: #be185d;
+}
+
+.ops-report__section--info h2,
+.ops-report__section--info .ops-report__group th {
+  color: #2563eb;
+}
+
+.ops-report table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.ops-report th,
+.ops-report td {
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid #a0aab8;
+  overflow: hidden;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-report thead th {
+  height: 20px;
+  background: #e2e8f0;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.ops-report__group th {
+  height: 20px;
+  background: #f1f4f8;
+}
+
+.ops-report tr {
+  break-inside: avoid;
+}
+
+.ops-report__cliente {
+  font-weight: 700;
+}
+
+.ops-report__row--evento td {
+  background: #fff4de;
+}
+
+.ops-report__row--overdue td {
+  background: #fdecee;
+}
+
+.ops-report__col-cliente {
+  width: 46%;
+}
+
+.ops-report__col-vendedor {
+  width: 15%;
+}
+
+.ops-report__col-data {
+  width: 8.5%;
+}
+
 .draft-print-root {
   display: none;
 }
@@ -2207,25 +2331,18 @@
 }
 
 .print-raw-name-list-page h2 {
-  margin: 0 0 2mm;
+  margin: 0 0 4mm;
   color: var(--color-text);
   font-size: 16px;
-  font-weight: var(--font-weight-semibold);
-}
-
-.print-raw-name-list-page p {
-  margin: 0 0 4mm;
-  color: var(--color-muted);
-  font-size: 12px;
   font-weight: var(--font-weight-semibold);
 }
 
 .print-raw-name-list-page pre {
   margin: 0;
   color: var(--color-text);
-  font-family: var(--font-mono, "Courier New", monospace);
+  font-family: var(--font-sans), sans-serif;
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
 }

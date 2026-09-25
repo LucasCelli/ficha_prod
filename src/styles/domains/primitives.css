@@ -704,6 +704,30 @@ html[data-theme="dark"] .auth-card-brand {
   transform: translateY(-50%);
 }
 
+.combobox__clear {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--easing-standard), color var(--duration-fast) var(--easing-standard);
+}
+
+.combobox__clear:hover {
+  background: var(--color-surface-2);
+  color: var(--color-primary-text);
+}
+
+.combobox__clear:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
 .combobox__chevron,
 .combobox__spinner { color: var(--color-muted); pointer-events: none; }
 .combobox__spinner { animation: button-spinner-rotate 0.8s linear infinite; }

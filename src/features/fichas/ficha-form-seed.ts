@@ -28,6 +28,7 @@ export type ImageFormItem = {
 export type FichaFormClientValues = {
   acabamentoGola: string;
   acabamentoManga: string;
+  acabamentoMangaLonga: string;
   aberturaLateral: string;
   arte: string;
   comNomes: string;
@@ -38,6 +39,7 @@ export type FichaFormClientValues = {
   gola: string;
   imagens: ImageFormItem[];
   itens: ProductFormItem[];
+  manga: string;
   material: string;
   listaNomesRaw: string;
   observacoes: string;
@@ -48,6 +50,7 @@ export type FichaFormClientValues = {
 export type FichaFormInitialData = {
   acabamentoGola: string;
   acabamentoManga: string;
+  acabamentoMangaLonga: string;
   aberturaLateral: string;
   arte: string;
   bolso: string;
@@ -59,6 +62,7 @@ export type FichaFormInitialData = {
   etiqueta: string;
   corAberturaLateral: string;
   corAcabamentoManga: string;
+  corAcabamentoMangaLonga: string;
   corBotao: string;
   corDetalheGola: string;
   corGola: string;
@@ -83,6 +87,7 @@ export type FichaFormInitialData = {
   itens: ProductFormItem[];
   larguraGola: string;
   larguraManga: string;
+  larguraMangaLonga: string;
   manga: string;
   material: string;
   numeroVenda: string;
@@ -106,6 +111,7 @@ export function createEmptyFichaFormInitialData(): FichaFormInitialData {
   return {
     acabamentoGola: "",
     acabamentoManga: "",
+    acabamentoMangaLonga: "",
     aberturaLateral: "nao",
     arte: "",
     bolso: "",
@@ -117,6 +123,7 @@ export function createEmptyFichaFormInitialData(): FichaFormInitialData {
     etiqueta: "",
     corAberturaLateral: "",
     corAcabamentoManga: "",
+    corAcabamentoMangaLonga: "",
     corBotao: "",
     corDetalheGola: "",
     corGola: "",
@@ -141,6 +148,7 @@ export function createEmptyFichaFormInitialData(): FichaFormInitialData {
     itens: [createEmptyProductItem()],
     larguraGola: "",
     larguraManga: "",
+    larguraMangaLonga: "",
     manga: "",
     material: "",
     numeroVenda: "",
@@ -159,6 +167,7 @@ export function mapFichaToInitialData(ficha?: FichaDetail): FichaFormInitialData
     ...initial,
     acabamentoGola: ficha.acabamento_gola ?? "",
     acabamentoManga: ficha.acabamento_manga ?? "",
+    acabamentoMangaLonga: ficha.acabamento_manga_longa ?? "",
     aberturaLateral: ficha.abertura_lateral ?? "nao",
     arte: ficha.arte ?? "",
     bolso: ficha.bolso ?? "",
@@ -170,6 +179,7 @@ export function mapFichaToInitialData(ficha?: FichaDetail): FichaFormInitialData
     etiqueta: ficha.etiqueta ?? "",
     corAberturaLateral: ficha.cor_abertura_lateral ?? "",
     corAcabamentoManga: ficha.cor_acabamento_manga ?? "",
+    corAcabamentoMangaLonga: ficha.cor_acabamento_manga_longa ?? "",
     corBotao: ficha.cor_botao ?? "",
     corDetalheGola: ficha.cor_detalhe_gola ?? "",
     corGola: ficha.cor_gola ?? "",
@@ -216,6 +226,7 @@ export function mapFichaToInitialData(ficha?: FichaDetail): FichaFormInitialData
       : [createEmptyProductItem()],
     larguraGola: ficha.largura_gola ?? "",
     larguraManga: ficha.largura_manga ?? "",
+    larguraMangaLonga: ficha.largura_manga_longa ?? "",
     manga: ficha.manga ?? "",
     material: ficha.material ?? "",
     numeroVenda: ficha.numero_venda ?? "",

@@ -16,11 +16,13 @@ type AlertDialogProps = {
   children: ReactNode;
   description: string;
   onClose: () => void;
+  /** Permite levar o foco para outro ponto ao fechar, em vez do elemento que abriu o dialogo. */
+  onCloseAutoFocus?: (event: Event) => void;
   size?: "sm" | "md";
   title: string;
 };
 
-export function AlertDialog({ children, description, onClose, size = "sm", title }: AlertDialogProps) {
+export function AlertDialog({ children, description, onClose, onCloseAutoFocus, size = "sm", title }: AlertDialogProps) {
   const reduceMotion = useReducedMotion();
   const [visible, setVisible] = useState(true);
 
@@ -45,7 +47,7 @@ export function AlertDialog({ children, description, onClose, size = "sm", title
                   variants={dialogOverlayMotion}
                 />
               </AlertDialogPrimitive.Overlay>
-              <AlertDialogPrimitive.Content asChild forceMount>
+              <AlertDialogPrimitive.Content asChild forceMount onCloseAutoFocus={onCloseAutoFocus}>
                 <motion.div
                   animate="visible"
                   className={`modal-content modal-content--${size}`}

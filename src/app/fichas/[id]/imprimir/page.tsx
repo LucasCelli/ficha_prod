@@ -5,7 +5,8 @@ import { EmptyState } from "@/components/ui";
 import { sanitizeObservationHtml } from "@/lib/sanitize-observations";
 import { getFichaById } from "@/features/fichas/data";
 import { PrintFicha } from "@/features/fichas/print-ficha";
-import { PrintOnLoad } from "@/features/fichas/print-on-load";
+import { PrintBlockedNotice, PrintOnLoad } from "@/features/fichas/print-on-load";
+import { isMissingRequiredLayout, MISSING_LAYOUT_MESSAGE } from "@/features/fichas/print-requirements";
 import { requireAppSession } from "@/features/auth/session";
 
 type PrintFichaPageProps = {
@@ -14,6 +15,7 @@ type PrintFichaPageProps = {
   }>;
   searchParams?: Promise<{
     listaNomesRaw?: string | string[];
+    somenteListaNomes?: string | string[];
   }>;
 };
 
@@ -75,14 +77,34 @@ export default async function PrintFichaPage({ params, searchParams }: PrintFich
     notFound();
   }
 
+  const onlyRawNameList = isTruthyQueryValue(query.somenteListaNomes);
+
+  if (!onlyRawNameList && isMissingRequiredLayout(result.ficha.arte, result.ficha.imagens.length)) {
+    return (
+      <>
+        <PrintBlockedNotice message={MISSING_LAYOUT_MESSAGE} />
+        <EmptyState
+          actions={
+            <Link className="ui-button ui-button--secondary" href={`/fichas/${encodeURIComponent(id)}`}>
+              Editar ficha
+            </Link>
+          }
+          title="Layout obrigatório"
+          description={MISSING_LAYOUT_MESSAGE}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <PrintOnLoad />
       <PrintFicha
+        fallbackAuthor={session?.user.displayName}
         ficha={result.ficha}
         includeRawNameList={isTruthyQueryValue(query.listaNomesRaw)}
+        onlyRawNameList={onlyRawNameList}
         observationHtml={sanitizeObservationHtml(result.ficha.observacoes || result.ficha.observacoes_html || "Nenhuma")}
-        printedBy={session?.user.displayName.split(" ")[0]}
       />
     </>
   );

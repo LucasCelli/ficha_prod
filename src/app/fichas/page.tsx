@@ -30,7 +30,7 @@ type FichasPageProps = {
 };
 
 export default async function FichasPage({ searchParams }: FichasPageProps) {
-  await requireAppSession();
+  const session = await requireAppSession();
   const params = await searchParams;
   const printId =
     typeof params?.print === "string"
@@ -74,7 +74,7 @@ export default async function FichasPage({ searchParams }: FichasPageProps) {
             printHref={`/fichas/${encodeURIComponent(printId)}/imprimir`}
           >
             <Suspense fallback={<FichaPrintPreviewLoading />}>
-              <FichaPrintPreviewModalSlot printId={printId} />
+              <FichaPrintPreviewModalSlot fallbackAuthor={session?.user.displayName} printId={printId} />
             </Suspense>
           </FichaPrintPreviewShell>
         </Modal>
@@ -83,7 +83,7 @@ export default async function FichasPage({ searchParams }: FichasPageProps) {
   );
 }
 
-async function FichaPrintPreviewModalSlot({ printId }: { printId: string }) {
+async function FichaPrintPreviewModalSlot({ fallbackAuthor, printId }: { fallbackAuthor?: string; printId: string }) {
   const printResult: FichaDetailResult = await getFichaById(printId);
 
   if (printResult.kind !== "ok" || !printResult.ficha) {
@@ -94,5 +94,5 @@ async function FichaPrintPreviewModalSlot({ printId }: { printId: string }) {
     printResult.ficha.observacoes || printResult.ficha.observacoes_html || "Nenhuma",
   );
 
-  return <FichaPrintPreviewContent ficha={printResult.ficha} observationHtml={observationHtml} />;
+  return <FichaPrintPreviewContent fallbackAuthor={fallbackAuthor} ficha={printResult.ficha} observationHtml={observationHtml} />;
 }

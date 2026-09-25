@@ -2,18 +2,21 @@
 
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { normalizeNameOrCompany } from "@/lib/name-normalizer";
+import { normalizeClientName } from "@/lib/name-normalizer";
 import { sanitizeObservationHtmlInBrowser } from "@/lib/sanitize-observations.client";
 import type { FichaDetail } from "./data";
 import type { FichaFormClientValues } from "./ficha-form-seed";
+import { uppercaseObservationHtml } from "./observacoes-autofill";
 import { PrintFicha } from "./print-ficha";
 import { printFichaAutomatically } from "./print-pdf";
 
 export function DraftPrintLayer({
+  authorName,
   ficha,
   includeRawNameList,
   onPrinted,
 }: {
+  authorName?: string;
   ficha: FichaDetail;
   includeRawNameList: boolean;
   onPrinted: () => void;
@@ -37,6 +40,7 @@ export function DraftPrintLayer({
   return createPortal(
     <div className="draft-print-root" aria-hidden="true">
       <PrintFicha
+        fallbackAuthor={authorName}
         ficha={ficha}
         includeRawNameList={includeRawNameList}
         observationHtml={ficha.observacoes || ficha.observacoes_html || "Nenhuma"}
@@ -55,17 +59,19 @@ export function buildDraftPrintFicha(form: HTMLFormElement, values: FichaFormCli
     id: fichaId,
     acabamento_gola: values.acabamentoGola || null,
     acabamento_manga: values.acabamentoManga || null,
+    acabamento_manga_longa: text("acabamentoMangaLonga") || null,
     abertura_lateral: values.aberturaLateral || null,
     arte: values.arte || null,
     bolso: text("bolso") || null,
     cliente_auxiliar: text("clienteAuxiliar") || null,
     cliente_id: null,
-    cliente_nome_snapshot: normalizeNameOrCompany(text("cliente")) || "Ficha sem cliente",
+    cliente_nome_snapshot: normalizeClientName(text("cliente")) || "Ficha sem cliente",
     com_nomes: values.comNomes ? Number(values.comNomes) : null,
     composicao: values.composicao || null,
     etiqueta: text("etiqueta") || null,
     cor_abertura_lateral: text("corAberturaLateral") || null,
     cor_acabamento_manga: text("corAcabamentoManga") || null,
+    cor_acabamento_manga_longa: text("corAcabamentoMangaLonga") || null,
     cor_botao: text("corBotao") || null,
     cor_detalhe_gola: text("corDetalheGola") || null,
     cor_gola: text("corGola") || null,
@@ -121,6 +127,7 @@ export function buildDraftPrintFicha(form: HTMLFormElement, values: FichaFormCli
     kanban_status: "pendente",
     largura_gola: text("larguraGola") || null,
     largura_manga: text("larguraManga") || null,
+    largura_manga_longa: text("larguraMangaLonga") || null,
     legacy_ficha_id: null,
     lista_ia: null,
     lista_ia_anexada: false,
@@ -130,7 +137,7 @@ export function buildDraftPrintFicha(form: HTMLFormElement, values: FichaFormCli
     material: values.material || null,
     metadados: null,
     numero_venda: text("numeroVenda") || null,
-    observacoes: values.observacoes ? sanitizeObservationHtmlInBrowser(values.observacoes) : null,
+    observacoes: values.observacoes ? uppercaseObservationHtml(sanitizeObservationHtmlInBrowser(values.observacoes)) : null,
     observacoes_html: null,
     reforco_gola: values.reforcoGola || null,
     status: "pendente",

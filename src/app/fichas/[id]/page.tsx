@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: FichaPageProps): Promise<Meta
 }
 
 export default async function FichaPage({ params }: FichaPageProps) {
-  await requireAppSession();
+  const session = await requireAppSession();
   const { id } = await params;
   const [result, formOptions] = await Promise.all([getFichaById(id), listFichaFormOptions()]);
 
@@ -83,7 +83,7 @@ export default async function FichaPage({ params }: FichaPageProps) {
       </header>
 
       <Card className="ficha-create__card">
-        <FichaForm {...formOptions} ficha={ficha} mode="edit" />
+        <FichaForm {...formOptions} currentUserName={session?.user.displayName} ficha={ficha} mode="edit" />
       </Card>
 
       <Card className="ficha-create__card">

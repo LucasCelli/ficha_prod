@@ -2,34 +2,70 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { sortFichaProductItemsForSave } from "../src/features/fichas/product-item-sorting.ts";
 
-test("ao salvar agrupa detalhes iguais e ordena os tamanhos dentro de cada grupo", () => {
+test("agrupa primeiro por detalhes, depois por produto e ordena os tamanhos dentro do grupo", () => {
   const items = [
-    { detalhesProduto: "Frente azul", produto: "Baby Look", tamanho: "G" },
-    { detalhesProduto: "Costas branca", produto: "Camiseta", tamanho: "G" },
-    { detalhesProduto: " frente  AZUL ", produto: "Camiseta", tamanho: "6" },
-    { detalhesProduto: "Frente azul", produto: "Baby Look", tamanho: "P" },
-    { detalhesProduto: "Costas branca", produto: "Camiseta", tamanho: "P" },
+    { detalhesProduto: "Manga curta", produto: "Camisa Social Masculina", tamanho: "G" },
+    { detalhesProduto: "Manga longa", produto: "Camisa Social Feminina", tamanho: "GG" },
+    { detalhesProduto: " manga  CURTA ", produto: " camisa social MASCULINA ", tamanho: "M" },
+    { detalhesProduto: "Manga curta", produto: "Camisa Social Feminina", tamanho: "GG" },
+    { detalhesProduto: "Manga longa", produto: "Camisa Social Feminina", tamanho: "P" },
+    { detalhesProduto: "Manga curta", produto: "Camisa Social Feminina", tamanho: "P" },
   ];
 
   const sorted = sortFichaProductItemsForSave(items);
 
-  assert.deepEqual(sorted.map((item) => `${item.detalhesProduto.trim()}|${item.tamanho}`), [
-    "frente  AZUL|6",
-    "Frente azul|P",
-    "Frente azul|G",
-    "Costas branca|P",
-    "Costas branca|G",
+  assert.deepEqual(sorted.map((item) => `${item.produto.trim()}|${item.detalhesProduto.trim()}|${item.tamanho}`), [
+    "camisa social MASCULINA|manga  CURTA|M",
+    "Camisa Social Masculina|Manga curta|G",
+    "Camisa Social Feminina|Manga curta|P",
+    "Camisa Social Feminina|Manga curta|GG",
+    "Camisa Social Feminina|Manga longa|P",
+    "Camisa Social Feminina|Manga longa|GG",
   ]);
 });
 
-test("preserva a ordem de aparição dos grupos de detalhes", () => {
+test("preserva a ordem de aparição dos grupos de detalhes e de produto", () => {
   const items = [
-    { detalhesProduto: "Grupo B", produto: "Camiseta", tamanho: "G" },
-    { detalhesProduto: "Grupo A", produto: "Camiseta", tamanho: "P" },
+    { detalhesProduto: "Grupo B", produto: "Produto B", tamanho: "G" },
+    { detalhesProduto: "Grupo B", produto: "Produto A", tamanho: "G" },
+    { detalhesProduto: "Grupo A", produto: "Produto B", tamanho: "P" },
   ];
 
   assert.deepEqual(
-    sortFichaProductItemsForSave(items).map((item) => item.detalhesProduto),
-    ["Grupo B", "Grupo A"],
+    sortFichaProductItemsForSave(items).map((item) => `${item.produto}|${item.detalhesProduto}`),
+    ["Produto B|Grupo B", "Produto A|Grupo B", "Produto B|Grupo A"],
+  );
+});
+
+test("mantém produtos diferentes separados quando os detalhes são iguais", () => {
+  const items = [
+    { detalhesProduto: "", produto: "Camisa Social Masculina Manga Curta", tamanho: "M" },
+    { detalhesProduto: "", produto: "Camisa Social Feminina Manga Curta", tamanho: "P" },
+    { detalhesProduto: "", produto: "Camisa Social Masculina Manga Curta", tamanho: "G" },
+    { detalhesProduto: "", produto: "Camisa Social Feminina Manga Curta", tamanho: "GG" },
+  ];
+
+  assert.deepEqual(
+    sortFichaProductItemsForSave(items).map((item) => `${item.produto}|${item.tamanho}`),
+    [
+      "Camisa Social Masculina Manga Curta|M",
+      "Camisa Social Masculina Manga Curta|G",
+      "Camisa Social Feminina Manga Curta|P",
+      "Camisa Social Feminina Manga Curta|GG",
+    ],
+  );
+});
+
+test("mantém a separação canônica entre tamanhos masculinos e femininos", () => {
+  const items = [
+    { detalhesProduto: "Manga curta", produto: "Camiseta", tamanho: "Feminina P" },
+    { detalhesProduto: "Manga curta", produto: "Camiseta", tamanho: "Masculina G" },
+    { detalhesProduto: "Manga curta", produto: "Camiseta", tamanho: "Feminina GG" },
+    { detalhesProduto: "Manga curta", produto: "Camiseta", tamanho: "Masculina M" },
+  ];
+
+  assert.deepEqual(
+    sortFichaProductItemsForSave(items).map((item) => item.tamanho),
+    ["Masculina M", "Masculina G", "Feminina P", "Feminina GG"],
   );
 });

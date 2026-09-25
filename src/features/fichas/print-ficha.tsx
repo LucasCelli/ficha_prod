@@ -34,9 +34,11 @@ import type { FichaDetail } from "./data";
 
 type PrintFichaProps = {
   ficha: FichaDetail;
+  /** Usado quando a ficha não tem autor gravado (ficha antiga ou rascunho). */
+  fallbackAuthor?: string;
   includeRawNameList?: boolean;
   observationHtml: string;
-  printedBy?: string;
+  onlyRawNameList?: boolean;
 };
 
 type PrintProductRow = {
@@ -50,22 +52,26 @@ type PrintProductRow = {
 const MAX_PRINT_IMAGES = 4;
 const RAW_NAME_LIST_SINGLE_COLUMN_LINE_LIMIT = 51;
 
-export function PrintFicha({ ficha, includeRawNameList = false, observationHtml, printedBy }: PrintFichaProps) {
+export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, observationHtml, onlyRawNameList = false }: PrintFichaProps) {
   const products = buildProductRows(ficha);
   const productSummary = buildProductSummary(products);
   const rawNameList = ficha.lista_nomes_raw?.trim() ?? "";
-  const shouldPrintRawNameList = includeRawNameList && Boolean(rawNameList);
+  const shouldPrintRawNameList = (includeRawNameList || onlyRawNameList) && Boolean(rawNameList);
   const rawNameListColumns = getRawNameListColumnCount(rawNameList);
   const hasDetails = products.some((p) => p.detalhes && p.detalhes.trim() !== "-" && p.detalhes.trim() !== "");
   const imageClassNames = getImagesClassNames(ficha.imagens.length);
-  const shortId = String(parseInt(ficha.id.split("-")[0], 16) % 10000).padStart(4, "0");
-  const idText = printedBy ? `Ficha #${shortId} por ${printedBy}` : `Ficha #${shortId}`;
+  const idNumber = parseInt(ficha.id.split("-")[0], 16);
+  const fichaLabel = Number.isNaN(idNumber) ? "Ficha" : `Ficha #${String(idNumber % 10000).padStart(4, "0")}`;
+  const authorName = (ficha.author?.display_name ?? fallbackAuthor)?.split(" ")[0];
+  const idText = authorName ? `${fichaLabel} por ${authorName}` : null;
   const isEvento = Boolean(ficha.evento);
   const isRegata = ficha.itens.length > 0 && ficha.itens.every((item) => isRegataProduct(item.produto ?? ""));
   const normalizedGola = normalizeKey(ficha.gola ?? "");
   const isPolo = normalizedGola.includes("polo");
   const isSocial = normalizedGola.includes("social");
   const hasMangaExtra = hasAcabamentoMangaExtra(ficha.acabamento_manga);
+  const hasMangaLonga = !isRegata && Boolean(ficha.acabamento_manga_longa);
+  const mangaSuffix = hasMangaLonga ? " Curta" : "";
   const hasReforco = Boolean(ficha.gola && !isSocial && ficha.reforco_gola === "sim");
   const hasAbertura = Boolean(isPolo && ficha.abertura_lateral === "sim");
   const hasFilete = ficha.filete === "sim";
@@ -74,12 +80,13 @@ export function PrintFicha({ ficha, includeRawNameList = false, observationHtml,
   return (
     <section className="ficha-print-page" aria-label={`Ficha imprimível de ${ficha.cliente_nome_snapshot}`}>
       <div id="print-version" className="print-document">
+        {onlyRawNameList ? null : (
         <div className="print-container print-page">
           <header id="printHeader" className="print-header">
           <h1>Ficha Técnica | Priscila Confecções & Uniformes</h1>
           <p>
             Data de Emissão: <span>{formatDateTime(new Date())}</span>
-            <span> | {idText}</span>
+            {idText ? <span> | {idText}</span> : null}
           </p>
           </header>
 
@@ -143,12 +150,19 @@ export function PrintFicha({ ficha, includeRawNameList = false, observationHtml,
               <PrintSeparator />
 
               <PrintField icon={Shirt} label="Tipo Manga" value={ficha.manga} />
-              <PrintField icon={SlidersHorizontal} label={isRegata ? "Viés" : "Acab. Manga"} value={isRegata ? yesNo(ficha.acabamento_manga === "vies") : ficha.acabamento_manga} />
+              <PrintField icon={SlidersHorizontal} label={isRegata ? "Viés" : `Acab. Manga${mangaSuffix}`} value={isRegata ? yesNo(ficha.acabamento_manga === "vies") : ficha.acabamento_manga} />
               {hasMangaExtra && ficha.largura_manga ? (
-                <PrintField icon={Ruler} label={isRegata ? "Largura do Viés" : "Largura Acab. Manga"} value={ficha.largura_manga} />
+                <PrintField icon={Ruler} label={isRegata ? "Largura do Viés" : `Largura Acab. Manga${mangaSuffix}`} value={ficha.largura_manga} />
               ) : null}
               {hasMangaExtra && ficha.cor_acabamento_manga ? (
-                <PrintField icon={Palette} label={isRegata ? "Cor do Viés" : "Cor Acab. Manga"} value={ficha.cor_acabamento_manga} />
+                <PrintField icon={Palette} label={isRegata ? "Cor do Viés" : `Cor Acab. Manga${mangaSuffix}`} value={ficha.cor_acabamento_manga} />
+              ) : null}
+              {hasMangaLonga ? <PrintField icon={SlidersHorizontal} label="Acab. Manga Longa" value={ficha.acabamento_manga_longa} /> : null}
+              {hasMangaLonga && hasAcabamentoMangaExtra(ficha.acabamento_manga_longa) && ficha.largura_manga_longa ? (
+                <PrintField icon={Ruler} label="Largura Acab. Manga Longa" value={ficha.largura_manga_longa} />
+              ) : null}
+              {hasMangaLonga && hasAcabamentoMangaExtra(ficha.acabamento_manga_longa) && ficha.cor_acabamento_manga_longa ? (
+                <PrintField icon={Palette} label="Cor Acab. Manga Longa" value={ficha.cor_acabamento_manga_longa} />
               ) : null}
 
               <PrintSeparator />
@@ -216,13 +230,13 @@ export function PrintFicha({ ficha, includeRawNameList = false, observationHtml,
           </section>
         ) : null}
         </div>
+        )}
 
         {shouldPrintRawNameList ? (
           <section className={rawNameListColumns > 1 ? "print-container print-page print-raw-name-list-page print-raw-name-list-page--columns" : "print-container print-page print-raw-name-list-page"}>
             <h2>
-              <ClipboardList aria-hidden="true" size={16} /> Lista de nomes
+              <ClipboardList aria-hidden="true" size={16} /> Lista de nomes - {formatCliente(ficha)}
             </h2>
-            <p>{formatCliente(ficha)}</p>
             <pre>{rawNameList}</pre>
           </section>
         ) : null}

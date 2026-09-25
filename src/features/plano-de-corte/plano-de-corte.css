@@ -17,6 +17,17 @@
   margin-inline: auto;
 }
 
+/* Folga da barra de comando: foco por teclado e toasts nunca ficam sob ela.
+ * Acompanha a altura da barra em cada breakpoint (uma, duas ou tres faixas). */
+html:has(.cut-plan__command-bar) {
+  --cut-plan-command-clearance: 96px;
+  scroll-padding-block-end: var(--cut-plan-command-clearance);
+}
+
+html:has(.cut-plan__command-bar) [data-sonner-toaster][data-y-position="bottom"] {
+  bottom: var(--cut-plan-command-clearance);
+}
+
 .cut-plan__header {
   display: flex;
   align-items: center;
@@ -76,6 +87,7 @@
 .cut-plan__history.is-collapsed {
   width: auto;
   max-width: calc(100vw - 40px);
+  box-shadow: var(--shadow-md);
   padding: 10px 12px;
 }
 
@@ -168,11 +180,29 @@
   display: grid;
   gap: 18px;
   border: 1px solid var(--color-border-subtle);
-  border-top: 4px solid var(--color-primary);
   border-radius: var(--radius-xl);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
   padding: 18px 20px 20px;
+  transition: border-color var(--duration-fast) var(--easing-standard), box-shadow var(--duration-fast) var(--easing-standard);
+}
+
+/* Etapa em edicao: a borda e o numero indicam onde o usuario esta. */
+.cut-plan__section:focus-within {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  box-shadow: var(--shadow-md);
+}
+
+.cut-plan__section-top {
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding-bottom: 14px;
+}
+
+/* Resultado: unica etapa com acento, marca a troca de "montando" para "calculado". */
+.cut-plan__section--result {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  border-top: 4px solid var(--color-primary);
+  box-shadow: var(--shadow-md);
 }
 
 .cut-plan__section-top,
@@ -202,10 +232,40 @@
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-bold);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 20%, transparent);
+  transition: background-color var(--duration-fast) var(--easing-standard), color var(--duration-fast) var(--easing-standard);
+}
+
+.cut-plan__section[data-complete]>.cut-plan__section-top .cut-plan__section-heading>span {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-success) 30%, transparent);
+}
+
+.cut-plan__section:focus-within>.cut-plan__section-top .cut-plan__section-heading>span,
+.cut-plan__section--result>.cut-plan__section-top .cut-plan__section-heading>span {
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+  box-shadow: none;
 }
 
 .cut-plan__section-heading h2 {
   font-size: 1.05rem;
+}
+
+.cut-plan__section-heading p {
+  margin: 2px 0 0;
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Subdivisao interna de uma etapa (ex.: importar fichas x itens do plano). */
+.cut-plan__subheading {
+  color: var(--color-muted) !important;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 /* Configuracoes e tecidos */
@@ -272,12 +332,45 @@
 
 .cut-plan__fabric {
   display: grid;
-  gap: 14px;
+  align-content: start;
+  overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background: var(--color-surface-2);
-  padding: 16px;
+  background: var(--color-surface);
   transition: border-color var(--duration-fast) var(--easing-standard), box-shadow var(--duration-fast) var(--easing-standard), transform var(--duration-fast) var(--easing-standard);
+}
+
+.cut-plan__fabric-title {
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-2);
+  padding: 10px 10px 10px 16px;
+}
+
+.cut-plan__fabric-title>div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.cut-plan__fabric-title strong {
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cut-plan__fabric-title span {
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.cut-plan__fabric-body {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
 }
 
 .cut-plan__fabric-fields {
@@ -635,8 +728,12 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 8px;
   margin-block-end: 12px;
+}
+
+.cut-plan-items__toolbar .cut-plan__subheading {
+  margin-inline-end: auto;
 }
 
 .cut-plan-items__head,
@@ -811,8 +908,10 @@
 .cut-plan-fichas {
   display: grid;
   gap: 12px;
-  border-bottom: 1px solid var(--color-border-subtle);
-  padding-bottom: 18px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface-2) 45%, var(--color-surface));
+  padding: 14px 16px 16px;
 }
 
 .cut-plan-fichas__search {
@@ -855,6 +954,96 @@
 .cut-plan-fichas__added small {
   color: var(--color-muted);
   font-size: var(--font-size-xs);
+}
+
+/* Barra de comando do plano: estado a esquerda, comandos a direita.
+ * Sticky no fim do `.cut-plan`: acompanha a rolagem e, no fim da pagina,
+ * ocupa o proprio espaco no fluxo, sem cobrir conteudo. */
+.cut-plan__command-bar {
+  position: sticky;
+  z-index: 40;
+  bottom: max(var(--space-12), env(safe-area-inset-bottom));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12) var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-10) var(--space-12) var(--space-10) var(--space-18);
+}
+
+/* Menus de autocomplete abrem para baixo e nao usam portal: ficam por cima da barra. */
+.cut-plan:has(.custom-datalist__menu) .cut-plan__command-bar {
+  z-index: 1;
+}
+
+.cut-plan__command-status {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-10);
+}
+
+.cut-plan__command-status>div {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.cut-plan__command-status strong {
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.cut-plan__command-status span:not(.cut-plan__command-dot) {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* O rotulo carrega o estado; o ponto apenas reforca. */
+.cut-plan__command-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+  transition: background-color var(--duration-fast) var(--easing-standard);
+}
+
+.cut-plan__command-status[data-state="ready"] .cut-plan__command-dot { background: var(--color-primary); }
+.cut-plan__command-status[data-state="calculating"] .cut-plan__command-dot { background: var(--color-info); }
+.cut-plan__command-status[data-state="calculated"] .cut-plan__command-dot { background: var(--color-success); }
+.cut-plan__command-status[data-state="invalid"] .cut-plan__command-dot { background: var(--color-warning); }
+.cut-plan__command-status[data-state="invalid"] strong { color: var(--color-warning); }
+
+.cut-plan__command-actions,
+.cut-plan__command-reset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+/* Separador entre "recomecar" e os comandos de calculo. */
+.cut-plan__command-reset {
+  border-inline-end: 1px solid var(--color-border-subtle);
+  padding-inline-end: var(--space-8);
+}
+
+.cut-plan__calculate {
+  min-height: 46px;
+  padding-inline: var(--space-24);
+  box-shadow: var(--shadow-md);
+  font-weight: var(--font-weight-bold);
 }
 
 /* Breakpoints oficiais do projeto: sm 480 | md 768 | lg 1024 | xl 1280. */
@@ -967,6 +1156,43 @@
   .cut-plan-fichas__search .ui-button {
     width: 100%;
   }
+
+  html:has(.cut-plan__command-bar) {
+    --cut-plan-command-clearance: 150px;
+  }
+
+  /* Estado em cima; comandos embaixo, com Calcular ocupando a maior faixa. */
+  .cut-plan__command-bar {
+    padding: var(--space-10) var(--space-12);
+  }
+
+  .cut-plan__command-status,
+  .cut-plan__command-actions {
+    width: 100%;
+  }
+
+  .cut-plan__command-actions>.ui-button {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 480px) {
+  html:has(.cut-plan__command-bar) {
+    --cut-plan-command-clearance: 200px;
+  }
+
+  .cut-plan__command-reset {
+    display: grid;
+    flex-basis: 100%;
+    grid-template-columns: 1fr 1fr;
+    border-inline-end: 0;
+    padding-inline-end: 0;
+  }
+
+  .cut-plan__command-reset .ui-button {
+    min-height: 40px;
+    padding-inline: var(--space-8);
+  }
 }
 
 /* ==========================================================================
@@ -989,7 +1215,7 @@
 .cut-plan-print-simple__page {
   width: 794px;
   min-height: 1123px;
-  padding: 32px 38px;
+  padding: 24px 28px;
 }
 
 .cut-plan-print-simple__header {
@@ -997,13 +1223,14 @@
   align-items: flex-start;
   justify-content: space-between;
   border-bottom: 2px solid #204f91;
-  padding-bottom: 8px;
+  padding-bottom: 4px;
 }
 
 .cut-plan-print-simple__header h1 {
-  margin: 0 0 2px;
+  margin: 0;
   color: #000;
-  font-size: 30px;
+  font-size: 20px;
+  line-height: 1.2;
 }
 
 .cut-plan-print-simple__header p {
@@ -1013,38 +1240,42 @@
 }
 
 .cut-plan-print-simple__sources {
-  margin-top: 20px;
+  margin-top: 10px;
+  break-inside: avoid;
 }
 
 .cut-plan-print-simple__sources h2 {
-  margin: 0 0 7px;
+  margin: 0 0 4px;
   color: #000;
   font-size: 10px;
   text-transform: uppercase;
 }
 
+/* Fichas em duas colunas: cada cartao so precisa de nome e detalhe. */
 .cut-plan-print-simple__sources>div {
   display: grid;
-  gap: 5px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 8px;
 }
 
 .cut-plan-print-simple__sources article {
   display: flex;
   align-items: center;
-  gap: 9px;
-  border: 2px solid #1f2937;
+  min-width: 0;
+  gap: 7px;
+  border: 1.5px solid #1f2937;
   border-radius: 5px;
   background: #f5f7fa;
-  padding: 6px;
+  padding: 3px 6px 3px 3px;
   break-inside: avoid;
 }
 
 .cut-plan-print-simple__sources img,
 .cut-plan-print-simple__source-placeholder {
   display: block;
-  width: 54px;
-  height: 38px;
-  flex: 0 0 54px;
+  width: 40px;
+  height: 28px;
+  flex: 0 0 40px;
   border-radius: 3px;
   background: #e3e8ef;
   object-fit: cover;
@@ -1052,7 +1283,8 @@
 
 .cut-plan-print-simple__sources p {
   display: grid;
-  gap: 2px;
+  min-width: 0;
+  gap: 1px;
   margin: 0;
 }
 
@@ -1071,21 +1303,22 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  margin-top: 22px;
-  margin-bottom: 10px;
+  margin-top: 12px;
+  margin-bottom: 4px;
   break-inside: avoid;
+  break-after: avoid;
 }
 
 .cut-plan-print-simple__fabric-header h2 {
   margin: 0;
   color: #000;
-  font-size: 19px;
+  font-size: 15px;
 }
 
 .cut-plan-print-simple__fabric-header p {
-  margin: 2px 0 0;
+  margin: 1px 0 0;
   color: #000;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .cut-plan-print-simple__fabric-header>strong {
@@ -1096,13 +1329,16 @@
 /* Cada enfesto vira um cartao compacto; duas colunas por linha, como na tela. */
 .cut-plan-print-simple__lay-row {
   display: flex;
-  gap: 12px;
-  margin-top: 14px;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  break-inside: avoid;
 }
 
-.cut-plan-print-simple__lay {
-  flex: 0 0 calc(50% - 5px);
-  max-width: calc(50% - 5px);
+.cut-plan-print-simple__lay,
+.cut-plan-print-simple__lay-row>.cut-plan-print-simple__conference {
+  flex: 0 0 calc(50% - 4px);
+  max-width: calc(50% - 4px);
   min-width: 0;
   overflow: hidden;
   border: 2px solid #1f2937;
@@ -1120,13 +1356,13 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   background: #f5f7fa;
-  padding: 8px 10px;
+  padding: 5px 8px;
 }
 
 .cut-plan-print-simple__lay h3 {
-  margin: 0 0 3px;
+  margin: 0 0 1px;
   color: #204f91;
   font-size: 13px;
 }
@@ -1135,7 +1371,7 @@
   margin: 0;
   color: #000;
   font-size: 10pt;
-  line-height: 1.4;
+  line-height: 1.3;
 }
 
 .cut-plan-print-simple__length {
@@ -1154,13 +1390,13 @@
 
 .cut-plan-print-simple__badge span {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   place-items: center;
   border-radius: 50%;
   background: #dbe7fb;
   color: #204f91;
-  font-size: 16pt;
+  font-size: 14pt;
   font-weight: 800;
 }
 
@@ -1172,12 +1408,29 @@
 }
 
 .cut-plan-print-simple__conference {
-  margin-top: 26px;
+  margin-top: 12px;
   break-inside: avoid;
 }
 
+.cut-plan-print-simple__lay-row>.cut-plan-print-simple__conference {
+  margin-top: 0;
+}
+
+/* Ao lado de um enfesto, a conferencia vira um cartao com o mesmo cabecalho. */
+.cut-plan-print-simple__lay-row>.cut-plan-print-simple__conference h3 {
+  margin: 0;
+  background: #f5f7fa;
+  padding: 6px 8px;
+}
+
+.cut-plan-print-simple__lay-row>.cut-plan-print-simple__conference table.cut-plan-print-simple__check {
+  width: 100%;
+  min-width: 0;
+  border-bottom: 0;
+}
+
 .cut-plan-print-simple__conference h3 {
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   color: #000;
   font-size: 12px;
   text-transform: uppercase;
@@ -1186,12 +1439,6 @@
 .cut-plan-print-simple table.cut-plan-print-simple__check {
   width: auto;
   min-width: 60%;
-}
-
-/* Quebra de pagina forcada: mantem no maximo 4 tabelas pequenas por folha. */
-.cut-plan-print-simple__break {
-  break-before: page;
-  page-break-before: always;
 }
 
 .cut-plan-print-simple table {
@@ -1211,7 +1458,7 @@
 .cut-plan-print-simple th,
 .cut-plan-print-simple td {
   border-bottom: 1px solid #334155;
-  padding: 6px 8px;
+  padding: 3px 6px;
   text-align: left;
   vertical-align: middle;
 }
@@ -1233,7 +1480,7 @@
 
 .cut-plan-print-simple__lay th,
 .cut-plan-print-simple__lay td {
-  padding: 4px 8px;
+  padding: 2px 6px;
 }
 
 @media print {
@@ -1262,7 +1509,7 @@
   .cut-plan-native-print-root .cut-plan-print-simple__page {
     width: auto;
     min-height: 0;
-    padding: 12mm 13mm;
+    padding: 7mm 8mm;
   }
 
   .cut-plan-native-print-root>.cut-plan-print-simple:not(:last-child) {

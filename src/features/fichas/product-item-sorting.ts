@@ -16,20 +16,34 @@ function normalizeDetailsGroup(value: string | null | undefined) {
     .toLocaleLowerCase("pt-BR");
 }
 
-/** Mantém a primeira posição de cada grupo de detalhes e ordena seus tamanhos. */
+/** Agrupa detalhes e, dentro deles, produtos pela primeira aparição antes de ordenar os tamanhos. */
 export function sortFichaProductItemsForSave<T extends SortableFichaProductItem>(items: readonly T[], definitions?: readonly UniformSizeDefinition[]) {
-  const groupOrder = new Map<string, number>();
+  const detailsOrder = new Map<string, number>();
+  const productOrderByDetails = new Map<string, Map<string, number>>();
 
   items.forEach((item) => {
-    const group = normalizeDetailsGroup(item.detalhesProduto);
-    if (!groupOrder.has(group)) groupOrder.set(group, groupOrder.size);
+    const details = normalizeDetailsGroup(item.detalhesProduto);
+    const product = normalizeDetailsGroup(item.produto);
+    if (!detailsOrder.has(details)) detailsOrder.set(details, detailsOrder.size);
+
+    const productOrder = productOrderByDetails.get(details) ?? new Map<string, number>();
+    if (!productOrder.has(product)) productOrder.set(product, productOrder.size);
+    productOrderByDetails.set(details, productOrder);
   });
 
   return [...items].sort((first, second) => {
-    const firstGroup = groupOrder.get(normalizeDetailsGroup(first.detalhesProduto)) ?? 0;
-    const secondGroup = groupOrder.get(normalizeDetailsGroup(second.detalhesProduto)) ?? 0;
+    const firstDetails = normalizeDetailsGroup(first.detalhesProduto);
+    const secondDetails = normalizeDetailsGroup(second.detalhesProduto);
+    const firstDetailsOrder = detailsOrder.get(firstDetails) ?? 0;
+    const secondDetailsOrder = detailsOrder.get(secondDetails) ?? 0;
 
-    if (firstGroup !== secondGroup) return firstGroup - secondGroup;
+    if (firstDetailsOrder !== secondDetailsOrder) return firstDetailsOrder - secondDetailsOrder;
+
+    const productOrder = productOrderByDetails.get(firstDetails);
+    const firstProductOrder = productOrder?.get(normalizeDetailsGroup(first.produto)) ?? 0;
+    const secondProductOrder = productOrder?.get(normalizeDetailsGroup(second.produto)) ?? 0;
+
+    if (firstProductOrder !== secondProductOrder) return firstProductOrder - secondProductOrder;
     return compareUniformSizeAndBabyLookText(first, second, definitions);
   });
 }

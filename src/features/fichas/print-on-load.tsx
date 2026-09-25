@@ -20,10 +20,13 @@ export function PrintOnLoad() {
       }
 
       try {
-        await printFichaAutomatically(element, () => {
-          if (window.parent !== window) window.frameElement?.remove();
-        });
-        notifyParentPrintReady(searchParams.get("_printJob"));
+        await printFichaAutomatically(
+          element,
+          () => {
+            if (window.parent !== window) window.frameElement?.remove();
+          },
+          () => notifyParentPrintReady(searchParams.get("_printJob")),
+        );
       } catch (error) {
         console.error("Error preparing print:", error);
         notifyParentPrintReady(searchParams.get("_printJob"));
@@ -37,13 +40,23 @@ export function PrintOnLoad() {
   return null;
 }
 
-function notifyParentPrintReady(printJobId: string | null) {
+// Tells the opening PrintTriggerButton that this ficha cannot be printed.
+export function PrintBlockedNotice({ message }: { message: string }) {
+  useEffect(() => {
+    notifyParentPrintReady(new URLSearchParams(window.location.search).get("_printJob"), message);
+  }, [message]);
+
+  return null;
+}
+
+function notifyParentPrintReady(printJobId: string | null, error?: string) {
   if (!printJobId || window.parent === window) {
     return;
   }
 
   window.parent.postMessage(
     {
+      error,
       printJobId,
       type: PRINT_JOB_SIGNAL,
     },

@@ -47,7 +47,7 @@ export default async function NovaFichaPage({ searchParams }: NovaFichaPageProps
       </header>
 
       <Card className="ficha-create__card">
-        <FichaForm {...formOptions} canImportLegacyJson={session?.user.role === "superadmin"} initialData={duplicateInitialData} />
+        <FichaForm {...formOptions} currentUserName={session?.user.displayName} canImportLegacyJson={session?.user.role === "superadmin"} initialData={duplicateInitialData} />
       </Card>
 
       <Link className="ui-button ui-button--ghost" href="/fichas">

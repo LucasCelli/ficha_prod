@@ -23,10 +23,9 @@ const DOCUMENT_STYLE = `
   .print-direct .print-raw-name-list-page pre { font-size: 13px; }
   .print-direct .print-total-produtos, .print-direct .print-image-description { font-size: 10px; }
   .print-direct .print-raw-name-list-page h2 { font-size: 15px; }
-  .print-direct .print-raw-name-list-page p { font-size: 11px; }
 `;
 
-export async function printFichaAutomatically(element: HTMLElement, onFinished?: () => void) {
+export async function printFichaAutomatically(element: HTMLElement, onFinished?: () => void, onPrintOpen?: () => void) {
   const frame = document.createElement("iframe");
   frame.title = "Impressão da ficha";
   frame.setAttribute("aria-hidden", "true");
@@ -85,9 +84,9 @@ export async function printFichaAutomatically(element: HTMLElement, onFinished?:
     await waitForImages(copy);
     await new Promise<void>((resolve) => frameWindow.requestAnimationFrame(() => frameWindow.requestAnimationFrame(() => resolve())));
 
-    const mainPage = copy.querySelector<HTMLElement>(":scope > .print-page:not(.print-raw-name-list-page)") ?? copy;
-    const height = mainPage.getBoundingClientRect().height;
-    if (height > CONTENT_HEIGHT_MM * PX_PER_MM) {
+    // Absent when printing only the name list, which paginates naturally.
+    const mainPage = copy.querySelector<HTMLElement>(":scope > .print-page:not(.print-raw-name-list-page)");
+    if (mainPage && mainPage.getBoundingClientRect().height > CONTENT_HEIGHT_MM * PX_PER_MM) {
       try {
         copy.classList.remove("print-direct");
         const captureHeight = mainPage.getBoundingClientRect().height;
@@ -117,6 +116,11 @@ export async function printFichaAutomatically(element: HTMLElement, onFinished?:
     frameWindow.addEventListener("afterprint", dispose, { once: true });
     // Safety net for browsers that omit afterprint, after preparation completes.
     cleanupTimer = window.setTimeout(dispose, 60_000);
+    if (onPrintOpen) {
+      onPrintOpen();
+      // print() blocks the page until the dialog closes; let the toast dismissal render first.
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 250));
+    }
     frameWindow.focus();
     frameWindow.print();
   } catch (error) {

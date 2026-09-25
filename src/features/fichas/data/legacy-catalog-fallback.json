@@ -368,43 +368,148 @@
     },
     {
       "id": "profit",
-      "nome": "Profit Camisaria",
-      "composicao": "67% Poliéster / 33% Algodão"
+      "nome": "PROFIT",
+      "composicao": "67% poliéster 33% algodão"
+    },
+    {
+      "id": "profit_strong",
+      "nome": "PROFIT STRONG",
+      "composicao": "67% poliéster 33% algodão"
+    },
+    {
+      "id": "profit_mix",
+      "nome": "PROFIT MIX",
+      "composicao": "59% poliéster 41% algodão"
+    },
+    {
+      "id": "natural_fit",
+      "nome": "NATURAL FIT",
+      "composicao": "65% algodão 35% poliéster"
+    },
+    {
+      "id": "natural_fit_mescla",
+      "nome": "NATURAL FIT MESCLA",
+      "composicao": "65% algodão 35% poliéster"
     },
     {
       "id": "comfort_plus",
-      "nome": "Comfort Plus Camisaria",
-      "composicao": "37% Poliéster / 63% Algodão"
+      "nome": "COMFORT PLUS",
+      "composicao": "63% algodão 37% poliéster"
     },
     {
-      "id": "london",
-      "nome": "London Camisaria",
-      "composicao": "37% Poliéster / 63% Algodão"
+      "id": "cotton_premium",
+      "nome": "COTTON PREMIUM",
+      "composicao": "100% algodão"
     },
     {
-      "id": "spagueti",
-      "nome": "Spagueti Camisaria",
-      "composicao": "23% Poliéster / 77% Algodão"
+      "id": "fustao",
+      "nome": "FUSTÃO",
+      "composicao": "100% algodão"
+    },
+    {
+      "id": "classic",
+      "nome": "CLASSIC",
+      "composicao": "73% algodão 27% poliéster"
+    },
+    {
+      "id": "panama",
+      "nome": "PANAMÁ",
+      "composicao": "67% poliéster 33% algodão"
     },
     {
       "id": "tricoline",
-      "nome": "Tricoline Camisaria",
-      "composicao": "77% Poliéster / 19% Algodão / 4% Elastano"
+      "nome": "TRICOLINE AMÉLIE",
+      "composicao": "77% poliéster 19% algodão 4% elastano"
     },
     {
-      "id": "barcelona",
-      "nome": "Barcelona Camisaria",
-      "composicao": "73% Poliéster / 23% Algodão / 4% Elastano"
+      "id": "tricoline_ibiza",
+      "nome": "TRICOLINE IBIZA",
+      "composicao": "75% poliéster 21% algodão 4% elastano"
     },
     {
-      "id": "fusili",
-      "nome": "Fusili Camisaria",
-      "composicao": "50% Poliéster / 50% Algodão"
+      "id": "tricoline_cannes",
+      "nome": "TRICOLINE CANNES",
+      "composicao": "58% algodão 38% poliéster 4% elastano"
+    },
+    {
+      "id": "dopfil",
+      "nome": "DOPFIL",
+      "composicao": "67% poliéster 33% algodão"
+    },
+    {
+      "id": "bristol",
+      "nome": "BRISTOL",
+      "composicao": "53% poliéster 47% algodão"
     },
     {
       "id": "microvichy",
-      "nome": "Micro Vichy Camisaria",
-      "composicao": "57% Poliéster / 43% Algodão"
+      "nome": "MICRO VICHY",
+      "composicao": "57% poliéster 43% algodão"
+    },
+    {
+      "id": "medium_vichy",
+      "nome": "MÉDIUM VICHY",
+      "composicao": "63% poliéster 37% algodão"
+    },
+    {
+      "id": "london",
+      "nome": "LONDON",
+      "composicao": "67% algodão 33% poliéster"
+    },
+    {
+      "id": "spagueti",
+      "nome": "SPAGUETI",
+      "composicao": "77% algodão 23% poliéster"
+    },
+    {
+      "id": "fusili",
+      "nome": "FUSILI",
+      "composicao": "50% poliéster 50% algodão"
+    },
+    {
+      "id": "london_comfort",
+      "nome": "LONDON COMFORT",
+      "composicao": "52% poliéster 30% algodão 14% poliamida 4% elastano"
+    },
+    {
+      "id": "barcelona",
+      "nome": "BARCELONA",
+      "composicao": "73% poliéster 23% algodão 4% elastano"
+    },
+    {
+      "id": "saville",
+      "nome": "SAVILLE",
+      "composicao": "67% poliéster 29% algodão 4% elastano"
+    },
+    {
+      "id": "turim",
+      "nome": "TURIM",
+      "composicao": "79% poliéster 21% viscose"
+    },
+    {
+      "id": "ravena",
+      "nome": "RAVENA",
+      "composicao": "78% poliéster 22% viscose"
+    },
+    {
+      "id": "milano_plus",
+      "nome": "MILANO PLUS",
+      "composicao": "74% poliéster 22% viscose 4% elastano"
+    },
+    {
+      "id": "firenze",
+      "nome": "FIRENZE",
+      "composicao": "96% poliéster 4% elastano"
+    },
+    {
+      "id": "dopwork_pesado",
+      "nome": "DOPWORK PESADO",
+      "composicao": "100% algodão"
+    },
+    {
+      "id": "dopwork_light",
+      "nome": "DOPWORK LIGHT",
+      "composicao": "100% algodão"
     }
   ]
 }

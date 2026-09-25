@@ -1,12 +1,14 @@
 export type ObservacoesTecnicasInput = {
   acabamentoGola?: string;
   acabamentoManga?: string;
+  acabamentoMangaLonga?: string;
   arte?: string;
   arteLabel?: string;
   bolso?: string;
   comNomes?: string;
   corBotao?: string;
   corAcabamentoManga?: string;
+  corAcabamentoMangaLonga?: string;
   corAberturaLateral?: string;
   corDetalheGola?: string;
   corFaixa?: string;
@@ -26,6 +28,7 @@ export type ObservacoesTecnicasInput = {
   gola?: string;
   larguraGola?: string;
   larguraManga?: string;
+  larguraMangaLonga?: string;
   manga?: string;
   material?: string;
   produto?: string;
@@ -80,10 +83,20 @@ function buildMaterialSegment(input: ObservacoesTecnicasInput) {
 }
 
 function buildMangaSegment(input: ObservacoesTecnicasInput) {
-  const manga = clean(input.manga);
-  const acabamento = clean(input.acabamentoManga);
-  const largura = clean(input.larguraManga);
-  const corAcabamento = clean(input.corAcabamentoManga);
+  if (clean(input.acabamentoMangaLonga)) {
+    return [
+      describeManga("CURTA", input.acabamentoManga, input.larguraManga, input.corAcabamentoManga),
+      describeManga("LONGA", input.acabamentoMangaLonga, input.larguraMangaLonga, input.corAcabamentoMangaLonga),
+    ].filter(Boolean).join(" E ");
+  }
+  return describeManga(input.manga, input.acabamentoManga, input.larguraManga, input.corAcabamentoManga);
+}
+
+function describeManga(mangaValue?: string, acabamentoValue?: string, larguraValue?: string, corValue?: string) {
+  const manga = clean(mangaValue);
+  const acabamento = clean(acabamentoValue);
+  const largura = clean(larguraValue);
+  const corAcabamento = clean(corValue);
   if (!manga && !acabamento) return "";
 
   if (!acabamento) return `MANGA ${manga}`;

@@ -261,7 +261,8 @@ test.describe("plano de corte: tamanhos e mangas", () => {
     await expect(page.locator('input[id^="cut-plan-fabric-width-"]').first()).toHaveValue("118");
     await expect(page.locator('select[id^="cut-plan-fabric-type-"]').first()).toHaveValue("TUBULAR");
     await page.locator('input[id^="cut-plan-fabric-color-"]').first().fill("Azul");
-    await expect(page.locator(".cut-plan__fabric-title strong").first()).toHaveText("Malha Fria (PV) — Azul");
+    await expect(page.locator(".cut-plan__fabric-title strong").first()).toHaveText("Malha Fria (PV)");
+    await expect(page.locator(".cut-plan__fabric-title span").first()).toHaveText("Azul");
 
     await page.getByRole("button", { name: /adicionar tamanho/i }).click();
 
@@ -292,7 +293,8 @@ test.describe("plano de corte: tamanhos e mangas", () => {
 
     await expect(page.locator(".cut-plan-fichas__added")).toContainText(ficha.sleeveType === "LONGA" ? "Manga longa" : "Manga curta");
     await expect(page.locator('input[id^="cut-plan-fabric-name-"]').first()).toHaveValue(ficha.material);
-    await expect(page.locator(".cut-plan__fabric-title strong").first()).toHaveText(ficha.color ? `${ficha.material} — ${ficha.color}` : ficha.material);
+    await expect(page.locator(".cut-plan__fabric-title strong").first()).toHaveText(ficha.material);
+    if (ficha.color) await expect(page.locator(".cut-plan__fabric-title span").first()).toHaveText(ficha.color);
     const sleeves = page.locator('select[aria-label^="Manga da linha"]');
     await expect(sleeves).toHaveCount(ficha.items.length);
     for (const select of await sleeves.all()) await expect(select).toHaveValue(ficha.sleeveType);
@@ -323,7 +325,8 @@ test.describe("plano de corte: tamanhos e mangas", () => {
     await expect(page.locator('input[id^="cut-plan-fabric-name-"]').first()).toHaveValue("Malha Fria (PV)");
     await expect(page.locator('input[id^="cut-plan-fabric-width-"]').first()).toHaveValue("118");
     await expect(page.locator('select[id^="cut-plan-fabric-type-"]').first()).toHaveValue("TUBULAR");
-    await expect(page.locator(".cut-plan__fabric-title strong").first()).toHaveText("Malha Fria (PV) — Azul");
+    await expect(page.locator(".cut-plan__fabric-title strong").first()).toHaveText("Malha Fria (PV)");
+    await expect(page.locator(".cut-plan__fabric-title span").first()).toHaveText("Azul");
     await expect(page.getByRole("checkbox", { name: /Mesclar tecidos nos enfestos/ })).not.toBeChecked();
     await page.getByRole("button", { name: "Calcular plano" }).click();
     await expect(page.getByRole("heading", { name: "Resultado", exact: true })).toBeVisible();

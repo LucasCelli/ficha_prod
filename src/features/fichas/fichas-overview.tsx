@@ -26,12 +26,12 @@ type FichasOverviewProps = {
 };
 
 const columns = [
-  { key: "cliente", label: "Ficha", width: "29%" },
+  { key: "cliente", label: "Ficha", width: "34%" },
   { key: "entrega", label: "Entrega", width: "12%" },
   { key: "status", label: "Status", width: "11%" },
-  { key: "personalizacao", label: "Etapas", width: "15%" },
+  { key: "personalizacao", label: "Etapas", width: "13%" },
   { key: "responsavel", label: "Responsável", width: "11%" },
-  { key: "acao", label: "Ações", width: "22%" },
+  { key: "acao", label: "Ações", width: "19%" },
 ];
 
 const statusLabels: Record<FichaStatus, string> = {
@@ -83,9 +83,9 @@ export function FichasOverview({ filters, result }: FichasOverviewProps) {
       </nav>
 
       <FichasFilterToolbar
-        canExportPdf={result.kind === "ok" && result.total > 0}
+        canPrint={result.kind === "ok" && result.total > 0}
         filters={filters}
-        pdfHref={hrefForPdf(filters)}
+        printHref={hrefForPrint(filters)}
       />
 
       {renderFichasContent(result, filters)}
@@ -151,7 +151,7 @@ function hrefForFilters(currentFilters: FichaFilters, shortcutFilters: ShortcutF
   return query ? `/fichas?${query}` : "/fichas";
 }
 
-function hrefForPdf(filters: FichaFilters) {
+function hrefForPrint(filters: FichaFilters) {
   const params = new URLSearchParams();
 
   if (filters.arte) params.set("arte", filters.arte);
@@ -161,7 +161,7 @@ function hrefForPdf(filters: FichaFilters) {
   if (filters.dataInicio) params.set("dataInicio", filters.dataInicio);
   if (filters.dataFim) params.set("dataFim", filters.dataFim);
   const query = params.toString();
-  return query ? `/fichas/pdf?${query}` : "/fichas/pdf";
+  return query ? `/fichas/relatorio/imprimir?${query}` : "/fichas/relatorio/imprimir";
 }
 
 function matchesShortcut(current: FichaFilters, shortcut: ShortcutFilters) {

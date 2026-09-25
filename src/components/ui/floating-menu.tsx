@@ -10,6 +10,8 @@ import { motionTransition, popoverMotion, transitionForReducedMotion } from "./m
 
 type FloatingMenuProps = {
   children: ReactNode;
+  /** Selector of an ancestor (e.g. "tr") whose right-click opens this menu at the cursor. */
+  contextMenuTarget?: string;
   label: string;
   trigger: ReactNode;
 };
@@ -24,8 +26,9 @@ type FloatingMenuButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   danger?: boolean;
 };
 
-export function FloatingMenu({ children, label, trigger }: FloatingMenuProps) {
+export function FloatingMenu({ children, contextMenuTarget, label, trigger }: FloatingMenuProps) {
   const [open, setOpen] = useState(false);
+  const [anchorPoint, setAnchorPoint] = useState<{ x: number; y: number } | null>(null);
   const [menuPosition, setMenuPosition] = useState<CSSProperties | null>(null);
   const reduceMotion = useReducedMotion();
   const menuId = useId();
@@ -38,13 +41,15 @@ export function FloatingMenu({ children, label, trigger }: FloatingMenuProps) {
     const rootElement = rootRef.current;
     if (!triggerElement || !rootElement) return;
 
-    const triggerRect = triggerElement.getBoundingClientRect();
+    const triggerRect = anchorPoint
+      ? { bottom: anchorPoint.y, right: anchorPoint.x, top: anchorPoint.y }
+      : triggerElement.getBoundingClientRect();
     const rootStyles = window.getComputedStyle(rootElement);
     const minWidth = rootStyles.getPropertyValue("--floating-menu-min-width").trim() || "232px";
     const menuWidth = menuRef.current?.offsetWidth || Number.parseFloat(minWidth) || 232;
     const menuHeight = menuRef.current?.offsetHeight || 0;
     const viewportPadding = 8;
-    const gap = 8;
+    const gap = anchorPoint ? 0 : 8;
     const availableBelow = window.innerHeight - triggerRect.bottom - gap - viewportPadding;
     const availableAbove = triggerRect.top - gap - viewportPadding;
     const openAbove = menuHeight > availableBelow && availableAbove > availableBelow;
@@ -53,7 +58,7 @@ export function FloatingMenu({ children, label, trigger }: FloatingMenuProps) {
       : triggerRect.bottom + gap;
     const availableHeight = Math.max(120, openAbove ? availableAbove : availableBelow);
     const left = Math.min(
-      Math.max(viewportPadding, triggerRect.right - menuWidth),
+      Math.max(viewportPadding, anchorPoint ? anchorPoint.x : triggerRect.right - menuWidth),
       Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding),
     );
 
@@ -63,7 +68,23 @@ export function FloatingMenu({ children, label, trigger }: FloatingMenuProps) {
       maxHeight: availableHeight,
       top,
     } as CSSProperties);
-  }, []);
+  }, [anchorPoint]);
+
+  useEffect(() => {
+    if (!contextMenuTarget) return;
+    const target = rootRef.current?.closest<HTMLElement>(contextMenuTarget);
+    if (!target) return;
+
+    function handleContextMenu(event: globalThis.MouseEvent) {
+      event.preventDefault();
+      // Keyboard-triggered context menus (Shift+F10) report 0,0: anchor to the trigger instead.
+      setAnchorPoint(event.clientX || event.clientY ? { x: event.clientX, y: event.clientY } : null);
+      setOpen(true);
+    }
+
+    target.addEventListener("contextmenu", handleContextMenu);
+    return () => target.removeEventListener("contextmenu", handleContextMenu);
+  }, [contextMenuTarget]);
 
   function handleMenuClick(event: MouseEvent<HTMLDivElement>) {
     const target = event.target;
@@ -123,7 +144,10 @@ export function FloatingMenu({ children, label, trigger }: FloatingMenuProps) {
         aria-haspopup="menu"
         className="icon-action floating-menu__trigger"
         label={label}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setAnchorPoint(null);
+          setOpen((current) => !current);
+        }}
         ref={triggerRef}
         tooltip={false}
       >

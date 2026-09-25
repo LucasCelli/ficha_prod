@@ -4,15 +4,16 @@
 import { getActionError, requireAuthenticatedAction } from "@/lib/server/boundaries";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { normalizeNameOrCompany } from "@/lib/name-normalizer";
+import { normalizeClientName } from "@/lib/name-normalizer";
 import { sanitizeObservationHtml } from "@/lib/sanitize-observations";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import type { Json } from "@/lib/supabase/database.types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FichaDeleteActionState, FichaFormState, FichaStatusActionState, FieldErrors } from "./form-state";
-import { fichaFormSchema, type FichaFormValues } from "./schema";
+import { fichaFormSchema, isMangaCurtaELonga, type FichaFormValues } from "./schema";
 import { getFichaDeleteConfirmationCode } from "./delete-confirmation";
 import { sortFichaProductItemsForSave } from "./product-item-sorting";
+import { uppercaseObservationHtml } from "./observacoes-autofill";
 import { listUniformSizeDefinitions } from "@/features/catalogos/data";
 import { createUniformSizeDomain, DEFAULT_UNIFORM_SIZE_DEFINITIONS, type UniformSizeDefinition } from "@/lib/uniform-sizes";
 
@@ -34,6 +35,9 @@ function getFichaFormInput(formData: FormData) {
     acabamentoManga: formData.get("acabamentoManga"),
     corAcabamentoManga: formData.get("corAcabamentoManga"),
     larguraManga: formData.get("larguraManga"),
+    acabamentoMangaLonga: formData.get("acabamentoMangaLonga"),
+    corAcabamentoMangaLonga: formData.get("corAcabamentoMangaLonga"),
+    larguraMangaLonga: formData.get("larguraMangaLonga"),
     gola: formData.get("gola"),
     acabamentoGola: formData.get("acabamentoGola"),
     corGola: formData.get("corGola"),
@@ -70,15 +74,19 @@ function nullableText(value: string | undefined) {
 }
 
 function getFichaPayload(values: FichaFormValues): Json {
+  const mangaLonga = isMangaCurtaELonga(values.manga);
   return {
     acabamento_gola: nullableText(values.acabamentoGola),
     acabamento_manga: nullableText(values.acabamentoManga),
+    acabamento_manga_longa: mangaLonga ? nullableText(values.acabamentoMangaLonga) : null,
+    cor_acabamento_manga_longa: mangaLonga ? nullableText(values.corAcabamentoMangaLonga) : null,
+    largura_manga_longa: mangaLonga ? nullableText(values.larguraMangaLonga) : null,
     abertura_lateral: nullableText(values.aberturaLateral),
     arte: nullableText(values.arte),
     bolso: nullableText(values.bolso),
     cliente_auxiliar: nullableText(values.clienteAuxiliar),
     cliente_id: values.clienteId,
-    cliente_nome_snapshot: normalizeNameOrCompany(values.cliente),
+    cliente_nome_snapshot: normalizeClientName(values.cliente),
     com_nomes: values.comNomes ?? null,
     composicao: nullableText(values.composicao),
     etiqueta: nullableText(values.etiqueta),
@@ -110,7 +118,7 @@ function getFichaPayload(values: FichaFormValues): Json {
     manga: nullableText(values.manga),
     material: nullableText(values.material),
     numero_venda: nullableText(values.numeroVenda),
-    observacoes: nullableText(values.observacoes ? sanitizeObservationHtml(values.observacoes) : undefined),
+    observacoes: nullableText(values.observacoes ? uppercaseObservationHtml(sanitizeObservationHtml(values.observacoes)) : undefined),
     reforco_gola: nullableText(values.reforcoGola),
     vendedor: values.vendedor,
   };

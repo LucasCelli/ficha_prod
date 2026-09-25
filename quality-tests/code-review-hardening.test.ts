@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import test from "node:test";
 import { getFichaDeleteConfirmationCode } from "../src/features/fichas/delete-confirmation.ts";
+import { getPrintPeriodError } from "../src/features/fichas/print-period.ts";
 import { mapWithConcurrency } from "../src/lib/promise-pool.ts";
 import { sanitizeObservationHtml } from "../src/lib/sanitize-observations.ts";
 
@@ -59,12 +60,25 @@ test("todas as páginas privadas validam a sessão explicitamente", () => {
 
 test("PDF busca todos os lotes e ignora a página da tela", () => {
   const data = readFileSync("src/features/fichas/data.ts", "utf8");
-  const route = readFileSync("src/app/fichas/pdf/route.ts", "utf8");
+  const route = readFileSync("src/app/fichas/relatorio/imprimir/page.tsx", "utf8");
   const overview = readFileSync("src/features/fichas/fichas-overview.tsx", "utf8");
   assert.match(data, /OPERATIONAL_PDF_BATCH_SIZE = 500/);
   assert.match(data, /while \(total === null \|\| fichas\.length < total\)/);
   assert.doesNotMatch(route, /normalizePageFilter|searchParams\.get\("page"\)/);
-  assert.doesNotMatch(overview.slice(overview.indexOf("function hrefForPdf")), /params\.set\("page"/);
+  assert.doesNotMatch(overview.slice(overview.indexOf("function hrefForPrint")), /params\.set\("page"/);
+});
+
+test("PDF exige período fechado e limitado antes de consultar", () => {
+  assert.ok(getPrintPeriodError());
+  assert.ok(getPrintPeriodError("2026-09-28"));
+  assert.ok(getPrintPeriodError(undefined, "2026-10-04"));
+  assert.ok(getPrintPeriodError("2026-10-04", "2026-09-28"));
+  assert.ok(getPrintPeriodError("2026-01-01", "2026-12-31"));
+  assert.equal(getPrintPeriodError("2026-09-28", "2026-10-04"), null);
+  assert.equal(getPrintPeriodError("2026-09-28", "2026-09-28"), null);
+
+  const route = readFileSync("src/app/fichas/relatorio/imprimir/page.tsx", "utf8");
+  assert.ok(route.indexOf("getPrintPeriodError(") < route.indexOf("listFichasForOperationalPdf(filters)"));
 });
 
 test("migration cobre retenção, legado, limites e Kanban agregado", () => {

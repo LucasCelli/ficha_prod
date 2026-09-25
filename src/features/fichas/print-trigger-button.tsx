@@ -50,13 +50,14 @@ export function PrintTriggerButton({ children, className, disabled, href, label,
 
       if (ready) {
         window.setTimeout(() => frame.remove(), FRAME_CLEANUP_MS);
-        toast.success("Impressão pronta", {
-          description: "A janela de impressão foi aberta.",
-        });
       }
     }
 
-    cleanupJob = watchPrintSignal(printJobId, finish);
+    cleanupJob = watchPrintSignal(printJobId, finish, (message) => {
+      finish();
+      frame.remove();
+      toast.error("Impressão bloqueada", { description: message });
+    });
 
     frame.onerror = () => {
       finish();
@@ -85,7 +86,7 @@ export function PrintTriggerButton({ children, className, disabled, href, label,
   );
 }
 
-function watchPrintSignal(printJobId: string, onReady: (ready?: boolean) => void) {
+function watchPrintSignal(printJobId: string, onReady: (ready?: boolean) => void, onBlocked: (message: string) => void) {
   const timeoutId = window.setTimeout(() => {
     onReady(false);
   }, PRINT_SIGNAL_TIMEOUT_MS);
@@ -97,6 +98,15 @@ function watchPrintSignal(printJobId: string, onReady: (ready?: boolean) => void
     }
 
     if (data.type !== PRINT_JOB_SIGNAL || data.printJobId !== printJobId) {
+      return;
+    }
+
+    if (event.origin !== window.location.origin) {
+      return;
+    }
+
+    if (typeof data.error === "string") {
+      onBlocked(data.error);
       return;
     }
 

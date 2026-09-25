@@ -17,6 +17,7 @@ type FichaPrintPreviewShellProps = {
 };
 
 type FichaPrintPreviewContentProps = {
+  fallbackAuthor?: string;
   ficha: FichaDetail;
   observationHtml: string;
 };
@@ -45,10 +46,7 @@ export function FichaPrintPreviewShell({ children, duplicateHref, printHref }: F
     });
 
     try {
-      await printFichaAutomatically(element);
-      toast.success("Impressão pronta", {
-        description: "A janela de impressão foi aberta.",
-      });
+      await printFichaAutomatically(element, undefined, () => toast.dismiss(PREVIEW_PRINT_TOAST_ID));
     } catch (error) {
       console.error("Error preparing print:", error);
       toast.error("Falha ao imprimir", {
@@ -89,10 +87,10 @@ export function FichaPrintPreviewShell({ children, duplicateHref, printHref }: F
   );
 }
 
-export function FichaPrintPreviewContent({ ficha, observationHtml }: FichaPrintPreviewContentProps) {
+export function FichaPrintPreviewContent({ fallbackAuthor, ficha, observationHtml }: FichaPrintPreviewContentProps) {
   return (
     <div className="ficha-print-preview__body">
-      <PrintFicha ficha={ficha} observationHtml={observationHtml} />
+      <PrintFicha fallbackAuthor={fallbackAuthor} ficha={ficha} observationHtml={observationHtml} />
     </div>
   );
 }

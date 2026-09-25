@@ -12,40 +12,12 @@ const fichaDetail = (ficha: CutPlanSourceFicha) => [
   `${ficha.total} peças`,
 ].filter(Boolean).join(" · ");
 
-// Ate 4 tabelas pequenas (menos de 15 linhas) cabem numa folha A4 vertical;
-// tabelas maiores ganham folha propria para nao espremer o resto do plano.
-const MAX_SMALL_TABLES_PER_PAGE = 4;
-const LARGE_TABLE_ROW_THRESHOLD = 15;
-
+// Cada bloco (cabecalho, linha de enfestos, conferencia) evita quebrar no meio;
+// o navegador so leva para a proxima folha o que realmente nao cabe.
 interface PrintBlock {
   key: string;
-  node: ReactNode;
-  tableCount: number;
-  hasLargeTable: boolean;
-}
-
-function paginateBlocks(blocks: PrintBlock[]) {
-  let runningCount = 0;
-  let forceBreakNext = false;
-  return blocks.map((block) => {
-    let breakBefore = false;
-    if (block.tableCount > 0) {
-      if (forceBreakNext) {
-        breakBefore = true;
-        runningCount = 0;
-      } else if (runningCount > 0 && (block.hasLargeTable || runningCount + block.tableCount > MAX_SMALL_TABLES_PER_PAGE)) {
-        breakBefore = true;
-        runningCount = 0;
-      }
-      runningCount += block.tableCount;
-      forceBreakNext = block.hasLargeTable;
-    }
-    return { ...block, breakBefore };
-  });
-}
-
-function PagedBlock({ breakBefore, children }: { breakBefore: boolean; children: ReactNode }) {
-  return <div className={breakBefore ? "cut-plan-print-simple__break" : undefined}>{children}</div>;
+  header?: ReactNode;
+  cards?: ReactNode[];
 }
 
 function LayCard({ badgeLayers, header, rows }: { badgeLayers: number; header: ReactNode; rows: ReactNode }) {
@@ -56,10 +28,6 @@ function LayCard({ badgeLayers, header, rows }: { badgeLayers: number; header: R
     </header>
     <table>{rows}</table>
   </article>;
-}
-
-function mergedLayRowCount(lay: MergedLayPlan) {
-  return lay.allocations.reduce((sum, allocation) => sum + allocation.frequencies.length, 0);
 }
 
 function sortedMergedMarkers(lay: MergedLayPlan) {
@@ -135,51 +103,34 @@ function OverallConference({ rows }: { rows: ReturnType<typeof aggregateOverallS
 }
 
 export function CutPlanPrintSimple({ alternative, input, sourceFichas = [] }: { alternative: CutPlanAlternative; input: CutPlanInput; sourceFichas?: CutPlanSourceFicha[] }) {
-  const blocks: PrintBlock[] = [];
   // Uma unica tabela no plano inteiro pode ocupar a largura toda; a partir de
   // duas, todas ficam do mesmo tamanho para nao destacar a ultima sozinha na linha.
   const totalLays = alternative.result.mergedLays?.length ?? alternative.result.fabrics.reduce((sum, fabricResult) => sum + fabricResult.lays.length, 0);
-  const isSolo = totalLays === 1;
-  const rowClassName = isSolo ? "cut-plan-print-simple__lay-row is-solo" : "cut-plan-print-simple__lay-row";
-
+  const blocks: PrintBlock[] = [];
   if (alternative.result.mergedLays) {
     const mergedLays = alternative.result.mergedLays;
-    blocks.push({ key: "merged-header", node: <header className="cut-plan-print-simple__fabric-header"><div><h2>Enfestos mesclados</h2><p>As grades permanecem separadas por cor.</p></div><strong>{countLabel(mergedLays.length, "enfesto")}</strong></header>, tableCount: 0, hasLargeTable: false });
+    blocks.push({ key: "merged-header", header: <header className="cut-plan-print-simple__fabric-header"><div><h2>Enfestos mesclados</h2><p>As grades permanecem separadas por cor.</p></div><strong>{countLabel(mergedLays.length, "enfesto")}</strong></header> });
     pairUp(mergedLays).forEach((pair, rowIndex) => {
-      const baseIndex = rowIndex * 2;
-      blocks.push({
-        key: `merged-row-${rowIndex}`,
-        node: <div className={rowClassName}>{pair.map((lay, offset) => <MergedLayCard fabricResults={alternative.result.fabrics} fabrics={input.fabrics} index={baseIndex + offset} key={lay.id} lay={lay} />)}</div>,
-        tableCount: pair.length,
-        hasLargeTable: pair.some((lay) => mergedLayRowCount(lay) >= LARGE_TABLE_ROW_THRESHOLD),
-      });
+      blocks.push({ key: `merged-row-${rowIndex}`, cards: pair.map((lay, offset) => <MergedLayCard fabricResults={alternative.result.fabrics} fabrics={input.fabrics} index={rowIndex * 2 + offset} key={lay.id} lay={lay} />) });
     });
   } else {
     alternative.result.fabrics.forEach((fabricResult) => {
       const fabric = input.fabrics.find((item) => item.id === fabricResult.fabricId)!;
       const showSleeveType = new Set(fabricResult.sizes.map((size) => size.sleeveType)).size > 1;
-      blocks.push({ key: `fabric-header-${fabric.id}`, node: <header className="cut-plan-print-simple__fabric-header"><div><h2>{fabricLabel(fabric)}</h2><p>{fabric.widthCm} cm · {fabric.type === "TUBULAR" ? "Tubular" : "Plano"}</p></div><strong>{countLabel(fabricResult.lays.length, "enfesto")}</strong></header>, tableCount: 0, hasLargeTable: false });
+      blocks.push({ key: `fabric-header-${fabric.id}`, header: <header className="cut-plan-print-simple__fabric-header"><div><h2>{fabricLabel(fabric)}</h2><p>{fabric.widthCm} cm · {fabric.type === "TUBULAR" ? "Tubular" : "Plano"}</p></div><strong>{countLabel(fabricResult.lays.length, "enfesto")}</strong></header> });
       pairUp(fabricResult.lays).forEach((pair, rowIndex) => {
-        const baseIndex = rowIndex * 2;
-        blocks.push({
-          key: `fabric-${fabric.id}-row-${rowIndex}`,
-          node: <div className={rowClassName}>{pair.map((lay, offset) => <FabricLayCard index={baseIndex + offset} key={lay.id} lay={lay} showSleeveType={showSleeveType} />)}</div>,
-          tableCount: pair.length,
-          hasLargeTable: pair.some((lay) => lay.frequencies.length >= LARGE_TABLE_ROW_THRESHOLD),
-        });
+        blocks.push({ key: `fabric-${fabric.id}-row-${rowIndex}`, cards: pair.map((lay, offset) => <FabricLayCard index={rowIndex * 2 + offset} key={lay.id} lay={lay} showSleeveType={showSleeveType} />) });
       });
     });
   }
 
-  const overallSizes = aggregateOverallSizes(alternative.result.fabrics);
-  blocks.push({
-    key: "overall-conference",
-    node: <OverallConference rows={overallSizes} />,
-    tableCount: 1,
-    hasLargeTable: overallSizes.length >= LARGE_TABLE_ROW_THRESHOLD,
-  });
-
-  const pagedBlocks = paginateBlocks(blocks);
+  // A conferencia ocupa a metade livre ao lado de um ultimo enfesto sozinho,
+  // em vez de abrir uma faixa nova (e, muitas vezes, uma folha nova).
+  const conference = <OverallConference key="overall-conference" rows={aggregateOverallSizes(alternative.result.fabrics)} />;
+  const lastRow = blocks.at(-1);
+  const conferenceBeside = Boolean(lastRow?.cards?.length === 1 && !alternative.result.mergedLays);
+  if (conferenceBeside) lastRow!.cards!.push(conference);
+  const isSolo = totalLays === 1 && !conferenceBeside;
 
   return <div className="cut-plan-print-simple">
     <section className="cut-plan-print-simple__page print-page">
@@ -189,7 +140,8 @@ export function CutPlanPrintSimple({ alternative, input, sourceFichas = [] }: { 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img alt="" src={ficha.imageUrl} />
       </> : <span aria-hidden="true" className="cut-plan-print-simple__source-placeholder" />}<p><strong>{ficha.client}</strong><small>{fichaDetail(ficha)}</small></p></article>)}</div></section> : null}
-      {pagedBlocks.map((block) => <PagedBlock breakBefore={block.breakBefore} key={block.key}>{block.node}</PagedBlock>)}
+      {blocks.map((block) => block.header ? <div key={block.key}>{block.header}</div> : <div className={isSolo ? "cut-plan-print-simple__lay-row is-solo" : "cut-plan-print-simple__lay-row"} key={block.key}>{block.cards}</div>)}
+      {conferenceBeside ? null : conference}
     </section>
   </div>;
 }

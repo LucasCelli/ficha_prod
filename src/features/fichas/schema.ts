@@ -82,6 +82,58 @@ const imagensJsonSchema = z.preprocess((value) => {
   .min(1, "Adicione pelo menos uma imagem para salvar a ficha.")
   .max(4, "Adicione no máximo 4 imagens."));
 
+export function normalizeProductForRule(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function isRegataProduct(value: string) {
+  const product = normalizeProductForRule(value);
+  return product.includes("regata") || product.includes("colete");
+}
+
+export function isMangaCurtaELonga(value: unknown) {
+  return typeof value === "string" && normalizeProductForRule(value) === "curta e longa";
+}
+
+// Mirrors field visibility in ficha-form: hidden fields are not required.
+export function getMissingConditionalFields(values: {
+  acabamentoGola?: unknown;
+  acabamentoManga?: unknown;
+  acabamentoMangaLonga?: unknown;
+  gola?: unknown;
+  larguraGola?: unknown;
+  manga?: unknown;
+  produtos: string[];
+}) {
+  const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+  const produtos = values.produtos.filter((produto) => produto.trim());
+  const gola = normalizeProductForRule(text(values.gola));
+  const missing: Array<"acabamentoManga" | "acabamentoMangaLonga" | "larguraGola"> = [];
+  const hasManga = produtos.length > 0 && !produtos.every(isRegataProduct);
+
+  if (hasManga && !text(values.acabamentoManga)) {
+    missing.push("acabamentoManga");
+  }
+  if (hasManga && isMangaCurtaELonga(values.manga) && !text(values.acabamentoMangaLonga)) {
+    missing.push("acabamentoMangaLonga");
+  }
+  if (text(values.acabamentoGola) && !gola.includes("polo") && !gola.includes("social") && !text(values.larguraGola)) {
+    missing.push("larguraGola");
+  }
+  return missing;
+}
+
+const conditionalFieldMessages = {
+  acabamentoManga: "Acabamento da manga é obrigatório.",
+  acabamentoMangaLonga: "Acabamento da manga longa é obrigatório.",
+  larguraGola: "Largura da gola é obrigatória.",
+};
+
 export const fichaFormSchema = z.object({
   clienteId: z.preprocess(
     (value) => (typeof value === "string" ? value.trim() : ""),
@@ -105,6 +157,9 @@ export const fichaFormSchema = z.object({
   acabamentoManga: optionalText,
   corAcabamentoManga: optionalText,
   larguraManga: optionalText,
+  acabamentoMangaLonga: optionalText,
+  corAcabamentoMangaLonga: optionalText,
+  larguraMangaLonga: optionalText,
   gola: optionalText,
   acabamentoGola: optionalText,
   corGola: optionalText,
@@ -133,6 +188,11 @@ export const fichaFormSchema = z.object({
   listaNomesRaw: optionalTextWithMax(100_000),
   observacoes: optionalTextWithMax(20_000),
   evento: z.preprocess((value) => value === "on" || value === "sim", z.boolean()),
+}).superRefine((values, context) => {
+  const missing = getMissingConditionalFields({ ...values, produtos: values.itens.map((item) => item.produto) });
+  for (const field of missing) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: conditionalFieldMessages[field], path: [field] });
+  }
 });
 
 export type FichaFormValues = z.infer<typeof fichaFormSchema>;

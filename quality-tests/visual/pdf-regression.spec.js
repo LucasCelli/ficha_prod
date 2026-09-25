@@ -27,7 +27,7 @@ test.describe("impressao de ficha", () => {
     await expect(page.locator("#print-version > .print-page")).toBeVisible();
 
     await preview.getByRole("button", { name: "Imprimir ficha" }).click();
-    await expect(page.getByText("Impressão pronta")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Preparando impressão")).toHaveCount(0, { timeout: 30_000 });
     expect(runtimeErrors).toEqual([]);
   });
 
@@ -49,7 +49,7 @@ test.describe("impressao de ficha", () => {
     await expect(printButton).toBeVisible();
     await printButton.click();
 
-    await expect(page.getByText("Impressão pronta")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Preparando impressão")).toHaveCount(0, { timeout: 30_000 });
     await expect(printButton).toBeEnabled();
     expect(runtimeErrors).toEqual([]);
   });

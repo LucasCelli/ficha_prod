@@ -36,6 +36,7 @@ export type FichaListItem = Pick<
 export type FichaOverdueCandidate = Pick<Database["public"]["Tables"]["fichas"]["Row"], "data_entrega" | "status">;
 
 export type FichaDetail = Database["public"]["Tables"]["fichas"]["Row"] & {
+  author?: { display_name: string } | null;
   imagens: FichaImage[];
   itens: FichaItem[];
 };
@@ -212,7 +213,11 @@ export async function getFichaById(id: string): Promise<FichaDetailResult> {
 
   try {
     const supabase = createServerSupabaseClient();
-    const { data, error } = await supabase.from("fichas").select("*").eq("id", id).maybeSingle();
+    const { data, error } = await supabase
+      .from("fichas")
+      .select("*, author:app_users!fichas_created_by_user_id_fkey(display_name)")
+      .eq("id", id)
+      .maybeSingle();
 
     if (error) {
       return {
