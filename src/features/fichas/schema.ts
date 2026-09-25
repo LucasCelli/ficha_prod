@@ -96,6 +96,10 @@ export function isRegataProduct(value: string) {
   return product.includes("regata") || product.includes("colete");
 }
 
+export function isCamisetaProduct(value: string) {
+  return normalizeProductForRule(value).includes("camiseta");
+}
+
 export function isMangaCurtaELonga(value: unknown) {
   return typeof value === "string" && normalizeProductForRule(value) === "curta e longa";
 }
@@ -114,7 +118,9 @@ export function getMissingConditionalFields(values: {
   const produtos = values.produtos.filter((produto) => produto.trim());
   const gola = normalizeProductForRule(text(values.gola));
   const missing: Array<"acabamentoManga" | "acabamentoMangaLonga" | "larguraGola"> = [];
-  const hasManga = produtos.length > 0 && !produtos.every(isRegataProduct);
+  const camisetas = produtos.filter(isCamisetaProduct);
+  const hasCamiseta = camisetas.length > 0;
+  const hasManga = camisetas.some((produto) => !isRegataProduct(produto));
 
   if (hasManga && !text(values.acabamentoManga)) {
     missing.push("acabamentoManga");
@@ -122,7 +128,7 @@ export function getMissingConditionalFields(values: {
   if (hasManga && isMangaCurtaELonga(values.manga) && !text(values.acabamentoMangaLonga)) {
     missing.push("acabamentoMangaLonga");
   }
-  if (text(values.acabamentoGola) && !gola.includes("polo") && !gola.includes("social") && !text(values.larguraGola)) {
+  if (hasCamiseta && text(values.acabamentoGola) && !gola.includes("polo") && !gola.includes("social") && !text(values.larguraGola)) {
     missing.push("larguraGola");
   }
   return missing;

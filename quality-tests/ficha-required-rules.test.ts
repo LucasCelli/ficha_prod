@@ -11,6 +11,17 @@ test("acabamento da manga e largura da gola são obrigatórios só quando visív
   assert.deepEqual(getMissingConditionalFields({ acabamentoManga: "Punho", produtos: ["Camiseta"] }), []);
 });
 
+test("acabamentos de gola e manga não são obrigatórios para produtos que não sejam camisetas", () => {
+  for (const produto of ["Bandeira", "Sacochila", "Camisa Polo", "Calça"]) {
+    assert.deepEqual(getMissingConditionalFields({ acabamentoGola: "Ribana", gola: "Careca", manga: "Curta e Longa", produtos: [produto] }), []);
+  }
+
+  assert.deepEqual(
+    getMissingConditionalFields({ acabamentoGola: "Ribana", gola: "Careca", produtos: ["Bandeira", "Camiseta"] }),
+    ["acabamentoManga", "larguraGola"],
+  );
+});
+
 test("manga curta e longa exige acabamento da manga longa", () => {
   assert.deepEqual(getMissingConditionalFields({ acabamentoManga: "Barra", manga: "Curta e Longa", produtos: ["Camiseta"] }), ["acabamentoMangaLonga"]);
   assert.deepEqual(getMissingConditionalFields({ acabamentoManga: "Barra", acabamentoMangaLonga: "Punho", manga: "curta e longa", produtos: ["Camiseta"] }), []);
