@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { sortFichaProductItemsForSave } from "../src/features/fichas/product-item-sorting.ts";
+import { canonicalizeFichaProductItemSize, sortFichaProductItemsForSave } from "../src/features/fichas/product-item-sorting.ts";
 
 test("agrupa primeiro por detalhes, depois por produto e ordena os tamanhos dentro do grupo", () => {
   const items = [
@@ -22,6 +22,13 @@ test("agrupa primeiro por detalhes, depois por produto e ordena os tamanhos dent
     "Camisa Social Feminina|Manga longa|P",
     "Camisa Social Feminina|Manga longa|GG",
   ]);
+});
+
+test("normaliza Baby Look com prefixo Baby, mas nao camisete", () => {
+  assert.equal(canonicalizeFichaProductItemSize({ produto: "Baby Look Manga Curta", tamanho: "Feminina P" }), "Baby P");
+  assert.equal(canonicalizeFichaProductItemSize({ produto: "Camiseta Feminina", tamanho: "P" }), "Baby P");
+  assert.equal(canonicalizeFichaProductItemSize({ produto: "Camisete Manga Curta", tamanho: "Baby P" }), "P");
+  assert.equal(canonicalizeFichaProductItemSize({ produto: "Camiseta Tradicional", tamanho: "Masculina P" }), "P");
 });
 
 test("preserva a ordem de aparição dos grupos de detalhes e de produto", () => {

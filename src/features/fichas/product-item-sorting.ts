@@ -1,4 +1,4 @@
-import { compareUniformSizeAndBabyLookText } from "../../lib/uniform-sizes.ts";
+import { compareUniformSizeAndBabyLookText, createUniformSizeDomain } from "../../lib/uniform-sizes.ts";
 import type { UniformSizeDefinition } from "../../lib/uniform-sizes.ts";
 
 type SortableFichaProductItem = {
@@ -6,6 +6,19 @@ type SortableFichaProductItem = {
   produto?: string | null;
   tamanho?: string | null;
 };
+
+export function isFichaProductItemBabyLook(item: SortableFichaProductItem) {
+  const description = normalizeDetailsGroup(`${item.produto ?? ""} ${item.detalhesProduto ?? ""}`);
+  if (/\bcamisete(?:s)?\b/.test(description)) return false;
+  if (/\b(?:baby\s*look|babylook|bl)\b/.test(description)) return true;
+  return /\b(?:feminina|feminino|fem)\b/.test(description) && /\bcamiseta(?:s)?\b/.test(description);
+}
+
+export function canonicalizeFichaProductItemSize(item: SortableFichaProductItem, definitions?: readonly UniformSizeDefinition[]) {
+  const resolved = createUniformSizeDomain(definitions).resolveSize(item.tamanho);
+  if (!resolved.definition) return item.tamanho ?? "";
+  return `${isFichaProductItemBabyLook(item) ? "Baby " : ""}${resolved.definition.name}`;
+}
 
 function normalizeDetailsGroup(value: string | null | undefined) {
   return (value ?? "")

@@ -50,7 +50,7 @@ import { getInitialFichaFormState } from "./form-state";
 import type { LegacyFichaImportWarning } from "./legacy-import";
 import { mapLegacyDraftToFichaFormInitialData, parseLegacyFichaJson } from "./legacy-import";
 import { buildObservacoesTecnicas } from "./observacoes-autofill";
-import { sortFichaProductItemsForSave } from "./product-item-sorting";
+import { canonicalizeFichaProductItemSize, isFichaProductItemBabyLook, sortFichaProductItemsForSave } from "./product-item-sorting";
 import { PrintTriggerButton } from "./print-trigger-button";
 import { isMissingRequiredLayout, MISSING_LAYOUT_MESSAGE } from "./print-requirements";
 import { getMissingConditionalFields, isMangaCurtaELonga, isRegataProduct, normalizeProductForRule } from "./schema";
@@ -1560,7 +1560,8 @@ function FichaFormInner({
   }
 
   function sortProductItems() {
-    const sortedItems = sortFichaProductItemsForSave(getValues("itens"), sizeDefinitions);
+    const sortedItems = sortFichaProductItemsForSave(getValues("itens"), sizeDefinitions)
+      .map((item) => ({ ...item, tamanho: canonicalizeFichaProductItemSize(item, sizeDefinitions) }));
 
     showProductSortFeedback();
     setSortAnimationKey((current) => current + 1);
@@ -1973,7 +1974,15 @@ function FichaFormInner({
                     onFocus={() => handleClearableProductFieldFocus(item.id, "tamanho")}
                     onKeyDown={(event) => handleProductColumnTab(event, "tamanho", index)}
                     onValueChange={(value) => handleClearableProductFieldChange(item.id, "tamanho", value)}
-                    options={sizeOptions}
+                    options={isFichaProductItemBabyLook(item)
+                      ? sizeOptions.map((option) => ({
+                          ...option,
+                          aliases: (option.aliases ?? []).map((alias) => `Baby ${alias}`),
+                          id: option.id ? `baby-${option.id}` : undefined,
+                          label: `Baby ${option.label}`,
+                          value: `Baby ${option.value ?? option.label}`,
+                        }))
+                      : sizeOptions}
                     placeholder="Tam."
                     value={item.tamanho ?? ""}
                   />

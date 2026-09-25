@@ -12,10 +12,10 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FichaDeleteActionState, FichaFormState, FichaStatusActionState, FieldErrors } from "./form-state";
 import { fichaFormSchema, isMangaCurtaELonga, type FichaFormValues } from "./schema";
 import { getFichaDeleteConfirmationCode } from "./delete-confirmation";
-import { sortFichaProductItemsForSave } from "./product-item-sorting";
+import { canonicalizeFichaProductItemSize, sortFichaProductItemsForSave } from "./product-item-sorting";
 import { uppercaseObservationHtml } from "./observacoes-autofill";
 import { listUniformSizeDefinitions } from "@/features/catalogos/data";
-import { createUniformSizeDomain, DEFAULT_UNIFORM_SIZE_DEFINITIONS, type UniformSizeDefinition } from "@/lib/uniform-sizes";
+import { DEFAULT_UNIFORM_SIZE_DEFINITIONS, type UniformSizeDefinition } from "@/lib/uniform-sizes";
 
 function getFichaFormInput(formData: FormData) {
   return {
@@ -125,12 +125,11 @@ function getFichaPayload(values: FichaFormValues): Json {
 }
 
 function getFichaItensPayload(values: FichaFormValues, definitions: readonly UniformSizeDefinition[]): Json {
-  const domain = createUniformSizeDomain(definitions);
   return sortFichaProductItemsForSave(values.itens, definitions).map((item) => ({
     detalhes_produto: nullableText(item.detalhesProduto),
     produto: item.produto,
     quantidade: item.quantidade,
-    tamanho: nullableText(domain.resolveSize(item.tamanho).definition?.name ?? item.tamanho),
+    tamanho: nullableText(canonicalizeFichaProductItemSize(item, definitions)),
   }));
 }
 

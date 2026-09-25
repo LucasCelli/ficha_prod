@@ -1277,7 +1277,7 @@
 .ops-report__header span,
 .ops-report__header p {
   margin: 0;
-  color: #475569;
+  color: #000;
   font-size: 10px;
 }
 
@@ -1286,7 +1286,7 @@
 }
 
 .ops-report__empty {
-  color: #475569;
+  color: #000;
 }
 
 .ops-report__section {
@@ -1301,17 +1301,17 @@
 
 .ops-report__section--evento h2,
 .ops-report__section--evento .ops-report__group th {
-  color: #b45309;
+  color: #000;
 }
 
 .ops-report__section--danger h2,
 .ops-report__section--danger .ops-report__group th {
-  color: #be185d;
+  color: #000;
 }
 
 .ops-report__section--info h2,
 .ops-report__section--info .ops-report__group th {
-  color: #2563eb;
+  color: #000;
 }
 
 .ops-report table {
@@ -1324,7 +1324,8 @@
 .ops-report td {
   height: 26px;
   padding: 0 6px;
-  border: 1px solid #a0aab8;
+  border: 1px solid #000;
+  color: #000;
   overflow: hidden;
   text-align: start;
   text-overflow: ellipsis;
