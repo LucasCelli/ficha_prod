@@ -1,6 +1,12 @@
 export type FabricType = "PLANO" | "TUBULAR";
 export type SleeveType = "CURTA" | "LONGA";
 export type GarmentType = "T_SHIRT" | "BABY_LOOK" | "DRESS_SHIRT" | "CAMISETE" | "PANTS" | "SHORTS";
+/** Limite operacional conservador; nunca se aplica a outras modelagens. */
+export const MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE = 3;
+
+export function allowsCutPlanOverproduction(garmentType: GarmentType) {
+  return garmentType === "T_SHIRT" || garmentType === "BABY_LOOK";
+}
 
 const CUT_PLAN_DEMAND_SEPARATOR = "\u001f";
 

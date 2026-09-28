@@ -290,8 +290,9 @@ test("oferece alternativa intermediaria de dois enfestos com tamanhos pequenos j
   ];
 
   const alternatives = calculateCutPlanAlternatives(input);
-  assert.deepEqual(alternatives.slice(0, 2).map(({ layCount }) => layCount), [1, 2]);
-  assert.ok(alternatives[1].result.fabrics[0].lays.some((lay) => {
+  assert.equal(alternatives[0].layCount, 1);
+  const twoLays = alternatives.find(({ layCount }) => layCount === 2);
+  assert.ok(twoLays?.result.fabrics[0].lays.some((lay) => {
     const sizes = new Set(lay.frequencies.map(({ size }) => size));
     return sizes.has("GG") && sizes.has("BABY GG");
   }));
@@ -792,7 +793,7 @@ test("mantém aliases femininos antigos sem perder a nova identificação por mo
 });
 
 
-test("separa a camisa avulsa do mapa plano comprido de uma folha", () => {
+test("não cria um enfesto extra apenas para encurtar o mapa plano de uma folha", () => {
   const input = createInput("PLANO", 100);
   input.tableLengthCm = 2000;
   input.items = [["GG1", 1], ["BL P", 2], ["BL G", 2], ["BL EG", 2]].map(([size, quantity], index) => ({
@@ -800,12 +801,32 @@ test("separa a camisa avulsa do mapa plano comprido de uma folha", () => {
   }));
   const result = calculateCutPlanAlternatives(input)[0].result;
   const lays = result.fabrics[0].lays;
-  assert.equal(lays.length, 2);
-  assert.equal(lays.find((lay) => lay.layers === 1)?.frequencies.length, 1);
-  assert.equal(lays.find((lay) => lay.layers === 2)?.frequencies.length, 3);
+  assert.equal(lays.length, 1);
+  assert.equal(lays[0].layers, 1);
+  assert.equal(lays[0].frequencies.length, 4);
   assert.ok(lays.every((lay) => lay.markerLengthCm !== undefined && lay.markerLengthCm > 0));
   assert.ok(result.fabrics[0].sizes.every((size) => size.difference === 0));
   assert.equal(result.search?.measurementsComplete, true);
+});
+
+test("aceita sobra mínima para camiseta e baby look, mas não para camisa social", () => {
+  for (const garmentType of ["T_SHIRT", "BABY_LOOK"] as const) {
+    const input = createInput("PLANO", 6);
+    input.maxFrequency = 2;
+    input.items = [{ id: garmentType, fabricId: "fabric", size: "P", sleeveType: "CURTA", garmentType, quantity: 11 }];
+    const result = calculateCutPlanAlternatives(input)[0].result.fabrics[0];
+    assert.equal(result.lays.length, 1);
+    assert.equal(result.sizes[0].produced, 12);
+    assert.equal(result.sizes[0].difference, 1);
+  }
+
+  const social = createInput("PLANO", 6);
+  social.maxFrequency = 2;
+  social.items = [{ id: "social", fabricId: "fabric", size: "P", sleeveType: "CURTA", garmentType: "DRESS_SHIRT", quantity: 11 }];
+  const result = calculateCutPlanAlternatives(social)[0].result.fabrics[0];
+  assert.equal(result.lays.length, 2);
+  assert.equal(result.sizes[0].produced, 11);
+  assert.equal(result.sizes[0].difference, 0);
 });
 
 

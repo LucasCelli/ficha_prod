@@ -1,5 +1,5 @@
 import { calculateCutPlan } from "./calculator.ts";
-import { cutPlanDemandKey, parseCutPlanDemandKey, type CutPlanInput, type CutPlanResult, type FabricCutPlanResult, type LayPlan } from "./model.ts";
+import { cutPlanDemandKey, MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE, parseCutPlanDemandKey, type CutPlanInput, type CutPlanResult, type FabricCutPlanResult, type LayPlan } from "./model.ts";
 import { aggregateCutPlanItems, normalizeCutPlanInput } from "./normalization.ts";
 import { checkSearchBudget, createSearchBudget, searchExpired, SearchInterrupted, sliceSearchBudget, type SearchBudget } from "./search-budget.ts";
 import { buildMergedLays, calculateMergedLayLowerBound } from "./merge-solver.ts";
@@ -109,6 +109,7 @@ function score(result: CutPlanResult, input?: CutPlanInput) {
   }).length;
   const singleLayerLayCount = operationalLays.filter((lay) => lay.layers === 1).length;
   const totalLayers = operationalLays.reduce((total, lay) => total + lay.layers, 0);
+  const totalOverproduction = result.fabrics.flatMap((fabric) => fabric.sizes).reduce((total, size) => total + Math.max(0, size.difference), 0);
   const layerHeights = operationalLays.map((lay) => lay.layers);
   const layerHeightImbalance = Math.max(...layerHeights) / Math.min(...layerHeights);
   const totalMarkerLengthCm = operationalLays.reduce((total, lay) => total + (lay.markerLengthCm ?? 0), 0);
@@ -124,7 +125,7 @@ function score(result: CutPlanResult, input?: CutPlanInput) {
     }, 0);
   }, 0);
   const balanceAdjustedMarkerLengthCm = totalMarkerLengthCm * (1 + sizeEntryImbalance * SIZE_ENTRY_IMBALANCE_PENALTY);
-  return { mapCount: operationalLays.length, layCount: operationalLays.length, layerHeightImbalance, balanceAdjustedMarkerLengthCm, complexity, minimumSizeEntriesPerLay, peakFrequency, sizeEntries, sizeEntryImbalance, sizeSpreadScore, sparseLayCount, flatSingleLayerLengthCm, flatSingleLayerLayCount, singleMoldLayCount, singleLayerLayCount, totalLayers, totalMarkerLengthCm };
+  return { mapCount: operationalLays.length, layCount: operationalLays.length, layerHeightImbalance, balanceAdjustedMarkerLengthCm, complexity, minimumSizeEntriesPerLay, peakFrequency, sizeEntries, sizeEntryImbalance, sizeSpreadScore, sparseLayCount, flatSingleLayerLengthCm, flatSingleLayerLayCount, singleMoldLayCount, singleLayerLayCount, totalLayers, totalMarkerLengthCm, totalOverproduction };
 }
 
 type Candidate = { result: CutPlanResult; description: string };
@@ -143,8 +144,11 @@ function uniqueCandidates(candidates: Candidate[]) {
 
 function compareCandidates(a: Candidate, b: Candidate, input?: CutPlanInput) {
   const left = score(a.result, input), right = score(b.result, input);
-  return left.flatSingleLayerLengthCm - right.flatSingleLayerLengthCm
-    || left.layCount - right.layCount
+  // Mantém a mesma prioridade do solver: um mapa plano adicional não pode
+  // vencer apenas porque isola e encurta a grade que será cortada em uma folha.
+  return left.layCount - right.layCount
+    || left.totalOverproduction - right.totalOverproduction
+    || left.flatSingleLayerLengthCm - right.flatSingleLayerLengthCm
     || left.flatSingleLayerLayCount - right.flatSingleLayerLayCount
     || left.singleMoldLayCount - right.singleMoldLayCount
     || left.singleLayerLayCount - right.singleLayerLayCount
@@ -231,6 +235,7 @@ function calculateOptimizedVariants(input: CutPlanInput, primary: CutPlanResult,
       fabricWidthCm: fabric.widthCm,
       sizeProfiles: input.sizeProfiles,
       maxFrequency: input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type),
+      maxTShirtOverproductionPerSize: MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE,
       // Ao mesclar cores, um plano local com mais enfestos pode alinhar alturas
       // e reduzir o total global. Nenhuma cor precisa de mais segmentos que o
       // incumbente completo do seu grupo compatível.

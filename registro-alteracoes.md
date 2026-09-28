@@ -1,5 +1,13 @@
 # Registro de alterações
 
+## 2026-09-28 — Plano de Corte: fragmentação de tecido plano
+
+- Corrigido o ranking que colocava a metragem dos enfestos de uma folha antes da quantidade total de enfestos. Em pedidos planos com sobras pequenas, isso promovia um plano fragmentado apenas para isolar e encurtar o mapa de uma folha.
+- Camisetas e Baby Looks podem receber até três peças adicionais por tamanho para reduzir enfestos e melhorar a grade. O desempate minimiza a sobra total; camisas sociais, camisetes, calças, shorts e demais modelagens continuam exatos, ressalvado o arredondamento par obrigatório do tubular.
+- A quantidade de enfestos volta a ser a prioridade principal; entre planos com a mesma quantidade, permanecem os critérios de mapa plano de uma folha, molde isolado, equilíbrio, comprimento e altura.
+- Adicionada regressão garantindo que um enfesto extra não seja criado somente para encurtar o mapa plano de uma folha.
+- Arquivos: `solver.ts`, `alternatives.ts`, `plano-de-corte-solver.test.ts` e este registro.
+
 ## 2026-09-11 — Plano de Corte: equilíbrio operacional dos enfestos
 
 - Evidência: comparação manual do PDF `resultado.pdf`. A opção inicialmente classificada em primeiro distribuiu os tamanhos em 2/7/8 entradas por enfesto e consumiu aproximadamente 15,6 m; a segunda distribuiu em 4/6/5 e consumiu aproximadamente 14,1 m, oferecendo grades mais úteis para o encaixe posterior no Audaces.

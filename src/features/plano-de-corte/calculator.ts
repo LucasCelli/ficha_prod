@@ -1,5 +1,6 @@
 import {
   cutPlanDemandKey,
+  MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE,
   parseCutPlanDemandKey,
   type CutPlanInput,
   type CutPlanResult,
@@ -147,6 +148,7 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
     fabricWidthCm: fabric.widthCm,
     sizeProfiles: input.sizeProfiles,
     maxFrequency: input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type),
+    maxTShirtOverproductionPerSize: MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE,
   };
   const baseline = assessLays(lays, optimizationTarget, fabric.type, constraints);
   // Acima deste porte, a combinação exata sob teto global cresce muito rápido.
@@ -172,7 +174,8 @@ export function calculateFabricPlan(input: CutPlanInput, fabricId: string, optim
       || !Number.isInteger(frequency)
       || frequency > (input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type))
       || (fabric.type === "TUBULAR" && frequency % 2 !== 0)))
-    || targetSizes.some(({ difference }) => difference !== 0)) {
+    || targetSizes.some(({ difference, garmentType }) => difference < 0 || (garmentType !== "T_SHIRT" && garmentType !== "BABY_LOOK" && difference !== 0))
+    || targetSizes.some(({ difference }) => difference > MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE)) {
     throw new CutPlanCalculationError("Não deu para fechar a conta com esses limites. Aumente o máximo de folhas por enfesto ou revise as quantidades.");
   }
   const result = { fabricId, lays, sizes, searchComplete: Boolean(useOptimized && optimized.searchComplete) };

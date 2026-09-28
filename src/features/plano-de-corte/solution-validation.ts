@@ -1,5 +1,5 @@
 import { buildSizeProfileIndex, estimateMarkerLengthCm, fitsTable, getDefaultMaximumFrequency, getLayerLimit, isPantsCutPlanSize, resolveEntryLengthPerFrequencyCm } from "./dimensions.ts";
-import { cutPlanDemandKey, type CutPlanInput, type CutPlanResult } from "./model.ts";
+import { allowsCutPlanOverproduction, cutPlanDemandKey, MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE, parseCutPlanDemandKey, type CutPlanInput, type CutPlanResult } from "./model.ts";
 import { aggregateCutPlanItems } from "./normalization.ts";
 
 /** Independente do gerador: quantidades, limites e comprimentos são refeitos. */
@@ -41,7 +41,12 @@ export function validateCutPlanSolution(input: CutPlanInput, result: CutPlanResu
       if (length === null ? lay.markerLengthCm !== undefined : lay.markerLengthCm === undefined || Math.abs(length - lay.markerLengthCm) > 1e-8) fail();
     }
     for (const [key, quantity] of expected) {
-      if (produced.get(key) !== step * Math.ceil(quantity / step)) fail();
+      const minimum = step * Math.ceil(quantity / step);
+      const actual = produced.get(key);
+      const { garmentType } = parseCutPlanDemandKey(key);
+      if (actual === undefined) { fail(); continue; }
+      if (actual < minimum || (!allowsCutPlanOverproduction(garmentType) && actual !== minimum)
+        || actual - minimum > MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE) fail();
     }
     if (output.sizes.length !== expected.size || new Set(output.sizes.map((item) => cutPlanDemandKey(item.size, item.sleeveType, item.garmentType))).size !== expected.size) fail();
     for (const item of output.sizes) {

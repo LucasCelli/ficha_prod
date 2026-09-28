@@ -1,12 +1,13 @@
 import { compareUniformSizes } from "../../lib/uniform-sizes.ts";
 import { buildSizeProfileIndex, calculateEntryLengthPerFrequencyCm, fitsTable, getDefaultMaximumFrequency, isPantsCutPlanSize, maximumFrequencyForLength, tableCapacityCm } from "./dimensions.ts";
-import { parseCutPlanDemandKey, type CutPlanSizeProfile, type FabricType, type GarmentType, type MarkerFrequency, type SleeveType } from "./model.ts";
+import { allowsCutPlanOverproduction, parseCutPlanDemandKey, type CutPlanSizeProfile, type FabricType, type GarmentType, type MarkerFrequency, type SleeveType } from "./model.ts";
 import { checkSearchBudget, createSearchBudget, SearchInterrupted, type SearchBudget } from "./search-budget.ts";
 
 export type SolvedLay = { layers: number; frequencies: MarkerFrequency[]; markerLengthCm?: number };
 export const SIZE_ENTRY_IMBALANCE_PENALTY = 0.05;
 export type SolverMetrics = {
   totalFrequency: number;
+  totalOverproduction: number;
   peakFrequency: number;
   sizeSpreadScore: number;
   totalLayers: number;
@@ -33,6 +34,7 @@ export type SolverConstraints = {
   additionalLayCounts?: number;
   budget?: SearchBudget;
   onSolution?: (solution: SolvedPlan) => void;
+  maxTShirtOverproductionPerSize?: number;
 };
 
 // Limita apenas o pool de alternativas completas, nunca a prova do melhor plano.
@@ -40,13 +42,14 @@ const MAX_RETURNED_SOLUTIONS = 128;
 const MAX_STATES = 150_000;
 const RETAINED_STATES_AFTER_COMPACTION = 100_000;
 
-type RankedEntry = { garmentType: GarmentType; size: string; sleeveType: SleeveType; quantity: number; rank: number; length: number; measured: boolean; maxFrequency: number };
-type SizeAssignment = { frequencies: number[]; markerLengths: number[]; totalFrequency: number };
+type RankedEntry = { garmentType: GarmentType; size: string; sleeveType: SleeveType; quantity: number; rank: number; length: number; measured: boolean; maxFrequency: number; maxOverproduction: number };
+type SizeAssignment = { frequencies: number[]; markerLengths: number[]; totalFrequency: number; overproduction: number };
 type PartialPlan = {
   assignments: number[][];
   markerLengths: number[];
   sizeSpreadScore: number;
   totalFrequency: number;
+  totalOverproduction: number;
   usedMask: bigint;
 };
 
@@ -73,11 +76,12 @@ function canRepresentAllQuantities(entries: RankedEntry[], layers: number[], typ
   // Todo enfesto precisa aparecer em pelo menos um tamanho. Uma quantidade
   // menor que folhas x frequencia minima jamais consegue usar esse enfesto.
   if (layers.some((layer) => layer * minimumFrequency > maximumQuantity)) return false;
-  return entries.every(({ quantity, maxFrequency: limit }) => quantity <= totalLayers * Math.min(limit, maxFrequency) && quantity % divisor === 0);
+  return entries.every(({ quantity, maxFrequency: limit, maxOverproduction }) => quantity <= totalLayers * Math.min(limit, maxFrequency)
+    && Array.from({ length: maxOverproduction + 1 }, (_, extra) => quantity + extra).some((target) => target % divisor === 0));
 }
 
-function assignmentKey(quantity: number, layers: number[], type: FabricType, lengthPerFrequency: number, maxFrequency: number) {
-  return `${type}:${quantity}:${layers.join(",")}:${lengthPerFrequency}:${maxFrequency}`;
+function assignmentKey(quantity: number, layers: number[], type: FabricType, lengthPerFrequency: number, maxFrequency: number, maxOverproduction: number) {
+  return `${type}:${quantity}:${layers.join(",")}:${lengthPerFrequency}:${maxFrequency}:${maxOverproduction}`;
 }
 
 function getSizeAssignments(
@@ -90,7 +94,7 @@ function getSizeAssignments(
   cache: Map<string, SizeAssignment[]>,
   budget: SearchBudget,
 ) {
-  const key = assignmentKey(entry.quantity, layers, type, lengthPerFrequency, maxFrequency);
+  const key = assignmentKey(entry.quantity, layers, type, lengthPerFrequency, maxFrequency, entry.maxOverproduction);
   const cached = cache.get(key);
   if (cached) return cached;
 
@@ -99,7 +103,7 @@ function getSizeAssignments(
   const remainingCapacities = layers.map((_, index) => layers.slice(index + 1).reduce((sum, layer) => sum + layer * maxFrequency, 0));
   const suffixDivisors = layers.map((_, index) => layers.slice(index + 1).reduce(greatestCommonDivisor, 0) * step);
 
-  function visit(index: number, remaining: number, values: number[]) {
+  function visit(index: number, remaining: number, values: number[], target: number) {
     checkSearchBudget(budget);
     if (index === layers.length) {
       if (remaining === 0) {
@@ -107,13 +111,14 @@ function getSizeAssignments(
           frequencies: values,
           markerLengths: values.map((frequency) => frequency * lengthPerFrequency),
           totalFrequency: values.reduce((sum, value) => sum + value, 0),
+          overproduction: target - entry.quantity,
         });
       }
       return;
     }
     if (index === layers.length - 1) {
       const frequency = remaining / layers[index];
-      if (Number.isInteger(frequency) && frequency % step === 0 && frequency <= maxFrequency && fitsTable(frequency * lengthPerFrequency, tableLengthCm)) visit(index + 1, 0, [...values, frequency]);
+      if (Number.isInteger(frequency) && frequency % step === 0 && frequency <= maxFrequency && fitsTable(frequency * lengthPerFrequency, tableLengthCm)) visit(index + 1, 0, [...values, frequency], target);
       return;
     }
     const lower = step * Math.ceil(Math.max(0, Math.ceil((remaining - remainingCapacities[index]) / layers[index])) / step);
@@ -124,12 +129,12 @@ function getSizeAssignments(
       if (next < 0 || next > remainingCapacities[index]) continue;
       if (next % suffixDivisors[index] !== 0) continue;
       if (!fitsTable(frequency * lengthPerFrequency, tableLengthCm)) continue;
-      visit(index + 1, next, [...values, frequency]);
+      visit(index + 1, next, [...values, frequency], target);
     }
   }
 
-  visit(0, entry.quantity, []);
-  result.sort((a, b) => a.totalFrequency - b.totalFrequency || compareNumbers(a.frequencies, b.frequencies));
+  for (let extra = 0; extra <= entry.maxOverproduction; extra += 1) visit(0, entry.quantity + extra, [], entry.quantity + extra);
+  result.sort((a, b) => a.overproduction - b.overproduction || a.totalFrequency - b.totalFrequency || compareNumbers(a.frequencies, b.frequencies));
   cache.set(key, result);
   return result;
 }
@@ -186,6 +191,7 @@ function solveLayerSet(
     markerLengths: layers.map(() => 0),
     sizeSpreadScore: 0,
     totalFrequency: 0,
+    totalOverproduction: 0,
     usedMask: BigInt(0),
   };
   let states = new Map<string, PartialPlan>([[partialKey(initialPlan), initialPlan]]);
@@ -207,6 +213,7 @@ function solveLayerSet(
         markerLengths,
         sizeSpreadScore: calculateSizeSpreadScore(assignments, layers),
         totalFrequency: plan.totalFrequency + option.totalFrequency,
+        totalOverproduction: plan.totalOverproduction + option.overproduction,
         usedMask,
       };
       // A última etapa já produz planos completos. Guarda/publica imediatamente
@@ -241,7 +248,8 @@ function solveLayerSet(
 
 function comparePartialPlans(a: PartialPlan, b: PartialPlan) {
   const entries = (plan: PartialPlan) => plan.assignments.reduce((sum, values) => sum + values.filter((value) => value > 0).length, 0);
-  return b.sizeSpreadScore - a.sizeSpreadScore
+  return a.totalOverproduction - b.totalOverproduction
+    || b.sizeSpreadScore - a.sizeSpreadScore
     || a.totalFrequency - b.totalFrequency
     || compareNumbers(a.markerLengths, b.markerLengths)
     || entries(a) - entries(b)
@@ -264,6 +272,7 @@ function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPl
   const totalMarkerLengthCm = plan.markerLengths.reduce((sum, value) => sum + value, 0);
   const metrics = {
     totalFrequency: markerTotals.reduce((sum, value) => sum + value, 0),
+    totalOverproduction: plan.totalOverproduction,
     peakFrequency: Math.max(...markerTotals),
     sizeSpreadScore: calculateSizeSpreadScore(plan.assignments, layers),
     totalLayers: layers.reduce((sum, value) => sum + value, 0),
@@ -288,8 +297,12 @@ export function compareSolutions(a: SolvedPlan, b: SolvedPlan) {
 }
 
 export function compareSolutionMetrics(a: SolvedPlan, b: SolvedPlan) {
-  return a.metrics.flatSingleLayerLengthCm - b.metrics.flatSingleLayerLengthCm
-    || a.lays.length - b.lays.length
+  // Trocar menos enfestos por um marcador curto de uma folha fragmenta pedidos
+  // planos com quantidades baixas. A metragem de uma folha continua sendo o
+  // primeiro desempate entre planos com a mesma quantidade de enfestos.
+  return a.lays.length - b.lays.length
+    || a.metrics.totalOverproduction - b.metrics.totalOverproduction
+    || a.metrics.flatSingleLayerLengthCm - b.metrics.flatSingleLayerLengthCm
     || a.metrics.flatSingleLayerLayCount - b.metrics.flatSingleLayerLayCount
     || a.metrics.singleMoldLayCount - b.metrics.singleMoldLayCount
     || a.metrics.singleLayerLayCount - b.metrics.singleLayerLayCount
@@ -314,12 +327,13 @@ export function assessLays(lays: SolvedLay[], quantities: Map<string, number>, t
   }).map(([key, quantity], rank) => {
     const demand = parseCutPlanDemandKey(key);
     const length = calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, type, constraints.fabricWidthCm, index, demand.garmentType);
-    return { ...demand, quantity, rank, length: length ?? 0, measured: length !== null, maxFrequency: 0 };
+    return { ...demand, quantity, rank, length: length ?? 0, measured: length !== null, maxFrequency: 0, maxOverproduction: 0 };
   });
   const assignments = entries.map((entry) => lays.map((lay) => lay.frequencies.find((item) => item.size === entry.size && item.sleeveType === entry.sleeveType
     && (item.garmentType ?? "T_SHIRT") === entry.garmentType)?.frequency ?? 0));
   const markerLengths = lays.map((_, j) => entries.reduce((sum, entry) => sum + entry.length * assignments[entry.rank][j], 0));
-  return buildSolution(entries, lays.map((lay) => lay.layers), { assignments, markerLengths, totalFrequency: 0, sizeSpreadScore: 0, usedMask: BigInt(0) }, false, type);
+  const totalOverproduction = entries.reduce((sum, entry) => sum + Math.max(0, assignments[entry.rank].reduce((produced, frequency, index) => produced + frequency * lays[index].layers, 0) - entry.quantity), 0);
+  return buildSolution(entries, lays.map((lay) => lay.layers), { assignments, markerLengths, totalFrequency: 0, totalOverproduction, sizeSpreadScore: 0, usedMask: BigInt(0) }, false, type);
 }
 
 export function solveMinimumLays(
@@ -346,9 +360,11 @@ export function solveMinimumLays(
   const entries: RankedEntry[] = ordered.map(([key, quantity], rank) => {
     const demand = parseCutPlanDemandKey(key);
     const length = calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, type, constraints.fabricWidthCm, profileIndex, demand.garmentType);
-    const configured = Math.min(maxFrequency, demand.garmentType === "PANTS" || isPantsCutPlanSize(demand.size) ? step : maxFrequency, quantity);
+    const maxOverproduction = allowsCutPlanOverproduction(demand.garmentType) ? constraints.maxTShirtOverproductionPerSize ?? 0 : 0;
+    const configured = Math.min(maxFrequency, demand.garmentType === "PANTS" || isPantsCutPlanSize(demand.size) ? step : maxFrequency, quantity + maxOverproduction);
     const limit = maximumFrequencyForLength(length, constraints.tableLengthCm, configured, step);
-    return { ...demand, quantity, rank, length: length ?? 0, measured: length !== null, maxFrequency: limit };
+    return { ...demand, quantity, rank, length: length ?? 0, measured: length !== null, maxFrequency: limit,
+      maxOverproduction };
   });
   if (entries.some((entry) => entry.maxFrequency < step)) return [];
   const volume = entries.reduce((sum, entry) => sum + entry.quantity * entry.length, 0);
