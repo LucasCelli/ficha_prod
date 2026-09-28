@@ -1,18 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Calculator, ChevronDown, ChevronUp, Eraser, FilePlus, Layers3, Plus, Printer, Scissors, Trash2 } from "lucide-react";
+import { Calculator, ChevronDown, ChevronUp, Eraser, FilePlus, Plus, Printer, Scissors, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, Badge, Button, CustomDatalist, IconButton, type CustomDatalistOption } from "@/components/ui";
 import type { CatalogSizeForCutPlan } from "@/features/catalogos/data";
 import { compareUniformSizes } from "@/lib/uniform-sizes";
 import type { CutPlanAlternative } from "./alternatives";
-import { countLabel, formatCutPlanItemType, formatCutPlanSizeLabel, formatMarkerLabel, formatOperationalMarkerLabel, sortMarkerFrequenciesForDisplay } from "./calculator";
+import { countLabel, formatCutPlanItemType, formatCutPlanSizeLabel, formatMarkerLabel, formatOperationalMarkerLabel, groupCutPlanRowsByModel, sortMarkerFrequenciesForDisplay } from "./calculator";
 import { CutPlanFichaPicker } from "./cut-plan-ficha-picker";
 import { CutPlanNativePrintLayer } from "./cut-plan-native-print-layer";
 import { CutPlanItemsEditor, sortCutPlanItems } from "./cut-plan-items-editor";
 import { moveCutPlanItem } from "./item-order";
-import { calculateInterliningLay, type InterliningLayPlan, type InterliningPlan } from "./interlining";
 import type { CutPlanFabric, CutPlanInput, CutPlanItem, CutPlanSourceFicha, FabricType, MarkerFrequency } from "./model";
 import { useCutPlanSearch } from "./use-cut-plan-search";
 import { validateCutPlan } from "./validation";
@@ -91,7 +90,6 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
   const [confirmReset, setConfirmReset] = useState<"clear" | "new" | null>(null);
   const focusFirstStepOnClose = useRef(false);
   const [printSelection, setPrintSelection] = useState<CutPlanAlternative[] | null>(null);
-  const [showInterlining, setShowInterlining] = useState(false);
   const { calculating, start: startSearch, cancel: cancelSearch } = useCutPlanSearch();
   const [history, setHistory] = useState<CutPlanHistoryEntry[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -118,7 +116,6 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
   })), [catalogSizes]);
   const input = useMemo<CutPlanInput>(() => ({ tableLengthCm, maxLayers, maxFrequency, mergeFabricsInLays, fabrics, items, sizeProfiles, sourceFichaIds: sourceFichas.map((ficha) => ficha.id) }), [tableLengthCm, maxLayers, maxFrequency, mergeFabricsInLays, fabrics, items, sizeProfiles, sourceFichas]);
   const selected = alternatives.find((alternative) => alternative.id === selectedId) ?? alternatives[0];
-  const interlining = useMemo(() => showInterlining ? calculateInterliningLay(items) : null, [items, showInterlining]);
   const issueCount = useMemo(() => validateCutPlan(input).length, [input]);
   const totalPieces = items.reduce((sum, item) => sum + (Number.isFinite(item.quantity) ? item.quantity : 0), 0);
   const hasContent = items.length > 0 || sourceFichas.length > 0 || alternatives.length > 0 || calculating;
@@ -147,7 +144,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
       toast.error("Não foi possível salvar o histórico neste navegador.");
     }
   }, [history, historyLoaded]);
-  const invalidate = () => { cancelSearch(); setAlternatives([]); setSelectedId(""); setShowInterlining(false); };
+  const invalidate = () => { cancelSearch(); setAlternatives([]); setSelectedId(""); };
   const findCatalogFabric = (name: string) => catalogFabricOptions.find((option) =>
     [option.value, option.label, ...(option.aliases ?? [])]
       .some((candidate) => candidate && normalizeMaterial(candidate) === normalizeMaterial(name)),
@@ -294,7 +291,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
   function clearContent() {
     const defaultType = defaultFabricSettings.type ?? "TUBULAR";
     cancelSearch(); setMaxLayers((current) => Math.min(current, getLayerLimit(defaultType))); setMaxFrequency(getDefaultMaximumFrequency(defaultType));
-    setFabrics([createFabric(defaultFabricName, undefined, defaultFabricSettings)]); setItems([]); setSourceFichas([]); setAlternatives([]); setSelectedId(""); setShowInterlining(false); setConfirmReset(null);
+    setFabrics([createFabric(defaultFabricName, undefined, defaultFabricSettings)]); setItems([]); setSourceFichas([]); setAlternatives([]); setSelectedId(""); setConfirmReset(null);
   }
   /** Novo plano volta tudo ao padrão e leva o usuário de volta à primeira etapa. */
   function startNewPlan() {
@@ -315,10 +312,6 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
     if (!selected) return;
     setPrintSelection(scope === "all" ? alternatives : [selected]);
   }
-  function generateInterlining() {
-    setShowInterlining(true);
-    toast.success("Enfesto de entretela gerado.", { description: "Pedido inteiro reunido em um único enfesto de 145 cm." });
-  }
 
   return <section className="cut-plan" aria-labelledby="cut-plan-title">
     <header className="cut-plan__header"><span aria-hidden="true"><Scissors size={24} /></span><div><h1 id="cut-plan-title">Plano de Corte</h1><p>Monte os enfestos antes de fazer o encaixe no Audaces.</p></div></header>
@@ -329,7 +322,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
     <Panel complete={fabrics.length > 0 && fabrics.every((fabric) => fabric.name.trim() && fabric.widthCm > 0)} meta={countLabel(fabrics.length, "tecido")} number="2" title="Tecidos" action={<Button variant="secondary" onClick={addFabric}><Plus size={17} /> Adicionar tecido</Button>}><div className="cut-plan__fabric-list">{fabrics.map((fabric, index) => <article className="cut-plan__fabric" key={fabric.id}><div className="cut-plan__fabric-title"><div><strong>{fabric.name.trim() || "Tecido"}</strong>{fabric.color.trim() ? <span>{fabric.color.trim()}</span> : null}</div><IconButton label={`Remover ${fabricLabel(fabric)}`} onClick={() => removeFabric(fabric.id)} size="sm" tone="danger"><Trash2 size={17} /></IconButton></div><div className="cut-plan__fabric-body"><div className="cut-plan__fabric-fields"><div className="field"><label htmlFor={`cut-plan-fabric-name-${fabric.id}`}>Tecido</label><CustomDatalist id={`cut-plan-fabric-name-${fabric.id}`} onValueChange={(value, option) => updateFabric(fabric.id, { name: value, ...getFabricCutSettings(option) })} options={catalogFabricOptions} placeholder="Escolha um tecido" value={fabric.name} /></div><Field id={`cut-plan-fabric-color-${fabric.id}`} label="Cor"><input id={`cut-plan-fabric-color-${fabric.id}`} value={fabric.color} placeholder="Ex.: Azul Marinho" onChange={(event) => updateFabric(fabric.id, { color: event.currentTarget.value })} /></Field><NumberField id={`cut-plan-fabric-width-${fabric.id}`} label="Largura" unit="cm" value={fabric.widthCm} onChange={(value) => updateFabric(fabric.id, { widthCm: value })} /><Field id={`cut-plan-fabric-type-${fabric.id}`} label="Plano ou tubular"><select id={`cut-plan-fabric-type-${fabric.id}`} value={fabric.type} onChange={(event) => updateFabric(fabric.id, { type: event.currentTarget.value as FabricType })}><option value="PLANO">Plano</option><option value="TUBULAR">Tubular</option></select></Field></div><small>{index ? "A largura e o tipo seguem o primeiro tecido." : fabric.type === "TUBULAR" ? "No tubular, a frequência de cada tamanho sai sempre em número par." : "A frequência de cada tamanho vai de 1 a 6."}</small></div></article>)}</div></Panel>
     <Panel complete={items.length > 0 && items.every((item) => item.size.trim() && item.quantity >= 1)} meta={items.length ? countLabel(totalPieces, "peça") : undefined} number="3" title="Tamanhos e quantidades"><CutPlanFichaPicker added={sourceFichas} onAdd={addSourceFicha} onRemove={removeSourceFicha} /><CutPlanItemsEditor fabrics={fabrics} items={items} addItem={addItem} duplicateItem={duplicateItem} moveItem={moveItem} sizeOptions={sizeOptions} sortItems={sortItems} updateItem={updateItem} removeItem={(itemId) => { setItems((current) => current.filter((item) => item.id !== itemId)); invalidate(); }} /></Panel>
     {selected ? <Panel className="cut-plan__section--result" meta={countLabel(alternatives.length, "opção", "opções")} number="4" title="Resultado">
-      <div className="cut-plan__result-toolbar"><div className="cut-plan__tabs" role="group" aria-label="Opções de plano">{alternatives.map((alternative) => <button aria-pressed={alternative.id === selected.id} className={alternative.id === selected.id ? "is-active" : ""} key={alternative.id} onClick={() => setSelectedId(alternative.id)} type="button"><span>{alternative.label}</span><small>{countLabel(alternative.layCount, "enfesto")}</small></button>)}</div></div><p className="cut-plan__alternative-description" role="status">{calculating ? "Buscando melhores opções…" : selected.result.search?.status === "optimal" ? "Melhor plano comprovado para as medidas estimadas." : "Melhor plano encontrado."}{selected.result.search?.termination === "time_limit" ? " Prazo de busca atingido." : ""}{selected.result.search && !selected.result.search.measurementsComplete ? " Comprimento não validado: faltam medidas." : selected.result.search?.measurementSource?.startsWith("FALLBACK") ? " Comprimento calculado com medidas aproximadas." : ""}</p><PlanResult alternative={selected} fabrics={fabrics} />{interlining ? <InterliningResult plan={interlining} /> : null}<div className="cut-plan__print-actions cut-plan__print-actions--bottom"><Button onClick={() => printPlan("current")} variant="secondary"><Printer size={17} /> Imprimir esta</Button><Button onClick={showInterlining ? () => setShowInterlining(false) : generateInterlining} variant={showInterlining ? "ghost" : "secondary"}><Layers3 size={17} /> {showInterlining ? "Remover entretela" : "Gerar enfesto de entretela"}</Button>{alternatives.length > 1 ? <Button onClick={() => printPlan("all")} variant="ghost"><Printer size={17} /> Imprimir todas</Button> : null}</div>
+      <div className="cut-plan__result-toolbar"><div className="cut-plan__tabs" role="group" aria-label="Opções de plano">{alternatives.map((alternative) => <button aria-pressed={alternative.id === selected.id} className={alternative.id === selected.id ? "is-active" : ""} key={alternative.id} onClick={() => setSelectedId(alternative.id)} type="button"><span>{alternative.label}</span><small>{countLabel(alternative.layCount, "enfesto")}</small></button>)}</div></div><p className="cut-plan__alternative-description" role="status">{calculating ? "Buscando melhores opções…" : selected.result.search?.status === "optimal" ? "Melhor plano comprovado para as medidas estimadas." : "Melhor plano encontrado."}{selected.result.search?.termination === "time_limit" ? " Prazo de busca atingido." : ""}{selected.result.search && !selected.result.search.measurementsComplete ? " Comprimento não validado: faltam medidas." : selected.result.search?.measurementSource?.startsWith("FALLBACK") ? " Comprimento calculado com medidas aproximadas." : ""}</p><PlanResult alternative={selected} fabrics={fabrics} /><div className="cut-plan__print-actions cut-plan__print-actions--bottom"><Button onClick={() => printPlan("current")} variant="secondary"><Printer size={17} /> Imprimir esta</Button>{alternatives.length > 1 ? <Button onClick={() => printPlan("all")} variant="ghost"><Printer size={17} /> Imprimir todas</Button> : null}</div>
     </Panel> : null}
     <div aria-label="Ações do plano" className="cut-plan__command-bar" role="region">
       <div className="cut-plan__command-status" data-state={planStatus.state}>
@@ -345,7 +338,7 @@ export function PlanoDeCorteWorkspace({ catalogFabricOptions, catalogSizes }: { 
         <Button aria-busy={calculating} className="cut-plan__calculate" disabled={calculating} onClick={calculate}>{calculating ? <span className="button-spinner" aria-hidden="true" /> : <Calculator aria-hidden="true" size={18} />} {calculating ? "Calculando…" : "Calcular plano"}</Button>
       </div>
     </div>
-    {printSelection ? <CutPlanNativePrintLayer alternatives={printSelection} input={input} interlining={interlining} sourceFichas={sourceFichas} onPrinted={finishPrinting} /> : null}
+    {printSelection ? <CutPlanNativePrintLayer alternatives={printSelection} input={input} sourceFichas={sourceFichas} onPrinted={finishPrinting} /> : null}
     {confirmReset ? <AlertDialog title={confirmReset === "new" ? "Novo plano" : "Limpar plano"} description={resetCopy[confirmReset].description} onClose={() => setConfirmReset(null)} onCloseAutoFocus={(event) => { if (!focusFirstStepOnClose.current) return; focusFirstStepOnClose.current = false; event.preventDefault(); focusFirstStep(); }}>
       <section className="confirm-dialog" aria-describedby="cut-plan-reset-description">
         <header className="confirm-dialog__header"><div><span className="confirm-dialog__eyebrow">Confirmação necessária</span><h2>{resetCopy[confirmReset].heading}</h2></div></header>
@@ -382,13 +375,6 @@ async function copyLaySummary(text: string) {
     toast.error("Não foi possível copiar o resumo do enfesto.");
   }
 }
-function interliningClipboardText(lay: InterliningLayPlan) {
-  const grade = lay.frequencies.map((entry) => `${entry.frequency}-${formatCutPlanSizeLabel(entry.size, entry.garmentType)}`).join(", ");
-  return `ENTRETELA 145 CM: ${grade} x ${lay.layers} ${lay.layers === 1 ? "FOLHA" : "FOLHAS"}`;
-}
-function InterliningResult({ plan }: { plan: InterliningPlan }) {
-  return <section className="cut-plan__fabric-result cut-plan__interlining-result"><header><div><h3>Entretela</h3><p>{plan.widthCm} cm · Plano · comprimento livre</p></div><span>{countLabel(plan.lays.length, "enfesto")}</span></header><div className="cut-plan__lays">{plan.lays.map((lay, index) => <article className="cut-plan__lay" key={`interlining-${index}`}><div className="cut-plan__lay-header"><div className="cut-plan__lay-heading"><h4><button className="cut-plan__lay-copy" onClick={() => void copyLaySummary(interliningClipboardText(lay))} title="Copiar resumo do enfesto de entretela" type="button">Entretela {String(index + 1).padStart(2, "0")}</button></h4><ul className="cut-plan__grade">{lay.frequencies.map((entry) => <li key={`${entry.garmentType}-${entry.size}`}><Badge tone="info">{entry.frequency}-{formatCutPlanSizeLabel(entry.size, entry.garmentType)}</Badge></li>)}</ul><p className="cut-plan__marker-length">Comprimento livre</p></div><p className="cut-plan__lay-layers"><span>{lay.layers}</span><small>{lay.layers === 1 ? "folha" : "folhas"}</small></p></div><ResultTable><thead><tr><th>Tamanho</th><th>Frequência</th><th>Peças cortadas</th></tr></thead><tbody>{lay.frequencies.map((entry) => <tr key={`${entry.garmentType}-${entry.size}`}><td>{formatCutPlanSizeLabel(entry.size, entry.garmentType)}</td><td>{entry.frequency}</td><td>{entry.quantity}</td></tr>)}</tbody><tfoot><tr><th>Total</th><td>{lay.frequencies.reduce((sum, entry) => sum + entry.frequency, 0)}</td><td>{lay.totalPieces}</td></tr></tfoot></ResultTable></article>)}</div></section>;
-}
 function PlanResult({ alternative, fabrics }: { alternative: CutPlanAlternative; fabrics: CutPlanFabric[] }) {
   const fabricLays = alternative.result.fabrics.flatMap((fabric) => fabric.lays);
   const operationalLays = alternative.result.mergedLays ?? fabricLays;
@@ -404,7 +390,7 @@ function PlanResult({ alternative, fabrics }: { alternative: CutPlanAlternative;
       </div>
       <ResultTable><thead><tr><th>Tamanho</th><th>Tipo</th><th>Frequência</th><th>Peças cortadas</th></tr></thead><tbody>{sortMarkerFrequenciesForDisplay(lay.frequencies).map((marker) => <tr key={`${marker.garmentType}-${marker.size}-${marker.sleeveType}`}><td>{formatCutPlanSizeLabel(marker.size, marker.garmentType)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>)}</tbody></ResultTable>
     </article>)}</div></section>; })}
-    {alternative.result.fabrics.map((fabricResult) => { const fabric = fabrics.find((entry) => entry.id === fabricResult.fabricId)!; const orderedSizes = [...fabricResult.sizes].sort((left, right) => compareUniformSizes(left.size, right.size) || left.sleeveType.localeCompare(right.sleeveType) || (left.garmentType ?? "").localeCompare(right.garmentType ?? "")); const totals = fabricResult.sizes.reduce((sum, size) => ({ requested: sum.requested + size.requested, produced: sum.produced + size.produced, difference: sum.difference + Math.max(0, size.difference) }), { requested: 0, produced: 0, difference: 0 }); return <div className="cut-plan__check" key={`check-${fabric.id}`}><h4>Conferência — {fabricLabel(fabric)}</h4><ResultTable><thead><tr><th>Tamanho</th><th>Tipo</th><th>Pedido</th><th>Vai cortar</th><th>Diferença</th></tr></thead><tbody>{orderedSizes.map((size) => <tr key={`${size.garmentType}-${size.size}-${size.sleeveType}`}><td>{formatCutPlanSizeLabel(size.size, size.garmentType)}</td><td>{formatCutPlanItemType(size.size, size.sleeveType, size.garmentType)}</td><td>{size.requested}</td><td>{size.produced}</td><td><span className={size.difference === 0 ? "is-exact" : "is-changed"}>{size.difference > 0 ? "+" : ""}{size.difference}</span></td></tr>)}</tbody><tfoot><tr><th colSpan={2}>Totais</th><td>{totals.requested}</td><td>{totals.produced}</td><td>{totals.difference}</td></tr></tfoot></ResultTable></div>; })}</>;
+    {alternative.result.fabrics.map((fabricResult) => { const fabric = fabrics.find((entry) => entry.id === fabricResult.fabricId)!; const groups = groupCutPlanRowsByModel(fabricResult.sizes); const totals = fabricResult.sizes.reduce((sum, size) => ({ requested: sum.requested + size.requested, produced: sum.produced + size.produced, difference: sum.difference + Math.max(0, size.difference) }), { requested: 0, produced: 0, difference: 0 }); return <div className="cut-plan__check" key={`check-${fabric.id}`}><h4>Conferência — {fabricLabel(fabric)}</h4>{groups.map((group) => <section key={group.key}><h5>{group.label}</h5><ResultTable><thead><tr><th>Tamanho</th><th>Tipo</th><th>Pedido</th><th>Vai cortar</th><th>Diferença</th></tr></thead><tbody>{group.rows.map((size) => <tr key={`${size.garmentType}-${size.size}-${size.sleeveType}`}><td>{formatCutPlanSizeLabel(size.size, size.garmentType)}</td><td>{formatCutPlanItemType(size.size, size.sleeveType, size.garmentType)}</td><td>{size.requested}</td><td>{size.produced}</td><td><span className={size.difference === 0 ? "is-exact" : "is-changed"}>{size.difference > 0 ? "+" : ""}{size.difference}</span></td></tr>)}</tbody></ResultTable></section>)}<ResultTable><tfoot><tr><th colSpan={2}>Totais gerais</th><td>{totals.requested}</td><td>{totals.produced}</td><td>{totals.difference}</td></tr></tfoot></ResultTable></div>; })}</>;
 }
 
 function Panel({ number, title, meta, complete, className, action, children }: { number: string; title: string; meta?: string; complete?: boolean; className?: string; action?: React.ReactNode; children: React.ReactNode }) {

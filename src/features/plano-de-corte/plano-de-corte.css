@@ -624,6 +624,14 @@ html:has(.cut-plan__command-bar) [data-sonner-toaster][data-y-position="bottom"]
   padding: 14px 14px 0;
 }
 
+.cut-plan__check h5 {
+  margin: 0;
+  padding: 4px 14px 0;
+  color: var(--color-primary-text);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+}
+
 /* Saldo: o sinal e o valor carregam o estado; a cor apenas reforca. */
 .cut-plan .is-exact {
   color: var(--color-success);
@@ -1433,6 +1441,13 @@ html:has(.cut-plan__command-bar) [data-sonner-toaster][data-y-position="bottom"]
   margin: 0 0 4px;
   color: #000;
   font-size: 12px;
+  text-transform: uppercase;
+}
+
+.cut-plan-print-simple__conference h4 {
+  margin: 6px 0 2px;
+  color: #204f91;
+  font-size: 10px;
   text-transform: uppercase;
 }
 

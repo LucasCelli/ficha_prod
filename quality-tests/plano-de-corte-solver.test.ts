@@ -4,7 +4,7 @@ import { performance } from "node:perf_hooks";
 import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, calculateShirtAreaCm2, ESTIMATED_NESTING_EFFICIENCY, estimateMarkerLengthCm, formatEstimatedLengthMeters, getDefaultMaximumFrequency, getLayerLimit, getMaximumEstimatedFrequency, normalizeCutPlanSizeKey } from "../src/features/plano-de-corte/dimensions.ts";
 import { cutPlanDemandKey, type CutPlanSizeProfile, type FabricType } from "../src/features/plano-de-corte/model.ts";
 import { assessLays, compareSolutionMetrics, hasSingleMold, solveMinimumLays } from "../src/features/plano-de-corte/solver.ts";
-import { calculateCutPlan, formatCutPlanItemType, formatCutPlanSizeLabel, formatMarkerLabel, formatOperationalMarkerLabel } from "../src/features/plano-de-corte/calculator.ts";
+import { calculateCutPlan, formatCutPlanItemType, formatCutPlanSizeLabel, formatMarkerLabel, formatOperationalMarkerLabel, groupCutPlanRowsByModel } from "../src/features/plano-de-corte/calculator.ts";
 import { calculateCutPlanAlternatives } from "../src/features/plano-de-corte/alternatives.ts";
 import { validateCutPlan } from "../src/features/plano-de-corte/validation.ts";
 import { moveCutPlanItem } from "../src/features/plano-de-corte/item-order.ts";
@@ -93,7 +93,7 @@ test("identifica a modelagem no tamanho exibido e copiado", () => {
     { size: "P", garmentType: "BABY_LOOK", sleeveType: "CURTA", frequency: 1 },
     { size: "P", garmentType: "DRESS_SHIRT", sleeveType: "LONGA", frequency: 1 },
     { size: "P", garmentType: "CAMISETE", sleeveType: "LONGA", frequency: 1 },
-  ]), "1-BL P BABYLOOK MC, 1-FEM. P CAMISETE ML, 1-MASC. P SOCIAL ML, 1-P MC");
+  ]), "1-BL P BABYLOOK MC, 1-FEM. P ML, 1-MASC. P ML, 1-P MC");
   assert.equal(formatMarkerLabel([
     { size: "P", sleeveType: "CURTA", frequency: 2 },
     { size: "M", sleeveType: "CURTA", frequency: 2 },
@@ -343,7 +343,7 @@ test("formato operacional identifica modelagens de camisa", () => {
   assert.equal(formatOperationalMarkerLabel([
     { garmentType: "DRESS_SHIRT", size: "M", sleeveType: "LONGA", frequency: 2 },
     { garmentType: "T_SHIRT", size: "P", sleeveType: "CURTA", frequency: 1 },
-  ], true), "1-P MC, 2-MASC. M SOCIAL ML");
+  ], true), "1-P MC, 2-MASC. M ML");
 });
 
 test("distribui tamanho infantil tubular entre enfestos existentes", () => {
@@ -574,6 +574,19 @@ test("mantém o mesmo tamanho e manga separados por modelagem", () => {
     { garmentType: "T_SHIRT", requested: 2, produced: 2 },
   ]);
   assert.equal(result.lays.flatMap((lay) => lay.frequencies).length, 2);
+});
+
+test("agrupa a conferência por masculino e feminino e ordena cada grade por tamanho", () => {
+  const groups = groupCutPlanRowsByModel([
+    { garmentType: "CAMISETE" as const, size: "GG", sleeveType: "CURTA" as const },
+    { garmentType: "DRESS_SHIRT" as const, size: "G", sleeveType: "CURTA" as const },
+    { garmentType: "BABY_LOOK" as const, size: "P", sleeveType: "CURTA" as const },
+    { garmentType: "T_SHIRT" as const, size: "M", sleeveType: "CURTA" as const },
+  ]);
+  assert.deepEqual(groups.map((group) => ({ label: group.label, sizes: group.rows.map((row) => row.size) })), [
+    { label: "Masculino", sizes: ["M", "G"] },
+    { label: "Feminino", sizes: ["P", "GG"] },
+  ]);
 });
 
 test("mantém modelagens femininas separadas das masculinas", () => {

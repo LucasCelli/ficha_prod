@@ -258,8 +258,20 @@ export function formatMarkerLabel(frequencies: MarkerFrequency[], showSleeveType
 
 export function formatOperationalMarkerLabel(frequencies: MarkerFrequency[], showSleeveType = true) {
   return sortMarkerFrequenciesForDisplay(frequencies)
-    .map(({ garmentType, size, sleeveType, frequency }) => `${frequency}-${formatCutPlanSizeLabel(size, garmentType)}${garmentType === "DRESS_SHIRT" ? " SOCIAL" : garmentType === "BABY_LOOK" ? " BABYLOOK" : garmentType === "CAMISETE" ? " CAMISETE" : ""}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`)
+    .map(({ garmentType, size, sleeveType, frequency }) => `${frequency}-${formatCutPlanSizeLabel(size, garmentType)}${garmentType === "BABY_LOOK" ? " BABYLOOK" : ""}${showSleeveType ? ` ${sleeveType === "LONGA" ? "ML" : "MC"}` : ""}`)
     .join(", ");
+}
+
+export function groupCutPlanRowsByModel<T extends Pick<MarkerFrequency, "garmentType" | "size" | "sleeveType">>(rows: T[]) {
+  const sorted = [...rows].sort((left, right) => compareUniformSizes(left.size, right.size)
+    || left.sleeveType.localeCompare(right.sleeveType)
+    || (left.garmentType ?? "T_SHIRT").localeCompare(right.garmentType ?? "T_SHIRT"));
+  const masculine = sorted.filter((row) => row.garmentType !== "BABY_LOOK" && row.garmentType !== "CAMISETE");
+  const feminine = sorted.filter((row) => row.garmentType === "BABY_LOOK" || row.garmentType === "CAMISETE");
+  return [
+    { key: "masculine", label: "Masculino", rows: masculine },
+    { key: "feminine", label: "Feminino", rows: feminine },
+  ].filter((group) => group.rows.length > 0);
 }
 
 /** Rotulo contado no padrao do projeto: plural escrito, nunca "(s)". */
