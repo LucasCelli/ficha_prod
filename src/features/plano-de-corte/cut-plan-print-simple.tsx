@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { CutPlanAlternative } from "./alternatives";
 import { countLabel, formatCutPlanItemType, formatCutPlanSizeLabel, formatOperationalMarkerLabel, sortMarkerFrequenciesForDisplay } from "./calculator";
 import { compareUniformSizes } from "../../lib/uniform-sizes";
+import type { InterliningLayPlan } from "./interlining";
 import { cutPlanDemandKey, parseCutPlanDemandKey, type CutPlanFabric, type CutPlanInput, type CutPlanSourceFicha, type FabricCutPlanResult, type LayPlan, type MergedLayPlan } from "./model";
 
 const fabricLabel = (fabric: CutPlanFabric) => `${fabric.name}${fabric.color.trim() ? ` — ${fabric.color.trim()}` : ""}`;
@@ -66,6 +67,14 @@ function FabricLayCard({ index, lay, showSleeveType }: { index: number; lay: Lay
   </>} />;
 }
 
+function InterliningLayCard({ plan }: { plan: InterliningLayPlan }) {
+  return <LayCard badgeLayers={plan.layers} header={<><h3>Enfesto de entretela</h3><p><strong>Entretela · {plan.widthCm} cm · comprimento livre</strong></p></>} rows={<>
+    <thead><tr><th>Tamanho</th><th>Frequência</th><th>Peças cortadas</th></tr></thead>
+    <tbody>{plan.frequencies.map((entry) => <tr key={`${entry.garmentType}-${entry.size}`}><td>{formatCutPlanSizeLabel(entry.size, entry.garmentType)}</td><td>{entry.frequency}</td><td>{entry.quantity}</td></tr>)}</tbody>
+    <tfoot><tr><th>Total</th><td>{plan.frequencies.reduce((sum, entry) => sum + entry.frequency, 0)}</td><td>{plan.totalPieces}</td></tr></tfoot>
+  </>} />;
+}
+
 function pairUp<T>(items: T[]) {
   const pairs: T[][] = [];
   for (let index = 0; index < items.length; index += 2) pairs.push(items.slice(index, index + 2));
@@ -102,7 +111,7 @@ function OverallConference({ rows }: { rows: ReturnType<typeof aggregateOverallS
   return <section className="cut-plan-print-simple__conference"><h3>Conferência final</h3><table className="cut-plan-print-simple__check"><thead><tr><th>Tamanho</th><th>Tipo</th><th>Pedido</th><th>Vai cortar</th><th>Diferença</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.garmentType}-${row.size}-${row.sleeveType}`}><td><strong>{formatCutPlanSizeLabel(row.size, row.garmentType)}</strong></td><td>{formatCutPlanItemType(row.size, row.sleeveType, row.garmentType)}</td><td>{row.requested}</td><td>{row.produced}</td><td>{row.difference > 0 ? "+" : ""}{row.difference}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>Totais</th><td><strong>{totals.requested}</strong></td><td><strong>{totals.produced}</strong></td><td><strong>{totals.difference}</strong></td></tr></tfoot></table></section>;
 }
 
-export function CutPlanPrintSimple({ alternative, input, sourceFichas = [] }: { alternative: CutPlanAlternative; input: CutPlanInput; sourceFichas?: CutPlanSourceFicha[] }) {
+export function CutPlanPrintSimple({ alternative, input, interlining, sourceFichas = [] }: { alternative: CutPlanAlternative; input: CutPlanInput; interlining?: InterliningLayPlan | null; sourceFichas?: CutPlanSourceFicha[] }) {
   // Uma unica tabela no plano inteiro pode ocupar a largura toda; a partir de
   // duas, todas ficam do mesmo tamanho para nao destacar a ultima sozinha na linha.
   const totalLays = alternative.result.mergedLays?.length ?? alternative.result.fabrics.reduce((sum, fabricResult) => sum + fabricResult.lays.length, 0);
@@ -142,6 +151,7 @@ export function CutPlanPrintSimple({ alternative, input, sourceFichas = [] }: { 
       </> : <span aria-hidden="true" className="cut-plan-print-simple__source-placeholder" />}<p><strong>{ficha.client}</strong><small>{fichaDetail(ficha)}</small></p></article>)}</div></section> : null}
       {blocks.map((block) => block.header ? <div key={block.key}>{block.header}</div> : <div className={isSolo ? "cut-plan-print-simple__lay-row is-solo" : "cut-plan-print-simple__lay-row"} key={block.key}>{block.cards}</div>)}
       {conferenceBeside ? null : conference}
+      {interlining ? <><header className="cut-plan-print-simple__fabric-header"><div><h2>Entretela</h2><p>Enfesto separado do plano principal</p></div><strong>1 enfesto</strong></header><div className="cut-plan-print-simple__lay-row is-solo"><InterliningLayCard plan={interlining} /></div></> : null}
     </section>
   </div>;
 }
