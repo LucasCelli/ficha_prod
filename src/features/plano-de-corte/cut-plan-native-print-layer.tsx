@@ -4,10 +4,10 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { CutPlanAlternative } from "./alternatives";
 import { CutPlanPrintSimple } from "./cut-plan-print-simple";
-import type { InterliningLayPlan } from "./interlining";
+import type { InterliningPlan } from "./interlining";
 import type { CutPlanInput, CutPlanSourceFicha } from "./model";
 
-export function CutPlanNativePrintLayer({ alternatives, input, interlining, sourceFichas, onPrinted }: { alternatives: CutPlanAlternative[]; input: CutPlanInput; interlining?: InterliningLayPlan | null; sourceFichas: CutPlanSourceFicha[]; onPrinted: () => void }) {
+export function CutPlanNativePrintLayer({ alternatives, input, interlining, sourceFichas, onPrinted }: { alternatives: CutPlanAlternative[]; input: CutPlanInput; interlining?: InterliningPlan | null; sourceFichas: CutPlanSourceFicha[]; onPrinted: () => void }) {
   useEffect(() => {
     const handleAfterPrint = () => onPrinted();
     window.addEventListener("afterprint", handleAfterPrint);

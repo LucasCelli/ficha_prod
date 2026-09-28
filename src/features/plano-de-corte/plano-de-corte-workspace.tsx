@@ -12,7 +12,7 @@ import { CutPlanFichaPicker } from "./cut-plan-ficha-picker";
 import { CutPlanNativePrintLayer } from "./cut-plan-native-print-layer";
 import { CutPlanItemsEditor, sortCutPlanItems } from "./cut-plan-items-editor";
 import { moveCutPlanItem } from "./item-order";
-import { calculateInterliningLay, type InterliningLayPlan } from "./interlining";
+import { calculateInterliningLay, type InterliningLayPlan, type InterliningPlan } from "./interlining";
 import type { CutPlanFabric, CutPlanInput, CutPlanItem, CutPlanSourceFicha, FabricType, MarkerFrequency } from "./model";
 import { useCutPlanSearch } from "./use-cut-plan-search";
 import { validateCutPlan } from "./validation";
@@ -382,12 +382,12 @@ async function copyLaySummary(text: string) {
     toast.error("Não foi possível copiar o resumo do enfesto.");
   }
 }
-function interliningClipboardText(plan: InterliningLayPlan) {
-  const grade = plan.frequencies.map((entry) => `${entry.frequency}-${formatCutPlanSizeLabel(entry.size, entry.garmentType)}`).join(", ");
-  return `ENTRETELA 145 CM: ${grade} x ${plan.layers} ${plan.layers === 1 ? "FOLHA" : "FOLHAS"}`;
+function interliningClipboardText(lay: InterliningLayPlan) {
+  const grade = lay.frequencies.map((entry) => `${entry.frequency}-${formatCutPlanSizeLabel(entry.size, entry.garmentType)}`).join(", ");
+  return `ENTRETELA 145 CM: ${grade} x ${lay.layers} ${lay.layers === 1 ? "FOLHA" : "FOLHAS"}`;
 }
-function InterliningResult({ plan }: { plan: InterliningLayPlan }) {
-  return <section className="cut-plan__fabric-result cut-plan__interlining-result"><header><div><h3>Entretela</h3><p>{plan.widthCm} cm · Plano · comprimento livre</p></div><span>1 enfesto</span></header><div className="cut-plan__lays"><article className="cut-plan__lay"><div className="cut-plan__lay-header"><div className="cut-plan__lay-heading"><h4><button className="cut-plan__lay-copy" onClick={() => void copyLaySummary(interliningClipboardText(plan))} title="Copiar resumo do enfesto de entretela" type="button">Enfesto de entretela</button></h4><ul className="cut-plan__grade">{plan.frequencies.map((entry) => <li key={`${entry.garmentType}-${entry.size}`}><Badge tone="info">{entry.frequency}-{formatCutPlanSizeLabel(entry.size, entry.garmentType)}</Badge></li>)}</ul><p className="cut-plan__marker-length">Comprimento livre: todos os tamanhos no mesmo encaixe</p></div><p className="cut-plan__lay-layers"><span>{plan.layers}</span><small>{plan.layers === 1 ? "folha" : "folhas"}</small></p></div><ResultTable><thead><tr><th>Tamanho</th><th>Frequência</th><th>Peças cortadas</th></tr></thead><tbody>{plan.frequencies.map((entry) => <tr key={`${entry.garmentType}-${entry.size}`}><td>{formatCutPlanSizeLabel(entry.size, entry.garmentType)}</td><td>{entry.frequency}</td><td>{entry.quantity}</td></tr>)}</tbody><tfoot><tr><th>Total</th><td>{plan.frequencies.reduce((sum, entry) => sum + entry.frequency, 0)}</td><td>{plan.totalPieces}</td></tr></tfoot></ResultTable></article></div></section>;
+function InterliningResult({ plan }: { plan: InterliningPlan }) {
+  return <section className="cut-plan__fabric-result cut-plan__interlining-result"><header><div><h3>Entretela</h3><p>{plan.widthCm} cm · Plano · comprimento livre</p></div><span>{countLabel(plan.lays.length, "enfesto")}</span></header><div className="cut-plan__lays">{plan.lays.map((lay, index) => <article className="cut-plan__lay" key={`interlining-${index}`}><div className="cut-plan__lay-header"><div className="cut-plan__lay-heading"><h4><button className="cut-plan__lay-copy" onClick={() => void copyLaySummary(interliningClipboardText(lay))} title="Copiar resumo do enfesto de entretela" type="button">Entretela {String(index + 1).padStart(2, "0")}</button></h4><ul className="cut-plan__grade">{lay.frequencies.map((entry) => <li key={`${entry.garmentType}-${entry.size}`}><Badge tone="info">{entry.frequency}-{formatCutPlanSizeLabel(entry.size, entry.garmentType)}</Badge></li>)}</ul><p className="cut-plan__marker-length">Comprimento livre</p></div><p className="cut-plan__lay-layers"><span>{lay.layers}</span><small>{lay.layers === 1 ? "folha" : "folhas"}</small></p></div><ResultTable><thead><tr><th>Tamanho</th><th>Frequência</th><th>Peças cortadas</th></tr></thead><tbody>{lay.frequencies.map((entry) => <tr key={`${entry.garmentType}-${entry.size}`}><td>{formatCutPlanSizeLabel(entry.size, entry.garmentType)}</td><td>{entry.frequency}</td><td>{entry.quantity}</td></tr>)}</tbody><tfoot><tr><th>Total</th><td>{lay.frequencies.reduce((sum, entry) => sum + entry.frequency, 0)}</td><td>{lay.totalPieces}</td></tr></tfoot></ResultTable></article>)}</div></section>;
 }
 function PlanResult({ alternative, fabrics }: { alternative: CutPlanAlternative; fabrics: CutPlanFabric[] }) {
   const fabricLays = alternative.result.fabrics.flatMap((fabric) => fabric.lays);
