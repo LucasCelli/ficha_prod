@@ -77,14 +77,23 @@ test("agrupa short e bermuda como a mesma categoria operacional", () => {
   ]);
 });
 
-test("abrevia Baby Look como BL na apresentação", () => {
+test("identifica a modelagem no tamanho exibido e copiado", () => {
   assert.equal(formatCutPlanSizeLabel("P"), "P");
   assert.equal(formatCutPlanSizeLabel("BABY PP"), "BL PP");
+  assert.equal(formatCutPlanSizeLabel("MASC. P", "T_SHIRT"), "P");
   assert.equal(formatCutPlanSizeLabel("P", "DRESS_SHIRT"), "MASC. P");
   assert.equal(formatCutPlanSizeLabel("BABY PP", "DRESS_SHIRT"), "FEM. PP");
+  assert.equal(formatCutPlanSizeLabel("P", "CAMISETE"), "FEM. P");
+  assert.equal(formatCutPlanSizeLabel("P", "BABY_LOOK"), "BL P");
   assert.equal(formatCutPlanSizeLabel("FEM P"), "FEM. P");
   assert.equal(formatCutPlanSizeLabel("MASC P"), "MASC. P");
   assert.equal(formatMarkerLabel([{ size: "BABY PP", sleeveType: "CURTA", frequency: 2 }], false), "2-BL PP");
+  assert.equal(formatOperationalMarkerLabel([
+    { size: "P", garmentType: "T_SHIRT", sleeveType: "CURTA", frequency: 1 },
+    { size: "P", garmentType: "BABY_LOOK", sleeveType: "CURTA", frequency: 1 },
+    { size: "P", garmentType: "DRESS_SHIRT", sleeveType: "LONGA", frequency: 1 },
+    { size: "P", garmentType: "CAMISETE", sleeveType: "LONGA", frequency: 1 },
+  ]), "1-BL P BABYLOOK MC, 1-FEM. P CAMISETE ML, 1-MASC. P SOCIAL ML, 1-P MC");
   assert.equal(formatMarkerLabel([
     { size: "P", sleeveType: "CURTA", frequency: 2 },
     { size: "M", sleeveType: "CURTA", frequency: 2 },
@@ -763,7 +772,7 @@ test("plano prefere mais camadas mesmo quando uma folha evita mapa de um molde",
   assert.equal(calculateCutPlanAlternatives(input)[0].result.fabrics[0].lays[0].layers, 1);
 });
 
-test("camisas femininas aceitam aliases Baby Look e BL nas tabelas", () => {
+test("mantém aliases femininos antigos sem perder a nova identificação por modelagem", () => {
   assert.equal(formatCutPlanSizeLabel("BABY LOOK P", "DRESS_SHIRT"), "FEM. P");
   assert.equal(formatCutPlanSizeLabel("BL P", "DRESS_SHIRT"), "FEM. P");
   assert.equal(formatCutPlanSizeLabel("BL P", "T_SHIRT"), "BL P");

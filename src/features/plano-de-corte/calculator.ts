@@ -216,13 +216,20 @@ export function recalculateFabricResult(
 }
 
 export function formatCutPlanSizeLabel(size: string, garmentType?: MarkerFrequency["garmentType"]) {
-  const isFemaleModel = garmentType === "BABY_LOOK" || garmentType === "CAMISETE";
-  const labeled = size
-    .replace(/^(?:BABY(?:\s+LOOK)?|BL)\s+/i, isFemaleModel ? "" : garmentType === "DRESS_SHIRT" ? "FEM. " : "BL ")
-    .replace(/^FEM(?:ININA)?\.?\s+/i, isFemaleModel ? "" : "FEM. ")
-    .replace(/\bMASC(?:ULINA|ULINO)?\s+/i, "MASC. ");
-  if (labeled !== size) return labeled;
-  return garmentType === "DRESS_SHIRT" && /^(?:PP|P|M|G|GG|XG|EG|EGG|EEGG)(?:\s*\(\d+\))?$/i.test(size.trim()) ? `MASC. ${size.trim()}` : size;
+  const trimmed = size.trim();
+  const hasBabyLookPrefix = /^(?:BABY(?:\s+LOOK)?|BL)\s+/i.test(trimmed);
+  const hasFemalePrefix = /^FEM(?:ININA)?\.?\s+/i.test(trimmed);
+  const normalizedSize = trimmed.replace(/^(?:(?:BABY(?:\s+LOOK)?|BL)|FEM(?:ININA)?\.?|MASC(?:ULINA|ULINO)?\.?)\s+/i, "");
+
+  if (garmentType === "DRESS_SHIRT") return `${hasBabyLookPrefix || hasFemalePrefix ? "FEM." : "MASC."} ${normalizedSize}`;
+  if (garmentType === "CAMISETE") return `FEM. ${normalizedSize}`;
+  if (garmentType === "BABY_LOOK") return `BL ${normalizedSize}`;
+  if (garmentType === "T_SHIRT") return hasBabyLookPrefix ? `BL ${normalizedSize}` : normalizedSize;
+
+  if (hasBabyLookPrefix) return `BL ${normalizedSize}`;
+  if (hasFemalePrefix) return `FEM. ${normalizedSize}`;
+  if (/^MASC(?:ULINA|ULINO)?\.?\s+/i.test(trimmed)) return `MASC. ${normalizedSize}`;
+  return trimmed;
 }
 
 export function formatCutPlanItemType(size: string, sleeveType: MarkerFrequency["sleeveType"], garmentType?: MarkerFrequency["garmentType"]) {
