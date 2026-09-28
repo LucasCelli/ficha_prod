@@ -360,7 +360,9 @@ export function solveMinimumLays(
   const entries: RankedEntry[] = ordered.map(([key, quantity], rank) => {
     const demand = parseCutPlanDemandKey(key);
     const length = calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, type, constraints.fabricWidthCm, profileIndex, demand.garmentType);
-    const maxOverproduction = allowsCutPlanOverproduction(demand.garmentType) ? constraints.maxTShirtOverproductionPerSize ?? 0 : 0;
+    const maxOverproduction = type === "PLANO" && allowsCutPlanOverproduction(demand.garmentType)
+      ? constraints.maxTShirtOverproductionPerSize ?? 0
+      : 0;
     const configured = Math.min(maxFrequency, demand.garmentType === "PANTS" || isPantsCutPlanSize(demand.size) ? step : maxFrequency, quantity + maxOverproduction);
     const limit = maximumFrequencyForLength(length, constraints.tableLengthCm, configured, step);
     return { ...demand, quantity, rank, length: length ?? 0, measured: length !== null, maxFrequency: limit,

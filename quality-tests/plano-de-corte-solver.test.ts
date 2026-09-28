@@ -829,6 +829,18 @@ test("aceita sobra mínima para camiseta e baby look, mas não para camisa socia
   assert.equal(result.sizes[0].difference, 0);
 });
 
+test("não aplica acréscimo de até três peças em tecido tubular", () => {
+  const input = createInput("TUBULAR", 3);
+  input.maxFrequency = 4;
+  input.items = [{ id: "tubular", fabricId: "fabric", size: "P", sleeveType: "CURTA", garmentType: "T_SHIRT", quantity: 10 }];
+
+  const result = calculateCutPlanAlternatives(input)[0].result.fabrics[0];
+
+  assert.equal(result.sizes[0].produced, 10);
+  assert.equal(result.sizes[0].difference, 0);
+  assert.equal(result.lays.length, 2);
+});
+
 
 test("GG1 social usa a medida aproximada de 52 em vez da maior base", () => {
   const index = buildSizeProfileIndex([]);
