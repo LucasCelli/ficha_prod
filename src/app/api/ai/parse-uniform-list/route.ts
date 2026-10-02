@@ -7,6 +7,7 @@ import { getAiModel, getSelectedAiModelOption, hasAiModelApiKey } from "@/lib/ai
 import { buildUniformListPrompt, UNIFORM_LIST_SYSTEM_PROMPT } from "@/lib/ai/prompts/uniform-list";
 import { UniformListSchema, type UniformList } from "@/lib/ai/schemas/uniform-list";
 import { applyUniformListSourceSections, normalizeUniformListGroups } from "@/lib/ai/uniform-list-groups";
+import { parseStructuredUniformListInput, parseVerticalUniformListInput } from "@/lib/ai/uniform-list-structured-input";
 import { consumeOperationQuota } from "@/lib/operation-quota";
 import { mapWithConcurrency } from "@/lib/promise-pool";
 
@@ -271,6 +272,12 @@ async function parseUniformText(text: string, modelValue?: string) {
 }
 
 async function parseUniformList(text: string, modelValue?: string): Promise<UniformList> {
+  const structuredInput = parseStructuredUniformListInput(text);
+  if (structuredInput) return normalizeUniformListGroups(structuredInput);
+
+  const verticalInput = parseVerticalUniformListInput(text);
+  if (verticalInput) return normalizeUniformListGroups(verticalInput);
+
   const chunks = splitUniformText(text, modelValue);
 
   if (chunks.length === 1) {

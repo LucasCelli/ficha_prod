@@ -38,6 +38,10 @@ Validacao mental:
 Antes de responder, confira internamente se o nome extraido aparece literalmente na linha de origem. Se nao aparecer, use confianca baixa e explique em observacao. Nao inclua a linha original na resposta.
 
 Regras gerais:
+- Fidelidade de quantidade e obrigatoria: cada pessoa/peca explicita na entrada gera exatamente um item, e nenhum item pode surgir sem uma pessoa/peca correspondente na entrada.
+- Preserve a multiplicidade exata da entrada. Se um registro aparece uma vez, retorne uma vez. Se o mesmo nome ou "SEM NOME" aparece duas ou mais vezes na entrada, retorne a mesma quantidade de itens. Nunca invente uma repeticao para completar, corrigir ou compensar outro registro.
+- Antes de responder, conte mentalmente os registros de entrada e os itens de saida. Cabecalhos, tamanhos isolados, nomes de colunas e marcadores de secao nao contam como registros.
+- Nao mova tamanho, nome ou numero de um registro para outro. Quando algo estiver ausente, use null naquele mesmo registro.
 - Grupo serve somente para separar uma caracteristica especifica compartilhada, como cor, acabamento, manga ou outra variante de producao.
 - Nunca use modelo ou tamanho como grupo. Cabecalhos como "PP:", "G:", "BABY LOOK P:", "CAMISETA GG:" ou "REGATA M:" definem tamanho/modelo dos itens seguintes; preencha suas colunas proprias e deixe grupo null.
 - Se um cabecalho combinar uma caracteristica com modelo/tamanho, mantenha somente a caracteristica no grupo. Exemplo: "PRETA BABY LOOK P:" => grupo "PRETA", modelo baby_look e tamanho "P".
@@ -49,8 +53,11 @@ Regras gerais:
 - Se um campo estiver ausente, use null.
 - Se houver duvida, use null e explique em observacao.
 - Marcadores de ausencia de nome nunca entram no campo nome: "sem nome", "sem nomes", "s/nome", "s/ nome", "sem identificação", "sem identificacao", "sem id", "sem nome:" e similares.
-- Quando um marcador de ausencia de nome aparecer sozinho como cabecalho ou antes de uma lista, ele cria uma secao sem nome: extraia as linhas seguintes como itens normalmente, mas deixe nome null ate aparecer outro cabecalho ou uma linha com nome claro.
+- Um marcador com dois-pontos, como "SEM NOME:", e cabecalho de secao: extraia as linhas seguintes como itens normalmente, mas deixe nome null ate aparecer outro cabecalho explicito. Uma palavra que pareca nome dentro dessa secao NAO encerra a secao e NAO vira nome da camisa.
+- Um marcador sem dois-pontos dentro de um bloco que ja tem tamanho, como "G\nSEM NOME\nSEM NOME", representa pecas individuais. Cada ocorrencia gera um item separado com nome null e o tamanho ativo. Nunca descarte nem agrupe essas ocorrencias.
+- Um marcador sem dois-pontos tambem pode iniciar uma secao quando estiver claramente antes de linhas com numero/tamanho proprio, como "S/NOME\n12 M\n09 GG". Use a estrutura ao redor para distinguir os casos.
 - Em uma secao sem nome, palavras antes do tamanho ou numero podem ser responsavel, professor(a), referencia ou anotacao, nao nome da camisa. Exemplo: depois de "SEM NOME:", linhas como "Prof° Daiane G" e "Arlene P" devem ter nome null, tamanhos "G" e "P".
+- Se um registro JSON tiver nome ausente, null, string vazia ou marcador como "SEM NOME", retorne nome null. Ainda assim, crie o item: ausencia de nome nunca e motivo para descartar uma peca.
 - Preserve nomes e apelidos exatamente como escritos.
 - Nao deduplique automaticamente.
 - Nao junte pessoas diferentes.
@@ -82,6 +89,24 @@ Regras gerais:
 - Para tratar uma letra como inicial do nome, ela normalmente deve estar marcada com ponto ou colada ao nome, como "g."; sem ponto e solta, prefira tamanho.
 - Se houver apenas um numero na linha, decida com cautela se e numero da camisa ou tamanho infantil.
 - Em duplicidades aparentes, mantenha ambos os registros e adicione observacao se necessario.
+
+Entrada em JSON:
+- O texto recebido pode ser um array JSON ou uma sequencia de objetos JSON, inclusive dentro de bloco de codigo. Nesse caso, leia os objetos como dados, nao como texto corrido.
+- As chaves nao diferenciam maiusculas de minusculas. Exemplos de equivalencia: Nome/nome => nome; Numero/Número/numero => numero; Tamanho/tamanho => tamanho; Modelo/modelo => modelo; Grupo/grupo => grupo.
+- Cada objeto de entrada representa exatamente um item de saida. A quantidade de items deve ser exatamente a quantidade de objetos de entrada.
+- Nunca combine objetos, nunca crie objeto extra e nunca duplique um objeto. Objetos iguais so permanecem repetidos se realmente estiverem repetidos na entrada.
+- Valores pertencem somente ao proprio objeto. Nao use o tamanho do objeto anterior ou seguinte para preencher um campo ausente.
+- Campos ausentes, null ou vazios continuam null, salvo a normalizacao explicita de tamanho e modelo descrita neste prompt.
+
+Listas em colunas verticais:
+- Uma linha contendo SOMENTE um tamanho valido e um cabecalho de tamanho, nao uma peca e nao um nome.
+- Esse tamanho se aplica a TODAS as linhas de pessoas seguintes ate aparecer outra linha contendo somente tamanho ou outro cabecalho de secao/grupo.
+- Gere um item para cada linha de pessoa; nao gere item para a linha do tamanho.
+- Nunca aplique o tamanho apenas ao primeiro nome e nunca transforme a linha de tamanho em item sem nome.
+- Linhas repetidas continuam sendo pecas diferentes. Exemplo: dois nomes "LUCAS OLIVEIRA" geram dois itens; tres linhas "SEM NOME" geram tres itens com nome null.
+- Exemplo: "M\nGARDENYA\nWESLEN\nJACIARA\nG\nQRA KAKAROTTO\nFABIANA\nGG\nADAGMAR\nJHONY" gera 7 itens: GARDENYA/WESLEN/JACIARA com M; QRA KAKAROTTO/FABIANA com G; ADAGMAR/JHONY com GG.
+- A regra continua dentro de grupos. Exemplo: "MANGA CURTA:\nP\nWESLEN\nM\nGARDENYA\nG\nMARQUINHOS" gera 3 itens no grupo MANGA CURTA, respectivamente P, M e G.
+- Exemplo: "G\nLUCAS OLIVEIRA\nLUCAS OLIVEIRA\nGEOVANA\nLUIS\nMAURO\nSEM NOME\nSEM NOME\nLETICIA\nMARCOS\nSEM NOME" gera exatamente 10 itens tamanho G: dois chamados LUCAS OLIVEIRA, GEOVANA, LUIS, MAURO, tres itens distintos com nome null, LETICIA e MARCOS.
 
 Tamanhos adultos aceitos: ${promptAdultSizes.join(", ")}.
 Tamanhos infantis aceitos: ${promptChildSizes.join(", ")}.
@@ -124,6 +149,9 @@ Exemplos:
 "Paulo 64" => nome "Paulo", numero null, tamanho "64", modelo "tradicional".
 "SEM NOME:\nProf° Daiane G\nArlene P" => dois itens: nome null, tamanho "G"; nome null, tamanho "P".
 "S/NOME\n12 M\n09 GG" => dois itens: nome null, numero "12", tamanho "M"; nome null, numero "09", tamanho "GG".
+"SEM NOME:\nArlene P\nDaiane G" => dois itens: ambos com nome null; tamanhos "P" e "G". "Arlene" e "Daiane" nao encerram a secao.
+JSON [{"Nome":"WESLEN","Tamanho":"P"},{"Nome":"GARDENYA","Tamanho":"M"}] => exatamente dois itens, WESLEN/P e GARDENYA/M; nao duplique nenhum deles.
+JSON [{"Nome":"","Tamanho":"P"},{"Tamanho":"G"}] => exatamente dois itens, ambos com nome null; tamanhos "P" e "G".
 "PRETA:\nKailany (M)\nCINZA:\nMarilene (G)" => dois itens: Kailany com grupo "PRETA" e tamanho "M"; Marilene com grupo "CINZA" e tamanho "G".
 "PP:\nAdriel\nGabrieli F." => dois itens com grupo null, modelo "tradicional" e tamanho "PP".
 "BABY LOOK P:\nLivia\nCoord. Jessica" => dois itens com grupo null, modelo "baby_look" e tamanho "P".
@@ -139,5 +167,15 @@ Nunca transforme:
 `.trim();
 
 export function buildUniformListPrompt(text: string) {
-  return `Extraia a lista abaixo preservando nomes literalmente.\n\nTexto recebido:\n${JSON.stringify(text)}`;
+  return `Extraia a lista delimitada abaixo preservando nomes e a quantidade de registros literalmente.
+
+Checklist obrigatorio antes da resposta:
+1. Preserve cada ocorrencia: nao invente, omita nem una registros e mantenha duplicidades que existam na entrada.
+2. Se a entrada for JSON, retorne exatamente um item por objeto.
+3. Se houver um tamanho sozinho em uma linha, aplique-o aos nomes seguintes ate o proximo tamanho/cabecalho, sem criar item para o tamanho.
+4. Em secao SEM NOME, crie os itens com nome null.
+
+<LISTA_RECEBIDA>
+${text}
+</LISTA_RECEBIDA>`;
 }
