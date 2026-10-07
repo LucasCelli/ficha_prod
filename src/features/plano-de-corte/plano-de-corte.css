@@ -304,6 +304,31 @@ html:has(.cut-plan__command-bar) [data-sonner-toaster][data-y-position="bottom"]
   font-weight: var(--font-weight-regular);
 }
 
+.cut-plan__sleeve-fabric-control {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(260px, 420px);
+  align-items: center;
+  gap: 16px;
+  margin-block-end: 16px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 38%, var(--color-border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface));
+}
+
+.cut-plan__sleeve-fabric-control div {
+  display: grid;
+  gap: 3px;
+}
+
+.cut-plan__sleeve-fabric-control small {
+  color: var(--color-muted);
+}
+
+.cut-plan__sleeve-fabric-control select {
+  width: 100%;
+}
+
 /* Sufixo de unidade sobreposto ao input, alinhado ao padding do `.field`. */
 .cut-plan__unit-input {
   display: grid;
@@ -1074,6 +1099,10 @@ html:has(.cut-plan__command-bar) [data-sonner-toaster][data-y-position="bottom"]
 }
 
 @media (max-width: 768px) {
+  .cut-plan__sleeve-fabric-control {
+    grid-template-columns: 1fr;
+  }
+
   .cut-plan__history {
     top: 72px;
     right: 12px;
