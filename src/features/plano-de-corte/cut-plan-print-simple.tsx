@@ -35,6 +35,7 @@ function sortedMergedMarkers(lay: MergedLayPlan) {
     .flatMap((allocation) => allocation.frequencies.map((marker) => ({ allocation, marker })))
     .sort((left, right) => compareUniformSizes(left.marker.size, right.marker.size)
       || left.marker.sleeveType.localeCompare(right.marker.sleeveType)
+      || (left.marker.component ?? "WHOLE").localeCompare(right.marker.component ?? "WHOLE")
       || left.allocation.fabricId.localeCompare(right.allocation.fabricId));
 }
 
@@ -51,7 +52,7 @@ function MergedLayCard({ fabricResults, fabrics, index, lay }: { fabricResults: 
     <thead><tr><th>Tecido</th><th>Tamanho</th><th>Tipo</th><th>Frequência</th><th>Peças cortadas</th></tr></thead>
     <tbody>{sortedMergedMarkers(lay).map(({ allocation, marker }) => {
       const fabric = fabrics.find((item) => item.id === allocation.fabricId)!;
-      return <tr key={`${allocation.id}-${marker.garmentType}-${marker.size}-${marker.sleeveType}`}><td>{fabricLabel(fabric)}</td><td>{formatCutPlanSizeLabel(marker.size, marker.garmentType)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>;
+      return <tr key={`${allocation.id}-${marker.garmentType}-${marker.size}-${marker.sleeveType}-${marker.component}`}><td>{fabricLabel(fabric)}</td><td>{formatCutPlanSizeLabel(marker.size, marker.garmentType)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType, marker.component)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>;
     })}</tbody>
   </>} />;
 }
@@ -62,7 +63,7 @@ function FabricLayCard({ index, lay, showSleeveType }: { index: number; lay: Lay
     <p><strong>{formatOperationalMarkerLabel(lay.frequencies, showSleeveType)}</strong></p>
   </>} rows={<>
     <thead><tr><th>Tamanho</th><th>Tipo</th><th>Frequência</th><th>Peças cortadas</th></tr></thead>
-    <tbody>{sortMarkerFrequenciesForDisplay(lay.frequencies).map((marker) => <tr key={`${marker.garmentType}-${marker.size}-${marker.sleeveType}`}><td>{formatCutPlanSizeLabel(marker.size, marker.garmentType)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>)}</tbody>
+    <tbody>{sortMarkerFrequenciesForDisplay(lay.frequencies).map((marker) => <tr key={`${marker.garmentType}-${marker.size}-${marker.sleeveType}-${marker.component}`}><td>{formatCutPlanSizeLabel(marker.size, marker.garmentType)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType, marker.component)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>)}</tbody>
   </>} />;
 }
 
@@ -76,7 +77,7 @@ function aggregateOverallSizes(fabricResults: FabricCutPlanResult[]) {
   const totals = new Map<string, { produced: number; requested: number }>();
   for (const fabricResult of fabricResults) {
     for (const size of fabricResult.sizes) {
-      const key = cutPlanDemandKey(size.size, size.sleeveType, size.garmentType);
+      const key = cutPlanDemandKey(size.size, size.sleeveType, size.garmentType, size.component);
       const current = totals.get(key) ?? { produced: 0, requested: 0 };
       current.produced += size.produced;
       current.requested += size.requested;
@@ -85,8 +86,8 @@ function aggregateOverallSizes(fabricResults: FabricCutPlanResult[]) {
   }
   return [...totals.entries()]
     .map(([key, value]) => {
-      const { garmentType, size, sleeveType } = parseCutPlanDemandKey(key);
-      return { difference: value.produced - value.requested, garmentType, produced: value.produced, requested: value.requested, size, sleeveType };
+      const { garmentType, size, sleeveType, component } = parseCutPlanDemandKey(key);
+      return { difference: value.produced - value.requested, garmentType, component, produced: value.produced, requested: value.requested, size, sleeveType };
     })
     .sort((left, right) => compareUniformSizes(left.size, right.size)
       || left.sleeveType.localeCompare(right.sleeveType)

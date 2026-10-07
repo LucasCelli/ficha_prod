@@ -1,5 +1,12 @@
 # Registro de alterações
 
+## 2026-10-07 — Plano de Corte: mangas em tecido separado
+
+- Adicionada a opção **Mangas separadas**. Quando ativa, cada linha escolhe independentemente o tecido do corpo e o tecido das mangas; quando inativa, o fluxo e os limites anteriores permanecem inalterados.
+- Corpo e mangas passam a usar suas áreas próprias na estimativa. Sem medida específica cadastrada, mangas curtas separadas usam a proporção operacional de 1/4 do comprimento e 1/2 da largura do corpo. Os enfestos exclusivos de mangas deixam de herdar o teto normal de frequência e são limitados pela metragem da mesa, permitindo concentrar o maior número fisicamente possível de mangas em um só enfesto.
+- O resultado, a conferência, a cópia da grade, a impressão e o histórico preservam a identificação interna de corpo/mangas e as cores correspondentes. A validação impede usar o mesmo tecido nos dois grupos, evitando que o solver volte a misturá-los.
+- O caso de regressão confirma produção exata, frequência de mangas acima do teto dos corpos, tentativa de enfesto único e conservação da metragem total ao dividir corpo e mangas.
+
 ## 2026-10-07 — Plano de Corte: frequência 1 para modelagens de tecido plano
 
 - Camisa social, camisete e jaleco passam a aceitar frequência 1 mesmo quando um cadastro antigo do material estiver marcado como tubular. Calça e bermuda de brim também usam frequência 1; calça e bermuda de helanca mantêm frequência par.

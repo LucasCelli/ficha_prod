@@ -1,5 +1,5 @@
 import { isUniformBabyLookText, normalizeUniformSizeKey } from "../../lib/uniform-sizes.ts";
-import { getCutPlanEffectiveFabricType, getCutPlanFrequencyStep, inferCutPlanGarmentType, isPantsGarment, isShortsGarment, type CutPlanSizeProfile, type FabricType, type GarmentType, type MarkerFrequency, type SleeveType } from "./model.ts";
+import { getCutPlanEffectiveFabricType, getCutPlanFrequencyStep, inferCutPlanGarmentType, isPantsGarment, isShortsGarment, type CutPlanComponent, type CutPlanSizeProfile, type FabricType, type GarmentType, type MarkerFrequency, type SleeveType } from "./model.ts";
 import { resolveLowerGarmentFallback, resolveShirtFallback, type MeasurementSource } from "./fallback-dimensions.ts";
 
 /** Margem conservadora para perdas do encaixe aproximado. */
@@ -57,20 +57,22 @@ export function calculateMarkerAreaLengthCm(
   type: FabricType,
   fabricWidthCm: number,
   frequency: number,
+  component: CutPlanComponent = "WHOLE",
 ) {
   const sleeveHeightCm = sleeveType === "LONGA" ? profile.longSleeveHeightCm : profile.shortSleeveHeightCm;
   const sleeveWidthCm = sleeveType === "LONGA" ? profile.longSleeveWidthCm : profile.shortSleeveWidthCm;
-  const shirtAreaCm2 = calculateShirtAreaCm2(profile, sleeveType);
+  const bodyAreaCm2 = profile.frontHeightCm * profile.frontWidthCm + profile.backHeightCm * profile.backWidthCm;
+  const sleevesAreaCm2 = sleeveHeightCm * sleeveWidthCm * 2;
+  const shirtAreaCm2 = component === "BODY" ? bodyAreaCm2 : component === "SLEEVES" ? sleevesAreaCm2 : bodyAreaCm2 + sleevesAreaCm2;
   let markerAreaCm2 = shirtAreaCm2 * frequency;
   if (type === "TUBULAR") {
     const frontAreaCm2 = profile.frontHeightCm * profile.frontWidthCm;
     const foldedBackHalfAreaCm2 = profile.backHeightCm * (profile.backWidthCm / 2);
     const fullSleeveAreaCm2 = sleeveHeightCm * sleeveWidthCm;
     const foldedSleeveHalfAreaCm2 = sleeveHeightCm * (sleeveWidthCm / 2);
-    const areaPerProducedPairCm2 = frontAreaCm2
-      + foldedBackHalfAreaCm2 * 2
-      + fullSleeveAreaCm2
-      + foldedSleeveHalfAreaCm2 * 2;
+    const tubularBodyAreaCm2 = frontAreaCm2 + foldedBackHalfAreaCm2 * 2;
+    const tubularSleevesAreaCm2 = fullSleeveAreaCm2 + foldedSleeveHalfAreaCm2 * 2;
+    const areaPerProducedPairCm2 = component === "BODY" ? tubularBodyAreaCm2 : component === "SLEEVES" ? tubularSleevesAreaCm2 : tubularBodyAreaCm2 + tubularSleevesAreaCm2;
     markerAreaCm2 = areaPerProducedPairCm2 * (frequency / 2);
   }
   const areaLengthCm = markerAreaCm2 / (fabricWidthCm * ESTIMATED_NESTING_EFFICIENCY);
@@ -119,8 +121,9 @@ export function calculateEntryLengthPerFrequencyCm(
   fabricWidthCm: number,
   profileIndex: Map<string, CutPlanSizeProfile>,
   garmentType?: GarmentType,
+  component: CutPlanComponent = "WHOLE",
 ) {
-  return resolveEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex, garmentType).lengthCm;
+  return resolveEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex, garmentType, component).lengthCm;
 }
 
 export function resolveEntryLengthPerFrequencyCm(
@@ -130,6 +133,7 @@ export function resolveEntryLengthPerFrequencyCm(
   fabricWidthCm: number,
   profileIndex: Map<string, CutPlanSizeProfile>,
   garmentType?: GarmentType,
+  component: CutPlanComponent = "WHOLE",
 ): { lengthCm: number | null; source: MeasurementSource } {
   const effectiveType = getCutPlanEffectiveFabricType(type, garmentType ?? inferCutPlanGarmentType(size));
   if ((garmentType && isPantsGarment(garmentType)) || isPantsCutPlanSize(size)) {
@@ -147,15 +151,29 @@ export function resolveEntryLengthPerFrequencyCm(
   // próprios da modelagem que não existem numa camiseta.
   const profile = profileIndex.get(normalizeCutPlanSizeKey(measurementSize));
   if (profile) {
-    const base = calculateMarkerAreaLengthCm(profile, sleeveType, effectiveType, fabricWidthCm, 1);
+    const base = calculateMarkerAreaLengthCm(profile, sleeveType, effectiveType, fabricWidthCm, 1, component);
     return { lengthCm: isDressShirt ? base * DRESS_SHIRT_COMPONENT_ALLOWANCE : base, source: "REGISTERED" };
   }
   const fallback = resolveShirtFallback(measurementSize, sleeveType, isDressShirt);
   if (!fallback) return { lengthCm: null, source: "UNKNOWN" };
-  const base = calculateMarkerAreaLengthCm(fallback.profile, sleeveType, effectiveType, fabricWidthCm, 1);
-  const estimated = fallback.margin.kind === "fixed"
-    ? base + fallback.margin.value
-    : base + Math.min(fallback.margin.maximumCm, base * (fallback.margin.value - 1));
+  // Na separacao de mangas curtas, usa a proporcao operacional observada no
+  // encaixe: 1/4 do comprimento e 1/2 da largura do corpo. O perfil cadastrado
+  // acima continua soberano; a grade completa (WHOLE) conserva a regra antiga.
+  const componentProfile = component === "SLEEVES" && sleeveType === "CURTA"
+    ? {
+      ...fallback.profile,
+      shortSleeveHeightCm: ((fallback.profile.frontHeightCm + fallback.profile.backHeightCm) / 2) * 0.25,
+      shortSleeveWidthCm: ((fallback.profile.frontWidthCm + fallback.profile.backWidthCm) / 2) * 0.5,
+    }
+    : fallback.profile;
+  const base = calculateMarkerAreaLengthCm(componentProfile, sleeveType, effectiveType, fabricWidthCm, 1, component);
+  const wholeBase = calculateMarkerAreaLengthCm(fallback.profile, sleeveType, effectiveType, fabricWidthCm, 1);
+  const wholeEstimated = fallback.margin.kind === "fixed"
+    ? wholeBase + fallback.margin.value
+    : wholeBase + Math.min(fallback.margin.maximumCm, wholeBase * (fallback.margin.value - 1));
+  // Ao separar componentes, a margem do fallback precisa ser rateada; somar a
+  // margem inteira ao corpo e novamente às mangas inflaria a metragem total.
+  const estimated = wholeBase > 0 ? wholeEstimated * (base / wholeBase) : base;
   const lengthCm = isDressShirt ? estimated * DRESS_SHIRT_COMPONENT_ALLOWANCE : estimated;
   return { lengthCm, source: fallback.confidence };
 }
@@ -169,8 +187,8 @@ export function estimateMarkerLengthCm(
   if (!Number.isFinite(fabricWidthCm) || fabricWidthCm <= 0) return null;
   let areaLengthCm = 0;
   let matchedEntries = 0;
-  for (const { garmentType, size, sleeveType, frequency } of frequencies) {
-    const lengthPerFrequency = calculateEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex, garmentType);
+  for (const { garmentType, size, sleeveType, frequency, component } of frequencies) {
+    const lengthPerFrequency = calculateEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex, garmentType, component);
     if (lengthPerFrequency === null) return null;
     areaLengthCm += lengthPerFrequency * frequency;
     matchedEntries += 1;
@@ -193,11 +211,12 @@ export function getMaximumEstimatedFrequency(
   profiles: CutPlanSizeProfile[],
   maxFrequency = getDefaultMaximumFrequency(type),
   garmentType?: GarmentType,
+  component: CutPlanComponent = "WHOLE",
 ) {
   const profileIndex = buildSizeProfileIndex(profiles);
   const step = getCutPlanFrequencyStep(type, garmentType ?? inferCutPlanGarmentType(size));
   const effectiveMaxFrequency = (garmentType && isPantsGarment(garmentType)) || isPantsCutPlanSize(size) ? Math.min(step, maxFrequency) : maxFrequency;
-  const length = calculateEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex, garmentType);
+  const length = calculateEntryLengthPerFrequencyCm(size, sleeveType, type, fabricWidthCm, profileIndex, garmentType, component);
   return maximumFrequencyForLength(length, tableLengthCm, effectiveMaxFrequency, step);
 }
 

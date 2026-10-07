@@ -1,5 +1,6 @@
 export type FabricType = "PLANO" | "TUBULAR";
 export type SleeveType = "CURTA" | "LONGA";
+export type CutPlanComponent = "WHOLE" | "BODY" | "SLEEVES";
 export type GarmentType = "T_SHIRT" | "BABY_LOOK" | "DRESS_SHIRT" | "CAMISETE" | "LAB_COAT"
   | "PANTS_BRIM" | "SHORTS_BRIM" | "PANTS_HELANCA" | "SHORTS_HELANCA"
   | "PANTS" | "SHORTS";
@@ -44,17 +45,18 @@ export function inferCutPlanGarmentType(size: string): GarmentType {
   return "T_SHIRT";
 }
 
-export function cutPlanDemandKey(size: string, sleeveType: SleeveType, garmentType = inferCutPlanGarmentType(size)) {
-  return `${size}${CUT_PLAN_DEMAND_SEPARATOR}${sleeveType}${CUT_PLAN_DEMAND_SEPARATOR}${garmentType}`;
+export function cutPlanDemandKey(size: string, sleeveType: SleeveType, garmentType = inferCutPlanGarmentType(size), component: CutPlanComponent = "WHOLE") {
+  return `${size}${CUT_PLAN_DEMAND_SEPARATOR}${sleeveType}${CUT_PLAN_DEMAND_SEPARATOR}${garmentType}${CUT_PLAN_DEMAND_SEPARATOR}${component}`;
 }
 
-export function parseCutPlanDemandKey(key: string): { garmentType: GarmentType; size: string; sleeveType: SleeveType } {
+export function parseCutPlanDemandKey(key: string): { garmentType: GarmentType; size: string; sleeveType: SleeveType; component: CutPlanComponent } {
   const parts = key.split(CUT_PLAN_DEMAND_SEPARATOR);
-  if (parts.length < 2) return { garmentType: inferCutPlanGarmentType(key), size: key, sleeveType: "CURTA" };
+  if (parts.length < 2) return { garmentType: inferCutPlanGarmentType(key), size: key, sleeveType: "CURTA", component: "WHOLE" };
   const size = parts[0];
   const sleeveType = parts[1] === "LONGA" ? "LONGA" : "CURTA";
   const garmentType = (["T_SHIRT", "BABY_LOOK", "DRESS_SHIRT", "CAMISETE", "LAB_COAT", "PANTS_BRIM", "SHORTS_BRIM", "PANTS_HELANCA", "SHORTS_HELANCA", "PANTS", "SHORTS"] as const).find((type) => type === parts[2]) ?? inferCutPlanGarmentType(size);
-  return { garmentType, size, sleeveType };
+  const component = parts[3] === "BODY" || parts[3] === "SLEEVES" ? parts[3] : "WHOLE";
+  return { garmentType, size, sleeveType, component };
 }
 
 export interface CutPlanFabric {
@@ -68,6 +70,10 @@ export interface CutPlanFabric {
 export interface CutPlanItem {
   id: string;
   fabricId: string;
+  /** Tecido usado apenas nas mangas quando o modo de mangas separadas estiver ativo. */
+  sleeveFabricId?: string;
+  /** Campo interno preenchido pela normalizacao; linhas da interface usam WHOLE. */
+  component?: CutPlanComponent;
   size: string;
   sleeveType: SleeveType;
   garmentType?: GarmentType;
@@ -100,6 +106,7 @@ export interface CutPlanInput {
   sizeProfiles: CutPlanSizeProfile[];
   sourceFichaIds?: string[];
   mergeFabricsInLays?: boolean;
+  separateSleeves?: boolean;
 }
 
 export interface CutPlanSourceFicha {
@@ -119,6 +126,7 @@ export interface MarkerFrequency {
   sleeveType: SleeveType;
   frequency: number;
   garmentType?: GarmentType;
+  component?: CutPlanComponent;
 }
 
 export interface LayPlan {
@@ -134,6 +142,7 @@ export interface SizeProductionResult {
   size: string;
   sleeveType: SleeveType;
   garmentType?: GarmentType;
+  component?: CutPlanComponent;
   requested: number;
   produced: number;
   difference: number;

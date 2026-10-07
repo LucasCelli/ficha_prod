@@ -895,3 +895,33 @@ test("GG1 social usa a medida aproximada de 52 em vez da maior base", () => {
   assert.equal(estimateMarkerLengthCm(marker("GG1"), "PLANO", 118, index), estimateMarkerLengthCm(marker("52"), "PLANO", 118, index));
   assert.ok(estimateMarkerLengthCm(marker("GG1"), "PLANO", 118, index)! < estimateMarkerLengthCm(marker("EGG"), "PLANO", 118, index)!);
 });
+
+test("mangas separadas usam outro tecido, metragem propria e frequencia acima do teto dos corpos", () => {
+  const input = createInput("TUBULAR", 50);
+  input.tableLengthCm = 800;
+  input.maxFrequency = 2;
+  input.separateSleeves = true;
+  input.fabrics = [
+    { ...input.fabrics[0], id: "body", color: "Branco" },
+    { ...input.fabrics[0], id: "sleeves", color: "Azul" },
+  ];
+  input.items = [
+    { id: "p", fabricId: "body", sleeveFabricId: "sleeves", size: "P", sleeveType: "CURTA", garmentType: "T_SHIRT", quantity: 12 },
+    { id: "m", fabricId: "body", sleeveFabricId: "sleeves", size: "M", sleeveType: "CURTA", garmentType: "T_SHIRT", quantity: 8 },
+  ];
+
+  const result = calculateCutPlan(input, false);
+  const bodies = result.fabrics.find((fabric) => fabric.fabricId === "body")!;
+  const sleeves = result.fabrics.find((fabric) => fabric.fabricId === "sleeves")!;
+
+  assert.ok(bodies.lays.flatMap((lay) => lay.frequencies).every((marker) => marker.component === "BODY" && marker.frequency <= 2));
+  assert.equal(sleeves.lays.length, 1);
+  assert.ok(sleeves.lays[0].frequencies.every((marker) => marker.component === "SLEEVES"));
+  assert.ok(sleeves.lays[0].frequencies.reduce((sum, marker) => sum + marker.frequency, 0) > input.maxFrequency!);
+  assert.ok(result.fabrics.flatMap((fabric) => fabric.sizes).every((size) => size.difference === 0));
+
+  const profile = buildSizeProfileIndex(input.sizeProfiles);
+  const body = estimateMarkerLengthCm([{ size: "M", sleeveType: "CURTA", component: "BODY", frequency: 2 }], "TUBULAR", 118, profile)!;
+  const sleeve = estimateMarkerLengthCm([{ size: "M", sleeveType: "CURTA", component: "SLEEVES", frequency: 2 }], "TUBULAR", 118, profile)!;
+  assert.ok(Math.abs(sleeve / body - 0.125) < 1e-8);
+});

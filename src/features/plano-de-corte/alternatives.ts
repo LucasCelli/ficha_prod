@@ -1,12 +1,12 @@
 import { calculateCutPlan } from "./calculator.ts";
 import { cutPlanDemandKey, getCutPlanFrequencyStep, MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE, parseCutPlanDemandKey, prioritizesCutPlanLayers, type CutPlanInput, type CutPlanResult, type FabricCutPlanResult, type LayPlan } from "./model.ts";
-import { aggregateCutPlanItems, normalizeCutPlanInput } from "./normalization.ts";
+import { aggregateCutPlanItems, getFabricMaximumFrequency, normalizeCutPlanInput } from "./normalization.ts";
 import { checkSearchBudget, createSearchBudget, searchExpired, SearchInterrupted, sliceSearchBudget, type SearchBudget } from "./search-budget.ts";
 import { buildMergedLays, calculateMergedLayLowerBound } from "./merge-solver.ts";
 import { fabricCompatibilityKey, validateCutPlanSolution } from "./solution-validation.ts";
 import { hasSingleMold, SIZE_ENTRY_IMBALANCE_PENALTY, solveMinimumLays } from "./solver.ts";
 import { compareUniformSizes } from "../../lib/uniform-sizes.ts";
-import { buildSizeProfileIndex, estimateMarkerLengthCm, getDefaultMaximumFrequency, getMaximumEstimatedFrequency } from "./dimensions.ts";
+import { buildSizeProfileIndex, estimateMarkerLengthCm, getMaximumEstimatedFrequency } from "./dimensions.ts";
 
 export interface CutPlanAlternative {
   id: string;
@@ -24,11 +24,11 @@ function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"
       const operational = aggregateCutPlanItems(input, fabric.id);
       const lays: LayPlan[] = [];
       for (const [key, requestedQuantity] of operational) {
-        const { garmentType, size, sleeveType } = parseCutPlanDemandKey(key);
+        const { garmentType, size, sleeveType, component } = parseCutPlanDemandKey(key);
         const step = getCutPlanFrequencyStep(fabric.type, garmentType);
         let remaining = step * Math.ceil(requestedQuantity / step);
-        const configuredMaximumFrequency = input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type);
-        const maximumFrequency = getMaximumEstimatedFrequency(size, sleeveType, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles, configuredMaximumFrequency, garmentType);
+        const configuredMaximumFrequency = getFabricMaximumFrequency(input, fabric.id);
+        const maximumFrequency = getMaximumEstimatedFrequency(size, sleeveType, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles, configuredMaximumFrequency, garmentType, component);
         while (remaining > 0) {
           checkSearchBudget(budget);
           let frequency = getCutPlanFrequencyStep(fabric.type, garmentType);
@@ -47,7 +47,7 @@ function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"
           if (maximumFrequency < frequency) throw new Error(`O tamanho ${size} não cabe na menor grade.`);
           layers = Math.max(1, Math.floor(layers));
           const produced = frequency * layers;
-          lays.push({ id: `${fabric.id}-${mode}-${lays.length + 1}`, fabricId: fabric.id, layers, frequencies: [{ garmentType, size, sleeveType, frequency }] });
+          lays.push({ id: `${fabric.id}-${mode}-${lays.length + 1}`, fabricId: fabric.id, layers, frequencies: [{ garmentType, size, sleeveType, component, frequency }] });
           remaining -= produced;
         }
       }
@@ -62,18 +62,18 @@ function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"
 }
 
 function buildFabricResult(fabricId: string, requested: Map<string, number>, lays: LayPlan[]): FabricCutPlanResult {
-  const keys = new Set([...requested.keys(), ...lays.flatMap((lay) => lay.frequencies.map((marker) => cutPlanDemandKey(marker.size, marker.sleeveType, marker.garmentType)))]);
+  const keys = new Set([...requested.keys(), ...lays.flatMap((lay) => lay.frequencies.map((marker) => cutPlanDemandKey(marker.size, marker.sleeveType, marker.garmentType, marker.component)))]);
   const sizes = [...keys].map((key) => {
     const quantity = requested.get(key) ?? 0;
-    const { garmentType, size, sleeveType } = parseCutPlanDemandKey(key);
-    const produced = lays.reduce((total, lay) => total + (lay.frequencies.find((item) => item.size === size && item.sleeveType === sleeveType && (item.garmentType ?? "T_SHIRT") === garmentType)?.frequency ?? 0) * lay.layers, 0);
-    return { garmentType, size, sleeveType, requested: quantity, produced, difference: produced - quantity };
+    const { garmentType, size, sleeveType, component } = parseCutPlanDemandKey(key);
+    const produced = lays.reduce((total, lay) => total + (lay.frequencies.find((item) => item.size === size && item.sleeveType === sleeveType && (item.garmentType ?? "T_SHIRT") === garmentType && (item.component ?? "WHOLE") === component)?.frequency ?? 0) * lay.layers, 0);
+    return { garmentType, size, sleeveType, ...(component === "WHOLE" ? {} : { component }), requested: quantity, produced, difference: produced - quantity };
   });
   return { fabricId, lays, sizes };
 }
 
 function laySignature(lay: LayPlan) {
-  return JSON.stringify([lay.fabricId, lay.layers, lay.frequencies.map((item) => [item.garmentType ?? "T_SHIRT", item.size, item.sleeveType, item.frequency]).sort()]);
+  return JSON.stringify([lay.fabricId, lay.layers, lay.frequencies.map((item) => [item.garmentType ?? "T_SHIRT", item.size, item.sleeveType, item.component ?? "WHOLE", item.frequency]).sort()]);
 }
 
 function planSignature(result: CutPlanResult) {
@@ -121,13 +121,13 @@ function score(result: CutPlanResult, input?: CutPlanInput) {
   const layerHeightImbalance = Math.max(...layerHeights) / Math.min(...layerHeights);
   const totalMarkerLengthCm = operationalLays.reduce((total, lay) => total + (lay.markerLengthCm ?? 0), 0);
   const sizeSpreadScore = result.fabrics.reduce((total, fabric) => {
-    const orderedSizes = [...new Set(fabric.sizes.map((size) => cutPlanDemandKey(size.size, size.sleeveType, size.garmentType)))].sort((left, right) => {
+    const orderedSizes = [...new Set(fabric.sizes.map((size) => cutPlanDemandKey(size.size, size.sleeveType, size.garmentType, size.component)))].sort((left, right) => {
       const a = parseCutPlanDemandKey(left), b = parseCutPlanDemandKey(right);
       return compareUniformSizes(a.size, b.size) || a.sleeveType.localeCompare(b.sleeveType) || left.localeCompare(right);
     });
     const ranks = new Map(orderedSizes.map((size, index) => [size, index]));
     return total + fabric.lays.reduce((fabricTotal, lay) => {
-      const activeRanks = lay.frequencies.map((item) => ranks.get(cutPlanDemandKey(item.size, item.sleeveType, item.garmentType)) ?? 0).sort((a, b) => a - b);
+      const activeRanks = lay.frequencies.map((item) => ranks.get(cutPlanDemandKey(item.size, item.sleeveType, item.garmentType, item.component)) ?? 0).sort((a, b) => a - b);
       return fabricTotal + (activeRanks.length > 1 ? (activeRanks.at(-1)! - activeRanks[0]) * lay.layers : 0);
     }, 0);
   }, 0);
@@ -246,7 +246,7 @@ function calculateOptimizedVariants(input: CutPlanInput, primary: CutPlanResult,
       tableLengthCm: input.tableLengthCm,
       fabricWidthCm: fabric.widthCm,
       sizeProfiles: input.sizeProfiles,
-      maxFrequency: input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type),
+      maxFrequency: getFabricMaximumFrequency(input, fabric.id),
       maxTShirtOverproductionPerSize: MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE,
       // Ao mesclar cores, um plano local com mais enfestos pode alinhar alturas
       // e reduzir o total global. Nenhuma cor precisa de mais segmentos que o

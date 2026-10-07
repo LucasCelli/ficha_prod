@@ -1,6 +1,6 @@
 import { compareUniformSizes } from "../../lib/uniform-sizes.ts";
 import { buildSizeProfileIndex, calculateEntryLengthPerFrequencyCm, fitsTable, getDefaultMaximumFrequency, isPantsCutPlanSize, maximumFrequencyForLength, tableCapacityCm } from "./dimensions.ts";
-import { allowsCutPlanOverproduction, getCutPlanFrequencyStep, isPantsGarment, parseCutPlanDemandKey, prioritizesCutPlanLayers, type CutPlanSizeProfile, type FabricType, type GarmentType, type MarkerFrequency, type SleeveType } from "./model.ts";
+import { allowsCutPlanOverproduction, getCutPlanFrequencyStep, isPantsGarment, parseCutPlanDemandKey, prioritizesCutPlanLayers, type CutPlanComponent, type CutPlanSizeProfile, type FabricType, type GarmentType, type MarkerFrequency, type SleeveType } from "./model.ts";
 import { checkSearchBudget, createSearchBudget, SearchInterrupted, type SearchBudget } from "./search-budget.ts";
 
 export type SolvedLay = { layers: number; frequencies: MarkerFrequency[]; markerLengthCm?: number };
@@ -43,7 +43,7 @@ const MAX_RETURNED_SOLUTIONS = 128;
 const MAX_STATES = 150_000;
 const RETAINED_STATES_AFTER_COMPACTION = 100_000;
 
-type RankedEntry = { garmentType: GarmentType; size: string; sleeveType: SleeveType; quantity: number; rank: number; length: number; measured: boolean; maxFrequency: number; maxOverproduction: number; frequencyStep: number };
+type RankedEntry = { garmentType: GarmentType; size: string; sleeveType: SleeveType; component: CutPlanComponent; quantity: number; rank: number; length: number; measured: boolean; maxFrequency: number; maxOverproduction: number; frequencyStep: number };
 type SizeAssignment = { frequencies: number[]; markerLengths: number[]; totalFrequency: number; overproduction: number };
 type PartialPlan = {
   assignments: number[][];
@@ -258,9 +258,9 @@ function comparePartialPlans(a: PartialPlan, b: PartialPlan) {
 function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPlan, searchComplete: boolean, type: FabricType): SolvedPlan {
   const lays = layers.map((layerCount, layIndex) => ({
     layers: layerCount,
-    frequencies: entries.flatMap(({ garmentType, size, sleeveType, rank }) => {
+    frequencies: entries.flatMap(({ garmentType, size, sleeveType, component, rank }) => {
       const frequency = plan.assignments[rank][layIndex];
-      return frequency ? [{ garmentType, size, sleeveType, frequency }] : [];
+      return frequency ? [{ garmentType, size, sleeveType, ...(component === "WHOLE" ? {} : { component }), frequency }] : [];
     }),
     ...(entries.every((entry) => !plan.assignments[entry.rank][layIndex] || entry.measured) ? { markerLengthCm: plan.markerLengths[layIndex] } : {}),
   }));
@@ -291,7 +291,7 @@ function buildSolution(entries: RankedEntry[], layers: number[], plan: PartialPl
       return prioritizesCutPlanLayers(garmentType) && getCutPlanFrequencyStep(type, garmentType) === 1;
     }) ? lay.layers : 0), 0),
   };
-  const signature = lays.map((lay) => `${lay.layers}:${lay.frequencies.map((item) => `${item.garmentType ?? "T_SHIRT"}:${item.size}:${item.sleeveType}=${item.frequency}`).join(",")}`).join("|");
+  const signature = lays.map((lay) => `${lay.layers}:${lay.frequencies.map((item) => `${item.garmentType ?? "T_SHIRT"}:${item.size}:${item.sleeveType}:${item.component ?? "WHOLE"}=${item.frequency}`).join(",")}`).join("|");
   return { lays, metrics, signature, searchComplete };
 }
 
@@ -330,7 +330,7 @@ export function assessLays(lays: SolvedLay[], quantities: Map<string, number>, t
     return compareUniformSizes(a.size, b.size) || a.sleeveType.localeCompare(b.sleeveType) || left.localeCompare(right);
   }).map(([key, quantity], rank) => {
     const demand = parseCutPlanDemandKey(key);
-    const length = calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, type, constraints.fabricWidthCm, index, demand.garmentType);
+    const length = calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, type, constraints.fabricWidthCm, index, demand.garmentType, demand.component);
     return { ...demand, quantity, rank, length: length ?? 0, measured: length !== null, maxFrequency: 0, maxOverproduction: 0, frequencyStep: getCutPlanFrequencyStep(type, demand.garmentType) };
   });
   const assignments = entries.map((entry) => lays.map((lay) => lay.frequencies.find((item) => item.size === entry.size && item.sleeveType === entry.sleeveType
@@ -361,7 +361,7 @@ export function solveMinimumLays(
   const profileIndex = buildSizeProfileIndex(constraints.sizeProfiles);
   const entries: RankedEntry[] = ordered.map(([key, quantity], rank) => {
     const demand = parseCutPlanDemandKey(key);
-    const length = calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, type, constraints.fabricWidthCm, profileIndex, demand.garmentType);
+    const length = calculateEntryLengthPerFrequencyCm(demand.size, demand.sleeveType, type, constraints.fabricWidthCm, profileIndex, demand.garmentType, demand.component);
     const maxOverproduction = type === "PLANO" && allowsCutPlanOverproduction(demand.garmentType)
       ? constraints.maxTShirtOverproductionPerSize ?? 0
       : 0;

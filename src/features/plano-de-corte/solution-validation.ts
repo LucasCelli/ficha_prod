@@ -1,6 +1,6 @@
-import { buildSizeProfileIndex, estimateMarkerLengthCm, fitsTable, getDefaultMaximumFrequency, getLayerLimit, isPantsCutPlanSize, resolveEntryLengthPerFrequencyCm } from "./dimensions.ts";
+import { buildSizeProfileIndex, estimateMarkerLengthCm, fitsTable, getLayerLimit, isPantsCutPlanSize, resolveEntryLengthPerFrequencyCm } from "./dimensions.ts";
 import { allowsCutPlanOverproduction, cutPlanDemandKey, getCutPlanFrequencyStep, isPantsGarment, MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE, parseCutPlanDemandKey, type CutPlanInput, type CutPlanResult } from "./model.ts";
-import { aggregateCutPlanItems } from "./normalization.ts";
+import { aggregateCutPlanItems, getFabricMaximumFrequency } from "./normalization.ts";
 
 /** Independente do gerador: quantidades, limites e comprimentos são refeitos. */
 export function validateCutPlanSolution(input: CutPlanInput, result: CutPlanResult) {
@@ -24,19 +24,19 @@ export function validateCutPlanSolution(input: CutPlanInput, result: CutPlanResu
       let totalFrequency = 0;
       for (const item of lay.frequencies) {
         const step = getCutPlanFrequencyStep(fabric.type, item.garmentType ?? "T_SHIRT");
-        const key = cutPlanDemandKey(item.size, item.sleeveType, item.garmentType);
+        const key = cutPlanDemandKey(item.size, item.sleeveType, item.garmentType, item.component);
         const garmentType = item.garmentType ?? "T_SHIRT";
-        const limit = Math.min(input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type), isPantsGarment(garmentType) || isPantsCutPlanSize(item.size) ? step : Infinity);
+        const limit = Math.min(getFabricMaximumFrequency(input, fabric.id), isPantsGarment(garmentType) || isPantsCutPlanSize(item.size) ? step : Infinity);
         if (seen.has(key) || !expected.has(key) || !Number.isSafeInteger(item.frequency) || item.frequency < step || item.frequency > limit || item.frequency % step !== 0) fail();
         seen.add(key);
         totalFrequency += item.frequency;
         produced.set(key, (produced.get(key) ?? 0) + item.frequency * lay.layers);
-        const measurement = resolveEntryLengthPerFrequencyCm(item.size, item.sleeveType, fabric.type, fabric.widthCm, index, item.garmentType);
+        const measurement = resolveEntryLengthPerFrequencyCm(item.size, item.sleeveType, fabric.type, fabric.widthCm, index, item.garmentType, item.component);
         if (sourceRank[measurement.source] > sourceRank[measurementSource]) measurementSource = measurement.source;
         if (measurement.lengthCm === null) measurementsComplete = false;
         else knownLength += measurement.lengthCm * item.frequency;
       }
-      if (totalFrequency > (input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type))) fail();
+      if (totalFrequency > getFabricMaximumFrequency(input, fabric.id)) fail();
       if (!fitsTable(knownLength, input.tableLengthCm)) fail();
       const length = estimateMarkerLengthCm(lay.frequencies, fabric.type, fabric.widthCm, index);
       if (length === null ? lay.markerLengthCm !== undefined : lay.markerLengthCm === undefined || Math.abs(length - lay.markerLengthCm) > 1e-8) fail();
@@ -50,9 +50,9 @@ export function validateCutPlanSolution(input: CutPlanInput, result: CutPlanResu
       if (actual < minimum || (!allowsCutPlanOverproduction(garmentType) && actual !== minimum)
         || actual - minimum > MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE) fail();
     }
-    if (output.sizes.length !== expected.size || new Set(output.sizes.map((item) => cutPlanDemandKey(item.size, item.sleeveType, item.garmentType))).size !== expected.size) fail();
+    if (output.sizes.length !== expected.size || new Set(output.sizes.map((item) => cutPlanDemandKey(item.size, item.sleeveType, item.garmentType, item.component))).size !== expected.size) fail();
     for (const item of output.sizes) {
-      const key = cutPlanDemandKey(item.size, item.sleeveType, item.garmentType);
+      const key = cutPlanDemandKey(item.size, item.sleeveType, item.garmentType, item.component);
       if (item.produced !== produced.get(key) || item.requested !== requested.get(key) || item.difference !== item.produced - item.requested) fail();
     }
   }

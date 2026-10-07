@@ -1,4 +1,4 @@
-import { getCutPlanFrequencyStep, inferCutPlanGarmentType, type CutPlanInput } from "./model.ts";
+import { getCutPlanFrequencyStep, inferCutPlanGarmentType, isPantsGarment, isShortsGarment, type CutPlanInput } from "./model.ts";
 import { getDefaultMaximumFrequency, getLayerLimit, normalizeCutPlanSizeKey } from "./dimensions.ts";
 
 export function validateCutPlan(input: CutPlanInput, requireSharedFabricSettings = true) {
@@ -24,6 +24,7 @@ export function validateCutPlan(input: CutPlanInput, requireSharedFabricSettings
     if (input.maxLayers > getLayerLimit(fabric.type)) errors.push(`O limite de ${fabric.name || "folhas"} é ${getLayerLimit(fabric.type)} folhas.`);
   }
   if (input.items.length === 0) errors.push("Adicione pelo menos um tamanho.");
+  const bodyFabricIds = new Set(input.items.map((item) => item.fabricId));
   for (const item of input.items) {
     if (!item.size.trim()) errors.push("Preencha o tamanho em todas as linhas.");
     if (item.sleeveType !== "CURTA" && item.sleeveType !== "LONGA") errors.push(`Informe o tipo de manga de ${item.size || "cada linha"}.`);
@@ -33,6 +34,12 @@ export function validateCutPlan(input: CutPlanInput, requireSharedFabricSettings
     if (!Number.isSafeInteger(step * Math.ceil(item.quantity / step))) errors.push(`A quantidade de ${item.size} está fora do limite suportado.`);
     if (item.importedQuantity !== undefined && (!Number.isSafeInteger(item.importedQuantity) || item.importedQuantity < 0)) errors.push(`Revise a quantidade original de ${item.size || "cada linha"}.`);
     if (!input.fabrics.some((fabric) => fabric.id === item.fabricId)) errors.push(`Escolha o tecido de ${item.size || "cada linha"}.`);
+    const garmentType = item.garmentType ?? inferCutPlanGarmentType(item.size);
+    if (input.separateSleeves && !item.component && !isPantsGarment(garmentType) && !isShortsGarment(garmentType)) {
+      if (!item.sleeveFabricId || !input.fabrics.some((fabric) => fabric.id === item.sleeveFabricId)) errors.push(`Escolha o tecido das mangas de ${item.size || "cada linha"}.`);
+      else if (item.sleeveFabricId === item.fabricId) errors.push(`Corpo e mangas de ${item.size || "cada linha"} precisam usar tecidos diferentes.`);
+      else if (bodyFabricIds.has(item.sleeveFabricId)) errors.push(`O tecido das mangas de ${item.size || "cada linha"} também está sendo usado como tecido de corpo. Separe as cores em tecidos distintos.`);
+    }
   }
   const profileKeys = new Map<string, string>();
   for (const profile of input.sizeProfiles) {
