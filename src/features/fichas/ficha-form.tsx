@@ -50,7 +50,7 @@ import { getInitialFichaFormState } from "./form-state";
 import type { LegacyFichaImportWarning } from "./legacy-import";
 import { mapLegacyDraftToFichaFormInitialData, parseLegacyFichaJson } from "./legacy-import";
 import { buildObservacoesTecnicas } from "./observacoes-autofill";
-import { canonicalizeFichaProductItemSize, isFichaProductItemBabyLook, sortFichaProductItemsForSave } from "./product-item-sorting";
+import { canonicalizeFichaProductItemProduct, canonicalizeFichaProductItemSize, isFichaProductItemBabyLook, sortFichaProductItemsForSave } from "./product-item-sorting";
 import { PrintTriggerButton } from "./print-trigger-button";
 import { isMissingRequiredLayout, MISSING_LAYOUT_MESSAGE } from "./print-requirements";
 import { getMissingConditionalFields, isMangaCurtaELonga, isRegataProduct, normalizeProductForRule } from "./schema";
@@ -1561,7 +1561,11 @@ function FichaFormInner({
 
   function sortProductItems() {
     const sortedItems = sortFichaProductItemsForSave(getValues("itens"), sizeDefinitions)
-      .map((item) => ({ ...item, tamanho: canonicalizeFichaProductItemSize(item, sizeDefinitions) }));
+      .map((item) => ({
+        ...item,
+        produto: canonicalizeFichaProductItemProduct(item),
+        tamanho: canonicalizeFichaProductItemSize(item, sizeDefinitions),
+      }));
 
     showProductSortFeedback();
     setSortAnimationKey((current) => current + 1);

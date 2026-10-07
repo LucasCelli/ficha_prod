@@ -12,7 +12,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FichaDeleteActionState, FichaFormState, FichaStatusActionState, FieldErrors } from "./form-state";
 import { fichaFormSchema, isMangaCurtaELonga, type FichaFormValues } from "./schema";
 import { getFichaDeleteConfirmationCode } from "./delete-confirmation";
-import { canonicalizeFichaProductItemSize, sortFichaProductItemsForSave } from "./product-item-sorting";
+import { canonicalizeFichaProductItemProduct, canonicalizeFichaProductItemSize, sortFichaProductItemsForSave } from "./product-item-sorting";
 import { uppercaseObservationHtml } from "./observacoes-autofill";
 import { listUniformSizeDefinitions } from "@/features/catalogos/data";
 import { DEFAULT_UNIFORM_SIZE_DEFINITIONS, type UniformSizeDefinition } from "@/lib/uniform-sizes";
@@ -127,7 +127,7 @@ function getFichaPayload(values: FichaFormValues): Json {
 function getFichaItensPayload(values: FichaFormValues, definitions: readonly UniformSizeDefinition[]): Json {
   return sortFichaProductItemsForSave(values.itens, definitions).map((item) => ({
     detalhes_produto: nullableText(item.detalhesProduto),
-    produto: item.produto,
+    produto: canonicalizeFichaProductItemProduct(item),
     quantidade: item.quantidade,
     tamanho: nullableText(canonicalizeFichaProductItemSize(item, definitions)),
   }));
