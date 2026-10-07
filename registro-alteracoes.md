@@ -1,5 +1,15 @@
 # Registro de alterações
 
+## 2026-10-07 — Plano de Corte: frequência 1 para modelagens de tecido plano
+
+- Camisa social, camisete e jaleco passam a aceitar frequência 1 mesmo quando um cadastro antigo do material estiver marcado como tubular. Calça e bermuda de brim também usam frequência 1; calça e bermuda de helanca mantêm frequência par.
+- O ranking prioriza mais folhas para as modelagens planas depois de conservar a menor quantidade de enfestos e a produção exata. Camiseta, Baby Look e peças de helanca continuam com frequência par.
+- Jaleco ganhou modelagem própria na importação e no editor, evitando que seja tratado como camiseta e receba sobra indevida.
+- O campo Tipo agora separa calça e bermuda de brim (plano), calça e bermuda de helanca (tubular) e jaleco de brim (plano). A coluna foi ampliada; Quantidade e Tecido ficaram mais compactas.
+- Tamanhos mantêm na apresentação a grafia recebida da ficha. Um alias como `GG1` continua usando as medidas cadastradas para `XG`, mas aparece como `GG1` no mapa, na conferência e na impressão.
+- No caso de camisaria com pedidos 3/3 de manga curta e 2/2 de manga longa, o plano passa a usar 3 e 2 folhas com frequência 1, produzindo as dez peças exatas e eliminando as duas sobras.
+- Arquivos: `model.ts`, `solver.ts`, `calculator.ts`, `alternatives.ts`, validações, classificação/editor, testes do Plano de Corte e este registro.
+
 ## 2026-09-28 — Plano de Corte: fragmentação de tecido plano
 
 - Corrigido o ranking que colocava a metragem dos enfestos de uma folha antes da quantidade total de enfestos. Em pedidos planos com sobras pequenas, isso promovia um plano fragmentado apenas para isolar e encurtar o mapa de uma folha.

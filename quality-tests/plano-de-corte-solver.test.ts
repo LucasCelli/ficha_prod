@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { performance } from "node:perf_hooks";
 import { buildSizeProfileIndex, calculateMarkerAreaLengthCm, calculateShirtAreaCm2, ESTIMATED_NESTING_EFFICIENCY, estimateMarkerLengthCm, formatEstimatedLengthMeters, getDefaultMaximumFrequency, getLayerLimit, getMaximumEstimatedFrequency, normalizeCutPlanSizeKey } from "../src/features/plano-de-corte/dimensions.ts";
-import { cutPlanDemandKey, type CutPlanSizeProfile, type FabricType } from "../src/features/plano-de-corte/model.ts";
+import { cutPlanDemandKey, getCutPlanFrequencyStep, type CutPlanSizeProfile, type FabricType } from "../src/features/plano-de-corte/model.ts";
 import { assessLays, compareSolutionMetrics, hasSingleMold, solveMinimumLays } from "../src/features/plano-de-corte/solver.ts";
 import { calculateCutPlan, formatCutPlanItemType, formatCutPlanSizeLabel, formatMarkerLabel, formatOperationalMarkerLabel, groupCutPlanRowsByModel } from "../src/features/plano-de-corte/calculator.ts";
 import { calculateCutPlanAlternatives } from "../src/features/plano-de-corte/alternatives.ts";
@@ -60,6 +60,8 @@ test("apresenta o tipo da peca em vez de manga curta para itens inferiores", () 
   assert.equal(formatCutPlanItemType("CALÇA G", "CURTA"), "Calça");
   assert.equal(formatCutPlanItemType("SHORT M", "CURTA"), "Short/Bermuda");
   assert.equal(formatCutPlanItemType("BERMUDA M", "CURTA"), "Short/Bermuda");
+  assert.equal(formatCutPlanItemType("CALÇA M", "CURTA", "PANTS_BRIM"), "Calça de Brim · plano");
+  assert.equal(formatCutPlanItemType("BERMUDA M", "CURTA", "SHORTS_HELANCA"), "Bermuda de Helanca · tubular");
   assert.equal(formatCutPlanItemType("G", "CURTA"), "Curta");
   assert.equal(formatCutPlanItemType("G", "LONGA"), "Longa");
 });
@@ -577,6 +579,17 @@ test("mantém o mesmo tamanho e manga separados por modelagem", () => {
   assert.equal(result.lays.flatMap((lay) => lay.frequencies).length, 2);
 });
 
+test("brim usa frequência 1 e helanca mantém frequência par conforme o tipo da peça", () => {
+  assert.equal(getCutPlanFrequencyStep("TUBULAR", "PANTS_BRIM"), 1);
+  assert.equal(getCutPlanFrequencyStep("TUBULAR", "SHORTS_BRIM"), 1);
+  assert.equal(getCutPlanFrequencyStep("PLANO", "PANTS_HELANCA"), 2);
+  assert.equal(getCutPlanFrequencyStep("PLANO", "SHORTS_HELANCA"), 2);
+  const index = buildSizeProfileIndex([]);
+  const marker = (garmentType: "PANTS_BRIM" | "PANTS_HELANCA", frequency: number) => [{ garmentType, size: "CALÇA M", sleeveType: "CURTA" as const, frequency }];
+  assert.equal(estimateMarkerLengthCm(marker("PANTS_BRIM", 1), "TUBULAR", 118, index), estimateMarkerLengthCm(marker("PANTS_BRIM", 1), "PLANO", 118, index));
+  assert.equal(estimateMarkerLengthCm(marker("PANTS_HELANCA", 2), "PLANO", 118, index), estimateMarkerLengthCm(marker("PANTS_HELANCA", 2), "TUBULAR", 118, index));
+});
+
 test("agrupa a conferência por masculino e feminino e ordena cada grade por tamanho", () => {
   const groups = groupCutPlanRowsByModel([
     { garmentType: "CAMISETE" as const, size: "GG", sleeveType: "CURTA" as const },
@@ -755,6 +768,8 @@ test("avalia o total do mapa tubular e plano sem penalizar grades mistas", () =>
   assert.equal(hasSingleMold([marker("P", 2), marker("PP", 2)], "TUBULAR"), false);
   assert.equal(hasSingleMold([marker("P", 1)], "PLANO"), true);
   assert.equal(hasSingleMold([marker("P", 1), marker("PP", 1)], "PLANO"), false);
+  assert.equal(hasSingleMold([{ ...marker("P", 1), garmentType: "CAMISETE" }], "TUBULAR"), true);
+  assert.equal(hasSingleMold([{ ...marker("P", 1), garmentType: "CAMISETE" }, { ...marker("PP", 1), garmentType: "CAMISETE" }], "TUBULAR"), false);
 });
 
 test("prefere frequência 2 no plano e mantém mapa único quando o limite exige", () => {
@@ -790,6 +805,38 @@ test("mantém aliases femininos antigos sem perder a nova identificação por mo
   assert.equal(formatCutPlanSizeLabel("BABY LOOK P", "DRESS_SHIRT"), "FEM. P");
   assert.equal(formatCutPlanSizeLabel("BL P", "DRESS_SHIRT"), "FEM. P");
   assert.equal(formatCutPlanSizeLabel("BL P", "T_SHIRT"), "BL P");
+});
+
+test("preserva na tabela a grafia do tamanho recebida da ficha", () => {
+  const input = createInput("PLANO", 20);
+  input.items = [{ id: "gg1", fabricId: "fabric", size: "GG1", sleeveType: "CURTA", garmentType: "DRESS_SHIRT", quantity: 2 }];
+  input.sizeProfiles = [{ ...measuredProfile("XG", [70, 50, 70, 50, 20, 20, 60, 20]), aliases: ["GG1"] }];
+
+  const result = calculateCutPlan(input).fabrics[0];
+
+  assert.equal(result.sizes[0].size, "GG1");
+  assert.ok(result.lays.every((lay) => lay.frequencies.every((marker) => marker.size === "GG1")));
+});
+
+test("camisaria aceita frequência 1 e prioriza mais folhas mesmo em cadastro tubular antigo", () => {
+  const input = createInput("TUBULAR", 50);
+  input.items = [
+    ["XG", "CURTA", 3], ["EEGG", "CURTA", 3],
+    ["XG", "LONGA", 2], ["EEGG", "LONGA", 2],
+  ].map(([size, sleeveType, quantity], index) => ({
+    id: `camisete-${index}`,
+    fabricId: "fabric",
+    size: String(size),
+    sleeveType: sleeveType as "CURTA" | "LONGA",
+    garmentType: "CAMISETE" as const,
+    quantity: Number(quantity),
+  }));
+
+  const result = calculateCutPlanAlternatives(input)[0].result.fabrics[0];
+
+  assert.deepEqual(result.lays.map((lay) => lay.layers), [3, 2]);
+  assert.ok(result.lays.every((lay) => lay.frequencies.every((marker) => marker.frequency === 1)));
+  assert.ok(result.sizes.every((size) => size.difference === 0));
 });
 
 

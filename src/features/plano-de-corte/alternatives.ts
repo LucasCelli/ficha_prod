@@ -1,5 +1,5 @@
 import { calculateCutPlan } from "./calculator.ts";
-import { cutPlanDemandKey, MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE, parseCutPlanDemandKey, type CutPlanInput, type CutPlanResult, type FabricCutPlanResult, type LayPlan } from "./model.ts";
+import { cutPlanDemandKey, getCutPlanFrequencyStep, MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE, parseCutPlanDemandKey, prioritizesCutPlanLayers, type CutPlanInput, type CutPlanResult, type FabricCutPlanResult, type LayPlan } from "./model.ts";
 import { aggregateCutPlanItems, normalizeCutPlanInput } from "./normalization.ts";
 import { checkSearchBudget, createSearchBudget, searchExpired, SearchInterrupted, sliceSearchBudget, type SearchBudget } from "./search-budget.ts";
 import { buildMergedLays, calculateMergedLayLowerBound } from "./merge-solver.ts";
@@ -25,15 +25,15 @@ function calculateIndividualPlan(input: CutPlanInput, mode: "compact" | "simple"
       const lays: LayPlan[] = [];
       for (const [key, requestedQuantity] of operational) {
         const { garmentType, size, sleeveType } = parseCutPlanDemandKey(key);
-        let remaining = fabric.type === "TUBULAR" && requestedQuantity % 2 !== 0 ? requestedQuantity + 1 : requestedQuantity;
+        const step = getCutPlanFrequencyStep(fabric.type, garmentType);
+        let remaining = step * Math.ceil(requestedQuantity / step);
         const configuredMaximumFrequency = input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type);
         const maximumFrequency = getMaximumEstimatedFrequency(size, sleeveType, fabric.type, fabric.widthCm, input.tableLengthCm, input.sizeProfiles, configuredMaximumFrequency, garmentType);
         while (remaining > 0) {
           checkSearchBudget(budget);
-          let frequency = fabric.type === "TUBULAR" ? 2 : 1;
+          let frequency = getCutPlanFrequencyStep(fabric.type, garmentType);
           let layers = Math.min(input.maxLayers, remaining / frequency);
           if (mode === "compact") {
-            const step = fabric.type === "TUBULAR" ? 2 : 1;
             for (let candidate = step; candidate <= maximumFrequency; candidate += step) {
               checkSearchBudget(budget);
               const candidateLayers = remaining / candidate;
@@ -109,6 +109,13 @@ function score(result: CutPlanResult, input?: CutPlanInput) {
   }).length;
   const singleLayerLayCount = operationalLays.filter((lay) => lay.layers === 1).length;
   const totalLayers = operationalLays.reduce((total, lay) => total + lay.layers, 0);
+  const priorityLayerWork = fabricLays.reduce((total, lay) => {
+    const type = input?.fabrics.find((fabric) => fabric.id === lay.fabricId)?.type;
+    return total + (type && lay.frequencies.some((item) => {
+      const garmentType = item.garmentType ?? "T_SHIRT";
+      return prioritizesCutPlanLayers(garmentType) && getCutPlanFrequencyStep(type, garmentType) === 1;
+    }) ? lay.layers : 0);
+  }, 0);
   const totalOverproduction = result.fabrics.flatMap((fabric) => fabric.sizes).reduce((total, size) => total + Math.max(0, size.difference), 0);
   const layerHeights = operationalLays.map((lay) => lay.layers);
   const layerHeightImbalance = Math.max(...layerHeights) / Math.min(...layerHeights);
@@ -125,7 +132,7 @@ function score(result: CutPlanResult, input?: CutPlanInput) {
     }, 0);
   }, 0);
   const balanceAdjustedMarkerLengthCm = totalMarkerLengthCm * (1 + sizeEntryImbalance * SIZE_ENTRY_IMBALANCE_PENALTY);
-  return { mapCount: operationalLays.length, layCount: operationalLays.length, layerHeightImbalance, balanceAdjustedMarkerLengthCm, complexity, minimumSizeEntriesPerLay, peakFrequency, sizeEntries, sizeEntryImbalance, sizeSpreadScore, sparseLayCount, flatSingleLayerLengthCm, flatSingleLayerLayCount, singleMoldLayCount, singleLayerLayCount, totalLayers, totalMarkerLengthCm, totalOverproduction };
+  return { mapCount: operationalLays.length, layCount: operationalLays.length, layerHeightImbalance, balanceAdjustedMarkerLengthCm, complexity, minimumSizeEntriesPerLay, peakFrequency, priorityLayerWork, sizeEntries, sizeEntryImbalance, sizeSpreadScore, sparseLayCount, flatSingleLayerLengthCm, flatSingleLayerLayCount, singleMoldLayCount, singleLayerLayCount, totalLayers, totalMarkerLengthCm, totalOverproduction };
 }
 
 type Candidate = { result: CutPlanResult; description: string };
@@ -148,6 +155,7 @@ function compareCandidates(a: Candidate, b: Candidate, input?: CutPlanInput) {
   // vencer apenas porque isola e encurta a grade que será cortada em uma folha.
   return left.layCount - right.layCount
     || left.totalOverproduction - right.totalOverproduction
+    || right.priorityLayerWork - left.priorityLayerWork
     || left.flatSingleLayerLengthCm - right.flatSingleLayerLengthCm
     || left.flatSingleLayerLayCount - right.flatSingleLayerLayCount
     || left.singleMoldLayCount - right.singleMoldLayCount
@@ -219,7 +227,11 @@ function calculateOptimizedVariants(input: CutPlanInput, primary: CutPlanResult,
     const fabric = input.fabrics.find((candidate) => candidate.id === fabricResult.fabricId)!;
     const requested = aggregateCutPlanItems(input, fabric.id, true);
     const operational = aggregateCutPlanItems(input, fabric.id);
-    const target = new Map([...operational].map(([size, quantity]) => [size, fabric.type === "TUBULAR" && quantity % 2 !== 0 ? quantity + 1 : quantity]));
+    const target = new Map([...operational].map(([size, quantity]) => {
+      const { garmentType } = parseCutPlanDemandKey(size);
+      const step = getCutPlanFrequencyStep(fabric.type, garmentType);
+      return [size, step * Math.ceil(quantity / step)];
+    }));
     const localBudget = sliceSearchBudget(budget, (budget.deadline - budget.now()) * (input.mergeFabricsInLays ? 0.65 : 1) / (primary.fabrics.length - fabricIndex));
     const constraints = {
       budget: localBudget,

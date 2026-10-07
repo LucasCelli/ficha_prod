@@ -1,11 +1,39 @@
 export type FabricType = "PLANO" | "TUBULAR";
 export type SleeveType = "CURTA" | "LONGA";
-export type GarmentType = "T_SHIRT" | "BABY_LOOK" | "DRESS_SHIRT" | "CAMISETE" | "PANTS" | "SHORTS";
+export type GarmentType = "T_SHIRT" | "BABY_LOOK" | "DRESS_SHIRT" | "CAMISETE" | "LAB_COAT"
+  | "PANTS_BRIM" | "SHORTS_BRIM" | "PANTS_HELANCA" | "SHORTS_HELANCA"
+  | "PANTS" | "SHORTS";
 /** Limite operacional conservador; nunca se aplica a outras modelagens. */
 export const MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE = 3;
 
 export function allowsCutPlanOverproduction(garmentType: GarmentType) {
   return garmentType === "T_SHIRT" || garmentType === "BABY_LOOK";
+}
+
+export function prioritizesCutPlanLayers(garmentType: GarmentType) {
+  return garmentType === "DRESS_SHIRT" || garmentType === "CAMISETE" || garmentType === "LAB_COAT"
+    || garmentType === "PANTS_BRIM" || garmentType === "SHORTS_BRIM"
+    || garmentType === "PANTS" || garmentType === "SHORTS";
+}
+
+export function isPantsGarment(garmentType: GarmentType) {
+  return garmentType === "PANTS" || garmentType === "PANTS_BRIM" || garmentType === "PANTS_HELANCA";
+}
+
+export function isShortsGarment(garmentType: GarmentType) {
+  return garmentType === "SHORTS" || garmentType === "SHORTS_BRIM" || garmentType === "SHORTS_HELANCA";
+}
+
+export function getCutPlanEffectiveFabricType(type: FabricType, garmentType: GarmentType): FabricType {
+  if (garmentType === "DRESS_SHIRT" || garmentType === "CAMISETE" || garmentType === "LAB_COAT"
+    || garmentType === "PANTS_BRIM" || garmentType === "SHORTS_BRIM") return "PLANO";
+  if (garmentType === "PANTS_HELANCA" || garmentType === "SHORTS_HELANCA") return "TUBULAR";
+  return type;
+}
+
+/** Peças de tecido plano podem ter uma repetição por mapa, mesmo em cadastros antigos marcados como tubulares. */
+export function getCutPlanFrequencyStep(type: FabricType, garmentType: GarmentType) {
+  return getCutPlanEffectiveFabricType(type, garmentType) === "TUBULAR" ? 2 : 1;
 }
 
 const CUT_PLAN_DEMAND_SEPARATOR = "\u001f";
@@ -25,7 +53,7 @@ export function parseCutPlanDemandKey(key: string): { garmentType: GarmentType; 
   if (parts.length < 2) return { garmentType: inferCutPlanGarmentType(key), size: key, sleeveType: "CURTA" };
   const size = parts[0];
   const sleeveType = parts[1] === "LONGA" ? "LONGA" : "CURTA";
-  const garmentType = (["T_SHIRT", "BABY_LOOK", "DRESS_SHIRT", "CAMISETE", "PANTS", "SHORTS"] as const).find((type) => type === parts[2]) ?? inferCutPlanGarmentType(size);
+  const garmentType = (["T_SHIRT", "BABY_LOOK", "DRESS_SHIRT", "CAMISETE", "LAB_COAT", "PANTS_BRIM", "SHORTS_BRIM", "PANTS_HELANCA", "SHORTS_HELANCA", "PANTS", "SHORTS"] as const).find((type) => type === parts[2]) ?? inferCutPlanGarmentType(size);
   return { garmentType, size, sleeveType };
 }
 

@@ -51,8 +51,9 @@ export function resolveItemGarmentSize(size: string, itemDescription: string) {
 
 export function resolveItemGarmentType(itemDescription: string): GarmentType {
   const description = normalizeCutPlanDescription(itemDescription);
-  if (/\bcalca(?:s)?\b/.test(description)) return "PANTS";
-  if (/\b(?:bermuda|short)(?:s)?\b/.test(description)) return "SHORTS";
+  if (/\bjaleco(?:s)?\b/.test(description)) return "LAB_COAT";
+  if (/\bcalca(?:s)?\b/.test(description)) return /\bhelanca\b/.test(description) ? "PANTS_HELANCA" : "PANTS_BRIM";
+  if (/\b(?:bermuda|short)(?:s)?\b/.test(description)) return /\bhelanca\b/.test(description) ? "SHORTS_HELANCA" : "SHORTS_BRIM";
   if (/\bcamisete(?:s)?\b/.test(description)) return "CAMISETE";
   if (/\b(?:baby\s*look|babylook|bl)\b/.test(description)) return "BABY_LOOK";
   const female = /\b(?:feminina|feminino|fem)\b/.test(description);

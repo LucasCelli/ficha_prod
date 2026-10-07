@@ -1,5 +1,5 @@
 import { buildSizeProfileIndex, estimateMarkerLengthCm, fitsTable, getDefaultMaximumFrequency, getLayerLimit, isPantsCutPlanSize, resolveEntryLengthPerFrequencyCm } from "./dimensions.ts";
-import { allowsCutPlanOverproduction, cutPlanDemandKey, MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE, parseCutPlanDemandKey, type CutPlanInput, type CutPlanResult } from "./model.ts";
+import { allowsCutPlanOverproduction, cutPlanDemandKey, getCutPlanFrequencyStep, isPantsGarment, MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE, parseCutPlanDemandKey, type CutPlanInput, type CutPlanResult } from "./model.ts";
 import { aggregateCutPlanItems } from "./normalization.ts";
 
 /** Independente do gerador: quantidades, limites e comprimentos são refeitos. */
@@ -14,7 +14,6 @@ export function validateCutPlanSolution(input: CutPlanInput, result: CutPlanResu
   for (const fabric of active) {
     const output = result.fabrics.find((item) => item.fabricId === fabric.id);
     if (!output) { fail(); continue; }
-    const step = fabric.type === "TUBULAR" ? 2 : 1;
     const expected = aggregateCutPlanItems(input, fabric.id);
     const requested = aggregateCutPlanItems(input, fabric.id, true);
     const produced = new Map<string, number>();
@@ -24,8 +23,10 @@ export function validateCutPlanSolution(input: CutPlanInput, result: CutPlanResu
       const seen = new Set<string>();
       let totalFrequency = 0;
       for (const item of lay.frequencies) {
+        const step = getCutPlanFrequencyStep(fabric.type, item.garmentType ?? "T_SHIRT");
         const key = cutPlanDemandKey(item.size, item.sleeveType, item.garmentType);
-        const limit = Math.min(input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type), item.garmentType === "PANTS" || isPantsCutPlanSize(item.size) ? step : Infinity);
+        const garmentType = item.garmentType ?? "T_SHIRT";
+        const limit = Math.min(input.maxFrequency ?? getDefaultMaximumFrequency(fabric.type), isPantsGarment(garmentType) || isPantsCutPlanSize(item.size) ? step : Infinity);
         if (seen.has(key) || !expected.has(key) || !Number.isSafeInteger(item.frequency) || item.frequency < step || item.frequency > limit || item.frequency % step !== 0) fail();
         seen.add(key);
         totalFrequency += item.frequency;
@@ -41,9 +42,10 @@ export function validateCutPlanSolution(input: CutPlanInput, result: CutPlanResu
       if (length === null ? lay.markerLengthCm !== undefined : lay.markerLengthCm === undefined || Math.abs(length - lay.markerLengthCm) > 1e-8) fail();
     }
     for (const [key, quantity] of expected) {
+      const { garmentType } = parseCutPlanDemandKey(key);
+      const step = getCutPlanFrequencyStep(fabric.type, garmentType);
       const minimum = step * Math.ceil(quantity / step);
       const actual = produced.get(key);
-      const { garmentType } = parseCutPlanDemandKey(key);
       if (actual === undefined) { fail(); continue; }
       if (actual < minimum || (!allowsCutPlanOverproduction(garmentType) && actual !== minimum)
         || actual - minimum > MAX_T_SHIRT_OVERPRODUCTION_PER_SIZE) fail();

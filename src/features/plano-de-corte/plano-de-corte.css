@@ -747,7 +747,7 @@ html:has(.cut-plan__command-bar) [data-sonner-toaster][data-y-position="bottom"]
 .cut-plan-items__head,
 .cut-plan-items__row {
   display: grid;
-  grid-template-columns: 34px minmax(90px, 0.55fr) minmax(100px, 0.45fr) minmax(100px, 0.45fr) minmax(220px, 1.35fr) auto;
+  grid-template-columns: 34px minmax(90px, 0.55fr) minmax(250px, 1.55fr) minmax(82px, 0.35fr) minmax(150px, 0.7fr) auto;
   gap: 10px;
   align-items: end;
 }

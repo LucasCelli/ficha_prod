@@ -34,8 +34,11 @@ test("classifica camiseta e camisa social como modelagens distintas", () => {
   assert.equal(resolveItemGarmentType("Camisa social masculina manga longa"), "DRESS_SHIRT");
   assert.equal(resolveItemGarmentType("Camisa manga longa feminina nos detalhes"), "CAMISETE");
   assert.equal(resolveItemGarmentType("Camisete manga curta"), "CAMISETE");
-  assert.equal(resolveItemGarmentType("Calça de helanca"), "PANTS");
-  assert.equal(resolveItemGarmentType("Bermuda de helanca"), "SHORTS");
+  assert.equal(resolveItemGarmentType("Jaleco de brim"), "LAB_COAT");
+  assert.equal(resolveItemGarmentType("Calça de brim"), "PANTS_BRIM");
+  assert.equal(resolveItemGarmentType("Bermuda de brim"), "SHORTS_BRIM");
+  assert.equal(resolveItemGarmentType("Calça de helanca"), "PANTS_HELANCA");
+  assert.equal(resolveItemGarmentType("Bermuda de helanca"), "SHORTS_HELANCA");
 });
 
 test("cor explícita do item prevalece e os demais usam a cor técnica", () => {
