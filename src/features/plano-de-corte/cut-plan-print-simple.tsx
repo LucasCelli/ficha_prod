@@ -50,10 +50,10 @@ function MergedLayCard({ fabrics, index, lay }: { fabrics: CutPlanFabric[]; inde
       return <p key={allocation.id}><strong>{fabricLabel(fabric)}</strong> {allocation.layers} {allocation.layers === 1 ? "folha" : "folhas"}</p>;
     })}
   </>} rows={<>
-    <thead><tr><th>Tecido</th><th>Folhas</th><th>Tamanho</th><th>Tipo</th><th>Frequência do mapa</th><th>Peças cortadas</th></tr></thead>
+    <thead><tr><th>Tecido</th><th>Folhas</th><th>Tamanho</th><th>Tipo</th><th>Peças cortadas</th></tr></thead>
     <tbody>{sortedMergedMarkers(lay).map(({ allocation, marker }) => {
       const fabric = fabrics.find((item) => item.id === allocation.fabricId)!;
-      return <tr key={`${allocation.id}-${marker.garmentType}-${marker.size}-${marker.sleeveType}-${marker.component}`}><td>{fabricLabel(fabric)}</td><td>{allocation.layers}</td><td>{formatCutPlanSizeLabel(marker.size, marker.garmentType)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType, marker.component)}</td><td>{marker.frequency}</td><td>{marker.frequency * allocation.layers}</td></tr>;
+      return <tr key={`${allocation.id}-${marker.garmentType}-${marker.size}-${marker.sleeveType}-${marker.component}`}><td>{fabricLabel(fabric)}</td><td>{allocation.layers}</td><td>{formatCutPlanSizeLabel(marker.size, marker.garmentType)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType, marker.component)}</td><td>{marker.frequency * allocation.layers}</td></tr>;
     })}</tbody>
   </>} />;
 }
