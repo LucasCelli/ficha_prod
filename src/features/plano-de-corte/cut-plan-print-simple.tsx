@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { CutPlanAlternative } from "./alternatives";
-import { countLabel, formatCutPlanItemType, formatCutPlanSizeLabel, formatOperationalMarkerLabel, groupCutPlanRowsByModel, sortMarkerFrequenciesForDisplay } from "./calculator";
+import { countLabel, formatCutPlanItemType, formatCutPlanSizeLabel, formatMarkerLabel, formatOperationalMarkerLabel, groupCutPlanRowsByModel, sortMarkerFrequenciesForDisplay } from "./calculator";
 import { compareUniformSizes } from "../../lib/uniform-sizes";
 import { cutPlanDemandKey, parseCutPlanDemandKey, type CutPlanFabric, type CutPlanInput, type CutPlanSourceFicha, type FabricCutPlanResult, type LayPlan, type MergedLayPlan } from "./model";
 
@@ -30,18 +30,11 @@ function LayCard({ badgeLayers, header, rows }: { badgeLayers: number; header: R
   </article>;
 }
 
-function sortedMergedMarkers(lay: MergedLayPlan) {
-  return lay.allocations
-    .flatMap((allocation) => allocation.frequencies.map((marker) => ({ allocation, marker })))
-    .sort((left, right) => compareUniformSizes(left.marker.size, right.marker.size)
-      || left.marker.sleeveType.localeCompare(right.marker.sleeveType)
-      || (left.marker.component ?? "WHOLE").localeCompare(right.marker.component ?? "WHOLE")
-      || left.allocation.fabricId.localeCompare(right.allocation.fabricId));
-}
-
 function MergedLayCard({ fabrics, index, lay }: { fabrics: CutPlanFabric[]; index: number; lay: MergedLayPlan }) {
   const sharedFrequencies = lay.allocations[0]?.frequencies ?? [];
   const showSleeveType = new Set(sharedFrequencies.map((marker) => marker.sleeveType)).size > 1;
+  const sharedFabricEntries = lay.allocations.map((allocation) => ({ allocation, fabric: fabrics.find((item) => item.id === allocation.fabricId)! }));
+  const sharedFabrics = sharedFabricEntries.map(({ fabric }) => fabric.color.trim() || fabricLabel(fabric)).join(" + ");
   return <LayCard badgeLayers={lay.layers} header={<>
     <h3>Enfesto {String(index + 1).padStart(2, "0")}</h3>
     <p><strong>Mapa compartilhado:</strong> {formatOperationalMarkerLabel(sharedFrequencies, showSleeveType)}</p>
@@ -50,11 +43,8 @@ function MergedLayCard({ fabrics, index, lay }: { fabrics: CutPlanFabric[]; inde
       return <p key={allocation.id}><strong>{fabricLabel(fabric)}</strong> {allocation.layers} {allocation.layers === 1 ? "folha" : "folhas"}</p>;
     })}
   </>} rows={<>
-    <thead><tr><th>Tecido</th><th>Folhas</th><th>Tamanho</th><th>Tipo</th><th>Peças cortadas</th></tr></thead>
-    <tbody>{sortedMergedMarkers(lay).map(({ allocation, marker }) => {
-      const fabric = fabrics.find((item) => item.id === allocation.fabricId)!;
-      return <tr key={`${allocation.id}-${marker.garmentType}-${marker.size}-${marker.sleeveType}-${marker.component}`}><td>{fabricLabel(fabric)}</td><td>{allocation.layers}</td><td>{formatCutPlanSizeLabel(marker.size, marker.garmentType)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType, marker.component)}</td><td>{marker.frequency * allocation.layers}</td></tr>;
-    })}</tbody>
+    <thead><tr><th>Tecidos</th><th>Frequência</th><th>Tipo</th><th>Total</th></tr></thead>
+    <tbody>{sortMarkerFrequenciesForDisplay(sharedFrequencies).map((marker) => <tr key={`${marker.garmentType}-${marker.size}-${marker.sleeveType}-${marker.component}`}><td>{sharedFabrics}</td><td>{formatMarkerLabel([marker], false)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType, marker.component)}</td><td>{sharedFabricEntries.map(({ allocation, fabric }) => `${marker.frequency * allocation.layers} ${fabric.color.trim() || fabricLabel(fabric)}`).join(", ")}</td></tr>)}</tbody>
   </>} />;
 }
 

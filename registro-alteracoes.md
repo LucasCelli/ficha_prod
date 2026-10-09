@@ -89,7 +89,7 @@
 
 - Enfestos mesclados agora só combinam tecidos que usam exatamente o mesmo mapa (mesmos tamanhos, tipos e frequências). Mapas diferentes não são mais concatenados como se cada cor ocupasse apenas um trecho da mesa.
 - Cada tecido conserva sua própria quantidade de folhas; o total do enfesto é a soma dessas folhas, respeitando o limite físico configurado. A tela, a cópia e a impressão mostram as folhas por tecido e calculam as peças com a quantidade correta daquela cor.
-- O mapa compartilhado aparece uma única vez na tela, na cópia e na impressão. Para malha tubular, a frequência continua no padrão do Audaces: frequência 2 equivale a uma repetição física, pois o tecido é duplo; a grade e sua frequência não são repetidas nas linhas de cada cor.
+- O mapa compartilhado aparece uma única vez na tela, na cópia e na impressão. Para malha tubular, a frequência continua no padrão do Audaces: frequência 2 equivale a uma repetição física, pois o tecido é duplo. As folhas ficam somente no resumo por cor; a tabela inferior resume tecidos, frequência, tipo e o total separado por cor.
 - A validação independente rejeita mesclagens com mapas divergentes, comprimentos diferentes ou total de folhas acima do limite. O fluxo sem a opção de mesclagem, inclusive o de tecido único, permanece inalterado.
 - Adicionado caso de regressão com azul turquesa (10 G) e azul royal (G/GG), garantindo que o molde GG não seja cortado no turquesa.
 - Arquivos: `merge-solver.ts`, `solution-validation.ts`, apresentação/impressão e testes do Plano de Corte.
