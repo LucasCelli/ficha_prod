@@ -32,12 +32,10 @@ function LayCard({ badgeLayers, header, rows }: { badgeLayers: number; header: R
 
 function MergedLayCard({ fabrics, index, lay }: { fabrics: CutPlanFabric[]; index: number; lay: MergedLayPlan }) {
   const sharedFrequencies = lay.allocations[0]?.frequencies ?? [];
-  const showSleeveType = new Set(sharedFrequencies.map((marker) => marker.sleeveType)).size > 1;
   const sharedFabricEntries = lay.allocations.map((allocation) => ({ allocation, fabric: fabrics.find((item) => item.id === allocation.fabricId)! }));
   const sharedFabrics = sharedFabricEntries.map(({ fabric }) => fabric.color.trim() || fabricLabel(fabric)).join(" + ");
   return <LayCard badgeLayers={lay.layers} header={<>
     <h3>Enfesto {String(index + 1).padStart(2, "0")}</h3>
-    <p><strong>Mapa compartilhado:</strong> {formatOperationalMarkerLabel(sharedFrequencies, showSleeveType)}</p>
     {lay.allocations.map((allocation) => {
       const fabric = fabrics.find((item) => item.id === allocation.fabricId)!;
       return <p key={allocation.id}><strong>{fabricLabel(fabric)}</strong> {allocation.layers} {allocation.layers === 1 ? "folha" : "folhas"}</p>;
