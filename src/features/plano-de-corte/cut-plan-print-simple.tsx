@@ -46,13 +46,13 @@ function MergedLayCard({ fabricResults, fabrics, index, lay }: { fabricResults: 
       const fabric = fabrics.find((item) => item.id === allocation.fabricId)!;
       const fabricResult = fabricResults.find((item) => item.fabricId === allocation.fabricId)!;
       const showSleeveType = new Set(fabricResult.sizes.map((size) => size.sleeveType)).size > 1;
-      return <p key={allocation.id}><strong>{fabricLabel(fabric)}</strong> {formatOperationalMarkerLabel(allocation.frequencies, showSleeveType)}</p>;
+      return <p key={allocation.id}><strong>{fabricLabel(fabric)}</strong> {allocation.layers} {allocation.layers === 1 ? "folha" : "folhas"} · {formatOperationalMarkerLabel(allocation.frequencies, showSleeveType)}</p>;
     })}
   </>} rows={<>
-    <thead><tr><th>Tecido</th><th>Tamanho</th><th>Tipo</th><th>Frequência</th><th>Peças cortadas</th></tr></thead>
+    <thead><tr><th>Tecido</th><th>Folhas</th><th>Tamanho</th><th>Tipo</th><th>Frequência</th><th>Peças cortadas</th></tr></thead>
     <tbody>{sortedMergedMarkers(lay).map(({ allocation, marker }) => {
       const fabric = fabrics.find((item) => item.id === allocation.fabricId)!;
-      return <tr key={`${allocation.id}-${marker.garmentType}-${marker.size}-${marker.sleeveType}-${marker.component}`}><td>{fabricLabel(fabric)}</td><td>{formatCutPlanSizeLabel(marker.size, marker.garmentType)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType, marker.component)}</td><td>{marker.frequency}</td><td>{marker.frequency * lay.layers}</td></tr>;
+      return <tr key={`${allocation.id}-${marker.garmentType}-${marker.size}-${marker.sleeveType}-${marker.component}`}><td>{fabricLabel(fabric)}</td><td>{allocation.layers}</td><td>{formatCutPlanSizeLabel(marker.size, marker.garmentType)}</td><td>{formatCutPlanItemType(marker.size, marker.sleeveType, marker.garmentType, marker.component)}</td><td>{marker.frequency}</td><td>{marker.frequency * allocation.layers}</td></tr>;
     })}</tbody>
   </>} />;
 }
@@ -110,7 +110,7 @@ export function CutPlanPrintSimple({ alternative, input, sourceFichas = [] }: { 
   const blocks: PrintBlock[] = [];
   if (alternative.result.mergedLays) {
     const mergedLays = alternative.result.mergedLays;
-    blocks.push({ key: "merged-header", header: <header className="cut-plan-print-simple__fabric-header"><div><h2>Enfestos mesclados</h2><p>As grades permanecem separadas por cor.</p></div><strong>{countLabel(mergedLays.length, "enfesto")}</strong></header> });
+    blocks.push({ key: "merged-header", header: <header className="cut-plan-print-simple__fabric-header"><div><h2>Enfestos mesclados</h2><p>Um mesmo mapa, com folhas identificadas por tecido.</p></div><strong>{countLabel(mergedLays.length, "enfesto")}</strong></header> });
     pairUp(mergedLays).forEach((pair, rowIndex) => {
       blocks.push({ key: `merged-row-${rowIndex}`, cards: pair.map((lay, offset) => <MergedLayCard fabricResults={alternative.result.fabrics} fabrics={input.fabrics} index={rowIndex * 2 + offset} key={lay.id} lay={lay} />) });
     });

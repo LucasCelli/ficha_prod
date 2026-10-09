@@ -60,7 +60,9 @@ export function validateCutPlanSolution(input: CutPlanInput, result: CutPlanResu
     const allocations = result.fabrics.flatMap((fabric) => fabric.lays);
     const seen = new Set<string>();
     for (const group of result.mergedLays) {
-      let total = 0;
+      let markerLength: number | undefined;
+      let totalLayers = 0;
+      let marker: string | undefined;
       let complete = true;
       const colors = new Set<string>();
       const fabrics = new Set<string>();
@@ -71,14 +73,20 @@ export function validateCutPlanSolution(input: CutPlanInput, result: CutPlanResu
         const fabric = input.fabrics.find((item) => item.id === lay.fabricId)!;
         const color = normalizeCompatibilityValue(fabric.color);
         const compatible = fabricCompatibilityKey(fabric);
-        if (!original || seen.has(key) || group.layers !== lay.layers || JSON.stringify(original) !== JSON.stringify(lay)) fail();
+        const currentMarker = JSON.stringify(lay.frequencies.map((item) => [item.garmentType ?? "T_SHIRT", item.size, item.sleeveType, item.component ?? "WHOLE", item.frequency]).sort());
+        if (!original || seen.has(key) || JSON.stringify(original) !== JSON.stringify(lay)) fail();
         if (group.allocations.length > 1 && (!color || colors.has(color) || fabrics.has(fabric.id) || (compatibility !== undefined && compatible !== compatibility))) fail();
+        if (group.allocations.length > 1 && marker !== undefined && currentMarker !== marker) fail();
         seen.add(key); colors.add(color); fabrics.add(fabric.id); compatibility = compatible;
+        marker = currentMarker;
+        totalLayers += lay.layers;
         if (lay.markerLengthCm === undefined) complete = false;
-        else total += lay.markerLengthCm;
+        else if (markerLength === undefined) markerLength = lay.markerLengthCm;
+        else if (Math.abs(markerLength - lay.markerLengthCm) > 1e-8) fail();
       }
-      if (!group.allocations.length || (!complete && group.allocations.length > 1) || !fitsTable(total, input.tableLengthCm)) fail();
-      if (complete ? group.markerLengthCm === undefined || Math.abs(group.markerLengthCm - total) > 1e-8 : group.markerLengthCm !== undefined) fail();
+      const firstFabric = input.fabrics.find((item) => item.id === group.allocations[0]?.fabricId);
+      if (!group.allocations.length || group.layers !== totalLayers || !firstFabric || totalLayers > Math.min(input.maxLayers, getLayerLimit(firstFabric.type)) || (!complete && group.allocations.length > 1)) fail();
+      if (complete ? group.markerLengthCm === undefined || markerLength === undefined || Math.abs(group.markerLengthCm - markerLength) > 1e-8 : group.markerLengthCm !== undefined) fail();
     }
     if (seen.size !== allocations.length) fail();
   }

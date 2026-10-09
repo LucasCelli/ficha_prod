@@ -1,27 +1,31 @@
-import { fitsTable } from "./dimensions.ts";
+import { getLayerLimit } from "./dimensions.ts";
 import type { CutPlanInput, CutPlanResult, LayPlan, MergedLayPlan } from "./model.ts";
 import { checkSearchBudget, SearchInterrupted, type SearchBudget } from "./search-budget.ts";
 import { fabricCompatibilityKey, normalizeCompatibilityValue } from "./solution-validation.ts";
 
-type Group = MergedLayPlan & { compatibility: string; colors: string[]; fabrics: string[] };
+type Group = MergedLayPlan & { compatibility: string; colors: string[]; fabrics: string[]; marker: string };
 
-/** Bound inferior aditivo por compatibilidade, altura, comprimento e cor. */
+function markerSignature(lay: LayPlan) {
+  return JSON.stringify(lay.frequencies.map((item) => [item.garmentType ?? "T_SHIRT", item.size, item.sleeveType, item.component ?? "WHOLE", item.frequency]).sort());
+}
+
+/** Bound inferior aditivo por compatibilidade e por mapa realmente compartilhavel. */
 export function calculateMergedLayLowerBound(input: CutPlanInput, result: CutPlanResult) {
   const fabricIndex = new Map(input.fabrics.map((fabric) => [fabric.id, fabric]));
-  const classes = new Map<string, { length: number; colors: Map<string, number> }>();
+  const classes = new Map<string, { layers: number; fabrics: Map<string, number>; capacity: number }>();
   let isolated = 0;
   for (const lay of result.fabrics.flatMap((fabric) => fabric.lays)) {
     const fabric = fabricIndex.get(lay.fabricId)!;
     const color = normalizeCompatibilityValue(fabric.color);
     if (lay.markerLengthCm === undefined || !color) { isolated++; continue; }
-    const key = JSON.stringify([fabricCompatibilityKey(fabric), lay.layers]);
-    const entry = classes.get(key) ?? { length: 0, colors: new Map<string, number>() };
-    entry.length += lay.markerLengthCm;
-    entry.colors.set(color, (entry.colors.get(color) ?? 0) + 1);
+    const key = JSON.stringify([fabricCompatibilityKey(fabric), markerSignature(lay)]);
+    const entry = classes.get(key) ?? { layers: 0, fabrics: new Map<string, number>(), capacity: Math.min(input.maxLayers, getLayerLimit(fabric.type)) };
+    entry.layers += lay.layers;
+    entry.fabrics.set(fabric.id, (entry.fabrics.get(fabric.id) ?? 0) + 1);
     classes.set(key, entry);
   }
   return isolated + [...classes.values()].reduce((sum, entry) => sum
-    + Math.max(Math.ceil(entry.length / input.tableLengthCm - 1e-12), ...entry.colors.values()), 0);
+    + Math.max(Math.ceil(entry.layers / entry.capacity), ...entry.fabrics.values()), 0);
 }
 
 /** Empacotamento exato das alocações disponíveis, com incumbente guloso. */
@@ -32,14 +36,16 @@ export function buildMergedLays(input: CutPlanInput, result: CutPlanResult, budg
     const fabric = fabricIndex.get(lay.fabricId)!;
     return { compatibility: fabricCompatibilityKey(fabric), color: normalizeCompatibilityValue(fabric.color) };
   };
-  const make = (lay: LayPlan): Group => ({ id: "", layers: lay.layers, allocations: [lay], markerLengthCm: lay.markerLengthCm, compatibility: properties(lay).compatibility, colors: [properties(lay).color], fabrics: [lay.fabricId] });
+  const make = (lay: LayPlan): Group => ({ id: "", layers: lay.layers, allocations: [lay], markerLengthCm: lay.markerLengthCm, compatibility: properties(lay).compatibility, colors: [properties(lay).color], fabrics: [lay.fabricId], marker: markerSignature(lay) });
   const fits = (group: Group, lay: LayPlan) => {
     const { compatibility, color } = properties(lay);
-    return color && group.compatibility === compatibility && group.layers === lay.layers && !group.colors.includes(color)
+    const fabric = fabricIndex.get(lay.fabricId)!;
+    return color && group.compatibility === compatibility && group.marker === markerSignature(lay) && !group.colors.includes(color)
       && group.colors.every(Boolean) && !group.fabrics.includes(lay.fabricId) && group.markerLengthCm !== undefined && lay.markerLengthCm !== undefined
-      && fitsTable(group.markerLengthCm + lay.markerLengthCm, input.tableLengthCm);
+      && Math.abs(group.markerLengthCm - lay.markerLengthCm) <= 1e-8
+      && group.layers + lay.layers <= Math.min(input.maxLayers, getLayerLimit(fabric.type));
   };
-  const append = (group: Group, lay: LayPlan): Group => ({ ...group, allocations: [...group.allocations, lay], colors: [...group.colors, properties(lay).color], fabrics: [...group.fabrics, lay.fabricId], markerLengthCm: group.markerLengthCm! + lay.markerLengthCm! });
+  const append = (group: Group, lay: LayPlan): Group => ({ ...group, layers: group.layers + lay.layers, allocations: [...group.allocations, lay], colors: [...group.colors, properties(lay).color], fabrics: [...group.fabrics, lay.fabricId] });
   let best: Group[] = [];
   for (const lay of allocations) {
     const index = best.findIndex((group) => fits(group, lay));
@@ -53,7 +59,7 @@ export function buildMergedLays(input: CutPlanInput, result: CutPlanResult, budg
     checkSearchBudget(budget);
     if (groups.length >= best.length) return;
     if (index === allocations.length) { best = groups; return; }
-    const signature = JSON.stringify([index, groups.map((group) => [group.compatibility, group.layers, group.markerLengthCm, [...group.colors].sort(), [...group.fabrics].sort()]).sort()]);
+    const signature = JSON.stringify([index, groups.map((group) => [group.compatibility, group.marker, group.layers, [...group.colors].sort(), [...group.fabrics].sort()]).sort()]);
     if (seen.has(signature)) return;
     seen.add(signature);
     // Este cache evita trabalho repetido, mas nao participa da correcao da busca.

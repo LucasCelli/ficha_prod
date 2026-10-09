@@ -37,31 +37,31 @@ test("busca usa 30 segundos globais e conserva o plano ao expirar depois da prim
   validateCutPlanSolution(normalizeCutPlanInput(input), alternatives[0].result);
 });
 
-test("empacotamento encontra dois enfestos onde first fit produzia três", () => {
+test("não empacota mapas diferentes apenas porque os comprimentos cabem na mesma mesa", () => {
   const input = inputFor([60, 50, 30, 20, 20, 20]);
   const result = calculateCutPlanAlternatives(input)[0];
-  assert.equal(result.layCount, 2);
-  assert.deepEqual(result.result.mergedLays?.map((lay) => lay.markerLengthCm), [100, 100]);
+  assert.equal(result.layCount, 6);
+  assert.deepEqual(result.result.mergedLays?.map((lay) => lay.markerLengthCm), [60, 50, 30, 20, 20, 20]);
   validateCutPlanSolution(input, result.result);
 });
 
-test("mesclagem não arredonda cada segmento antes de comparar a mesa", () => {
+test("comprimentos de mapas diferentes não são somados como segmentos", () => {
   const result = calculateCutPlanAlternatives(inputFor([50.1, 49.1]))[0];
-  assert.equal(result.layCount, 1);
-  assert.ok(Math.abs(result.result.mergedLays![0].markerLengthCm! - 99.2) < 1e-10);
+  assert.equal(result.layCount, 2);
+  assert.ok(Math.abs(result.result.mergedLays![0].markerLengthCm! - 50.1) < 1e-10);
+  assert.ok(Math.abs(result.result.mergedLays![1].markerLengthCm! - 49.1) < 1e-10);
 });
 
-test("preserva a opção local de quatro folhas necessária às cores de 12 e 4 peças", () => {
+test("não mistura cores de 12 e 4 peças quando os tamanhos dos mapas diferem", () => {
   const input = inputFor([10, 10]);
   input.maxLayers = 100; input.maxFrequency = 8;
   input.items[0].quantity = 12; input.items[1].quantity = 4;
   const result = calculateCutPlanAlternatives(input)[0];
-  assert.equal(result.layCount, 1);
-  assert.equal(result.result.mergedLays![0].layers, 4);
+  assert.equal(result.layCount, 2);
   validateCutPlanSolution(input, result.result);
 });
 
-test("busca conjunta aceita três divisões locais quando elas reduzem os enfestos globais", () => {
+test("busca conjunta mantém separados mapas de tamanhos distintos", () => {
   const input = inputFor([20, 80, 80, 80]);
   input.maxLayers = 4;
   input.maxFrequency = 3;
@@ -69,9 +69,8 @@ test("busca conjunta aceita três divisões locais quando elas reduzem os enfest
   for (const item of input.items.slice(1)) item.quantity = 4;
 
   const result = calculateCutPlanAlternatives(input)[0];
-  assert.equal(result.layCount, 3);
-  assert.equal(result.result.mergedLays?.every((lay) => lay.markerLengthCm === 100), true);
-  assert.equal(result.result.mergedLays?.flatMap((lay) => lay.allocations).filter((lay) => lay.fabricId === "f0").length, 3);
+  assert.equal(result.layCount, 4);
+  assert.equal(result.result.mergedLays?.every((lay) => lay.allocations.length === 1), true);
   assert.equal(result.result.search?.status, "feasible");
   validateCutPlanSolution(input, result.result);
 });
@@ -81,7 +80,7 @@ test("dominância preserva o melhor estado completo sob o critério de equilíbr
   const quantities = [9, 1, 8, 8, 7, 12, 12];
   const result = solveMinimumLays(new Map(sizes.map((size, i) => [size, quantities[i]])), 4, "PLANO", 3,
     { tableLengthCm: 12, fabricWidthCm: 100, maxFrequency: 7, sizeProfiles: sizes.map((size) => profile(size, 1)) })[0];
-  assert.deepEqual(result.metrics, { totalFrequency: 18, totalOverproduction: 0, peakFrequency: 7, sizeSpreadScore: 40, totalLayers: 9, totalMarkerLengthCm: 18, sizeEntries: 9, minimumSizeEntriesPerLay: 3, sizeEntryImbalance: 0, sparseLayCount: 0, singleLayerLayCount: 1, flatSingleLayerLayCount: 1, flatSingleLayerLengthCm: 5, singleMoldLayCount: 0, layerHeightImbalance: 4, balanceAdjustedMarkerLengthCm: 18 });
+  assert.deepEqual(result.metrics, { totalFrequency: 18, totalOverproduction: 0, peakFrequency: 7, sizeSpreadScore: 40, totalLayers: 9, totalMarkerLengthCm: 18, sizeEntries: 9, minimumSizeEntriesPerLay: 3, sizeEntryImbalance: 0, sparseLayCount: 0, singleLayerLayCount: 1, flatSingleLayerLayCount: 1, flatSingleLayerLengthCm: 5, singleMoldLayCount: 0, layerHeightImbalance: 4, balanceAdjustedMarkerLengthCm: 18, priorityLayerWork: 0 });
   assert.equal(result.searchComplete, true);
 });
 

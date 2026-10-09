@@ -469,19 +469,20 @@ test("mescla opt-in alinha cores compativeis no mesmo enfesto sem alterar a prod
 
   const merged = calculateCutPlanAlternatives({ ...input, mergeFabricsInLays: true })[0];
   assert.equal(merged.layCount, 1);
-  assert.equal(merged.result.mergedLays?.[0].layers, 3);
+  assert.equal(merged.result.mergedLays?.[0].layers, 12);
   assert.deepEqual(merged.result.mergedLays?.[0].allocations.map((allocation) => ({
     fabricId: allocation.fabricId,
+    layers: allocation.layers,
     frequency: allocation.frequencies[0].frequency,
   })), [
-    { fabricId: "black", frequency: 4 },
-    { fabricId: "blue", frequency: 2 },
-    { fabricId: "white", frequency: 2 },
+    { fabricId: "black", layers: 6, frequency: 2 },
+    { fabricId: "blue", layers: 3, frequency: 2 },
+    { fabricId: "white", layers: 3, frequency: 2 },
   ]);
   assert.ok(merged.result.fabrics.flatMap((fabric) => fabric.sizes).every((size) => size.difference === 0));
 });
 
-test("mescla tamanhos diferentes, mas nunca tecidos com largura incompativel", () => {
+test("não mescla mapas de tamanhos diferentes nem tecidos com largura incompativel", () => {
   const input: CutPlanInput = {
     tableLengthCm: 800,
     maxLayers: 50,
@@ -503,9 +504,8 @@ test("mescla tamanhos diferentes, mas nunca tecidos com largura incompativel", (
     ],
   };
   const result = calculateCutPlanAlternatives(input)[0].result;
-  assert.equal(result.mergedLays?.length, 2);
-  assert.deepEqual(new Set(result.mergedLays?.[0].allocations.map((allocation) => allocation.fabricId)), new Set(["black", "white"]));
-  assert.equal(result.mergedLays?.[1].allocations[0].fabricId, "narrow");
+  assert.equal(result.mergedLays?.length, 3);
+  assert.equal(result.mergedLays?.every((lay) => lay.allocations.length === 1), true);
 });
 
 test("mescla pequenas quantidades impares tubulares e conserva as sobras por cor", () => {
@@ -527,11 +527,16 @@ test("mescla pequenas quantidades impares tubulares e conserva as sobras por cor
   const sizes = alternative.result.fabrics.flatMap((fabric) => fabric.sizes);
 
   assert.equal(alternative.layCount, 1);
-  assert.equal(alternative.result.mergedLays?.[0].layers, 1);
+  assert.equal(alternative.result.mergedLays?.[0].layers, 6);
   assert.deepEqual(Object.fromEntries(alternative.result.mergedLays?.[0].allocations.map((allocation) => [allocation.fabricId, allocation.frequencies[0].frequency]) ?? []), {
     black: 2,
-    white: 4,
-    blue: 6,
+    white: 2,
+    blue: 2,
+  });
+  assert.deepEqual(Object.fromEntries(alternative.result.mergedLays?.[0].allocations.map((allocation) => [allocation.fabricId, allocation.layers]) ?? []), {
+    black: 1,
+    white: 2,
+    blue: 3,
   });
   assert.deepEqual(sizes.map(({ requested, produced, difference }) => ({ requested, produced, difference })), [
     { requested: 1, produced: 2, difference: 1 },
@@ -577,6 +582,37 @@ test("mantém o mesmo tamanho e manga separados por modelagem", () => {
     { garmentType: "T_SHIRT", requested: 2, produced: 2 },
   ]);
   assert.equal(result.lays.flatMap((lay) => lay.frequencies).length, 2);
+});
+
+test("mesclagem usa um único mapa e informa folhas por tecido no caso turquesa e royal", () => {
+  const input: CutPlanInput = {
+    tableLengthCm: 800,
+    maxLayers: 50,
+    maxFrequency: 6,
+    mergeFabricsInLays: true,
+    fabrics: [
+      { id: "turquoise", name: "Malha Fria (PV)", color: "Azul turquesa", widthCm: 118, type: "TUBULAR" },
+      { id: "royal", name: "Malha Fria (PV)", color: "Azul royal", widthCm: 118, type: "TUBULAR" },
+    ],
+    items: [
+      { id: "turquoise-g", fabricId: "turquoise", size: "G", sleeveType: "LONGA", quantity: 10 },
+      { id: "royal-g", fabricId: "royal", size: "G", sleeveType: "LONGA", quantity: 4 },
+      { id: "royal-gg", fabricId: "royal", size: "GG", sleeveType: "LONGA", quantity: 2 },
+    ],
+    sizeProfiles: [
+      measuredProfile("G", [74, 54, 74, 54, 27, 44, 64, 44]),
+      measuredProfile("GG", [78, 58, 78, 58, 29, 46, 68, 46]),
+    ],
+  };
+  const result = calculateCutPlanAlternatives(input)[0].result;
+  for (const lay of result.mergedLays ?? []) {
+    const markers = lay.allocations.map((allocation) => JSON.stringify(allocation.frequencies));
+    assert.equal(new Set(markers).size, 1);
+    assert.equal(lay.layers, lay.allocations.reduce((sum, allocation) => sum + allocation.layers, 0));
+  }
+  const turquoiseMarkers = result.mergedLays?.flatMap((lay) => lay.allocations.filter((allocation) => allocation.fabricId === "turquoise").flatMap((allocation) => allocation.frequencies)) ?? [];
+  assert.equal(turquoiseMarkers.some((marker) => marker.size === "GG"), false);
+  assert.equal(result.fabrics.find((fabric) => fabric.fabricId === "turquoise")?.sizes.find((size) => size.size === "G")?.produced, 10);
 });
 
 test("brim usa frequência 1 e helanca mantém frequência par conforme o tipo da peça", () => {
