@@ -1,5 +1,6 @@
 import { formatBusinessDateTime, formatDayMonthInput, getBusinessWeekRange } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
+import { getKanbanColumnLabel } from "@/features/quadro-producao/config";
 import { isFichaOverdue, type FichaFilters, type FichaListItem } from "./data";
 
 export type WeeklyReportMode = "current-week" | "next-week";
@@ -81,8 +82,7 @@ export function OperationalReport({ fichas, filters, weeklyMode }: OperationalRe
                     <td>{ficha.vendedor || "Sem vendedor"}</td>
                     <td>{ficha.data_inicio ? formatDayMonthInput(ficha.data_inicio) : "—"}</td>
                     <td>{formatDayMonthInput(ficha.data_entrega)}</td>
-                    {/* Em branco para anotação manual; só entregues vêm preenchidas. */}
-                    <td>{delivered ? "Entregue" : ""}</td>
+                    <td>{delivered ? "Entregue" : getFichaStageLabel(ficha)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -177,6 +177,14 @@ function compareFichas(a: FichaListItem, b: FichaListItem) {
     a.data_entrega.localeCompare(b.data_entrega) ||
     (a.vendedor ?? "").localeCompare(b.vendedor ?? "", "pt-BR") ||
     a.cliente_nome_snapshot.localeCompare(b.cliente_nome_snapshot, "pt-BR")
+  );
+}
+
+function getFichaStageLabel(ficha: FichaListItem) {
+  return getKanbanColumnLabel(
+    ficha.kanban_column?.slug ?? ficha.kanban_status,
+    ficha.arte,
+    ficha.kanban_column?.name,
   );
 }
 
