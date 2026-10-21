@@ -112,8 +112,13 @@
 
   .ai-demo__input textarea {
     height: 100%;
-    min-height: 200px;
+    min-height: 0;
     resize: none;
+  }
+
+  .ai-demo__editor {
+    height: 100%;
+    min-height: 200px;
   }
 
   .ai-demo__result {
@@ -138,7 +143,7 @@
     grid-template-columns: 1fr;
   }
 
-  .ai-demo__input textarea {
+  .ai-demo__editor {
     min-height: 320px;
   }
 }

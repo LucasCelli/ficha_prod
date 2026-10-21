@@ -325,8 +325,122 @@
   line-height: 1.45;
 }
 
-.ai-demo__input textarea {
+.ai-demo__editor {
+  display: flex;
   min-height: 520px;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-demo__editor > textarea {
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.ai-demo__replace {
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface-2);
+  box-shadow: var(--shadow-sm);
+  padding: 8px;
+}
+
+.ai-demo__replace-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(4, 32px);
+  align-items: center;
+  gap: 4px;
+}
+
+.ai-demo__replace-row--actions {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.ai-demo__replace-field {
+  display: flex;
+  min-width: 0;
+  height: 34px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  padding-inline: 9px;
+}
+
+.ai-demo__replace-field:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 16%, transparent);
+}
+
+.ai-demo__replace-field input {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.82rem;
+  outline: 0;
+  padding: 0;
+}
+
+.ai-demo__replace-count {
+  flex: 0 0 auto;
+  color: var(--color-muted);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ai-demo__replace-icon,
+.ai-demo__replace-button {
+  display: inline-flex;
+  min-width: 0;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.ai-demo__replace-icon:hover:not(:disabled),
+.ai-demo__replace-icon:focus-visible,
+.ai-demo__replace-button:hover:not(:disabled),
+.ai-demo__replace-button:focus-visible,
+.ai-demo__replace-icon[aria-pressed="true"] {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-primary-text);
+  outline: 0;
+}
+
+.ai-demo__replace-button {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding-inline: 10px;
+  white-space: nowrap;
+}
+
+.ai-demo__replace-icon:disabled,
+.ai-demo__replace-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .ai-demo__loading-table {

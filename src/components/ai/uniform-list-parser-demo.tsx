@@ -1,8 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   CaseLower,
   CaseSensitive,
   CaseUpper,
@@ -14,6 +16,7 @@ import {
   RemoveFormatting,
   Save,
   Search,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -96,6 +99,29 @@ type ActiveCopyCell = {
   field: "nome" | "numero";
   rowKey: string;
 };
+
+type TextMatch = {
+  end: number;
+  start: number;
+};
+
+function findTextMatches(value: string, query: string, matchCase: boolean): TextMatch[] {
+  if (!query) return [];
+
+  const source = matchCase ? value : value.toLocaleLowerCase("pt-BR");
+  const needle = matchCase ? query : query.toLocaleLowerCase("pt-BR");
+  const matches: TextMatch[] = [];
+  let start = 0;
+
+  while (start <= source.length - needle.length) {
+    const matchStart = source.indexOf(needle, start);
+    if (matchStart < 0) break;
+    matches.push({ start: matchStart, end: matchStart + query.length });
+    start = matchStart + Math.max(query.length, 1);
+  }
+
+  return matches;
+}
 
 const COLUMN_META: Record<SortKey, { align?: "center"; label: string }> = {
   nome: { label: "Nome" },
@@ -266,9 +292,17 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
   const [selectedFichaId, setSelectedFichaId] = useState(initialFicha?.id ?? "");
   const [selectedFichaLabel, setSelectedFichaLabel] = useState(initialFicha ? getFichaOptionLabel(initialFicha) : "");
   const [sortConfig, setSortConfig] = useState<{ direction: SortDirection; key: SortKey } | null>(null);
+  const [isReplaceOpen, setIsReplaceOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [replacementTerm, setReplacementTerm] = useState("");
+  const [matchCase, setMatchCase] = useState(false);
+  const [activeMatchIndex, setActiveMatchIndex] = useState(-1);
   const loadedFichaListRef = useRef<string | null>(null);
   const fichaDatalistRef = useRef<CustomDatalistHandle>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const hasItems = Boolean(result?.items.length);
+  const textMatches = useMemo(() => findTextMatches(text, searchTerm, matchCase), [matchCase, searchTerm, text]);
   const organizingModelLabel = organizingModel ? findAiModelOption(organizingModel)?.label ?? organizingModel : null;
   const selectedFicha = linkedFichas.find((ficha) => ficha.id === selectedFichaId) ?? null;
   const fichaOptions = useMemo<CustomDatalistOption[]>(
@@ -326,6 +360,167 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
       })),
     [showGroupColumn, sortConfig],
   );
+
+  function selectTextMatch(match: TextMatch, index: number) {
+    setActiveMatchIndex(index);
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(match.start, match.end);
+    });
+  }
+
+  function openReplacePanel() {
+    const textarea = textareaRef.current;
+    if (textarea && textarea.selectionStart !== textarea.selectionEnd) {
+      const selection = textarea.value.slice(textarea.selectionStart, textarea.selectionEnd);
+      if (!selection.includes("\n")) setSearchTerm(selection);
+    }
+
+    setIsReplaceOpen(true);
+    setActiveMatchIndex(-1);
+    requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+  }
+
+  function closeReplacePanel() {
+    setIsReplaceOpen(false);
+    setActiveMatchIndex(-1);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }
+
+  function handleEditorShortcut(event: ReactKeyboardEvent<HTMLElement>) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase("pt-BR") === "h") {
+      event.preventDefault();
+      openReplacePanel();
+    } else if (event.key === "Escape" && isReplaceOpen) {
+      event.preventDefault();
+      closeReplacePanel();
+    }
+  }
+
+  function handleTextareaTab(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Tab" || event.ctrlKey || event.metaKey || event.altKey) return;
+
+    event.preventDefault();
+    const textarea = event.currentTarget;
+    const selectionStart = textarea.selectionStart;
+    const selectionEnd = textarea.selectionEnd;
+    const lineStart = text.lastIndexOf("\n", selectionStart - 1) + 1;
+    const selectedBlock = text.slice(lineStart, selectionEnd);
+    const spansMultipleLines = selectedBlock.includes("\n");
+
+    if (!event.shiftKey && !spansMultipleLines) {
+      const nextText = `${text.slice(0, selectionStart)}\t${text.slice(selectionEnd)}`;
+      if (nextText.length > MAX_TEXT_LENGTH) return;
+      setText(nextText);
+      setActiveMatchIndex(-1);
+      requestAnimationFrame(() => textarea.setSelectionRange(selectionStart + 1, selectionStart + 1));
+      return;
+    }
+
+    const lines = selectedBlock.split("\n");
+    let removedBeforeSelection = 0;
+    const changedLines = lines.map((line, index) => {
+      if (!event.shiftKey) return `\t${line}`;
+      if (line.startsWith("\t")) {
+        if (index === 0) removedBeforeSelection = 1;
+        return line.slice(1);
+      }
+      const spaces = line.match(/^ {1,4}/u)?.[0].length ?? 0;
+      if (index === 0) removedBeforeSelection = spaces;
+      return line.slice(spaces);
+    });
+    const replacement = changedLines.join("\n");
+    const nextText = `${text.slice(0, lineStart)}${replacement}${text.slice(selectionEnd)}`;
+    if (nextText.length > MAX_TEXT_LENGTH) return;
+
+    setText(nextText);
+    setActiveMatchIndex(-1);
+    const nextStart = event.shiftKey
+      ? Math.max(lineStart, selectionStart - removedBeforeSelection)
+      : selectionStart + 1;
+    const nextEnd = selectionEnd + (replacement.length - (selectionEnd - lineStart));
+    requestAnimationFrame(() => textarea.setSelectionRange(nextStart, Math.max(nextStart, nextEnd)));
+  }
+
+  function moveToMatch(direction: 1 | -1) {
+    if (!textMatches.length) return;
+
+    const caret = textareaRef.current?.selectionStart ?? 0;
+    let nextIndex: number;
+    if (activeMatchIndex >= 0) {
+      nextIndex = (activeMatchIndex + direction + textMatches.length) % textMatches.length;
+    } else if (direction === 1) {
+      nextIndex = textMatches.findIndex((match) => match.start >= caret);
+      if (nextIndex < 0) nextIndex = 0;
+    } else {
+      nextIndex = textMatches.findLastIndex((match) => match.end <= caret);
+      if (nextIndex < 0) nextIndex = textMatches.length - 1;
+    }
+
+    selectTextMatch(textMatches[nextIndex], nextIndex);
+  }
+
+  function replaceCurrentMatch() {
+    if (!searchTerm || !textMatches.length) return;
+
+    const caret = textareaRef.current?.selectionStart ?? 0;
+    let targetIndex = activeMatchIndex;
+    if (targetIndex < 0 || targetIndex >= textMatches.length) {
+      targetIndex = textMatches.findIndex((match) => match.start >= caret);
+      if (targetIndex < 0) targetIndex = 0;
+    }
+
+    const target = textMatches[targetIndex];
+    const nextText = `${text.slice(0, target.start)}${replacementTerm}${text.slice(target.end)}`;
+    if (nextText.length > MAX_TEXT_LENGTH) {
+      toast.error("A substitui\u00e7\u00e3o ultrapassa o limite de 10000 caracteres.");
+      return;
+    }
+
+    setText(nextText);
+    const nextMatches = findTextMatches(nextText, searchTerm, matchCase);
+    const nextCaret = target.start + replacementTerm.length;
+    let nextIndex = nextMatches.findIndex((match) => match.start >= nextCaret);
+    if (nextIndex < 0 && nextMatches.length) nextIndex = 0;
+
+    if (nextIndex >= 0) {
+      selectTextMatch(nextMatches[nextIndex], nextIndex);
+    } else {
+      setActiveMatchIndex(-1);
+      requestAnimationFrame(() => textareaRef.current?.setSelectionRange(nextCaret, nextCaret));
+    }
+  }
+
+  function replaceAllMatches() {
+    if (!searchTerm || !textMatches.length) return;
+
+    let cursor = 0;
+    const parts: string[] = [];
+    textMatches.forEach((match) => {
+      parts.push(text.slice(cursor, match.start), replacementTerm);
+      cursor = match.end;
+    });
+    parts.push(text.slice(cursor));
+    const nextText = parts.join("");
+    if (nextText.length > MAX_TEXT_LENGTH) {
+      toast.error("A substitui\u00e7\u00e3o ultrapassa o limite de 10000 caracteres.");
+      return;
+    }
+
+    setText(nextText);
+    setActiveMatchIndex(-1);
+    toast.success(
+      textMatches.length === 1
+        ? "1 ocorr\u00eancia substitu\u00edda."
+        : `${textMatches.length} ocorr\u00eancias substitu\u00eddas.`,
+    );
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }
 
   function updateTextItem(rowId: string, field: EditableTextField, value: string) {
     setHasUnsavedChanges(true);
@@ -624,14 +819,107 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
 
           <div className="field ai-demo__input">
             <label htmlFor={textareaId}>Lista recebida</label>
-            <textarea
-              id={textareaId}
-              maxLength={MAX_TEXT_LENGTH}
-              onChange={(event) => setText(event.target.value)}
-              placeholder="Cole a lista aqui..."
-              rows={18}
-              value={text}
-            />
+            <div className="ai-demo__editor" onKeyDown={handleEditorShortcut}>
+              {isReplaceOpen ? (
+                <div aria-label="Localizar e substituir" className="ai-demo__replace" role="search">
+                  <div className="ai-demo__replace-row">
+                    <label className="ai-demo__replace-field">
+                      <span className="sr-only">Localizar</span>
+                      <Search aria-hidden="true" size={16} />
+                      <input
+                        aria-label="Localizar"
+                        onChange={(event) => {
+                          setSearchTerm(event.target.value);
+                          setActiveMatchIndex(-1);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter") return;
+                          event.preventDefault();
+                          moveToMatch(event.shiftKey ? -1 : 1);
+                        }}
+                        placeholder="Localizar"
+                        ref={searchInputRef}
+                        type="text"
+                        value={searchTerm}
+                      />
+                      <span aria-live="polite" className="ai-demo__replace-count">
+                        {searchTerm ? (textMatches.length ? `${Math.max(activeMatchIndex + 1, 1)}/${textMatches.length}` : "0/0") : ""}
+                      </span>
+                    </label>
+                    <button
+                      aria-label={"Ocorr\u00eancia anterior"}
+                      className="ai-demo__replace-icon"
+                      disabled={!textMatches.length}
+                      onClick={() => moveToMatch(-1)}
+                      type="button"
+                    >
+                      <ArrowUp aria-hidden="true" size={17} />
+                    </button>
+                    <button
+                      aria-label={"Pr\u00f3xima ocorr\u00eancia"}
+                      className="ai-demo__replace-icon"
+                      disabled={!textMatches.length}
+                      onClick={() => moveToMatch(1)}
+                      type="button"
+                    >
+                      <ArrowDown aria-hidden="true" size={17} />
+                    </button>
+                    <button
+                      aria-label={"Diferenciar mai\u00fasculas de min\u00fasculas"}
+                      aria-pressed={matchCase}
+                      className="ai-demo__replace-icon"
+                      onClick={() => {
+                        setMatchCase((current) => !current);
+                        setActiveMatchIndex(-1);
+                      }}
+                      type="button"
+                    >
+                      <CaseSensitive aria-hidden="true" size={18} />
+                    </button>
+                    <button aria-label="Fechar localizar e substituir" className="ai-demo__replace-icon" onClick={closeReplacePanel} type="button">
+                      <X aria-hidden="true" size={18} />
+                    </button>
+                  </div>
+                  <div className="ai-demo__replace-row ai-demo__replace-row--actions">
+                    <label className="ai-demo__replace-field">
+                      <span className="sr-only">Substituir por</span>
+                      <input
+                        aria-label="Substituir por"
+                        onChange={(event) => setReplacementTerm(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter") return;
+                          event.preventDefault();
+                          replaceCurrentMatch();
+                        }}
+                        placeholder="Substituir por"
+                        type="text"
+                        value={replacementTerm}
+                      />
+                    </label>
+                    <button className="ai-demo__replace-button" disabled={!textMatches.length} onClick={replaceCurrentMatch} type="button">
+                      Substituir
+                    </button>
+                    <button className="ai-demo__replace-button" disabled={!textMatches.length} onClick={replaceAllMatches} type="button">
+                      Substituir tudo
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              <textarea
+                aria-keyshortcuts="Control+H"
+                id={textareaId}
+                maxLength={MAX_TEXT_LENGTH}
+                onChange={(event) => {
+                  setText(event.target.value);
+                  setActiveMatchIndex(-1);
+                }}
+                onKeyDown={handleTextareaTab}
+                placeholder="Cole a lista aqui..."
+                ref={textareaRef}
+                rows={18}
+                value={text}
+              />
+            </div>
           </div>
         </form>
 
