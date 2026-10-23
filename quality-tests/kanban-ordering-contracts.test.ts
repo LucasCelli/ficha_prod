@@ -55,13 +55,12 @@ test("criacao, entrega e exclusao mantem a ordem combinada densa", () => {
   assert.match(delivery, /row_number\(\) over \(order by kanban_ordem, is_manual, id\)/);
 });
 
-test("cliente usa fila, IDs em namespace e plugins sortable padrao", () => {
+test("cliente preserva colisao controlada sem reordenacao direta do DOM", () => {
   assert.match(client, /scope: \{ id: "kanban-card-order" \}/);
   assert.match(client, /getCardDndId\(card\.id\)/);
   assert.match(client, /getColumnDndId\(column\.id\)/);
-  assert.doesNotMatch(client, /plugins:\s*CARD_SORTABLE_PLUGINS/);
-  assert.match(client, /isSortable\(source\)/);
-  assert.match(client, /source\.group/);
-  assert.match(client, /source\.index/);
-  assert.match(client, /event\.canceled \|\| !target/);
+  assert.match(client, /plugins:\s*CARD_SORTABLE_PLUGINS/);
+  assert.match(client, /setLocalColumns/);
+  assert.match(client, /onDragOver[\s\S]+?moveCard/);
+  assert.doesNotMatch(client, /isSortable\(source\)/);
 });

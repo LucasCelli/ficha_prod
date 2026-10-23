@@ -15,7 +15,7 @@ import {
 import { createPortal } from "react-dom";
 import { CollisionPriority } from "@dnd-kit/abstract";
 import { DragDropProvider, useDroppable } from "@dnd-kit/react";
-import { isSortable, useSortable } from "@dnd-kit/react/sortable";
+import { useSortable } from "@dnd-kit/react/sortable";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryStates } from "nuqs";
 import { toast } from "sonner";
@@ -78,17 +78,18 @@ type OrderOperation =
   | (OrderOperationBase & { kind: "sort-all" });
 
 import {
-  BOARD_QUERY_KEY, DND_TIMING, areQuadroFiltersEqual, findCardLocation,
+  BOARD_QUERY_KEY, CARD_SORTABLE_PLUGINS, DND_TIMING, areQuadroFiltersEqual, findCardLocation,
   formatCount, formatDate, getCardDndId, getCardIdFromDndId, getCardPlacement,
-  getCloudinaryThumbnailUrl, getColumnAccentStyle, getColumnDndId, getColumnIdFromDndId,
+  getCloudinaryThumbnailUrl, getColumnAccentStyle, getColumnDndId,
   getDeliveryUrgency, getDeliveryUrgencyLabel, getDestination, getEmptyManualCardDraft,
   getResultColumns, moveCard, removeCard, sameDestination, sortAllColumnsByDeliveryDate,
   sortColumnByDeliveryDate, stopCardDrag, updateQueryResult,
-  type CardPlacement, type DragStart, type ManualCardDraft,
+  type CardPlacement, type DragDestination, type DragStart, type ManualCardDraft,
 } from "./quadro-producao-state";
 export function QuadroProducaoClient({ catalogFabricOptions, initialFilters, initialResult }: QuadroProducaoClientProps) {
   const [filters, setFilters] = useQueryStates(quadroProducaoSearchParamParsers);
   const [searchDraft, setSearchDraft] = useState(filters.busca);
+  const [localColumns, setLocalColumns] = useState<KanbanBoardColumn[] | null>(null);
   const [dragStart, setDragStart] = useState<DragStart | null>(null);
   const [dropColumnId, setDropColumnId] = useState<string | null>(null);
   const [viewCard, setViewCard] = useState<KanbanCardSummary | null>(null);
@@ -99,6 +100,7 @@ export function QuadroProducaoClient({ catalogFabricOptions, initialFilters, ini
   const [createManualCardOpen, setCreateManualCardOpen] = useState(false);
   const [manualCardDraft, setManualCardDraft] = useState<ManualCardDraft>(() => getEmptyManualCardDraft(""));
   const dragStartRef = useRef<DragStart | null>(null);
+  const lastDestinationRef = useRef<DragDestination | null>(null);
   const latestOrderRevisionRef = useRef(0);
   const queryClient = useQueryClient();
 
@@ -128,7 +130,7 @@ export function QuadroProducaoClient({ catalogFabricOptions, initialFilters, ini
   const currentResult = boardQuery.data ?? initialResult;
 
   const canonicalColumns = useMemo(() => getResultColumns(currentResult), [currentResult]);
-  const columns = canonicalColumns;
+  const columns = localColumns ?? canonicalColumns;
   const columnsRef = useRef(columns);
   useLayoutEffect(() => {
     columnsRef.current = columns;
@@ -525,6 +527,7 @@ export function QuadroProducaoClient({ catalogFabricOptions, initialFilters, ini
 
           const start = { cardId, columnId: location.columnId, index: location.index };
           dragStartRef.current = start;
+          lastDestinationRef.current = location;
           setDropColumnId(null);
           setDragStart(start);
         }}
@@ -533,33 +536,40 @@ export function QuadroProducaoClient({ catalogFabricOptions, initialFilters, ini
           if (!activeDrag) return;
 
           const destination = getDestination(event.operation.target, columnsRef.current);
-          if (!destination) {
-            setDropColumnId(null);
-            return;
-          }
+          if (!destination || sameDestination(lastDestinationRef.current, destination)) return;
 
+          lastDestinationRef.current = destination;
           setDropColumnId((currentColumnId) =>
             currentColumnId === destination.columnId ? currentColumnId : destination.columnId,
           );
+          setLocalColumns((currentColumns) => {
+            const optimisticColumns = moveCard(currentColumns ?? columnsRef.current, activeDrag.cardId, destination);
+            columnsRef.current = optimisticColumns;
+            return optimisticColumns;
+          });
         }}
         onDragEnd={(event) => {
           const activeDrag = dragStartRef.current;
           if (!activeDrag) return;
 
+          const destination = event.canceled
+            ? null
+            : findCardLocation(columnsRef.current, activeDrag.cardId) ?? lastDestinationRef.current;
+          const optimisticColumns = columnsRef.current;
+
           dragStartRef.current = null;
+          lastDestinationRef.current = null;
           setDropColumnId(null);
           setDragStart(null);
 
-          const { source, target } = event.operation;
-          if (event.canceled || !target || !isSortable(source) || source.group == null) return;
+          if (!destination || sameDestination(activeDrag, destination)) {
+            columnsRef.current = canonicalColumns;
+            setLocalColumns(null);
+            return;
+          }
 
-          const destinationColumnId = getColumnIdFromDndId(String(source.group));
-          if (!destinationColumnId) return;
-          const destination = { columnId: destinationColumnId, index: Math.max(0, source.index) };
-          if (sameDestination(activeDrag, destination)) return;
-
-          const optimisticColumns = moveCard(columnsRef.current, activeDrag.cardId, destination);
           persistCardMove(activeDrag.cardId, optimisticColumns);
+          setLocalColumns(null);
         }}
       >
         <div className="quadro-producao-board-scroll">
@@ -898,6 +908,7 @@ const KanbanCard = memo(function KanbanCard({
     group: getColumnDndId(columnId),
     id: getCardDndId(card.id),
     index: cardIndex,
+    plugins: CARD_SORTABLE_PLUGINS,
     transition: DND_TIMING,
     type: "card",
   });

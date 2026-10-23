@@ -23,9 +23,9 @@
   "dependencies": {
     "@ai-sdk/google": "^3.0.71",
     "@ai-sdk/groq": "^3.0.39",
-    "@dnd-kit/abstract": "^0.5.1",
-    "@dnd-kit/dom": "^0.5.1",
-    "@dnd-kit/react": "^0.5.1",
+    "@dnd-kit/abstract": "0.5.0",
+    "@dnd-kit/dom": "0.5.0",
+    "@dnd-kit/react": "0.5.0",
     "@hookform/resolvers": "^5.2.2",
     "@openrouter/ai-sdk-provider": "^2.9.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",

@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Droppable } from "@dnd-kit/dom";
+import { SortableKeyboardPlugin } from "@dnd-kit/dom/sortable";
 import { isSortable } from "@dnd-kit/react/sortable";
 import { formatDateInput, formatShortDateInput, getBusinessTodayInput, getDateInputDifferenceInDays } from "../../lib/dates.ts";
 import type { KanbanBoardColumn, KanbanCardSummary, QuadroProducaoFilters, QuadroProducaoResult } from "./data";
@@ -19,6 +20,7 @@ export type CardPlacement = DragDestination & { nextCardId: string | null; previ
 
 export const BOARD_QUERY_KEY = "quadro-producao";
 export const DND_TIMING = { duration: 90, easing: "cubic-bezier(0.2, 0, 0, 1)" };
+export const CARD_SORTABLE_PLUGINS = [SortableKeyboardPlugin];
 const CARD_DND_PREFIX = "kanban-card:";
 const COLUMN_DND_PREFIX = "kanban-column:";
 
