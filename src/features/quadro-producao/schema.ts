@@ -24,6 +24,8 @@ export const reorderKanbanColumnsSchema = z.object({
 export const moveKanbanCardSchema = z.object({
   destinationColumnId: z.string().uuid("Coluna de destino inválida."),
   destinationIndex: z.number().int().min(0, "Posição inválida."),
+  nextCardId: z.string().uuid("Cartão seguinte inválido.").nullable().optional(),
+  previousCardId: z.string().uuid("Cartão anterior inválido.").nullable().optional(),
 });
 
 export const createManualKanbanCardSchema = z.object({

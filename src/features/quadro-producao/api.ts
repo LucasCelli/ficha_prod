@@ -78,6 +78,15 @@ export async function postKanbanColumnSortByDate(id: string) {
   return parseJsonResponse<{ ok: true }>(response);
 }
 
+export async function postKanbanSortAllByDate() {
+  const response = await fetch("/api/quadro-producao/sort-by-date", {
+    credentials: "same-origin",
+    method: "POST",
+  });
+
+  return parseJsonResponse<{ ok: true }>(response);
+}
+
 export async function postManualKanbanCard(payload: {
   arte?: string;
   columnId: string;
@@ -98,9 +107,15 @@ export async function postManualKanbanCard(payload: {
   return parseJsonResponse<{ card: { id: string } }>(response);
 }
 
-export async function patchKanbanCardMove(id: string, destinationColumnId: string, destinationIndex: number) {
+export async function patchKanbanCardMove(
+  id: string,
+  destinationColumnId: string,
+  destinationIndex: number,
+  previousCardId: string | null,
+  nextCardId: string | null,
+) {
   const response = await fetch(`/api/quadro-producao/cards/${encodeURIComponent(id)}/move`, {
-    body: JSON.stringify({ destinationColumnId, destinationIndex }),
+    body: JSON.stringify({ destinationColumnId, destinationIndex, nextCardId, previousCardId }),
     credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",

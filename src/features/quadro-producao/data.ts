@@ -293,10 +293,26 @@ export async function sortKanbanColumnByDate(columnId: string) {
   }
 }
 
-export async function moveKanbanCard(cardId: string, destinationColumnId: string, destinationIndex: number) {
+export async function sortAllKanbanCardsByDate() {
+  const { error } = await createServerSupabaseClient().rpc("sort_all_kanban_cards_by_delivery_date");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function moveKanbanCard(
+  cardId: string,
+  destinationColumnId: string,
+  destinationIndex: number,
+  previousCardId: string | null,
+  nextCardId: string | null,
+) {
   const { error } = await createServerSupabaseClient().rpc("move_kanban_card", {
     p_ficha_id: cardId,
     p_kanban_column_id: destinationColumnId,
+    p_next_card_id: nextCardId,
+    p_previous_card_id: previousCardId,
     p_target_index: destinationIndex,
   });
 

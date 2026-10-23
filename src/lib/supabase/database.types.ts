@@ -739,10 +739,13 @@ export type Database = {
           updated_at: string;
           vendedor: string | null;
         }>;
-      };      move_kanban_card: {
+      };
+      move_kanban_card: {
         Args: {
           p_ficha_id: string;
           p_kanban_column_id: string;
+          p_next_card_id?: string | null;
+          p_previous_card_id?: string | null;
           p_target_index?: number;
         };
         Returns: undefined;
@@ -756,7 +759,12 @@ export type Database = {
       set_ficha_delivery_status_atomic: {
         Args: { p_actor_id: string; p_delivered: boolean; p_ficha_id: string };
         Returns: undefined;
-      };      sort_kanban_cards_by_delivery_date: {
+      };
+      sort_all_kanban_cards_by_delivery_date: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
+      sort_kanban_cards_by_delivery_date: {
         Args: {
           p_kanban_column_id: string;
         };

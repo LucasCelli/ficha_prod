@@ -1,8 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Droppable } from "@dnd-kit/dom";
-import { SortableKeyboardPlugin } from "@dnd-kit/dom/sortable";
 import { isSortable } from "@dnd-kit/react/sortable";
-import { formatDateInput, formatShortDateInput, getBusinessTodayInput, getDateInputDifferenceInDays } from "@/lib/dates";
+import { formatDateInput, formatShortDateInput, getBusinessTodayInput, getDateInputDifferenceInDays } from "../../lib/dates.ts";
 import type { KanbanBoardColumn, KanbanCardSummary, QuadroProducaoFilters, QuadroProducaoResult } from "./data";
 
 export type ManualCardDraft = {
@@ -16,10 +15,12 @@ export type ManualCardDraft = {
 
 export type DragStart = { cardId: string; columnId: string; index: number };
 export type DragDestination = { columnId: string; index: number };
+export type CardPlacement = DragDestination & { nextCardId: string | null; previousCardId: string | null };
 
 export const BOARD_QUERY_KEY = "quadro-producao";
 export const DND_TIMING = { duration: 90, easing: "cubic-bezier(0.2, 0, 0, 1)" };
-export const CARD_SORTABLE_PLUGINS = [SortableKeyboardPlugin];
+const CARD_DND_PREFIX = "kanban-card:";
+const COLUMN_DND_PREFIX = "kanban-column:";
 
 export function formatDate(value: string) {
   return formatShortDateInput(value);
@@ -64,13 +65,29 @@ export function getResultColumns(result: QuadroProducaoResult) {
 function normalizeCards(column: KanbanBoardColumn, cards: KanbanCardSummary[]) {
   return {
     ...column,
-    cards: cards.map((card, index) => ({ ...card, kanbanColumnId: column.id, kanbanOrder: index })),
+    cards: cards.map((card, index) =>
+      card.kanbanColumnId === column.id && card.kanbanOrder === index
+        ? card
+        : { ...card, kanbanColumnId: column.id, kanbanOrder: index },
+    ),
     openCount: cards.length,
   };
 }
 
-export function normalizeColumnCounts(columns: KanbanBoardColumn[]) {
-  return columns.map((column) => normalizeCards(column, column.cards));
+export function getCardDndId(cardId: string) {
+  return `${CARD_DND_PREFIX}${cardId}`;
+}
+
+export function getColumnDndId(columnId: string) {
+  return `${COLUMN_DND_PREFIX}${columnId}`;
+}
+
+export function getCardIdFromDndId(dndId: string) {
+  return dndId.startsWith(CARD_DND_PREFIX) ? dndId.slice(CARD_DND_PREFIX.length) || null : null;
+}
+
+export function getColumnIdFromDndId(dndId: string) {
+  return dndId.startsWith(COLUMN_DND_PREFIX) ? dndId.slice(COLUMN_DND_PREFIX.length) || null : null;
 }
 
 export function findCardLocation(columns: KanbanBoardColumn[], cardId: string): DragDestination | null {
@@ -81,9 +98,23 @@ export function findCardLocation(columns: KanbanBoardColumn[], cardId: string): 
   return null;
 }
 
+export function getCardPlacement(columns: KanbanBoardColumn[], cardId: string): CardPlacement | null {
+  const location = findCardLocation(columns, cardId);
+  if (!location) return null;
+  const cards = columns.find((column) => column.id === location.columnId)?.cards;
+  if (!cards) return null;
+
+  return {
+    ...location,
+    nextCardId: cards[location.index + 1]?.id ?? null,
+    previousCardId: cards[location.index - 1]?.id ?? null,
+  };
+}
+
 export function moveCard(columns: KanbanBoardColumn[], cardId: string, destination: DragDestination) {
   const source = findCardLocation(columns, cardId);
   if (!source) return columns;
+  if (sameDestination(source, destination)) return columns;
   const sourceColumn = columns.find((column) => column.id === source.columnId);
   const destinationColumn = columns.find((column) => column.id === destination.columnId);
   if (!sourceColumn || !destinationColumn) return columns;
@@ -108,12 +139,76 @@ export function moveCard(columns: KanbanBoardColumn[], cardId: string, destinati
   });
 }
 
+export function removeCard(columns: KanbanBoardColumn[], cardId: string) {
+  const source = findCardLocation(columns, cardId);
+  if (!source) return columns;
+
+  return columns.map((column) => {
+    if (column.id !== source.columnId) return column;
+    return normalizeCards(column, column.cards.filter((card) => card.id !== cardId));
+  });
+}
+
+function getDeliveryDateKey(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  const isValid = parsed.getUTCFullYear() === Number(year)
+    && parsed.getUTCMonth() === Number(month) - 1
+    && parsed.getUTCDate() === Number(day);
+
+  return isValid ? value : null;
+}
+
+function compareCardsByDeliveryDate(left: KanbanCardSummary, right: KanbanCardSummary) {
+  const leftDate = getDeliveryDateKey(left.dataEntrega);
+  const rightDate = getDeliveryDateKey(right.dataEntrega);
+
+  if (leftDate && rightDate && leftDate !== rightDate) return leftDate.localeCompare(rightDate);
+  if (leftDate && !rightDate) return -1;
+  if (!leftDate && rightDate) return 1;
+  return left.kanbanOrder - right.kanbanOrder
+    || Number(left.isManualCard) - Number(right.isManualCard)
+    || left.id.localeCompare(right.id);
+}
+
+export function sortColumnByDeliveryDate(columns: KanbanBoardColumn[], columnId: string) {
+  const target = columns.find((column) => column.id === columnId);
+  if (!target) return columns;
+
+  const cards = [...target.cards].sort(compareCardsByDeliveryDate);
+  const alreadyNormalized = cards.every((card, index) =>
+    card === target.cards[index] && card.kanbanColumnId === columnId && card.kanbanOrder === index,
+  );
+  if (alreadyNormalized) return columns;
+
+  return columns.map((column) => column.id === columnId ? normalizeCards(column, cards) : column);
+}
+
+export function sortAllColumnsByDeliveryDate(columns: KanbanBoardColumn[]) {
+  let changed = false;
+  const sorted = columns.map((column) => {
+    const nextColumns = sortColumnByDeliveryDate([column], column.id);
+    const nextColumn = nextColumns[0] ?? column;
+    changed ||= nextColumn !== column;
+    return nextColumn;
+  });
+
+  return changed ? sorted : columns;
+}
+
 export function getDestination(target: Droppable | null, columns: KanbanBoardColumn[]): DragDestination | null {
   if (isSortable(target) && target.group != null) {
-    return { columnId: String(target.group), index: Math.max(0, target.index) };
+    const columnId = getColumnIdFromDndId(String(target.group));
+    if (columnId && columns.some((column) => column.id === columnId)) {
+      return { columnId, index: Math.max(0, target.index) };
+    }
   }
   if (target?.id != null) {
-    const columnId = String(target.id);
+    const columnId = getColumnIdFromDndId(String(target.id));
+    if (!columnId) return null;
     const column = columns.find((item) => item.id === columnId);
     if (column) return { columnId, index: column.cards.length };
   }

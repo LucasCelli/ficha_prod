@@ -23,7 +23,13 @@ async function handlePATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    await moveKanbanCard(id, parsed.data.destinationColumnId, parsed.data.destinationIndex);
+    await moveKanbanCard(
+      id,
+      parsed.data.destinationColumnId,
+      parsed.data.destinationIndex,
+      parsed.data.previousCardId ?? null,
+      parsed.data.nextCardId ?? null,
+    );
     revalidatePath("/quadro-producao");
     revalidatePath("/fichas");
     revalidatePath(`/fichas/${id}`);
