@@ -105,6 +105,12 @@ type TextMatch = {
   start: number;
 };
 
+type TextHistoryEntry = {
+  selectionEnd: number;
+  selectionStart: number;
+  value: string;
+};
+
 function findTextMatches(value: string, query: string, matchCase: boolean): TextMatch[] {
   if (!query) return [];
 
@@ -301,6 +307,10 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
   const fichaDatalistRef = useRef<CustomDatalistHandle>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const textHistoryRef = useRef<{ entries: TextHistoryEntry[]; index: number }>({
+    entries: [{ selectionEnd: 0, selectionStart: 0, value: initialText }],
+    index: 0,
+  });
   const hasItems = Boolean(result?.items.length);
   const textMatches = useMemo(() => findTextMatches(text, searchTerm, matchCase), [matchCase, searchTerm, text]);
   const organizingModelLabel = organizingModel ? findAiModelOption(organizingModel)?.label ?? organizingModel : null;
@@ -361,6 +371,48 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
     [showGroupColumn, sortConfig],
   );
 
+  function commitTextChange(nextText: string, selectionStart: number, selectionEnd = selectionStart) {
+    const history = textHistoryRef.current;
+    const current = history.entries[history.index];
+
+    if (current?.value === nextText) {
+      history.entries[history.index] = { value: nextText, selectionStart, selectionEnd };
+      return;
+    }
+
+    const entries = history.entries.slice(0, history.index + 1);
+    entries.push({ value: nextText, selectionStart, selectionEnd });
+    if (entries.length > 200) entries.shift();
+    history.entries = entries;
+    history.index = entries.length - 1;
+    setText(nextText);
+  }
+
+  function resetTextHistory(nextText: string) {
+    textHistoryRef.current = {
+      entries: [{ selectionEnd: 0, selectionStart: 0, value: nextText }],
+      index: 0,
+    };
+    setText(nextText);
+  }
+
+  function moveTextHistory(direction: -1 | 1) {
+    const history = textHistoryRef.current;
+    const nextIndex = history.index + direction;
+    const entry = history.entries[nextIndex];
+    if (!entry) return;
+
+    history.index = nextIndex;
+    setText(entry.value);
+    setActiveMatchIndex(-1);
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(entry.selectionStart, entry.selectionEnd);
+    });
+  }
+
   function selectTextMatch(match: TextMatch, index: number) {
     setActiveMatchIndex(index);
     requestAnimationFrame(() => {
@@ -403,6 +455,13 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
   }
 
   function handleTextareaTab(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    const shortcutKey = event.key.toLocaleLowerCase("pt-BR");
+    if ((event.ctrlKey || event.metaKey) && (shortcutKey === "z" || shortcutKey === "y")) {
+      event.preventDefault();
+      moveTextHistory(shortcutKey === "y" || event.shiftKey ? 1 : -1);
+      return;
+    }
+
     if (event.key !== "Tab" || event.ctrlKey || event.metaKey || event.altKey) return;
 
     event.preventDefault();
@@ -416,7 +475,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
     if (!event.shiftKey && !spansMultipleLines) {
       const nextText = `${text.slice(0, selectionStart)}\t${text.slice(selectionEnd)}`;
       if (nextText.length > MAX_TEXT_LENGTH) return;
-      setText(nextText);
+      commitTextChange(nextText, selectionStart + 1);
       setActiveMatchIndex(-1);
       requestAnimationFrame(() => textarea.setSelectionRange(selectionStart + 1, selectionStart + 1));
       return;
@@ -438,12 +497,12 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
     const nextText = `${text.slice(0, lineStart)}${replacement}${text.slice(selectionEnd)}`;
     if (nextText.length > MAX_TEXT_LENGTH) return;
 
-    setText(nextText);
-    setActiveMatchIndex(-1);
     const nextStart = event.shiftKey
       ? Math.max(lineStart, selectionStart - removedBeforeSelection)
       : selectionStart + 1;
     const nextEnd = selectionEnd + (replacement.length - (selectionEnd - lineStart));
+    commitTextChange(nextText, nextStart, Math.max(nextStart, nextEnd));
+    setActiveMatchIndex(-1);
     requestAnimationFrame(() => textarea.setSelectionRange(nextStart, Math.max(nextStart, nextEnd)));
   }
 
@@ -482,15 +541,16 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
       return;
     }
 
-    setText(nextText);
     const nextMatches = findTextMatches(nextText, searchTerm, matchCase);
     const nextCaret = target.start + replacementTerm.length;
     let nextIndex = nextMatches.findIndex((match) => match.start >= nextCaret);
     if (nextIndex < 0 && nextMatches.length) nextIndex = 0;
 
     if (nextIndex >= 0) {
+      commitTextChange(nextText, nextMatches[nextIndex].start, nextMatches[nextIndex].end);
       selectTextMatch(nextMatches[nextIndex], nextIndex);
     } else {
+      commitTextChange(nextText, nextCaret);
       setActiveMatchIndex(-1);
       requestAnimationFrame(() => textareaRef.current?.setSelectionRange(nextCaret, nextCaret));
     }
@@ -512,7 +572,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
       return;
     }
 
-    setText(nextText);
+    commitTextChange(nextText, 0);
     setActiveMatchIndex(-1);
     toast.success(
       textMatches.length === 1
@@ -740,7 +800,7 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
         setHasUnsavedChanges(false);
 
         const sourceText = loadedFicha.listaIa.sourceText?.trim();
-        if (sourceText) setText(sourceText);
+        if (sourceText) resetTextHistory(sourceText);
       }
     })();
 
@@ -906,11 +966,11 @@ export function UniformListParserDemo({ initialFicha = null, initialText = "" }:
                 </div>
               ) : null}
               <textarea
-                aria-keyshortcuts="Control+H"
+                aria-keyshortcuts="Control+H Control+Z Control+Y"
                 id={textareaId}
                 maxLength={MAX_TEXT_LENGTH}
                 onChange={(event) => {
-                  setText(event.target.value);
+                  commitTextChange(event.target.value, event.target.selectionStart, event.target.selectionEnd);
                   setActiveMatchIndex(-1);
                 }}
                 onKeyDown={handleTextareaTab}
