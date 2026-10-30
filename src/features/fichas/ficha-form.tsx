@@ -53,7 +53,7 @@ import { buildObservacoesTecnicas } from "./observacoes-autofill";
 import { canonicalizeFichaProductItemProduct, canonicalizeFichaProductItemSize, isFichaProductItemBabyLook, sortFichaProductItemsForSave } from "./product-item-sorting";
 import { PrintTriggerButton } from "./print-trigger-button";
 import { isMissingRequiredLayout, MISSING_LAYOUT_MESSAGE } from "./print-requirements";
-import { getMissingConditionalFields, isMangaCurtaELonga, isRegataProduct, normalizeProductForRule } from "./schema";
+import { getConditionalFieldProductRequirements, getMissingConditionalFields, isMangaCurtaELonga, isRegataProduct, normalizeProductForRule } from "./schema";
 import { buildDraftPrintFicha, DraftPrintLayer } from "./ficha-draft-print";
 
 type FichaFormProps = {
@@ -735,6 +735,7 @@ function FichaFormInner({
   const acabamentoGolaOptions = getOptions(catalogOptions, "acabamento_gola");
   const bolsoOptions = getOptions(catalogOptions, "bolso");
   const produtosPreenchidos = itens.map((item) => item.produto.trim()).filter(Boolean);
+  const conditionalFieldRequirements = getConditionalFieldProductRequirements(produtosPreenchidos);
   const isRegataMode = produtosPreenchidos.length > 0 && produtosPreenchidos.every(isRegataProduct);
   const normalizedGola = normalizeProductForRule(gola);
   const isPolo = normalizedGola.includes("polo");
@@ -2139,7 +2140,7 @@ function FichaFormInner({
                   value={manga ?? ""}
                 />
               </Field>
-              <Field label={isMangaLonga ? "Acabamento manga curta" : "Acabamento da manga"} name="acabamentoManga" error={state.fieldErrors?.acabamentoManga} required>
+              <Field label={isMangaLonga ? "Acabamento manga curta" : "Acabamento da manga"} name="acabamentoManga" error={state.fieldErrors?.acabamentoManga} required={conditionalFieldRequirements.acabamentoManga}>
                 <CustomDatalist
                   id="acabamentoManga"
                   name="acabamentoManga"
@@ -2179,7 +2180,7 @@ function FichaFormInner({
             </>
           ) : null}
           {isMangaLonga ? (
-            <Field label="Acabamento manga longa" name="acabamentoMangaLonga" error={state.fieldErrors?.acabamentoMangaLonga} required>
+            <Field label="Acabamento manga longa" name="acabamentoMangaLonga" error={state.fieldErrors?.acabamentoMangaLonga} required={conditionalFieldRequirements.acabamentoManga}>
               <CustomDatalist
                 id="acabamentoMangaLonga"
                 name="acabamentoMangaLonga"
@@ -2264,7 +2265,7 @@ function FichaFormInner({
             </Field>
           ) : null}
           {showLarguraGola ? (
-            <Field label="Largura da gola" name="larguraGola" error={state.fieldErrors?.larguraGola} required>
+            <Field label="Largura da gola" name="larguraGola" error={state.fieldErrors?.larguraGola} required={conditionalFieldRequirements.larguraGola}>
               <input
                 id="larguraGola"
                 name="larguraGola"

@@ -31,6 +31,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { FichaDetail } from "./data";
+import { hasOnlyPantsProducts } from "./print-product-rules";
 
 type PrintFichaProps = {
   ficha: FichaDetail;
@@ -66,6 +67,7 @@ export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, 
   const idText = authorName ? `${fichaLabel} por ${authorName}` : null;
   const isEvento = Boolean(ficha.evento);
   const isRegata = ficha.itens.length > 0 && ficha.itens.every((item) => isRegataProduct(item.produto ?? ""));
+  const isPantsOnly = hasOnlyPantsProducts(products.map((item) => item.produto));
   const normalizedGola = normalizeKey(ficha.gola ?? "");
   const isPolo = normalizedGola.includes("polo");
   const isSocial = normalizedGola.includes("social");
@@ -150,12 +152,12 @@ export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, 
               <PrintSeparator />
 
               <PrintField icon={Shirt} label="Tipo Manga" value={ficha.manga} />
-              <PrintField icon={SlidersHorizontal} label={isRegata ? "Viés" : `Acab. Manga${mangaSuffix}`} value={isRegata ? yesNo(ficha.acabamento_manga === "vies") : ficha.acabamento_manga} />
+              <PrintField icon={SlidersHorizontal} label={isRegata ? "Viés" : isPantsOnly ? "Acabamento" : `Acab. Manga${mangaSuffix}`} value={isRegata ? yesNo(ficha.acabamento_manga === "vies") : ficha.acabamento_manga} />
               {hasMangaExtra && ficha.largura_manga ? (
-                <PrintField icon={Ruler} label={isRegata ? "Largura do Viés" : `Largura Acab. Manga${mangaSuffix}`} value={ficha.largura_manga} />
+                <PrintField icon={Ruler} label={isRegata ? "Largura do Viés" : isPantsOnly ? "Largura do Acabamento" : `Largura Acab. Manga${mangaSuffix}`} value={ficha.largura_manga} />
               ) : null}
               {hasMangaExtra && ficha.cor_acabamento_manga ? (
-                <PrintField icon={Palette} label={isRegata ? "Cor do Viés" : `Cor Acab. Manga${mangaSuffix}`} value={ficha.cor_acabamento_manga} />
+                <PrintField icon={Palette} label={isRegata ? "Cor do Viés" : isPantsOnly ? "Cor do Acabamento" : `Cor Acab. Manga${mangaSuffix}`} value={ficha.cor_acabamento_manga} />
               ) : null}
               {hasMangaLonga ? <PrintField icon={SlidersHorizontal} label="Acab. Manga Longa" value={ficha.acabamento_manga_longa} /> : null}
               {hasMangaLonga && hasAcabamentoMangaExtra(ficha.acabamento_manga_longa) && ficha.largura_manga_longa ? (

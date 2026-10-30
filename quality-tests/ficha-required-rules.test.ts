@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { isMissingRequiredLayout } from "../src/features/fichas/print-requirements.ts";
-import { getMissingConditionalFields } from "../src/features/fichas/schema.ts";
+import { getConditionalFieldProductRequirements, getMissingConditionalFields } from "../src/features/fichas/schema.ts";
 
 test("acabamento da manga e largura da gola são obrigatórios só quando visíveis", () => {
   assert.deepEqual(getMissingConditionalFields({ acabamentoGola: "Ribana", gola: "Careca", produtos: ["Camiseta"] }), ["acabamentoManga", "larguraGola"]);
@@ -20,6 +20,13 @@ test("acabamentos de gola e manga não são obrigatórios para produtos que não
     getMissingConditionalFields({ acabamentoGola: "Ribana", gola: "Careca", produtos: ["Bandeira", "Camiseta"] }),
     ["acabamentoManga", "larguraGola"],
   );
+});
+
+test("formulário e servidor compartilham a obrigatoriedade por tipo de produto", () => {
+  assert.deepEqual(getConditionalFieldProductRequirements(["Bandeira"]), { acabamentoManga: false, larguraGola: false });
+  assert.deepEqual(getConditionalFieldProductRequirements(["Calça de Helanca"]), { acabamentoManga: false, larguraGola: false });
+  assert.deepEqual(getConditionalFieldProductRequirements(["Bandeira", "Camiseta Manga Curta"]), { acabamentoManga: true, larguraGola: true });
+  assert.deepEqual(getConditionalFieldProductRequirements(["Camiseta Regata"]), { acabamentoManga: false, larguraGola: true });
 });
 
 test("manga curta e longa exige acabamento da manga longa", () => {

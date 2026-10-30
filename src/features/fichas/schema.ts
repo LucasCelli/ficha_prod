@@ -104,7 +104,16 @@ export function isMangaCurtaELonga(value: unknown) {
   return typeof value === "string" && normalizeProductForRule(value) === "curta e longa";
 }
 
-// Mirrors field visibility in ficha-form: hidden fields are not required.
+export function getConditionalFieldProductRequirements(produtos: readonly string[]) {
+  const camisetas = produtos.filter((produto) => produto.trim()).filter(isCamisetaProduct);
+
+  return {
+    acabamentoManga: camisetas.some((produto) => !isRegataProduct(produto)),
+    larguraGola: camisetas.length > 0,
+  };
+}
+
+// Shared by server validation and the form's conditional required markers.
 export function getMissingConditionalFields(values: {
   acabamentoGola?: unknown;
   acabamentoManga?: unknown;
@@ -118,17 +127,15 @@ export function getMissingConditionalFields(values: {
   const produtos = values.produtos.filter((produto) => produto.trim());
   const gola = normalizeProductForRule(text(values.gola));
   const missing: Array<"acabamentoManga" | "acabamentoMangaLonga" | "larguraGola"> = [];
-  const camisetas = produtos.filter(isCamisetaProduct);
-  const hasCamiseta = camisetas.length > 0;
-  const hasManga = camisetas.some((produto) => !isRegataProduct(produto));
+  const requirements = getConditionalFieldProductRequirements(produtos);
 
-  if (hasManga && !text(values.acabamentoManga)) {
+  if (requirements.acabamentoManga && !text(values.acabamentoManga)) {
     missing.push("acabamentoManga");
   }
-  if (hasManga && isMangaCurtaELonga(values.manga) && !text(values.acabamentoMangaLonga)) {
+  if (requirements.acabamentoManga && isMangaCurtaELonga(values.manga) && !text(values.acabamentoMangaLonga)) {
     missing.push("acabamentoMangaLonga");
   }
-  if (hasCamiseta && text(values.acabamentoGola) && !gola.includes("polo") && !gola.includes("social") && !text(values.larguraGola)) {
+  if (requirements.larguraGola && text(values.acabamentoGola) && !gola.includes("polo") && !gola.includes("social") && !text(values.larguraGola)) {
     missing.push("larguraGola");
   }
   return missing;
