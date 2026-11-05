@@ -84,3 +84,21 @@ test("mantém a separação canônica entre tamanhos masculinos e femininos", ()
     ["Masculina M", "Masculina G", "Feminina P", "Feminina GG"],
   );
 });
+
+test("ordena alias derivado do rotulo canonico antes do tamanho seguinte", () => {
+  const definitions = [
+    { active: true, aliases: [], id: "gg", name: "GG", order: 13 },
+    { active: true, aliases: ["52", "G1"], id: "xg", name: "XG (52)", order: 14 },
+    { active: true, aliases: ["54", "XGG", "G2"], id: "eg", name: "EG (54)", order: 15 },
+  ];
+  const items = [
+    { detalhesProduto: "", produto: "Camiseta", tamanho: "GG" },
+    { detalhesProduto: "", produto: "Camiseta", tamanho: "EG (54)" },
+    { detalhesProduto: "", produto: "Camiseta", tamanho: "XG" },
+  ];
+
+  assert.deepEqual(
+    sortFichaProductItemsForSave(items, definitions).map((item) => item.tamanho),
+    ["GG", "XG", "EG (54)"],
+  );
+});

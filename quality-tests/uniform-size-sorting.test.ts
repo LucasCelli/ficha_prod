@@ -26,6 +26,19 @@ test("mantem desconhecidos depois dos conhecidos com fallback deterministico", (
   assert.deepEqual(createUniformSizeDomain().sortSizes(["ZZ", "P", "AA"]), ["P", "AA", "ZZ"]);
 });
 
+test("deriva aliases das partes de um rotulo canonico configurado", () => {
+  const configured = [
+    { active: true, aliases: [], id: "gg", name: "GG", order: 13 },
+    { active: true, aliases: ["52", "G1"], id: "xg", name: "XG (52)", order: 14 },
+    { active: true, aliases: ["54", "G2"], id: "eg", name: "EG (54)", order: 15 },
+  ];
+  const sizes = createUniformSizeDomain(configured);
+
+  assert.equal(sizes.resolveSize("XG").sizeId, "xg");
+  assert.equal(sizes.resolveSize("52").sizeId, "xg");
+  assert.deepEqual(sizes.sortSizes(["GG", "EG (54)", "XG"]), ["GG", "XG", "EG (54)"]);
+});
+
 test("agrupa tamanhos tradicionais antes dos tamanhos baby look", () => {
   const items = ["Baby G", "P", "Baby P", "6", "G"];
 

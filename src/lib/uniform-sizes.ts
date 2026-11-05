@@ -27,6 +27,11 @@ function presentationCandidates(value: string) {
   return match ? [match[1].trim(), match[2].trim()] : [value];
 }
 
+function identityCandidates(value: string) {
+  const normalized = normalizeSizeInput(value);
+  return Array.from(new Set([normalized, ...presentationCandidates(normalized).map(normalizeSizeInput)])).filter(Boolean);
+}
+
 export function validateSizeConfiguration(definitions: readonly UniformSizeDefinition[]) {
   const errors: string[] = [];
   const ids = new Set<string>();
@@ -39,10 +44,11 @@ export function validateSizeConfiguration(definitions: readonly UniformSizeDefin
     if (!Number.isInteger(definition.order) || definition.order < 0) errors.push(`Ordem inválida para ${definition.name}.`);
     ids.add(definition.id); names.add(name);
     for (const rawAlias of [definition.name, ...definition.aliases]) {
-      const alias = normalizeSizeInput(rawAlias);
-      const owner = aliases.get(alias);
-      if (owner && owner !== definition.id) errors.push(`Alias ${rawAlias} pertence a mais de um tamanho.`);
-      else if (alias) aliases.set(alias, definition.id);
+      for (const alias of identityCandidates(rawAlias)) {
+        const owner = aliases.get(alias);
+        if (owner && owner !== definition.id) errors.push(`Alias ${alias} pertence a mais de um tamanho.`);
+        else aliases.set(alias, definition.id);
+      }
     }
   }
   return errors;
@@ -51,7 +57,11 @@ export function validateSizeConfiguration(definitions: readonly UniformSizeDefin
 export function createUniformSizeDomain(definitions: readonly UniformSizeDefinition[] = DEFAULT_UNIFORM_SIZE_DEFINITIONS) {
   const ordered = [...definitions].sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : 1));
   const byAlias = new Map<string, UniformSizeDefinition>();
-  for (const definition of ordered) for (const alias of [definition.name, ...definition.aliases]) byAlias.set(normalizeSizeInput(alias), definition);
+  for (const definition of ordered) {
+    for (const value of [definition.name, ...definition.aliases]) {
+      for (const alias of identityCandidates(value)) byAlias.set(alias, definition);
+    }
+  }
 
   function resolveSize(input: string | null | undefined, explicitVariant?: UniformSizeVariantId): ResolvedUniformSize {
     let normalizedInput = normalizeSizeInput(input);
