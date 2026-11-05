@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSupabaseConfigStatus } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import type { Json } from "@/lib/supabase/database.types";
 import type { CatalogoDeleteActionState, CatalogoFieldErrors, CatalogoFormState } from "./form-state";
 import { catalogItemSchema, type CatalogItemValues } from "./schema";
 import { catalogKinds, type CatalogKind } from "./types";
@@ -51,7 +52,16 @@ function getCatalogItemInput(formData: FormData) {
   };
 }
 
-function getCatalogItemPayload(values: CatalogItemValues) {
+function getCanonicalPersonalizacaoValue(metadata: Json | undefined, name: string) {
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+    const value = metadata.canonicalValue;
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+
+  return slugify(name).replaceAll("-", "_");
+}
+
+function getCatalogItemPayload(values: CatalogItemValues, currentMetadata?: Json) {
   return {
     active: values.active,
     aliases: values.aliases,
@@ -61,7 +71,9 @@ function getCatalogItemPayload(values: CatalogItemValues) {
     kind: values.kind,
     metadata: values.kind === "tamanho"
       ? { sizeGroup: "traditional" }
-      : values.composition ? { composition: values.composition } : {},
+      : values.kind === "personalizacao"
+        ? { canonicalValue: getCanonicalPersonalizacaoValue(currentMetadata, values.name) }
+        : values.composition ? { composition: values.composition } : {},
     measure_back_height_cm: values.kind === "tamanho" ? values.measureBackHeightCm ?? null : null,
     measure_back_width_cm: values.kind === "tamanho" ? values.measureBackWidthCm ?? null : null,
     measure_front_height_cm: values.kind === "tamanho" ? values.measureFrontHeightCm ?? null : null,
@@ -129,7 +141,23 @@ export async function saveCatalogItemAction(_previousState: CatalogoFormState, f
 
   const id = String(formData.get("id") ?? "").trim();
   const supabase = createServerSupabaseClient();
-  const payload = getCatalogItemPayload(parsed.data);
+  let currentMetadata: Json | undefined;
+
+  if (id) {
+    const { data: currentItem, error: currentItemError } = await supabase
+      .from("catalog_items")
+      .select("kind,metadata")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (currentItemError || !currentItem || currentItem.kind !== parsed.data.kind) {
+      return { message: "Item de catálogo inválido.", status: "error" };
+    }
+
+    currentMetadata = currentItem.metadata;
+  }
+
+  const payload = getCatalogItemPayload(parsed.data, currentMetadata);
 
   if (payload.kind === "tamanho") {
     const conflict = await findSizeConfigurationConflict(id, payload.name, payload.aliases);
@@ -162,6 +190,7 @@ export async function saveCatalogItemAction(_previousState: CatalogoFormState, f
   revalidatePath("/catalogos");
   revalidatePath("/ferramentas/plano-de-corte");
   revalidatePath("/fichas");
+  revalidatePath("/quadro-producao");
 
   const returnTo = getReturnTo(formData);
   if (returnTo) {
@@ -197,8 +226,8 @@ export async function deleteCatalogItemAction(
   }
 
   const { data: item } = await createServerSupabaseClient().from("catalog_items").select("kind").eq("id", id).maybeSingle();
-  if (item?.kind === "tamanho") {
-    return { message: "Tamanhos com histórico devem ser desativados, não excluídos.", status: "error" };
+  if (item?.kind === "tamanho" || item?.kind === "personalizacao") {
+    return { message: "Tamanhos e personalizações devem ser desativados, não excluídos.", status: "error" };
   }
 
   const { error } = await createServerSupabaseClient().from("catalog_items").delete().eq("id", id);
@@ -213,6 +242,7 @@ export async function deleteCatalogItemAction(
   revalidatePath("/catalogos");
   revalidatePath("/ferramentas/plano-de-corte");
   revalidatePath("/fichas");
+  revalidatePath("/quadro-producao");
   redirect(withToastParam(getReturnTo(formData) ?? "/catalogos", "catalog-item-deleted"));
 }
 
@@ -229,8 +259,8 @@ export async function deleteCatalogItemsAction(kind: CatalogKind, itemIds: strin
     };
   }
 
-  if (parsedKind === "tamanho") {
-    return { message: "Tamanhos com histórico devem ser desativados, não excluídos.", status: "error" as const };
+  if (parsedKind === "tamanho" || parsedKind === "personalizacao") {
+    return { message: "Tamanhos e personalizações devem ser desativados, não excluídos.", status: "error" as const };
   }
 
   if (!getSupabaseConfigStatus().hasServerConfig) {
@@ -273,6 +303,7 @@ export async function deleteCatalogItemsAction(kind: CatalogKind, itemIds: strin
   revalidatePath("/catalogos");
   revalidatePath("/ferramentas/plano-de-corte");
   revalidatePath("/fichas");
+  revalidatePath("/quadro-producao");
 
   return {
     deletedCount: ids.length,
@@ -324,7 +355,7 @@ export async function saveCatalogItemOrderAction(kind: CatalogKind, itemIds: str
   if (parsedKind === "tamanho") {
     const { error } = await supabase.rpc("reorder_catalog_sizes", { p_size_ids: ids });
     if (error) return { message: getActionError("catalogos.reorder", error, "Não foi possível salvar a ordem.").message, status: "error" as const };
-    revalidatePath("/catalogos"); revalidatePath("/ferramentas/plano-de-corte"); revalidatePath("/fichas");
+    revalidatePath("/catalogos"); revalidatePath("/ferramentas/plano-de-corte"); revalidatePath("/fichas"); revalidatePath("/quadro-producao");
     return { status: "success" as const };
   }
 
@@ -341,6 +372,7 @@ export async function saveCatalogItemOrderAction(kind: CatalogKind, itemIds: str
   revalidatePath("/catalogos");
   revalidatePath("/ferramentas/plano-de-corte");
   revalidatePath("/fichas");
+  revalidatePath("/quadro-producao");
 
   return {
     status: "success" as const,

@@ -62,6 +62,12 @@ function getMetadataRecord(metadata: Json): Record<string, string> | undefined {
   return entries.length ? Object.fromEntries(entries) : undefined;
 }
 
+function getCatalogOptionValue(item: { kind: CatalogKind; metadata: Json; name: string }) {
+  if (item.kind !== "personalizacao") return item.name;
+  const canonicalValue = getMetadataRecord(item.metadata)?.canonicalValue?.trim();
+  return canonicalValue || item.name;
+}
+
 function isTechnicalAlias(value: string) {
   const alias = value.trim();
 
@@ -165,7 +171,7 @@ export async function listCatalogOptionsForFichaForm(): Promise<CatalogOptionsBy
         id: item.id,
         label: item.name,
         metadata: item.kind === "tamanho" ? { ...metadata, sizeId: item.id, sizeOrder: String(itemsByKind[item.kind].length) } : metadata,
-        value: item.name,
+        value: getCatalogOptionValue(item),
       });
     });
 

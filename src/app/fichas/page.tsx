@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Modal } from "@/components/ui/modal";
 import { sanitizeObservationHtml } from "@/lib/sanitize-observations";
 import { FichasOverview } from "@/features/fichas/fichas-overview";
+import { listCatalogOptionsForFichaForm } from "@/features/catalogos/data";
 import { requireAppSession } from "@/features/auth/session";
 import {
   FichaPrintPreviewContent,
@@ -50,7 +51,10 @@ export default async function FichasPage({ searchParams }: FichasPageProps) {
     page: normalizePageFilter(params?.page),
     status: normalizeFichaStatus(params?.status),
   };
-  const result = await listFichas(filters);
+  const [result, catalogOptions] = await Promise.all([
+    listFichas(filters),
+    listCatalogOptionsForFichaForm(),
+  ]);
 
   const searchParamsObj = new URLSearchParams();
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -66,7 +70,7 @@ export default async function FichasPage({ searchParams }: FichasPageProps) {
 
   return (
     <>
-      <FichasOverview filters={filters} result={result} />
+      <FichasOverview filters={filters} personalizacaoOptions={catalogOptions.personalizacao} result={result} />
       {printId ? (
         <Modal onCloseHref={onCloseHref} size="print" title="Prévia de impressão">
           <FichaPrintPreviewShell

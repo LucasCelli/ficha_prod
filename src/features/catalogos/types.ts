@@ -13,6 +13,7 @@ export const catalogKinds = [
   "gola",
   "acabamento_gola",
   "bolso",
+  "personalizacao",
 ] as const satisfies CatalogKind[];
 
 export const catalogKindLabels: Record<CatalogKind, string> = {
@@ -22,6 +23,7 @@ export const catalogKindLabels: Record<CatalogKind, string> = {
   cor: "Cores",
   gola: "Tipos de gola",
   manga: "Tipos de manga",
+  personalizacao: "Personalizações",
   produto: "Produtos",
   tamanho: "Tamanhos",
   tecido: "Tecidos",

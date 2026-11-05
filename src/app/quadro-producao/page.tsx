@@ -21,5 +21,12 @@ export default async function QuadroProducaoPage({ searchParams }: QuadroProduca
     listCatalogOptionsForFichaForm(),
   ]);
 
-  return <QuadroProducaoClient catalogFabricOptions={catalogOptions.tecido} initialFilters={filters} initialResult={result} />;
+  return (
+    <QuadroProducaoClient
+      catalogFabricOptions={catalogOptions.tecido}
+      catalogPersonalizacaoOptions={catalogOptions.personalizacao}
+      initialFilters={filters}
+      initialResult={result}
+    />
+  );
 }

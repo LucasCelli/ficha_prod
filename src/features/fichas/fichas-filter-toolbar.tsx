@@ -5,6 +5,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Printer, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip } from "@/components/ui";
+import type { CustomDatalistOption } from "@/components/ui";
+import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import type { FichaFilters } from "./data";
 import { DatePickerField } from "./date-picker-field";
 import { getPrintPeriodError } from "./print-period";
@@ -13,12 +15,13 @@ import { PrintTriggerButton } from "./print-trigger-button";
 type FichasFilterToolbarProps = {
   canPrint: boolean;
   filters: FichaFilters;
+  personalizacaoOptions: CustomDatalistOption[];
   printHref: string;
 };
 
 const SEARCH_DEBOUNCE_MS = 450;
 
-export function FichasFilterToolbar({ canPrint, filters, printHref }: FichasFilterToolbarProps) {
+export function FichasFilterToolbar({ canPrint, filters, personalizacaoOptions, printHref }: FichasFilterToolbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -137,16 +140,14 @@ export function FichasFilterToolbar({ canPrint, filters, printHref }: FichasFilt
           value={filters.arte ?? ""}
         >
           <option value="">Todas</option>
-          <option value="sem_personalizacao">Sem personalização</option>
-          <option value="sublimacao">Sublimação</option>
-          <option value="serigrafia">Serigrafia</option>
-          <option value="bordado">Bordado</option>
-          <option value="patch">PATCH Termocolante</option>
-          <option value="dtf">DTF Têxtil</option>
-          <option value="transfer">Transfer</option>
-          <option value="sublimacao_serigrafia">Sublimação e Serigrafia</option>
-          <option value="serigrafia_dtf">Serigrafia e DTF</option>
-          <option value="serigrafia_bordado">Serigrafia e Bordado</option>
+          {filters.arte && !personalizacaoOptions.some((option) => (option.value ?? option.label) === filters.arte) ? (
+            <option value={filters.arte}>{normalizePersonalizacaoLabel(filters.arte)}</option>
+          ) : null}
+          {personalizacaoOptions.map((option) => (
+            <option key={option.id ?? option.value ?? option.label} value={option.value ?? option.label}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </div>
       <div className="field fichas-toolbar__event">

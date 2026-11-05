@@ -37,6 +37,7 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, Button, CustomDatalist, CustomSelect, IconButton, Modal, SortableHandle, SortableInstructions, Tooltip, type ComboboxOption, type CustomDatalistOption } from "@/components/ui";
 import type { CatalogOptionsByKind } from "@/features/catalogos/data";
 import { DEFAULT_UNIFORM_SIZE_DEFINITIONS, type UniformSizeDefinition } from "@/lib/uniform-sizes";
+import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { assertStableSortableIds } from "@/lib/sortable-items";
 import { createFichaAction, updateFichaAction } from "./actions";
 import { DatePickerField } from "./date-picker-field";
@@ -138,6 +139,18 @@ const FALLBACK_CATALOG_OPTIONS: CatalogOptionsByKind = {
   cor: ["Branco", "Preto", "Azul Marinho", "Azul Royal", "Vermelho", "Verde", "Cinza", "Amarelo"].map(createOption),
   gola: ["Gola Redonda", "Gola V", "Gola Polo", "Gola Social", "Gola Padre com Zíper", "Gola Padre Esportiva", "Gola V Polo", "Gola Canoa"].map(createOption),
   manga: ["Curta", "Longa", "Curta e Longa", "Raglan Curta", "Raglan Longa", "3/4"].map(createOption),
+  personalizacao: [
+    ["sem_personalizacao", "Sem Personalização"],
+    ["sublimacao", "Sublimação"],
+    ["serigrafia", "Serigrafia"],
+    ["bordado", "Bordado"],
+    ["patch", "PATCH Termocolante"],
+    ["dtf", "DTF Têxtil"],
+    ["transfer", "Transfer"],
+    ["sublimacao_serigrafia", "Sublimação e Serigrafia"],
+    ["serigrafia_dtf", "Serigrafia e DTF"],
+    ["serigrafia_bordado", "Serigrafia e Bordado"],
+  ].map(([value, label]) => ({ label, value })),
   produto: [],
   tamanho: DEFAULT_UNIFORM_SIZE_DEFINITIONS.map((size) => ({
     aliases: [...size.aliases], id: size.id, label: size.name,
@@ -730,6 +743,7 @@ function FichaFormInner({
   const materialOptions = getOptions(catalogOptions, "tecido");
   const colorOptions = getOptions(catalogOptions, "cor");
   const mangaOptions = getOptions(catalogOptions, "manga");
+  const personalizacaoOptions = getOptions(catalogOptions, "personalizacao");
   const acabamentoMangaOptions = getOptions(catalogOptions, "acabamento_manga");
   const golaOptions = getOptions(catalogOptions, "gola");
   const acabamentoGolaOptions = getOptions(catalogOptions, "acabamento_gola");
@@ -2515,16 +2529,14 @@ function FichaFormInner({
               value={arte ?? ""}
             >
               <option value="">-</option>
-              <option value="sem_personalizacao">Sem Personalização</option>
-              <option value="sublimacao">Sublimação</option>
-              <option value="serigrafia">Serigrafia</option>
-              <option value="bordado">Bordado</option>
-              <option value="patch">PATCH Termocolante</option>
-              <option value="dtf">DTF Têxtil</option>
-              <option value="transfer">Transfer</option>
-              <option value="sublimacao_serigrafia">Sublimação e Serigrafia</option>
-              <option value="serigrafia_dtf">Serigrafia e DTF</option>
-              <option value="serigrafia_bordado">Serigrafia e Bordado</option>
+              {arte && !personalizacaoOptions.some((option) => (option.value ?? option.label) === arte) ? (
+                <option value={arte}>{normalizePersonalizacaoLabel(arte)}</option>
+              ) : null}
+              {personalizacaoOptions.map((option) => (
+                <option key={option.id ?? option.value ?? option.label} value={option.value ?? option.label}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </Field>
           <Field label="Nomes / números" name="comNomes" error={state.fieldErrors?.comNomes}>

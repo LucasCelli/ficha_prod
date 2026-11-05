@@ -112,6 +112,21 @@ function getCanonicalAcabamentosGola() {
   ];
 }
 
+function getCanonicalPersonalizacoes() {
+  return [
+    { canonicalValue: "sem_personalizacao", name: "Sem Personalização" },
+    { canonicalValue: "sublimacao", name: "Sublimação" },
+    { canonicalValue: "serigrafia", name: "Serigrafia" },
+    { canonicalValue: "bordado", name: "Bordado" },
+    { canonicalValue: "patch", name: "PATCH Termocolante" },
+    { canonicalValue: "dtf", name: "DTF Têxtil" },
+    { canonicalValue: "transfer", name: "Transfer" },
+    { canonicalValue: "sublimacao_serigrafia", name: "Sublimação e Serigrafia" },
+    { canonicalValue: "serigrafia_dtf", name: "Serigrafia e DTF" },
+    { canonicalValue: "serigrafia_bordado", name: "Serigrafia e Bordado" },
+  ];
+}
+
 function buildCatalogItems() {
   const legacy = loadLegacyCatalog();
   const items = [];
@@ -158,6 +173,13 @@ function buildCatalogItems() {
 
   getCanonicalAcabamentosGola().forEach((item, index) => {
     items.push(createItem("acabamento_gola", item.name, index, { aliases: item.aliases }));
+  });
+
+  getCanonicalPersonalizacoes().forEach((item, index) => {
+    items.push(createItem("personalizacao", item.name, index + 1, {
+      aliases: [item.canonicalValue],
+      metadata: { canonicalValue: item.canonicalValue },
+    }));
   });
 
   return uniqueByKindSlug(items);

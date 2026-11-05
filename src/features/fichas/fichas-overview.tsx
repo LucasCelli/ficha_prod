@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CalendarDays, CircleHelp, History, ListFilter, Plus, Star } from "lucide-react";
 import { Badge, DataTable, EmptyState, IconButton, Pagination, Tooltip } from "@/components/ui";
+import type { CustomDatalistOption } from "@/components/ui";
 import { formatCompactDateInput, formatDateInput, getBusinessWeekRange } from "@/lib/dates";
 import { normalizePersonalizacaoLabel } from "@/lib/formatters";
 import { getKanbanColumnLabel } from "@/features/quadro-producao/config";
@@ -22,6 +23,7 @@ import {
 
 type FichasOverviewProps = {
   filters: FichaFilters;
+  personalizacaoOptions: CustomDatalistOption[];
   result: FichaListResult;
 };
 
@@ -44,7 +46,7 @@ const statusTones: Record<FichaStatus, "danger" | "pending" | "success"> = {
   pendente: "pending",
 };
 
-export function FichasOverview({ filters, result }: FichasOverviewProps) {
+export function FichasOverview({ filters, personalizacaoOptions, result }: FichasOverviewProps) {
   const shortcuts = buildOperationalShortcuts();
 
   return (
@@ -85,6 +87,7 @@ export function FichasOverview({ filters, result }: FichasOverviewProps) {
       <FichasFilterToolbar
         canPrint={result.kind === "ok" && result.total > 0}
         filters={filters}
+        personalizacaoOptions={personalizacaoOptions}
         printHref={hrefForPrint(filters)}
       />
 

@@ -782,7 +782,8 @@ export type Database = {
         | "acabamento_manga"
         | "gola"
         | "acabamento_gola"
-        | "bolso";
+        | "bolso"
+        | "personalizacao";
       ficha_status: "pendente" | "entregue";
       kanban_status: "pendente" | "exportando" | "fila_impressao" | "sublimando" | "na_costura";
       insumo_status: "tudo_ok" | "sem_tecido" | "sem_tinta" | "sem_papel" | "pendencias";

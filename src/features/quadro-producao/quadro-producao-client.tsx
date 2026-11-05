@@ -62,6 +62,7 @@ import { CardDetailsModal } from "./card-details-modal";
 
 type QuadroProducaoClientProps = {
   catalogFabricOptions: CustomDatalistOption[];
+  catalogPersonalizacaoOptions: CustomDatalistOption[];
   initialFilters: QuadroProducaoFilters;
   initialResult: QuadroProducaoResult;
 };
@@ -86,7 +87,7 @@ import {
   sortColumnByDeliveryDate, stopCardDrag, updateQueryResult,
   type CardPlacement, type DragDestination, type DragStart, type ManualCardDraft,
 } from "./quadro-producao-state";
-export function QuadroProducaoClient({ catalogFabricOptions, initialFilters, initialResult }: QuadroProducaoClientProps) {
+export function QuadroProducaoClient({ catalogFabricOptions, catalogPersonalizacaoOptions, initialFilters, initialResult }: QuadroProducaoClientProps) {
   const [filters, setFilters] = useQueryStates(quadroProducaoSearchParamParsers);
   const [searchDraft, setSearchDraft] = useState(filters.busca);
   const [localColumns, setLocalColumns] = useState<KanbanBoardColumn[] | null>(null);
@@ -692,12 +693,15 @@ export function QuadroProducaoClient({ catalogFabricOptions, initialFilters, ini
                 onChange={(event) => setManualCardDraft((draft) => ({ ...draft, arte: event.target.value }))}
                 value={manualCardDraft.arte}
               >
-                <option value="">-</option><option value="sem_personalizacao">Sem Personalização</option>
-                <option value="sublimacao">Sublimação</option><option value="serigrafia">Serigrafia</option>
-                <option value="bordado">Bordado</option><option value="patch">PATCH Termocolante</option>
-                <option value="dtf">DTF Têxtil</option><option value="transfer">Transfer</option>
-                <option value="sublimacao_serigrafia">Sublimação e Serigrafia</option>
-                <option value="serigrafia_dtf">Serigrafia e DTF</option><option value="serigrafia_bordado">Serigrafia e Bordado</option>
+                <option value="">-</option>
+                {manualCardDraft.arte && !catalogPersonalizacaoOptions.some((option) => (option.value ?? option.label) === manualCardDraft.arte) ? (
+                  <option value={manualCardDraft.arte}>{normalizePersonalizacaoLabel(manualCardDraft.arte)}</option>
+                ) : null}
+                {catalogPersonalizacaoOptions.map((option) => (
+                  <option key={option.id ?? option.value ?? option.label} value={option.value ?? option.label}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="quadro-producao-field">
