@@ -52,6 +52,7 @@ type PrintProductRow = {
 
 const MAX_PRINT_IMAGES = 4;
 const RAW_NAME_LIST_SINGLE_COLUMN_LINE_LIMIT = 51;
+const EXTENSIVE_PRODUCT_TABLE_ROW_LIMIT = 12;
 
 export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, observationHtml, onlyRawNameList = false }: PrintFichaProps) {
   const products = buildProductRows(ficha);
@@ -60,6 +61,7 @@ export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, 
   const shouldPrintRawNameList = (includeRawNameList || onlyRawNameList) && Boolean(rawNameList);
   const rawNameListColumns = getRawNameListColumnCount(rawNameList);
   const hasDetails = products.some((p) => p.detalhes && p.detalhes.trim() !== "-" && p.detalhes.trim() !== "");
+  const hasExtensiveProductTable = products.length >= EXTENSIVE_PRODUCT_TABLE_ROW_LIMIT;
   const imageClassNames = getImagesClassNames(ficha.imagens.length);
   const idNumber = parseInt(ficha.id.split("-")[0], 16);
   const fichaLabel = Number.isNaN(idNumber) ? "Ficha" : `Ficha #${String(idNumber % 10000).padStart(4, "0")}`;
@@ -106,12 +108,18 @@ export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, 
           </div>
         </section>
 
-        <div className="print-two-cols">
+        <div className={hasExtensiveProductTable ? "print-two-cols print-two-cols--products-wide" : "print-two-cols"}>
           <section className="print-card">
             <h2>
               <Boxes aria-hidden="true" size={16} /> Produtos
             </h2>
-            <table className="print-table">
+            <table className={hasDetails ? "print-table print-table--with-details" : "print-table"}>
+              <colgroup>
+                <col className="print-table__size-column" />
+                <col className="print-table__quantity-column" />
+                <col className="print-table__product-column" />
+                {hasDetails ? <col className="print-table__details-column" /> : null}
+              </colgroup>
               <thead>
                 <tr>
                   <th>TAM.</th>

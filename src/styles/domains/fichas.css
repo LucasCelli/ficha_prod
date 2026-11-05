@@ -2260,11 +2260,32 @@
   min-height: 0;
 }
 
+.print-two-cols--products-wide {
+  grid-template-columns: 68fr 32fr;
+}
+
 .print-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   border: 0.5mm solid var(--color-text);
   font-size: 14px;
+}
+
+.print-table__size-column {
+  width: 12%;
+}
+
+.print-table__quantity-column {
+  width: 12%;
+}
+
+.print-table--with-details .print-table__product-column {
+  width: 35%;
+}
+
+.print-table--with-details .print-table__details-column {
+  width: 41%;
 }
 
 .print-table th,
