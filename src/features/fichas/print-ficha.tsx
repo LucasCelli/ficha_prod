@@ -62,6 +62,7 @@ export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, 
   const rawNameListColumns = getRawNameListColumnCount(rawNameList);
   const hasDetails = products.some((p) => p.detalhes && p.detalhes.trim() !== "-" && p.detalhes.trim() !== "");
   const hasExtensiveProductTable = products.length >= EXTENSIVE_PRODUCT_TABLE_ROW_LIMIT;
+  const productColumnBalance = getProductColumnBalance(products, hasDetails);
   const imageClassNames = getImagesClassNames(ficha.imagens.length);
   const idNumber = parseInt(ficha.id.split("-")[0], 16);
   const fichaLabel = Number.isNaN(idNumber) ? "Ficha" : `Ficha #${String(idNumber % 10000).padStart(4, "0")}`;
@@ -113,7 +114,13 @@ export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, 
             <h2>
               <Boxes aria-hidden="true" size={16} /> Produtos
             </h2>
-            <table className={hasDetails ? "print-table print-table--with-details" : "print-table"}>
+            <table
+              className={[
+                "print-table",
+                hasDetails ? "print-table--with-details" : "",
+                hasDetails ? `print-table--${productColumnBalance}-wide` : "",
+              ].filter(Boolean).join(" ")}
+            >
               <colgroup>
                 <col className="print-table__size-column" />
                 <col className="print-table__quantity-column" />
@@ -285,11 +292,11 @@ function PrintField({
   else if (muted) valueClass = "print-value-muted";
 
   return (
-    <div>
+    <div className="print-field">
       <span className="label">
         {Icon ? <Icon aria-hidden="true" size={14} style={{ display: "inline-block", marginRight: "4px", verticalAlign: "-2px" }} /> : null}
         {label}:
-      </span>{" "}
+      </span>
       <span className={valueClass}>{formattedValue}</span>
     </div>
   );
@@ -510,4 +517,24 @@ function capitalizeFirst(value: string) {
 function getRawNameListColumnCount(value: string) {
   const lineCount = value.split(/\r?\n/).filter((line) => line.trim()).length;
   return lineCount > RAW_NAME_LIST_SINGLE_COLUMN_LINE_LIMIT ? 3 : 1;
+}
+
+function getProductColumnBalance(products: PrintProductRow[], hasDetails: boolean) {
+  if (!hasDetails) return "product";
+
+  const productPressure = getColumnTextPressure(products.map((item) => item.produto));
+  const detailsPressure = getColumnTextPressure(products.map((item) => item.detalhes));
+
+  if (productPressure > detailsPressure * 1.15) return "product";
+  if (detailsPressure > productPressure * 1.15) return "details";
+  return "balanced";
+}
+
+function getColumnTextPressure(values: string[]) {
+  const lengths = values.map((value) => value.trim().length).filter(Boolean);
+  if (lengths.length === 0) return 0;
+
+  const longest = Math.max(...lengths);
+  const average = lengths.reduce((total, length) => total + length, 0) / lengths.length;
+  return longest * 0.65 + average * 0.35;
 }
