@@ -4,10 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getActionError, requireSuperadminAction } from "@/lib/server/boundaries";
+import type { CatalogPrintActionState } from "./form-state";
 import { catalogPrintCategorySchema, catalogPrintEntrySchema, catalogPrintReviewSchema, catalogPrintSettingsSchema } from "./schema";
-
-export type CatalogPrintActionState = { status: "idle" | "success" | "error"; message?: string; fieldErrors?: Record<string, string> };
-export const initialCatalogPrintActionState: CatalogPrintActionState = { status: "idle" };
 
 function slugify(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
