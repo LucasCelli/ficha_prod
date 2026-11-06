@@ -8,7 +8,7 @@ import { Button, IconButton } from "@/components/ui";
 import { saveCatalogItemAction } from "./actions";
 import { getInitialCatalogoFormState } from "./form-state";
 import type { CatalogItem, CatalogKind } from "./types";
-import { catalogKindLabels, catalogKinds } from "./types";
+import { catalogKindLabels } from "./types";
 
 type CatalogoFormProps = {
   item?: CatalogItem;
@@ -39,7 +39,7 @@ function FieldLabel({ htmlFor, info, label }: { htmlFor?: string; info: string; 
 
 export function CatalogoForm({ item, returnTo, selectedKind }: CatalogoFormProps) {
   const [state, formAction] = useActionState(saveCatalogItemAction, getInitialCatalogoFormState());
-  const [kind, setKind] = useState<CatalogKind>(item?.kind ?? selectedKind);
+  const kind = item?.kind ?? selectedKind;
   const [sizeWidths, setSizeWidths] = useState<SizeWidths>(() => ({
     back: item?.measure_back_width_cm?.toString() ?? "",
     front: item?.measure_front_width_cm?.toString() ?? "",
@@ -83,21 +83,9 @@ export function CatalogoForm({ item, returnTo, selectedKind }: CatalogoFormProps
 
       <div className="catalog-form__grid">
         <div className="field">
-          <FieldLabel htmlFor="catalog-kind" info="Define em qual campo da ficha este item aparece." label="Categoria" />
-          {item ? (
-            <>
-              <input name="kind" type="hidden" value={item.kind} />
-              <div className="readonly-field">{catalogKindLabels[item.kind]}</div>
-            </>
-          ) : (
-            <select id="catalog-kind" name="kind" value={kind} onChange={(event) => setKind(event.currentTarget.value as CatalogKind)}>
-              {catalogKinds.map((kind) => (
-                <option key={kind} value={kind}>
-                  {catalogKindLabels[kind]}
-                </option>
-              ))}
-            </select>
-          )}
+          <FieldLabel info="Define em qual campo da ficha este item aparece." label="Categoria" />
+          <input name="kind" type="hidden" value={kind} />
+          <div className="readonly-field">{catalogKindLabels[kind]}</div>
         </div>
 
         <div className="field">

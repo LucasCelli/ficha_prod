@@ -102,6 +102,36 @@ test.describe("catalogos: reordenacao por teclado", () => {
   });
 });
 
+test.describe("catalogos: sub-shell de categorias", () => {
+  test("menu lateral preserva a categoria ao abrir novo item", async ({ context, page }) => {
+    await openPage(page, context, "/catalogos?tipo=personalizacao");
+
+    const sidebar = page.locator(".catalogos-sidebar");
+    const navigation = page.getByRole("navigation", { name: "Categorias do catálogo" });
+    await expect(sidebar).toBeVisible();
+    await expect(navigation.getByRole("link", { name: /Personalizações/ })).toHaveAttribute("aria-current", "page");
+    expect((await page.locator(".catalogos-shell").evaluate((element) => getComputedStyle(element).gridTemplateColumns)).split(" ")).toHaveLength(2);
+
+    await page.getByRole("link", { name: "Novo item em Personalizações" }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('input[name="kind"]')).toHaveValue("personalizacao");
+    await expect(dialog.locator(".readonly-field")).toHaveText("Personalizações");
+  });
+
+  test("menu continua acessível em viewport estreito", async ({ context, page }) => {
+    await page.setViewportSize({ height: 844, width: 390 });
+    await openPage(page, context, "/catalogos?tipo=personalizacao");
+
+    const navigation = page.getByRole("navigation", { name: "Categorias do catálogo" });
+    await expect(navigation).toBeVisible();
+    await expect(navigation.getByRole("link", { name: /Personalizações/ })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "Novo item em Personalizações" })).toBeVisible();
+    expect(await navigation.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+  });
+});
+
 test.describe("catalogos: medidas dos tamanhos", () => {
   test("o formulario de tamanho expoe largura e altura das quatro partes nessa ordem", async ({ context, page }) => {
     await openPage(page, context, "/catalogos?tipo=tamanho&modal=novo");

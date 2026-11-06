@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { ChevronDown, ListPlus, SlidersHorizontal } from "lucide-react";
-import { Badge, EmptyState, FloatingMenu, FloatingMenuLink, Modal } from "@/components/ui";
+import { ListPlus, SlidersHorizontal } from "lucide-react";
+import { Badge, EmptyState, Modal } from "@/components/ui";
 import { RouteToast, type RouteToastMessage } from "@/components/ui/route-toast";
 import type { CatalogosResult } from "./data";
 import { CatalogItemsTable } from "./catalog-items-table";
@@ -42,55 +42,56 @@ export function CatalogosOverview({ editId, modalMode, result, selectedKind }: C
       {result.kind === "error" ? <EmptyState description={result.message} title="Não foi possível carregar catálogos" /> : null}
 
       {result.kind === "ok" ? (
-        <div className="catalogos-layout">
-          <div className="catalogos-toolbar">
-            <div className="catalogos-current-kind">
-              <span>Categoria</span>
-              <strong>{catalogKindLabels[selectedKind]}</strong>
+        <div className="catalogos-shell">
+          <aside className="catalogos-sidebar">
+            <div className="catalogos-sidebar__title">
+              <SlidersHorizontal aria-hidden="true" size={17} />
+              <span>Categorias</span>
             </div>
-            <FloatingMenu
-              label="Selecionar categoria de catálogo"
-              trigger={
-                <>
-                  <SlidersHorizontal aria-hidden="true" size={18} />
-                  <span>{catalogKindLabels[selectedKind]}</span>
-                  <ChevronDown aria-hidden="true" size={16} />
-                </>
-              }
-            >
+            <nav aria-label="Categorias do catálogo" className="catalogos-side-nav">
               {catalogKinds.map((kind) => (
-                <FloatingMenuLink aria-current={kind === selectedKind ? "page" : undefined} href={`/catalogos?tipo=${kind}`} key={kind}>
+                <Link
+                  aria-current={kind === selectedKind ? "page" : undefined}
+                  className="catalogos-side-nav__link"
+                  href={`/catalogos?tipo=${kind}`}
+                  key={kind}
+                >
                   <span>{catalogKindLabels[kind]}</span>
                   <Badge>{result.itemsByKind[kind].length}</Badge>
-                </FloatingMenuLink>
+                </Link>
               ))}
-            </FloatingMenu>
-            <Link className="ui-button ui-button--primary" href={`/catalogos?tipo=${selectedKind}&modal=novo`}>
-              <ListPlus aria-hidden="true" size={18} />
-              Novo item
-            </Link>
+            </nav>
+          </aside>
+
+          <div className="catalogos-workspace">
+            <section className="catalogos-panel" aria-labelledby="catalogos-list-title">
+              <div className="catalogos-panel__title catalogos-panel__title--spread">
+                <div>
+                  <h2 id="catalogos-list-title">{catalogKindLabels[selectedKind]}</h2>
+                  <Badge>{items.length}</Badge>
+                </div>
+                <Link
+                  aria-label={`Novo item em ${catalogKindLabels[selectedKind]}`}
+                  className="ui-button ui-button--primary catalogos-new-item"
+                  href={`/catalogos?tipo=${selectedKind}&modal=novo`}
+                >
+                  <ListPlus aria-hidden="true" size={18} />
+                  Novo item
+                </Link>
+              </div>
+              {items.length ? (
+                <CatalogItemsTable closeHref={closeHref} items={items} selectedKind={selectedKind} />
+              ) : (
+                <EmptyState description="Nenhum item cadastrado para este tipo ainda." title="Catálogo vazio" />
+              )}
+            </section>
           </div>
 
-          <section className="catalogos-panel" aria-labelledby="catalogos-list-title">
-            <div className="catalogos-panel__title catalogos-panel__title--spread">
-              <div>
-                <SlidersHorizontal aria-hidden="true" size={18} />
-                <h2 id="catalogos-list-title">{catalogKindLabels[selectedKind]}</h2>
-              </div>
-              <Badge>{items.length}</Badge>
-            </div>
-            {items.length ? (
-              <CatalogItemsTable closeHref={closeHref} items={items} selectedKind={selectedKind} />
-            ) : (
-              <EmptyState description="Nenhum item cadastrado para este tipo ainda." title="Catálogo vazio" />
-            )}
-          </section>
-
           {modalMode === "novo" ? (
-            <Modal onCloseHref={closeHref} size="md" title="Novo item">
+            <Modal onCloseHref={closeHref} size="md" title={`Novo item em ${catalogKindLabels[selectedKind]}`}>
               <div className="modal-form">
                 <div className="modal-form__header">
-                  <h2>Novo item</h2>
+                  <h2>Novo item em {catalogKindLabels[selectedKind]}</h2>
                 </div>
                 <CatalogoForm returnTo={closeHref} selectedKind={selectedKind} />
               </div>
