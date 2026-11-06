@@ -60,6 +60,7 @@ export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, 
   const shouldPrintRawNameList = (includeRawNameList || onlyRawNameList) && Boolean(rawNameList);
   const rawNameListColumns = getRawNameListColumnCount(rawNameList);
   const hasDetails = products.some((p) => p.detalhes && p.detalhes.trim() !== "-" && p.detalhes.trim() !== "");
+  const hasDenseProductTable = products.length >= 18;
   const hasWideSizeColumn = products.some((item) => item.tamanho.trim().length >= 5);
   const productColumnBalance = getProductColumnBalance(products, hasDetails);
   const imageClassNames = getImagesClassNames(ficha.imagens.length);
@@ -118,6 +119,7 @@ export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, 
                 "print-table",
                 hasDetails ? "print-table--with-details" : "",
                 hasDetails ? `print-table--${productColumnBalance}-wide` : "",
+                hasDenseProductTable ? "print-table--dense" : "",
                 hasWideSizeColumn ? "print-table--size-wide" : "",
               ].filter(Boolean).join(" ")}
             >

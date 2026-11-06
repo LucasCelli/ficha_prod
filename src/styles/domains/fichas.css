@@ -2322,6 +2322,49 @@
   width: 40%;
 }
 
+.print-table.print-table--dense {
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.print-table.print-table--dense th,
+.print-table.print-table--dense td {
+  padding: 0.3mm 0.45mm;
+}
+
+.print-table--dense.print-table--size-wide .print-table__size-column {
+  width: 14%;
+}
+
+.print-table--dense .print-table__quantity-column {
+  width: 7%;
+}
+
+.print-table--dense.print-table--size-wide.print-table--balanced-wide .print-table__product-column,
+.print-table--dense.print-table--size-wide.print-table--balanced-wide .print-table__details-column {
+  width: 39.5%;
+}
+
+.print-table--dense.print-table--size-wide.print-table--product-wide .print-table__product-column {
+  width: 42%;
+}
+
+.print-table--dense.print-table--size-wide.print-table--product-wide .print-table__details-column {
+  width: 37%;
+}
+
+.print-table--dense.print-table--size-wide.print-table--details-wide .print-table__product-column {
+  width: 38%;
+}
+
+.print-table--dense.print-table--size-wide.print-table--details-wide .print-table__details-column {
+  width: 41%;
+}
+
+.print-direct .print-table.print-table--dense {
+  font-size: 11px;
+}
+
 .print-table th,
 .print-table td {
   padding: 0.5mm 1mm;

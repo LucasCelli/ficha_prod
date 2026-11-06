@@ -1,5 +1,6 @@
 ﻿const CONTENT_WIDTH_MM = 198;
 const CONTENT_HEIGHT_MM = 285;
+const RASTER_SOURCE_WIDTH_MM = 225;
 const PX_PER_MM = 96 / 25.4;
 
 // Shared layout for measurement and the printed document.
@@ -13,6 +14,7 @@ const DOCUMENT_STYLE = `
     color: black; --color-text: #000; --color-text-secondary: #000; --color-muted: #000; }
   .print-page { break-after: auto !important; page-break-after: auto !important; }
   .print-page + .print-page { break-before: page; page-break-before: always; }
+  .print-container.print-raster-source { width: ${RASTER_SOURCE_WIDTH_MM}mm !important; }
   .print-card, .print-table, .print-table th, .print-table td { border-color: black; }
   .print-raster-page { display: flex !important; align-items: flex-start; }
   .print-raster-page img { display: block; margin: 0 auto; }
@@ -89,11 +91,12 @@ export async function printFichaAutomatically(element: HTMLElement, onFinished?:
     if (mainPage && mainPage.getBoundingClientRect().height > CONTENT_HEIGHT_MM * PX_PER_MM) {
       try {
         copy.classList.remove("print-direct");
+        mainPage.classList.add("print-raster-source");
         const captureHeight = mainPage.getBoundingClientRect().height;
         const { default: html2canvas } = await import("html2canvas");
         const canvas = await html2canvas(mainPage, {
           backgroundColor: "#ffffff", logging: false, scale: 1.6, useCORS: true,
-          windowWidth: 794, windowHeight: Math.ceil(captureHeight),
+          windowWidth: Math.ceil(RASTER_SOURCE_WIDTH_MM * PX_PER_MM), windowHeight: Math.ceil(captureHeight),
         });
         if (!canvas.width || !canvas.height) throw new Error("Captura vazia.");
         const scale = Math.min(CONTENT_WIDTH_MM / canvas.width, CONTENT_HEIGHT_MM / canvas.height);
@@ -108,6 +111,7 @@ export async function printFichaAutomatically(element: HTMLElement, onFinished?:
         mainPage.replaceWith(raster);
         await waitForImages(raster);
       } catch (error) {
+        mainPage.classList.remove("print-raster-source");
         copy.classList.add("print-direct");
         console.error("Falha ao ajustar ficha; usando impressão direta.", error);
       }
