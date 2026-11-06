@@ -70,6 +70,7 @@ export function CatalogPrintArticleForm({ categories, entry, source, initialSect
   return (
     <form action={action} className="catalog-print-form">
       <input name="id" type="hidden" value={entry?.id ?? ""} />
+      <input name="sortOrder" type="hidden" value={entry?.sort_order ?? 0} />
       <input name="sourceFichaId" type="hidden" value={entry?.source_ficha_id ?? source?.id ?? ""} />
       <input name="imagesJson" type="hidden" value={JSON.stringify(images)} />
       {source ? <div className="catalog-print-source-context"><ImageIcon size={20} /><div><strong>Conteúdo iniciado a partir de uma ficha</strong><span>{[products.join(", "), source.material, source.arte].filter(Boolean).join(" · ")}</span></div></div> : null}
@@ -79,7 +80,6 @@ export function CatalogPrintArticleForm({ categories, entry, source, initialSect
         <div className="catalog-print-form__grid">
           <label><span>Seção</span><select name="section" value={section} onChange={(event) => changeSection(event.target.value as CatalogPrintSection)}><option value="produto">Produtos</option><option value="personalizacao">Personalizações</option></select></label>
           <label><span>Categoria</span><select name="categoryId" onChange={(event) => setCategoryId(event.target.value)} required value={categoryId}><option value="">Selecione</option>{availableCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>{state.fieldErrors?.categoryId ? <small>{state.fieldErrors.categoryId}</small> : null}</label>
-          <label><span>Ordem na categoria</span><input defaultValue={entry?.sort_order ?? 0} min="0" name="sortOrder" type="number" /></label>
         </div>
       </section>
 

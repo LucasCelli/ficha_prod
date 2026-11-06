@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getActionError, requireSuperadminAction } from "@/lib/server/boundaries";
 import type { CatalogPrintActionState } from "./form-state";
@@ -25,6 +26,49 @@ function errorState(message: string, issues?: Array<{ path: PropertyKey[]; messa
 
 function value(formData: FormData, name: string) {
   return String(formData.get(name) ?? "");
+}
+
+const reorderIdsSchema = z.array(z.string().uuid()).min(1).max(500).refine((ids) => new Set(ids).size === ids.length, "A ordem contém itens duplicados.");
+const reorderSectionSchema = z.enum(["produto", "personalizacao"]);
+
+export async function reorderCatalogPrintCategoriesAction(section: string, ids: string[]) {
+  await requireSuperadminAction();
+  const parsedSection = reorderSectionSchema.safeParse(section);
+  const parsedIds = reorderIdsSchema.safeParse(ids);
+  if (!parsedSection.success || !parsedIds.success) return { message: "A ordem das categorias é inválida.", status: "error" as const };
+
+  const supabase = createServerSupabaseClient();
+  const { data: existing, error: validationError } = await supabase.from("catalog_print_categories").select("id").eq("section", parsedSection.data);
+  const requestedIds = new Set(parsedIds.data);
+  if (validationError || existing?.length !== parsedIds.data.length || existing.some((item) => !requestedIds.has(item.id))) {
+    return { message: getActionError("catalogo-impresso.categories.reorder", validationError, "Não foi possível validar as categorias.").message, status: "error" as const };
+  }
+
+  const updates = await Promise.all(parsedIds.data.map((id, index) => supabase.from("catalog_print_categories").update({ sort_order: index + 1 }).eq("id", id).eq("section", parsedSection.data)));
+  const failed = updates.find((result) => result.error)?.error;
+  if (failed) return { message: getActionError("catalogo-impresso.categories.reorder", failed, "Não foi possível salvar a ordem das categorias.").message, status: "error" as const };
+  revalidatePath("/catalogo-impresso");
+  return { status: "success" as const };
+}
+
+export async function reorderCatalogPrintEntriesAction(categoryId: string, ids: string[]) {
+  await requireSuperadminAction();
+  const parsedCategoryId = z.string().uuid().safeParse(categoryId);
+  const parsedIds = reorderIdsSchema.safeParse(ids);
+  if (!parsedCategoryId.success || !parsedIds.success) return { message: "A ordem dos artigos é inválida.", status: "error" as const };
+
+  const supabase = createServerSupabaseClient();
+  const { data: existing, error: validationError } = await supabase.from("catalog_print_entries").select("id").eq("category_id", parsedCategoryId.data);
+  const requestedIds = new Set(parsedIds.data);
+  if (validationError || existing?.length !== parsedIds.data.length || existing.some((item) => !requestedIds.has(item.id))) {
+    return { message: getActionError("catalogo-impresso.entries.reorder", validationError, "Não foi possível validar os artigos.").message, status: "error" as const };
+  }
+
+  const updates = await Promise.all(parsedIds.data.map((id, index) => supabase.from("catalog_print_entries").update({ sort_order: index + 1 }).eq("id", id).eq("category_id", parsedCategoryId.data)));
+  const failed = updates.find((result) => result.error)?.error;
+  if (failed) return { message: getActionError("catalogo-impresso.entries.reorder", failed, "Não foi possível salvar a ordem dos artigos.").message, status: "error" as const };
+  revalidatePath("/catalogo-impresso");
+  return { status: "success" as const };
 }
 
 export async function saveCatalogPrintSettingsAction(_state: CatalogPrintActionState, formData: FormData): Promise<CatalogPrintActionState> {

@@ -2,15 +2,20 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { DragDropProvider } from "@dnd-kit/react";
+import { isSortable, useSortable } from "@dnd-kit/react/sortable";
 import {
   BookOpen, Check, ChevronLeft, ChevronRight, Clock3, Download, Eye, FilePlus2,
   FolderPlus, ImageIcon, PackageOpen, Pencil, Plus, RefreshCw, Search, Settings, Trash2,
 } from "lucide-react";
-import { Badge, Button, EmptyState, PageHeader } from "@/components/ui";
+import { toast } from "sonner";
+import { Badge, Button, EmptyState, PageHeader, SortableHandle, SortableInstructions } from "@/components/ui";
+import { assertStableSortableIds } from "@/lib/sortable-items";
 import {
   deleteCatalogPrintCategoryAction, deleteCatalogPrintEntryAction, reviewCatalogPrintFichaAction,
-  saveCatalogPrintCategoryAction, saveCatalogPrintSettingsAction,
+  reorderCatalogPrintCategoriesAction, reorderCatalogPrintEntriesAction, saveCatalogPrintCategoryAction, saveCatalogPrintSettingsAction,
 } from "./actions";
 import { initialCatalogPrintActionState } from "./form-state";
 import type { CatalogPrintCategory, CatalogPrintDashboard, CatalogPrintSection } from "./types";
@@ -18,6 +23,91 @@ import { catalogPrintSectionLabels } from "./types";
 
 type View = "articles" | "sources" | "categories" | "settings";
 const SOURCE_PAGE_SIZE = 10;
+type OrderedItem = { id: string };
+type OrderResult = { message?: string; status: "success" | "error" };
+
+function haveSameOrder<T extends OrderedItem>(left: T[], right: T[]) {
+  return left.length === right.length && left.every((item, index) => item.id === right[index]?.id);
+}
+
+function moveOrderedItem<T extends OrderedItem>(items: T[], itemId: string, destinationIndex: number) {
+  const sourceIndex = items.findIndex((item) => item.id === itemId);
+  if (sourceIndex < 0) return items;
+  const nextItems = [...items];
+  const [item] = nextItems.splice(sourceIndex, 1);
+  nextItems.splice(Math.max(0, Math.min(destinationIndex, nextItems.length)), 0, item);
+  return nextItems;
+}
+
+function useCatalogPrintOrder<T extends OrderedItem>(items: T[], listName: string, saveOrder: (ids: string[]) => Promise<OrderResult>) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [localItems, setLocalItems] = useState<T[] | null>(null);
+  const latestItemsRef = useRef(items);
+  const rollbackItemsRef = useRef(items);
+  const activeDragRef = useRef<string | null>(null);
+  const visibleItems = localItems ?? items;
+
+  assertStableSortableIds(visibleItems, listName);
+
+  useEffect(() => {
+    latestItemsRef.current = visibleItems;
+  }, [visibleItems]);
+
+  const persist = useCallback(async (nextItems: T[], rollbackItems: T[]) => {
+    try {
+      const result = await saveOrder(nextItems.map((item) => item.id));
+      if (result.status === "error") {
+        setLocalItems(rollbackItems);
+        setMessage("Ordem não salva.");
+        toast.error("Ordem não salva", { description: result.message ?? "Tente novamente." });
+        return;
+      }
+      setMessage("Ordem salva.");
+      setLocalItems(null);
+      toast.success("Ordem salva");
+      router.refresh();
+    } catch {
+      setLocalItems(rollbackItems);
+      setMessage("Ordem não salva.");
+      toast.error("Ordem não salva", { description: "Verifique sua conexão e tente novamente." });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [router, saveOrder]);
+
+  const move = useCallback((itemId: string, destinationIndex: number) => {
+    const rollbackItems = latestItemsRef.current;
+    const nextItems = moveOrderedItem(rollbackItems, itemId, destinationIndex);
+    if (destinationIndex < 0 || haveSameOrder(nextItems, rollbackItems)) return;
+    setIsSaving(true);
+    setMessage("Salvando ordem.");
+    setLocalItems(nextItems);
+    startTransition(() => { void persist(nextItems, rollbackItems); });
+  }, [persist, startTransition]);
+
+  function startDrag(itemId: string | null) {
+    rollbackItemsRef.current = latestItemsRef.current;
+    activeDragRef.current = itemId;
+  }
+
+  function finishDrag(destinationIndex: number, canceled: boolean) {
+    const itemId = activeDragRef.current;
+    activeDragRef.current = null;
+    if (!itemId || canceled) return;
+    const rollbackItems = rollbackItemsRef.current;
+    const nextItems = moveOrderedItem(rollbackItems, itemId, destinationIndex);
+    if (destinationIndex < 0 || haveSameOrder(nextItems, rollbackItems)) return;
+    setIsSaving(true);
+    setMessage("Salvando ordem.");
+    setLocalItems(nextItems);
+    startTransition(() => { void persist(nextItems, rollbackItems); });
+  }
+
+  return { finishDrag, isSaving, message, move, startDrag, visibleItems };
+}
 
 export function CatalogPrintAdminOverview({ data, initialView = "articles" }: { data: CatalogPrintDashboard; initialView?: View }) {
   const [view, setView] = useState<View>(initialView);
@@ -42,6 +132,7 @@ export function CatalogPrintAdminOverview({ data, initialView = "articles" }: { 
 
   return (
     <section className="catalog-print-admin">
+      <SortableInstructions />
       <PageHeader
         actions={<div className="catalog-print-header-actions">
           {data.publication ? <><a className="ui-button ui-button--ghost" href="/api/catalogo-impresso/publico.pdf" rel="noreferrer" target="_blank"><Eye size={16} /> Visualizar PDF</a><a className="ui-button ui-button--secondary" href="/api/catalogo-impresso/publico.pdf?download=1"><Download size={16} /> Baixar</a></> : null}
@@ -88,15 +179,23 @@ function Articles({ data }: { data: CatalogPrintDashboard }) {
     {data.entries.length === 0 ? <EmptyState actions={<Link className="ui-button ui-button--primary" href="/catalogo-impresso?view=sources">Revisar fichas</Link>} description="Escolha uma ficha existente para aproveitar imagens e especificações." title="Seu catálogo está vazio" /> : <div className="catalog-print-entry-list">{(["produto", "personalizacao"] as CatalogPrintSection[]).map((section) => {
       const sectionEntries = data.entries.filter((entry) => entry.section === section);
       if (!sectionEntries.length) return null;
-      return <section key={section}><div className="catalog-print-section-heading"><h3>{catalogPrintSectionLabels[section]}</h3><Badge>{sectionEntries.length}</Badge></div>{data.categories.filter((category) => category.section === section && sectionEntries.some((entry) => entry.category_id === category.id)).map((category) => <div className="catalog-print-category-group" key={category.id}><h4>{category.name}</h4>{sectionEntries.filter((entry) => entry.category_id === category.id).map((entry) => <ArticleRow entry={entry} key={entry.id} />)}</div>)}</section>;
+      return <section key={section}><div className="catalog-print-section-heading"><h3>{catalogPrintSectionLabels[section]}</h3><Badge>{sectionEntries.length}</Badge></div>{data.categories.filter((category) => category.section === section && sectionEntries.some((entry) => entry.category_id === category.id)).map((category) => <ArticleCategoryGroup category={category} entries={sectionEntries.filter((entry) => entry.category_id === category.id)} key={category.id} />)}</section>;
     })}</div>}
   </section>;
 }
 
-function ArticleRow({ entry }: { entry: CatalogPrintDashboard["entries"][number] }) {
-  return <article className="catalog-print-entry-row">
+function ArticleCategoryGroup({ category, entries }: { category: CatalogPrintCategory; entries: CatalogPrintDashboard["entries"] }) {
+  const saveOrder = useCallback((ids: string[]) => reorderCatalogPrintEntriesAction(category.id, ids), [category.id]);
+  const order = useCatalogPrintOrder(entries, `Artigos de ${category.name}`, saveOrder);
+  return <div className="catalog-print-category-group"><h4>{category.name}<span>Arraste para ordenar</span></h4><span aria-live="polite" className="sr-only">{order.message}</span><DragDropProvider onDragStart={(event) => order.startDrag(event.operation.source?.id != null ? String(event.operation.source.id) : null)} onDragEnd={(event) => order.finishDrag(isSortable(event.operation.source) ? event.operation.source.index : -1, event.canceled)}><div className="catalog-print-sortable-list" data-sortable-list="">{order.visibleItems.map((entry, index) => <ArticleRow disabled={order.isSaving} entry={entry} index={index} key={entry.id} onMove={(destination) => order.move(entry.id, destination)} total={order.visibleItems.length} />)}</div></DragDropProvider></div>;
+}
+
+function ArticleRow({ disabled, entry, index, onMove, total }: { disabled: boolean; entry: CatalogPrintDashboard["entries"][number]; index: number; onMove: (destination: number) => void; total: number }) {
+  const { handleRef, isDragging, isDropping, ref } = useSortable({ disabled, group: `catalog-print-entries-${entry.category_id}`, id: entry.id, index, type: "catalog-print-entry" });
+  return <article className={`catalog-print-entry-row${isDragging || isDropping ? " is-dragging" : ""}`} ref={ref}>
+    <SortableHandle className="catalog-print-drag" disabled={disabled} handleRef={handleRef} itemLabel={entry.title} onMove={onMove} position={index + 1} size={17} total={total} />
     {entry.images[0] ? <Image alt="" height={82} src={entry.images[0].url} width={118} /> : <div className="catalog-print-entry-placeholder"><ImageIcon size={22} /></div>}
-    <div className="catalog-print-entry-copy"><strong>{entry.title}</strong><span>{entry.description || "Sem descrição comercial"}</span><small>Ordem {entry.sort_order} · {entry.images.length} imagem(ns)</small></div>
+    <div className="catalog-print-entry-copy"><strong>{entry.title}</strong><span>{entry.description || "Sem descrição comercial"}</span><small>{entry.images.length} imagem(ns)</small></div>
     <Badge tone={entry.active ? "success" : "neutral"}>{entry.active ? "No próximo PDF" : "Fora do PDF"}</Badge>
     <div className="catalog-print-row-actions"><Link className="ui-button ui-button--secondary" href={`/catalogo-impresso/artigos/${entry.id}`}><Pencil size={15} /> Editar</Link><form action={deleteCatalogPrintEntryAction} onSubmit={(event) => { if (!window.confirm(`Excluir ${entry.title}?`)) event.preventDefault(); }}><input name="id" type="hidden" value={entry.id} /><button aria-label={`Excluir ${entry.title}`} className="ui-button ui-button--danger" type="submit"><Trash2 size={15} /></button></form></div>
   </article>;
@@ -132,24 +231,36 @@ function SourceRow({ source }: { source: CatalogPrintDashboard["pendingSources"]
   </article>;
 }
 
-function CategoryForm({ category }: { category?: CatalogPrintCategory }) {
+function CategoryForm({ category, dragHandle, dragging = false, rootRef, sortOrder }: { category?: CatalogPrintCategory; dragHandle?: ReactNode; dragging?: boolean; rootRef?: (element: Element | null) => void; sortOrder?: number }) {
   const [state, action, pending] = useActionState(saveCatalogPrintCategoryAction, initialCatalogPrintActionState);
-  return <form action={action} className={`catalog-print-category-form${category ? "" : " catalog-print-category-form--new"}`}>
+  return <form action={action} className={`catalog-print-category-form${category ? "" : " catalog-print-category-form--new"}${dragging ? " is-dragging" : ""}`} ref={rootRef}>
+    {dragHandle}
     <input name="id" type="hidden" value={category?.id ?? ""} />
+    <input name="sortOrder" type="hidden" value={sortOrder ?? category?.sort_order ?? 0} />
     <label><span>Seção</span><select defaultValue={category?.section ?? "produto"} name="section"><option value="produto">Produtos</option><option value="personalizacao">Personalizações</option></select></label>
     <label><span>Nome</span><input defaultValue={category?.name ?? ""} name="name" placeholder="Ex.: Camisetas" required /></label>
-    <label><span>Ordem</span><input defaultValue={category?.sort_order ?? 0} min="0" name="sortOrder" type="number" /></label>
     <label className="catalog-print-check"><input defaultChecked={category?.active ?? true} name="active" type="checkbox" /> Ativa</label>
     <div className="catalog-print-category-actions"><Button disabled={pending} type="submit"><Check size={15} /> {category ? "Salvar" : "Adicionar"}</Button>{category ? <button aria-label={`Excluir ${category.name}`} className="ui-button ui-button--danger" formAction={deleteCatalogPrintCategoryAction} type="submit"><Trash2 size={15} /></button> : null}</div>
     {state.message ? <small className={`catalog-print-message--${state.status}`}>{state.message}</small> : null}
   </form>;
 }
 
+function SortableCategoryForm({ category, disabled, index, onMove, total }: { category: CatalogPrintCategory; disabled: boolean; index: number; onMove: (destination: number) => void; total: number }) {
+  const { handleRef, isDragging, isDropping, ref } = useSortable({ disabled, group: `catalog-print-categories-${category.section}`, id: category.id, index, type: "catalog-print-category" });
+  return <CategoryForm category={category} dragging={isDragging || isDropping} rootRef={ref} sortOrder={index + 1} dragHandle={<SortableHandle className="catalog-print-drag" disabled={disabled} handleRef={handleRef} itemLabel={category.name} onMove={onMove} position={index + 1} size={17} total={total} />} />;
+}
+
+function SortableCategorySection({ categories, section }: { categories: CatalogPrintCategory[]; section: CatalogPrintSection }) {
+  const saveOrder = useCallback((ids: string[]) => reorderCatalogPrintCategoriesAction(section, ids), [section]);
+  const order = useCatalogPrintOrder(categories, `Categorias de ${catalogPrintSectionLabels[section]}`, saveOrder);
+  return <div className="catalog-print-category-section"><div><h3>{catalogPrintSectionLabels[section]}</h3><Badge>{categories.length}</Badge><span className="catalog-print-order-hint">Arraste para ordenar</span></div><span aria-live="polite" className="sr-only">{order.message}</span><DragDropProvider onDragStart={(event) => order.startDrag(event.operation.source?.id != null ? String(event.operation.source.id) : null)} onDragEnd={(event) => order.finishDrag(isSortable(event.operation.source) ? event.operation.source.index : -1, event.canceled)}><div className="catalog-print-sortable-list" data-sortable-list="">{order.visibleItems.map((category, index) => <SortableCategoryForm category={category} disabled={order.isSaving} index={index} key={category.id} onMove={(destination) => order.move(category.id, destination)} total={order.visibleItems.length} />)}</div></DragDropProvider></div>;
+}
+
 function Categories({ categories }: { categories: CatalogPrintCategory[] }) {
   return <section className="catalog-print-panel">
     <div className="catalog-print-panel-title"><div><FolderPlus size={18} /><div><h2>Categorias e ordem</h2><p>As categorias organizam o sumário e a sequência das páginas no PDF.</p></div></div></div>
     <div className="catalog-print-new-category"><h3><Plus size={16} /> Nova categoria</h3><CategoryForm /></div>
-    {(["produto", "personalizacao"] as CatalogPrintSection[]).map((section) => <div className="catalog-print-category-section" key={section}><div><h3>{catalogPrintSectionLabels[section]}</h3><Badge>{categories.filter((item) => item.section === section).length}</Badge></div>{categories.filter((item) => item.section === section).map((category) => <CategoryForm category={category} key={category.id} />)}</div>)}
+    {(["produto", "personalizacao"] as CatalogPrintSection[]).map((section) => <SortableCategorySection categories={categories.filter((item) => item.section === section)} key={section} section={section} />)}
   </section>;
 }
 

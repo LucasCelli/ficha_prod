@@ -8,6 +8,7 @@ const pdf = readFileSync("src/features/catalogo-impresso/pdf.ts", "utf8");
 const publishRoute = readFileSync("src/app/api/catalogo-impresso/publicar/route.ts", "utf8");
 const actions = readFileSync("src/features/catalogo-impresso/actions.ts", "utf8");
 const formState = readFileSync("src/features/catalogo-impresso/form-state.ts", "utf8");
+const adminOverview = readFileSync("src/features/catalogo-impresso/admin-overview.tsx", "utf8");
 
 const image = { altText: "Frente", url: "https://res.cloudinary.com/demo/image/upload/sample.jpg" };
 const entry = { active: "on", categoryId: "d31c8a7a-fc58-4b39-89ab-03c476ecdcad", description: "", highlights: "Leve\nResistente", id: "", images: [image], section: "produto", sortOrder: "1", sourceFichaId: "", title: "Camiseta" };
@@ -44,4 +45,12 @@ test("arquivo de server actions exporta somente funcoes assincronas", () => {
   assert.match(actions, /^"use server";/);
   assert.doesNotMatch(actions, /^export (?:const|let|var|type|interface|class) /m);
   assert.match(formState, /export const initialCatalogPrintActionState/);
+});
+
+test("categorias e artigos usam ordenacao por drag and drop", () => {
+  assert.match(actions, /export async function reorderCatalogPrintCategoriesAction/);
+  assert.match(actions, /export async function reorderCatalogPrintEntriesAction/);
+  assert.match(adminOverview, /DragDropProvider/);
+  assert.match(adminOverview, /SortableHandle/);
+  assert.doesNotMatch(adminOverview, /<span>Ordem<\/span>/);
 });
