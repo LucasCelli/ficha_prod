@@ -13,6 +13,7 @@ import {
   Wrench,
   CircleUserRound,
   Palette,
+  BookOpen,
 } from "lucide-react";
 import { mainNavigation } from "@/lib/navigation";
 import type { AppUserRole } from "@/features/auth/types";
@@ -26,6 +27,7 @@ const iconMap: Record<string, typeof Home> = {
   "/ferramentas": Wrench,
   "/clientes": Users,
   "/catalogos": Database,
+  "/catalogo-impresso": BookOpen,
   "/usuarios": UserCog,
   "/relatorios": BarChart3,
   "/design-system": Palette,

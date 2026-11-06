@@ -51,7 +51,7 @@ export default async function RootLayout({
     redirect("/");
   }
 
-  if (session?.user.role !== "superadmin" && (pathname?.startsWith("/catalogos") || pathname?.startsWith("/usuarios"))) {
+  if (session?.user.role !== "superadmin" && (pathname?.startsWith("/catalogos") || pathname?.startsWith("/catalogo-impresso") || pathname?.startsWith("/usuarios"))) {
     redirect("/");
   }
 

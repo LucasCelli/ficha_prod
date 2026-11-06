@@ -179,6 +179,42 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["ficha_ownership_audit"]["Insert"]>;
         Relationships: [];
       };
+      catalog_print_settings: {
+        Row: { id: number; business_name: string; title: string; subtitle: string | null; logo_url: string | null; cover_image_url: string | null; whatsapp: string | null; instagram: string | null; email: string | null; address: string | null; footer_text: string | null; latest_publication_id: string | null; updated_at: string };
+        Insert: { id?: number; business_name?: string; title?: string; subtitle?: string | null; logo_url?: string | null; cover_image_url?: string | null; whatsapp?: string | null; instagram?: string | null; email?: string | null; address?: string | null; footer_text?: string | null; latest_publication_id?: string | null; updated_at?: string };
+        Update: Partial<Database["public"]["Tables"]["catalog_print_settings"]["Insert"]>;
+        Relationships: [];
+      };
+      catalog_print_categories: {
+        Row: { id: string; section: Database["public"]["Enums"]["catalog_print_section"]; name: string; slug: string; active: boolean; sort_order: number; created_at: string; updated_at: string };
+        Insert: { id?: string; section: Database["public"]["Enums"]["catalog_print_section"]; name: string; slug: string; active?: boolean; sort_order?: number; created_at?: string; updated_at?: string };
+        Update: Partial<Database["public"]["Tables"]["catalog_print_categories"]["Insert"]>;
+        Relationships: [];
+      };
+      catalog_print_entries: {
+        Row: { id: string; source_ficha_id: string | null; section: Database["public"]["Enums"]["catalog_print_section"]; category_id: string; title: string; description: string | null; highlights: string[]; active: boolean; sort_order: number; created_at: string; updated_at: string };
+        Insert: { id?: string; source_ficha_id?: string | null; section: Database["public"]["Enums"]["catalog_print_section"]; category_id: string; title: string; description?: string | null; highlights?: string[]; active?: boolean; sort_order?: number; created_at?: string; updated_at?: string };
+        Update: Partial<Database["public"]["Tables"]["catalog_print_entries"]["Insert"]>;
+        Relationships: [];
+      };
+      catalog_print_entry_images: {
+        Row: { id: string; entry_id: string; source_ficha_image_id: string | null; url: string; public_id: string | null; alt_text: string | null; width: number | null; height: number | null; sort_order: number; created_at: string };
+        Insert: { id?: string; entry_id: string; source_ficha_image_id?: string | null; url: string; public_id?: string | null; alt_text?: string | null; width?: number | null; height?: number | null; sort_order?: number; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["catalog_print_entry_images"]["Insert"]>;
+        Relationships: [];
+      };
+      catalog_print_ficha_reviews: {
+        Row: { ficha_id: string; status: Database["public"]["Enums"]["catalog_print_review_status"]; ignored_reason: string | null; reviewed_by_user_id: string | null; reviewed_at: string };
+        Insert: { ficha_id: string; status: Database["public"]["Enums"]["catalog_print_review_status"]; ignored_reason?: string | null; reviewed_by_user_id?: string | null; reviewed_at?: string };
+        Update: Partial<Database["public"]["Tables"]["catalog_print_ficha_reviews"]["Insert"]>;
+        Relationships: [];
+      };
+      catalog_print_publications: {
+        Row: { id: string; storage_path: string; checksum: string; file_size: number; page_count: number; entry_count: number; generated_by_user_id: string | null; generated_at: string };
+        Insert: { id?: string; storage_path: string; checksum: string; file_size: number; page_count: number; entry_count: number; generated_by_user_id?: string | null; generated_at?: string };
+        Update: Partial<Database["public"]["Tables"]["catalog_print_publications"]["Insert"]>;
+        Relationships: [];
+      };
       catalog_items: {
         Row: {
           id: string;
@@ -773,6 +809,8 @@ export type Database = {
     };
     Enums: {
       app_user_role: "superadmin" | "vendedor" | "designer";
+      catalog_print_section: "produto" | "personalizacao";
+      catalog_print_review_status: "revisada" | "ignorada";
       catalog_item_kind:
         | "produto"
         | "tamanho"

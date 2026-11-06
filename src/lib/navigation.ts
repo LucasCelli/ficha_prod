@@ -33,6 +33,11 @@ export const mainNavigation: readonly NavigationItem[] = [
     roles: ["superadmin"],
   },
   {
+    href: "/catalogo-impresso",
+    label: "Catálogo impresso",
+    roles: ["superadmin"],
+  },
+  {
     href: "/usuarios",
     label: "Usuários",
     roles: ["superadmin"],

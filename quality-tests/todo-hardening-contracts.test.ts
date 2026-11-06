@@ -63,10 +63,15 @@ test("agrega painéis e relatórios no Postgres e pagina detalhes", () => {
   assert.doesNotMatch(pdfRoute, /includeDetails/);
 });
 
-test("todas as rotas com dados usam a fronteira autenticada", () => {
-  const routes = findRouteFiles("src/app").filter((path) => !path.endsWith(join("logout", "route.ts")));
+test("todas as rotas com dados usam a fronteira autenticada, exceto o PDF comercial publicado", () => {
+  const publicCatalogRoute = join("api", "catalogo-impresso", "publico.pdf", "route.ts");
+  const routes = findRouteFiles("src/app").filter((path) => !path.endsWith(join("logout", "route.ts")) && !path.endsWith(publicCatalogRoute));
   const unprotected = routes.filter((path) => !readFileSync(path, "utf8").includes("withAuthenticatedRoute"));
   assert.deepEqual(unprotected, []);
+  const publicRoute = readFileSync(join("src", "app", publicCatalogRoute), "utf8");
+  assert.match(publicRoute, /latest_publication_id/);
+  assert.match(publicRoute, /storage\.from\("catalogo-impresso"\)\.download/);
+  assert.doesNotMatch(publicRoute, /\.insert\(|\.update\(|\.delete\(/);
 });
 
 test("datas de negócio respeitam Cuiabá na virada UTC", () => {

@@ -11,6 +11,7 @@
 @import "./domains/fichas.css";
 @import "./domains/clientes.css";
 @import "./domains/catalogos.css";
+@import "./domains/catalogo-impresso.css";
 @import "./domains/relatorios.css";
 @import "./domains/quadro-producao.css";
 @import "./domains/tools.css";
