@@ -52,7 +52,6 @@ type PrintProductRow = {
 
 const MAX_PRINT_IMAGES = 4;
 const RAW_NAME_LIST_SINGLE_COLUMN_LINE_LIMIT = 51;
-const EXTENSIVE_PRODUCT_TABLE_ROW_LIMIT = 12;
 
 export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, observationHtml, onlyRawNameList = false }: PrintFichaProps) {
   const products = buildProductRows(ficha);
@@ -61,7 +60,7 @@ export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, 
   const shouldPrintRawNameList = (includeRawNameList || onlyRawNameList) && Boolean(rawNameList);
   const rawNameListColumns = getRawNameListColumnCount(rawNameList);
   const hasDetails = products.some((p) => p.detalhes && p.detalhes.trim() !== "-" && p.detalhes.trim() !== "");
-  const hasExtensiveProductTable = products.length >= EXTENSIVE_PRODUCT_TABLE_ROW_LIMIT;
+  const hasWideSizeColumn = products.some((item) => item.tamanho.trim().length >= 5);
   const productColumnBalance = getProductColumnBalance(products, hasDetails);
   const imageClassNames = getImagesClassNames(ficha.imagens.length);
   const idNumber = parseInt(ficha.id.split("-")[0], 16);
@@ -109,7 +108,7 @@ export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, 
           </div>
         </section>
 
-        <div className={hasExtensiveProductTable ? "print-two-cols print-two-cols--products-wide" : "print-two-cols"}>
+        <div className="print-two-cols">
           <section className="print-card">
             <h2>
               <Boxes aria-hidden="true" size={16} /> Produtos
@@ -119,6 +118,7 @@ export function PrintFicha({ ficha, fallbackAuthor, includeRawNameList = false, 
                 "print-table",
                 hasDetails ? "print-table--with-details" : "",
                 hasDetails ? `print-table--${productColumnBalance}-wide` : "",
+                hasWideSizeColumn ? "print-table--size-wide" : "",
               ].filter(Boolean).join(" ")}
             >
               <colgroup>
@@ -292,11 +292,11 @@ function PrintField({
   else if (muted) valueClass = "print-value-muted";
 
   return (
-    <div className="print-field">
+    <div>
       <span className="label">
         {Icon ? <Icon aria-hidden="true" size={14} style={{ display: "inline-block", marginRight: "4px", verticalAlign: "-2px" }} /> : null}
         {label}:
-      </span>
+      </span>{" "}
       <span className={valueClass}>{formattedValue}</span>
     </div>
   );

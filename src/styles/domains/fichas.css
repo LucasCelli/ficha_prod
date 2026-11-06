@@ -2233,22 +2233,6 @@
   font-weight: var(--font-weight-semibold);
 }
 
-.print-grid .print-field .label {
-  margin-right: 0.8mm;
-}
-
-.print-grid-single .print-field {
-  display: grid;
-  grid-template-columns: fit-content(46%) minmax(0, 1fr);
-  column-gap: 1mm;
-  align-items: start;
-}
-
-.print-grid-single .print-field > :last-child {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
 .print-grid .label svg,
 .print-grid-single .label svg {
   color: inherit;
@@ -2270,14 +2254,10 @@
 
 .print-two-cols {
   display: grid;
-  grid-template-columns: 64fr 36fr;
+  grid-template-columns: 6fr 4fr;
   column-gap: 3mm;
   flex: 0 0 auto;
   min-height: 0;
-}
-
-.print-two-cols--products-wide {
-  grid-template-columns: 68fr 32fr;
 }
 
 .print-table {
@@ -2309,6 +2289,25 @@
 .print-table--product-wide .print-table__details-column,
 .print-table--details-wide .print-table__product-column {
   width: 34%;
+}
+
+.print-table--size-wide .print-table__size-column {
+  width: 17%;
+}
+
+.print-table--size-wide.print-table--balanced-wide .print-table__product-column,
+.print-table--size-wide.print-table--balanced-wide .print-table__details-column {
+  width: 37%;
+}
+
+.print-table--size-wide.print-table--product-wide .print-table__product-column,
+.print-table--size-wide.print-table--details-wide .print-table__details-column {
+  width: 42%;
+}
+
+.print-table--size-wide.print-table--product-wide .print-table__details-column,
+.print-table--size-wide.print-table--details-wide .print-table__product-column {
+  width: 32%;
 }
 
 .print-table th,
