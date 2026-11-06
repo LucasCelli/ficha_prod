@@ -522,19 +522,14 @@ function getRawNameListColumnCount(value: string) {
 function getProductColumnBalance(products: PrintProductRow[], hasDetails: boolean) {
   if (!hasDetails) return "product";
 
-  const productPressure = getColumnTextPressure(products.map((item) => item.produto));
-  const detailsPressure = getColumnTextPressure(products.map((item) => item.detalhes));
+  const longestProduct = getLongestColumnText(products.map((item) => item.produto));
+  const longestDetails = getLongestColumnText(products.map((item) => item.detalhes));
 
-  if (productPressure > detailsPressure * 1.15) return "product";
-  if (detailsPressure > productPressure * 1.15) return "details";
+  if (longestDetails > longestProduct) return "details";
+  if (longestProduct > longestDetails * 1.15) return "product";
   return "balanced";
 }
 
-function getColumnTextPressure(values: string[]) {
-  const lengths = values.map((value) => value.trim().length).filter(Boolean);
-  if (lengths.length === 0) return 0;
-
-  const longest = Math.max(...lengths);
-  const average = lengths.reduce((total, length) => total + length, 0) / lengths.length;
-  return longest * 0.65 + average * 0.35;
+function getLongestColumnText(values: string[]) {
+  return Math.max(0, ...values.map((value) => value.trim().length));
 }
